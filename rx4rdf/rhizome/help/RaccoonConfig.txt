@@ -146,12 +146,14 @@ SAVE_DIR='content/.rzvs'
 #default is 'content'
 ALTSAVE_DIR='content' 
 
-#INDEX_DIR is the directory the content 
-#If the directory doesn't exist it will be created and all applicable content
-#will be indexed on startup. 
-#default is 'contentindex'
-INDEX_DIR = 'contentindex'
- 
+#THEME_DIR specifies the directory that theme resources (such theme.css)
+#are located. It only takes effect when PATH is not specified; if so, it is
+#added to the PATH after the ALTSAVE_DIR.
+#It can be either a relative or absolute path; if it is a relative path 
+#the directory where rhizome-config.py is located is prepended.
+#default is 'themes/default'
+THEME_DIR='themes/mytheme'
+
 #these following password related settings are referenced by the rhizome config 
 #and so must be set before you include it
 
@@ -198,6 +200,27 @@ unAuthorizedExpr='false()' #disable all authentification
 authPredicates = locals()['authPredicates'] + ['http:example.com/schema#myproperty'] 
 #assuming we've already included rhizome-config.py, the above adds to the list already defined
 
+#Authors that don't own the "base:create-unsanitary-content-token" access token 
+#will have their content filtered to prevent them from writing dangerous HTML constructs
+#(basically from executing javascript or embedding objects). You can customize which elements
+#and attributes may not appear using this settings:
+
+#blacklistedElements is a list of elements banned from appearing 
+#default: see utils.BlackListHTMLSanitizer
+blacklistedElements = rx.rhizome.SanitizeHTML.blacklistedElements + ['style']
+
+#blacklistedAttributes is a dictionary whose keys and values are regular expressions
+#that are matched against the attribute's name and value, respectively.
+#default: see utils.BlackListHTMLSanitizer
+blacklistedAttributes = { 'style': '.*', } #remove any inline style attribute
+
+#blacklistedContent is a dictionary whose keys and values are regular expressions.
+#The key is matched against the element's name and the value is searched through 
+#the text and comments contained by the element.
+#If they match, the entire comment or text will be removed
+#default: see utils.BlackListHTMLSanitizer
+blacklistedContent = { 'style': 'javascript:|@import' }
+
 #the following settings can be turned on to give your site a wiki like look and feel
 
 #if undefinedPageIndicator is True then links to internal pages that haven't been defined will be displayed with ? 
@@ -222,6 +245,12 @@ interWikiMapURL=''
 
 #content indexing 
 
+#INDEX_DIR is the directory the content index will be stored in
+#If the directory doesn't exist at startup, it will be created and all applicable 
+#content will be indexed on startup. 
+#default is 'contentindex'
+INDEX_DIR = 'contentindex'
+
 #useIndex indicates whether content indexing should be queried and updated
 #default is True if Lupy is installed
 useIndex = False #no indexing
@@ -239,7 +268,7 @@ indexableFormats = rhizome.defaultIndexableFormats + ['urn:example:mycontentform
 #The rhizome config creates a temporary dictionary of triples that is used to create the template
 #These functions allow you to add or replace the items in dictionary. The keys of the dictionary
 #are either page names or one of the following: 
-#@userClasses, @sitevars, @labels, @auth, @dispositions, @doctypes, @model, @keywords
+#@userClasses, @sitevars, @labels, @auth, @dispositions, @doctypes, @model, @keywords, @themes
 #(This list may be incomplete and is subject to change, see rhizome-config.py.)
 
 #__addItem__ adds a page to STORAGE_TEMPLATE. See rhizome.addItem() for a list of all the keyword parameters
@@ -398,6 +427,17 @@ authorizeRemovals=rhizome.authorizeRemovals
 #return True is the operation authorized or False if it isn't
 #default is lambda *args: True
 authorizeMetadata=rhizome.authorizeMetadata
+
+#validateExternalRequest is a function that is called 
+#when receiving an external request (e.g. an http request)
+#It is called before invoking runActions(). Use it to make sure the request 
+#doesn't contain metadata that could dangerously confuse request processing.
+#Its signature looks like:
+#def validateExternalRequest(kw)
+#where kw is the request metadata dictionary (which can be modified if necessary).
+#It should raise raccoon.NotAuthorized if the request should not be processed.
+#default is lambda *args: True
+validateExternalRequest=rhizome.validateExternalRequest
 
 #authorizeXPathFuncs is a function that is called before an XSLT or RxSLT stylesheet is invoked
 #(but not before running a RxUpdate script). 

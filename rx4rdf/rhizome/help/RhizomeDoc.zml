@@ -64,7 +64,8 @@ Below are some terms (in alphabetical order) that are used through this manual.
 Rhizome requires Python 2.2 or later (2.3 recommended) and 4Suite 1.0a1 
 or later (http://4Suite.org).
 
-Rhizome is known to run on Linux, Windows NT & 2000, and Cygwin and should work on any platform that supports Python and 4Suite.
+Rhizome should work on any platform that supports Python and 4Suite. See [rx4rdf:Download] 
+for details on supported platforms.
 
 Optional Packages:
 
@@ -76,8 +77,8 @@ must be installed or interprocess file locking will be disabled (You do not
 need this unless you have multiple Raccoon processes simultaneously accessing 
 the same application instance).
 
-Redland RDF data stores can be used if Redland (http://www.redland.opensource.ac.uk)
-is installed. See the [Raccoon manual|RaccoonDoc] for more info.
+Redland RDF or RDFLib data stores can be used if Redland ([http://www.redland.opensource.ac.uk])
+or RDFLib ([http://rdflib.net]) are installed. See the [Raccoon manual|RaccoonDoc] for more info.
 
 !Installation
 This is a standard Python source distribution. To install:
@@ -99,9 +100,6 @@ This will launch Raccoon's built-in http server, which runs on port 8000 by defa
 
 That's it! You now have a new instance of Rhizome running. By default, the site will be stored in the current directory in file called "wikistore.nt" and content will be stored in a subdirectory called "content".  Most of the Rhizome's behavior is defined in its pages so you can start customizing your Rhizome instance by editing its pages and metadata from within Rhizome.
 
-!!Full-text Indexing
-Rhizome has preliminary support for text indexing. If [Lupy|http://www.divmod.org/Home/Projects/Lupy] is installed, Rhizome will index content when pages are saved (currently, only the contents and the title). On start-up, Rhizome checks if the ^^INDEX_DIR^^ exists (the default is 'contentindex'); if it doesn't then all the pages will be indexed. Thus, to regenerate the index delete the directory and restart Rhizome.
-
 !!Initial Configuration
 However, there are few additional things you might want to configure first if you're deploying a live website. First, you should create your own config file to separate your config settings from the stock Rhizome config settings.  For example, the Rx4RDF distribution contains a copy of the rx4rdf.sf.net website;  here's the first couple of lines of its config file (^^site-config.py^^):
 
@@ -114,6 +112,9 @@ The second includes the Rhizome config file.
 Next, you probably want to set administrator password and the secure hash seed. Rhizome creates a default administrator super-user that has full access to the system, and its login name and password both default to 'admin'. To set your own password, in your config file set ^^ADMIN_PASSWORD^^ //before// including the Rhizome config. If you don't want to store the password in cleartext in your config file, you can set ^^ADMIN_PASSWORD_HASH^^ instead, which requires SHA1 digest of the concatenation of the password and the secure hash seed. In Python, you can calculate it like this: "import sha; sha.sha( 'yourpassword' + 'your secure hash seed').hexdigest()"
 
 As illustrated above, the secure hash seed is used to generate a digest that be safely stored in a publically accessible mode. To set your own private seed, set the ^^SECURE_HASH_SEED^^ setting in your config file //before// including the Rhizome config. If you don't set your own private seed, or if it is compromised, it will be much easier to mount a dictionary attack on the password hashes. Note that if you change its value, all previously generated password hashes stored in your model will no longer work.
+
+!!Text Indexing 
+Rhizome has preliminary support for text indexing. If [Lupy|http://www.divmod.org/Home/Projects/Lupy] is installed Rhizome will index content when pages are saved (currently, only the contents and the title). On start-up, Rhizome checks if the directory specified by the ^^INDEX_DIR^^ config setting exists (the default is 'contentindex'); if it doesn't then all the pages will be indexed. Thus, to regenerate the index delete the directory and restart Rhizome.
 
 !!Development Configuration
 While developing an application on top of Rhizome it is often useful to run it with a more developer friendly configuration -- for example, to enable Rhizome to immediately pick up changes to files modified by external programs (such as a text editor). This is illustrated in the configuration file ^^debug-confg.py^^ included in the distribution:
@@ -129,9 +130,6 @@ authorizeContentProcessors[
 
 !!More Configuration
 For information on configuring the Raccoon application server, for example, to run it behind an Apache web server, see the [Raccoon Manual]. For complete documentation on all the settings available in your config file see this sample [config file|RaccoonConfig]. Other common configuration tasks include choosing a model store, setting the PATH to search for files, and setting the application's base URL. 
-
-!!Text Indexing 
-Rhizome has preliminary support for text indexing. If [Lupy|http://www.divmod.org/Home/Projects/Lupy] is installed Rhizome will index content when pages are saved (currently, only the contents and the title). On start-up, Rhizome checks if the ^^INDEX_DIR^^ exists (the default is 'contentindex'); if it doesn't then all the pages will be indexed. Thus, to regenerate the index delete the directory and restart Rhizome.
 
 !Using Rhizome
 
@@ -269,19 +267,28 @@ In addition to permissions that correspond to the type of action associated with
 WARNING: Currently fine-grained authorization only works when editing metadata and deleting resources, but changes made by executing RxUpdate pages are not checked. Because of this, Rhizome's default schema has a specific access token for creating or modifying RxUpdate pages which must be specifically assigned to users or their roles.
 
 In addition, Rhizome provides a simple access control scheme for modifying a request metadata via the ^^assign-metadata^^ and ^^remove-metadata^^ XPath extension functions: Any variable whose name that starts with two leading underscores ("\__") is considered read-only and can not be assigned or removed.
+Similarly, external requests (e.g. form variables) cannot contain variables that start with two underscores (this is to prevent external variables from overriding the protected variables).
 
 !Rhizome Customization
 
 !!Simple Customization of Presentation
 Here are some files useful for the basic customization of Rhizome: 
-+[rhizome/basestyles.css|basestyles.css?action=edit]= Most CSS formatting rules are found here.
++[rhizome/basestyles.css|basestyles.css?action=edit]= CSS formatting rules shared by all themes are found here.
 +[rhizome/sidebar.txt|sidebar?action=edit]= This ZML document is displayed as the navbar on the left hand column by the site-template.
-+[rhizome/site-template.xsl|site-template?action=edit]= The XSL stylesheet that controls Rhizome's layout.
++[rhizome/site-template.xsl|site-template?action=edit]= The XSLT stylesheet that controls Rhizome's layout by invoking the current theme.
 
 There are three ways you could modify these files:
 * Just edit them in Rhizome (e.g. click on the links above)
 * Place a modified copy of the file in a directory that the appears in the Raccoon PATH before the 'rhizome' directory. By default, Rhizome set the PATH with the current working directory before the ^^rhizome^^ directory. (See [RaccoonConfig] for more on the PATH setting). 
-* Modify the files directly
+* Modify the files directly using any tool.
+
+!!Themes
+Rhizome supports //themes//, a simple mechanism for configuring the look and feel of a site. 
+A theme must consist of at least the two files that are referred to by site-template.xsl: ^^theme.xsl^^ which is responsible creating for the body of the page, and ^^theme.css^^, which linked to the HTML generated by the site-template. See the comments in [rhizome/site-template.xsl|site-template?action=view-source] for information on creating the theme XSLT stylesheet. 
+
+You can create a new theme by creating a new [wiki:SiteTheme|?about=http%3A//rx4rdf.sf.net/ns/wiki%23SiteTheme&amp;action=new] resource. This resource must refer to the theme's xsl and css pages (see the [create SiteTheme template|?about=http%3A//rx4rdf.sf.net/ns/wiki%23SiteTheme&action=new]). Unfortunately, we also have to add an alias named ^^theme.xsl^^ to the theme's xsl page -- the site-template always imports a stylesheet with this name because the ^^xsl:import^^ instruction must refer to a static URL, not a XPath expression (see above on how to add aliases). You can set which theme Rhizome uses by setting the ^^wiki:uses-theme^^ property associated with the [site-template|site-template?action=view-metadata]. If you switch themes you'll also have to remove ^^theme.xsl^^ alias from the old theme's xsl page and add it the new theme's page. If a theme refers to external files you it may be convenient to place those files in a separate theme directory and place that directory on the Raccoon PATH. If you haven't explicitly set the PATH, you can use the ^^THEME_DIR^^ config setting to include it in the PATH.
+
+Rhizome ships with a couple of themes, see the ^^rhizome/themes^^ directory for the ones currently included.
 
 !!Understanding the Schema
 Rhizome uses the following RDF schemas:
@@ -292,6 +299,27 @@ Rhizome uses the following RDF schemas:
 +http://rx4rdf.sf.net/ns/wiki# ("wiki" prefix)=
  This vocabulary contains a grab-bag of properties and classes created ad-hoc for Rhizome. There are no plans to formalize this into an ontology.
 +[http://xmlns.com/foaf/0.1/] ("foaf" prefix)=FOAF is used to represent Rhizome users. 
+
+!!Modifying the Model Template
+If the model store specified in the config file doesn't exist, Rhizome will create a new model by copying the contents of the ^^STORAGE_TEMPLATE^^. You can modify the contents of this template by using the special functions that can be used in the config file: ^^\__addItem\__^^,  ^^\__addRxML\__^^, and ^^\__addTriples\__^^ -- see the [config file|RaccoonConfig] documentation for more information. For example, this snippet from the ^^site-config.py^^ config file first adds a new page named "FOAFPaper" and then replaces the statements grouped together under the name "@sitevars" :
+
+p"""
+__addItem__('FOAFPaper',loc='path:.rzvs/FOAFPaper.zml', format='zml', 
+            title="Rhizome Position Paper", accessTokens=['base:save-only-token'],
+            disposition='entry', doctype='document')
+
+__addRxML__(replace = '@sitevars', contents = '''
+ base:site-template:
+  wiki:header-image: `Rx4RDFlogo.gif
+  wiki:header-text: `
+  wiki:uses-theme: base:default-theme
+  
+ #unfortunately we also have to add this alias in addition to setting wiki:uses-theme
+ #because site-template.xsl can only statically import an URL
+ {http://rx4rdf.sf.net/site/default/theme.xsl}:
+   wiki:alias: `theme.xsl
+ ''')
+"""
 
 !!Slightly Involved Customization Example
 In this example we'll add a template for displaying a print-friendly version of a page. (Note: in going through the trouble writing and testing this example, I've decided to leave it in the core product -- see ^^print-template.xsl^^.)
@@ -371,8 +399,8 @@ The command has these options:
 p'''--import path [--recurse] [--filenameonly] [--dest path] 
         [--xupdate url] [--folder path] [--noindex]
         [--format format]  [--doctype doctype] 
-        [--disposition disposition]
-        [--token accesstoken] [--label label]'''
+        [--disposition disposition] [--token accesstoken] 
+        [--label label] [--keyword keyword]'''
 where
 ~~^^path^^ Location of files to import (* and ? wildcards ok) 
 ~~^^--recurse^^ if present, recursively import subdirectories
@@ -389,10 +417,11 @@ The following are applied to a file if no metarx file is present:
 ~~^^--doctype URI or QName^^ default wiki:doctype value
 ~~^^--label URI or QName^^ default wiki:has-label value
 ~~^^--token URI or QName^^ Access Token to guard (auth:guarded-by) the content
+~~^^--keyword URI or QName^^ default wiki:about value
 
 If, for each file, there exists a matching file with ".metarx" appended, then import will attempt to add the metadata in the metarx file.  First it loads the metadata file and then updates it using the RxUpdate file specified by the ^^--xupdate^^ option.  If it isn't present it will run the default, "path:import.xml". This RxUpdate script disgards previous revisions and points the content to the new import location. You'll find a couple of other import scripts in the rhizome directory: one changes the base URI for the RDF resources, and another adds authorization tokens to the items. By writing your own import scripts and exporting and reimporting your site, you can migrate your site to your latest schema.
 
-If no .metarx file exists import will use the defaults specified by the ^^--format^^, ^^--disposition^^, ^^--label^^, ^^--token^^ and ^^--doctype^^ options, if present, or attempt a guess at the metadata based on the contents and file extension of the file. Their value can be either an URI or a QName.
+If no .metarx file exists import will use the defaults specified by the ^^--format^^, ^^--disposition^^, ^^--doctype^^, etc. options, if present. Their value can be either an URI or a QName. If a default is not specified, for required metadata import will attempt to guess at the metadata based on the contents and file extension of the imported file.
 
 !Exporting and static websites  
 
@@ -405,15 +434,16 @@ where
 ~~^^ dir^^ is the directory to export to 
 ~~^^-xpath^^ RxPath expression that evaluates to a nodeset of items to export
 ~~^^-name^^  The name of item to export (for exporting one item) (no effect if -xpath is specified)
-~~^^-label^^ Choose revisions with this label
+~~^^-label^^ Choose the last revision that matches this label
 ~~^^-static^^ Export as static HTML
 ~~^^-noalias^^ Don't create static copies of page aliases (use with -static only)
-~~^^-astriples filepath^^ Export the selected resources as an NTriples file. External content is inserted in the file as string literals.
+~~^^-astriples filepath^^ Export the selected resources as an NTriples file. External content is inserted into the file as string literals.
 
 If the ^^-static^^ option is present, export will try to render each item as HTML. Dynamic pages (e.g. those that require query parameters) are skipped (you may see exceptions being reported to the consol). A $_static variable is introduced so stylesheets can render appropriately (for example, see site-template.xsl). Limitations: 
-* External content referenced by links are not copied
+* External content (images, etc.) referenced by links are not copied
+* It would be nice if pages without extensions were renamed with an extension. This is not yet supported.
 
-If the ^^-static^^ or ^^-astriples^^ options are not present each item will be exported to 2 files: one containing the raw content of item and the other a RxML document containing the metadata associated with the item. The first file will match the item's name with a file type extension added, if necessary, and the second will be the same but with '.metarx' appended.
+If the ^^-static^^ or ^^-astriples^^ options are not present each item will be exported to 2 files: one containing the raw content of the item and the other a RxML document containing the metadata associated with the item. The first file will match the item's name with a file type extension added, if necessary, and the second will be the same but with '.metarx' appended.
 
 #todo:
 #!The RDF Store

@@ -1,4 +1,15 @@
 !Latest News
+\[24 Nov 2004]
+Version 0.4.2 of Rx4RDF and Rhizome released. 
+
+New features include: 
+Added a notion of themes to ease customization of look and feel;
+more security enhancements including sanitizing HTML;
+smoother installation and command line handling;
+compatibility with 4Suite 1.0a4 (enables OS X support); plus many bug fixes.
+
+[Download] it or view the [changelog|changelog.txt]
+
 \[14 Oct 2004]
 Version 0.4.1 of Rx4RDF and Rhizome released. 
 

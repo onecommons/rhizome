@@ -1,6 +1,34 @@
 Rx4RDF and Rhizome Changelog
 ============================
 
+Changes in Version 0.4.2 (Nov. 24, 2004)
+---------------------------------------
+Minor release:
+* Rhizome: fix login.zml
+* Raccoon: fix request pickling (for -r option)
+* Raccoon: add validateExternalRequest config setting
+* Rhizome: for security, disallow form variable names from starting with '__'
+* test:    add framework for black box scripts (see test/rhizomeTest.py)
+* Rhizome: fix bug where a minor edit change wasn't displayed sometimes
+* Rhizome: manually set mime type for action handler pages (since auto-detect's broken)
+* Rhizome: refactored the site-template and added pluggable themes, including 
+           a sample theme based on Movable Type's. See Rhizome manual for more info.
+* Raccoon: cache improvements and bug fixes
+* Rhizome: fix endless loop when a not found handler trys to include a missing resource.
+* RxML:    bug fixes, including fixing rdf:datatype and xml:lang support 
+* RxPath:  add -t command line option for invoking RxSLT transforms
+* Rhizome: sanitize HTML/XML unless created by a user with proper access token 
+* Raccoon: XSLT processor now strips XML prologue (fix parsing with wiki2html.xsl)
+* utils:   add support for CDATA sections to LinkFixer
+* Raccoon: better error reporting of invalid command line arguements
+* setup:   fix bugs installing auxillary files
+* RxPath:  handle rdf:ID properly with models that don't support reification
+           (not enabled by default: see BasePredicate.RDF_ID_EXPR in RxPathDOM.py)
+* Raccoon: fixed bug where trailing slashes at the end of any URL (including URLs 
+           to folders) caused broken links.
+* zml:     fix a few bad bugs parsing links and URI tokens
+* various: fixes for compatibility with 1.0a4 version of 4Suite
+
 Changes in Version 0.4.1 (Oct. 13, 2004)
 ---------------------------------------
 Minor release:

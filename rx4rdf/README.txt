@@ -1,8 +1,8 @@
                             README
 
                          Rx4RDF and Rhizome
-                         Version 0.4.1
-                         Oct 13, 2004
+                         Version 0.4.2
+                         Nov 24, 2004
  
   Introduction
   ------------
@@ -21,31 +21,32 @@
   
   What's new in this release?
   ---------------------------    
-  Changes from last announced release (0.3.0):
-  Rhizome gains full-text indexing, browsing and grouping by keyword, 
-  summary views, better support for RDF/XML, diffing of revisions, and 
-  several usability enhancements. Raccoon gets several improvements to 
-  performance, security, and error handling. RxML and ZML have been made
-  more user-friendly with simpler syntax and better documentation. RxPath
-  adds support for RDFLib. Better support for non-ASCII content throughout
-  all sub-systems.
+  Major changes since last announced release (0.4.1):
   
+  Added a notion of themes to ease customization of look and feel.
+  More security enhancements including sanitizing HTML. 
+  Smoother installation and command line handling.
+  Compatibility with 4Suite 1.0a4 (enables OS X support).
+  Many other bug fixes.
+      
   For a list of all major changes see docs/changelog.txt for more details.
 
   Known (major) bugs
-  ----------
+  ------------------
   (Also see docs/Status for more general information.)
   
   Rx4RDF
   * See comment at top of RxPathDom.py for discrepancies with the RxPath
   specification. 
   * RxSLT doesn't handle xsl:copy-of as specified in the RxPath spec.
-  
+  * Using Ft.Xml.PrettyPrint with the RxPath DOM will only work some of the time.
+    
   Raccoon
   * The global write lock doesn't seem to work correctly on CygWin and is disabled 
   on that platform.
   * When using file-based sessions, the files aren't deleted when the session ends.
-  
+  * The ROOT_PATH config setting doesn't work properly.
+
   Rhizome
   * Dynamic pages might not behave as expected since Rhizome doesn't set headers
     such as Pragma NoCache or Expires -- if you need that you'll have set them 
@@ -65,8 +66,12 @@
   Rx4RDF requires Python 2.2 or later (2.3 recommended) and 4Suite 1.0a1 
   or later (http://4Suite.org).
    
-  Rx4RDF and Rhizome are known to run on Linux and Windows 2000/XP  
-  and should work on any platform that supports Python and 4Suite.
+  Rx4RDF and Rhizome are known to run on Linux and Windows 2000/XP 
+  and should work on any platform that supports Python and 4Suite. 
+    
+  The released versions of 4Suite do not install properly on OS X, you will 
+  probably need to get the latest (unreleased and possibly unstable) 
+  version from ftp://ftp.4suite.org/pub/cvs-snapshots/
   
   Optional Packages:
   

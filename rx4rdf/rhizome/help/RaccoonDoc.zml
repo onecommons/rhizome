@@ -16,7 +16,8 @@ This document is intended for developers wishing to develop applications with Ra
 Raccoon requires Python 2.2 or later (2.3 recommended) and 4Suite 1.0a1 
 or later (http://4Suite.org).
 
-Raccoon is known to run on Linux, Windows 2000/XP, and Cygwin and should work on any platform that supports Python and 4Suite.
+Rhizome should work on any platform that supports Python and 4Suite. See [rx4rdf:Download] 
+for details on supported platforms.
 
 Optional Packages:
 
@@ -26,7 +27,7 @@ need this unless you have multiple Raccoon processes simultaneously accessing
 the same application instance).
 
 Redland RDF or RDFLib data stores can be used if Redland ([http://www.redland.opensource.ac.uk])
-or RDFLib ([http://rdflib.net]) are installed. For more infomation, See the section on loading and saving models below. 
+or RDFLib ([http://rdflib.net]) are installed. For more information, see the section on loading and saving models below. 
 
 !Installation
 This is a standard Python source distribution. To install:
@@ -42,6 +43,7 @@ This installs:
 Raccoon is an application server that runs a given application and is always in conjunction with a config file that defines that application. (Currently, each Raccoon instance only supports one application.) To specify that application's config file invoke Raccoon with the ^^-a^^ argument, e.g.: 
 
 ^^<python scrips dir>/run-raccoon -a your-app-config.py^^
+
 ^^<python scrips dir>/run-raccoon -a your-app-config.py --app-specific-arg --another-app-specific-arg^^
 
 ^^run-raccoon^^ is a simple shell script or batch file that just invokes ^^python <python lib dir>/site-packages/rx/raccoon.py^^. This will launch Raccoon's built-in http server, which runs on port 8000 by default. You can change this by editing ^^server.cfg^^ (see below in Configuration). If you don't want to run the built-in http server, use the ^^-x^^ option and Raccoon will exit after it processes the application's start-up actions and command line arguments. (Note that any options directed towards Raccoon should appear before the ^^-a^^ argument.)
@@ -97,12 +99,12 @@ The core Raccoon class that handles requests is the //RequestProcessor//. Each R
 
 Each RequestProcessor is associated with an application config file that defines the action sequences for each type of request. Raccoon supports a few built-in type of requests, such as HTTP, XML-RPC, and command-line, each of which defines how that type of request should be mapped to the request metadata. The application also define its own request types. The application config file is simply a Python script that gets executed when the RequestProcessor is created.
 
-Raccoon provides some building blocks for defining an application's actions. In particular, it provides a set of //ContentProcessors// which are Action functions for tranforming content, along with a framework for adding additional ContentProcessors. Built-in content processors include XSLT, [rx4rdf:RxSLT] and Python [rx4rdf:RxUpdate] among others. In addition, Raccoon has a sophisticated framework for caching request processing, including content processor actions.
+Raccoon provides some building blocks for defining an application's actions. In particular, it provides a set of //ContentProcessors// which are Action functions for tranforming content, along with a framework for adding additional ContentProcessors. Built-in content processors include XSLT, [rx4rdf:RxSLT], Python, and [rx4rdf:RxUpdate] among others. In addition, Raccoon has a sophisticated framework for caching request processing, including content processor actions.
 
 Raccoon also provides various facilities for building applications, including: 
-* transactional updating of and merging changes into the model
-* an authorization framework for accessing the model and request metadata and for processing content.
-* XPath extension functions for accessing Raccoon and application facilities from contexts such as XSLT, RxPath, RxUpdate, etc.
+* transactional updates and merging of the model
+* an authorization framework for processing content and for accessing the model and request metadata.
+* XPath extension functions for accessing application facilities from contexts such as XSLT, RxPath, RxUpdate, etc.
 * request invocation through URL resolution or Python function calls
 * maintaining session state
 
@@ -161,8 +163,9 @@ Raccoon invokes the following request triggers (or request types). The applicati
 
 *The ^^_request^^ object has the following properties: 
 ++browserUrl=The absolute URL of the request. This is mapped to an XPath variable named "_url".
-++browserBase=This is the part of the browserUrl which is excluded from the "_name". This is mapped to an XPath variable named "_base_url".
-++browserPath=This is the rest of the browserUrl after browserBase, usually the same as '_name', except when based on the default name (eg. 'index') or a subdomain. This is mapped to an XPath variable named "_path".
+++browserBase=This is the part of the browserUrl which is excluded from the "_name". This is mapped to an XPath variable named "_base-url".
+++browserPath=This is the rest of the browserUrl after browserBase up to the query part; usually the same as '_name', except when path has a trailing slash or the URL maps to the default name (eg. 'index') or a subdomain (if "virtual" domains are configured). This is mapped to an XPath variable named "_path".
+++browserQuery=This is the browserUrl after the "?". This is mapped to an XPath variable named "_url-query".
 ++method=The request's HTTP method (eg. "GET", "POST"). This is mapped to an XPath variable named "_method".
 ++headerMap=This is a dictionary of all the HTTP request headers. Each header is mapped to a XPath variable in the namespace "http://rx4rdf.sf.net/ns/raccoon/http-request-header#" (default prefix: "request-header").
 ++simpleCookie=This is a dictionary (actually a Cookie.SimpleCookie object) of all the cookies in the request. Each cookie is mapped to an XPath variable in the namespace "http://rx4rdf.sf.net/ns/raccoon/request-cookie#" (default prefix: "request-cookie").

@@ -18,4 +18,20 @@ No, that's another ZML. [That|http://czt.sourceforge.net/zml/] ZML is intended f
 How come sometimes when I save a page I get a "modified after edit began" error?
 <   answer:
 This can happen if, after recently saving an item, you pressed the back button in your browser to get back to the edit page; thus not reloading the edit page and so the page has the old edit-began time.  Reload the page to avoid this.
+<  faq:
+<   question:
+How secure is Raccoon and Rhizome?
+<   answer:
+It sounds like a cliche to say Rhizome was "designed with security in mind" but since anyone can edit the behavior of the application itself and write executable code, I had no choice in the matter. The current state of security: You can be reasonably assured that an unauthorized user can't access underlying system resources or modify the data store, but you should assume that a user can read anything stored in the system (don't worry, passwords are never stored). But bear in mind that Rhizome is an immature system that has not seen much real-world use. 
+
+The various security and authorization features of Rhizome include:
+* Executable Python code will only be executed when its contents is whitelisted in the config setting ^^authorizationDigests^^
+* Access to the file system is generally limited to the directories on Raccoon's path (see the ^^PATH^^ config setting)
+* In all user contexts (with the exception of [RxUpdate]), each addition or removal of a statement from the store is authorized.
+* An open-ended set of application-level actions also require authorization.
+* Any HTML authored directly or indirectly (e.g. via XSLT or [ZML]) by an untrusted user is sanitized (by a configurable sanitizer) when it is served.
+* Access to request metadata and XPath extension functions are controlled.
+* Raccoon can keep an audit log of all transactions which can be used to rollback changes.
+
+Raccoon provides an extensive set of configuration variables for setting hooks for authentication and authorization, and Rhizome's security is entirely implemented using these hooks. This makes it easy for other Raccoon applications to implement similar security measures. As a policy, Raccoon tries to use secure default settings where possible.
 

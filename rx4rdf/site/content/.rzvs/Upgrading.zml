@@ -1,3 +1,9 @@
+!Upgrading to Rhizome version 0.4.2 
+
+To upgrade an existing store to this version you will need to add the theme resources to your store.
+
+Alternatively, if you don't want to use themes, do not replace your current site-template.xsl.
+
 !Upgrading to Rhizome version 0.4
 
 Migrating an existing instance of Rhizome to the latest version involves exporting 
@@ -9,7 +15,7 @@ including it in your application's config script using the ^^\__addRxML\__^^ dir
 Alternatively, you can copy the statements from the old ^^wikistore.nt^^ or the transaction log 
 and include them using the ^^\__addTriples\__^^ directive in your config file. 
 
-The following list details changes between 0.4 and 0.3 that may require changes to existing 
+The following list details changes between 0.4 and 0.3 that may require changes to existing sites:
 
 *RxML now uses "bnode:" instead of "http://4suite.org/anonymous" as the URI prefix 
  to represent anonymous (blank) nodes. Any existing RxML files should be updated to reflect this.

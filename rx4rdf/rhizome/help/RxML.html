@@ -53,6 +53,12 @@ Finally, an advanced example, showing all the possible elements and attributes o
        #you can declare a datatype or xml:lang for it
        l rdf:datatype="http://www.w3.org/2001/XMLSchema#integer": 
          "1062022787"
+       #use the "xml" element if you want xml as the value
+       #any markup inside it becomes the property value
+       xml:
+         html:
+           body:
+             r"some &lt;b>xml&lt;/b> content"
      
      #stmtID is equivalent to "rdf:ID"
      wiki:name stmtID='http://rx4rdf.sf.net/ns/archive#': `foo
@@ -62,10 +68,5 @@ Finally, an advanced example, showing all the possible elements and attributes o
      wiki:revisions listType='rdf:Bag' list="bnode:list57":          
          {http://example.org/mysite/page1.html}
          l xml:lang=en: `some text in english
-         #the property value is the markup inside the "xml" 
-         xml:
-           html:
-             body:
-               r"some &lt;b>xml&lt;/b> content"
 </pre>
 </div>

@@ -1,1 +1,7 @@
 __Coming Soon!__
+
+[RDFScribbler] is a simple web application that can display and edit any arbitrary RDF model using RxSLT and RxUpdate. 
+Unlike Rhizome, it doesn't require a specialized schema. The idea: launch RDFScribbler with a RDF file and then visit your browser for a Wiki-like interface for browsing and editing the RDF.
+
+Update: I've put development of RDFScribbler on hold and instead have been adding more RDF-friendly functionality to Rhizome (such as the ability to view and download RDF as RDF/XML).
+

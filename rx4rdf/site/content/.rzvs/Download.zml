@@ -1,8 +1,11 @@
 Rx4RDF requires Python 2.2 or later (2.3 recommended) and 4Suite 1.0a1 
 or later ([http://4Suite.org]).
 
-Rx4RDF and Rhizome are known to run on Linux and Windows 2000/XP  
+Rx4RDF and Rhizome are tested on Linux and Windows 2000/XP  
 and should work on any platform that supports Python and 4Suite.
+It has been known to work on Windows 98, Cygwin and OS X. 
+For OS X you should have 4Suite 1.0a4 installed -- see
+[http://uche.ogbuji.net/tech/akara/nodes/2003-01-01/osx] for more details.
 
 [Source (zip)|http://sourceforge.net/project/showfiles.php?group_id=85676]
 
@@ -45,18 +48,6 @@ This installs:
 !Quick Start
 Once you've installed Rx4RDF, use this guide to quickly start playing with its various components. Also, see the ^^readme.txt^^ in the install package for release notes.
 
-!!RxPath
-To run a query on an RDF or NTriples file:
-
-^^python <python lib dir>/site-packages/rx/RxPathDom.py myrdf.rdf \[RxPath expression]
-
-If \[RxPath expression] is omitted it will start in interactive mode.
-
-RxPath expressions can be preceeded by one or more expressions of the form ^^xmlns(prefix=namespaceuri)^^, 
-which set the namespace prefixes for subsequent RxPath expression (for duration 
-of the session if in interactive mode). If the prefix is omitted (e.g. ^^xmlns(=http://example.org/ns)^^)
-the default namespace will be set. 
-
 !!Raccoon and Rhizome
 Run a local copy of this site:
 
@@ -71,8 +62,26 @@ To start a fresh Rhizome site, just run Rhizome from the directory where you wan
 1.^^cd <directory of the new site>
 1.^^<python script dir>/run-raccoon -a <python share dir>/rx4rdf/rhizome/rhizome-config.py
 
-!!RxSLT, RxUpdate, ZML
-To experiment with RxSLT, RxUpdate, or ZML run an instance of Rhizome and create or edit pages with this format.  Or see RxPath.py or zml.py for programmatic interfaces.
+!!RxPath
+To run a query on an RDF or NTriples file:
+
+^^python <python lib dir>/site-packages/rx/RxPathDom.py myrdf.rdf "RxPath expression"
+
+If "RxPath expression" is omitted it will start in interactive mode.
+
+RxPath expressions can be preceeded by one or more expressions of the form ^^xmlns(prefix=namespaceuri)^^, 
+which set the namespace prefixes for subsequent RxPath expression (for duration 
+of the session if in interactive mode). If the prefix is omitted (e.g. ^^xmlns(=http://example.org/ns)^^)
+the default namespace will be set. 
+
+!!RxSLT 
+To invoke a RxSLT transform on a RDF or NTriples file:
+
+^^python <python lib dir>/site-packages/rx/RxPathDom.py -t|--transform myrdf.rdf myrxslt.xsl
+
+!!RxUpdate
+There's no command line interface for RxUpdate yet -- to experiment with it run an instance of Rhizome and go to the Sandbox page 
+(you'll probably have to login as admin).  Or see RxPath.py for programmatic interfaces.
 
 !!ZML
 Convert ZML to XML:
