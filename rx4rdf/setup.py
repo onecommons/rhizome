@@ -4,7 +4,7 @@ import sys, glob, os, os.path, tempfile
 from distutils.core import setup
 #import py2exe
 
-version_string = "0.4.1"
+version_string = "0.4.2"
 
 PACKAGE_NAME = 'rx4rdf'
 
@@ -25,14 +25,6 @@ Topic :: Software Development :: Libraries :: Python Modules
 Operating System :: Microsoft :: Windows
 Operating System :: Unix
 """
-
-if sys.version_info < (2, 3):
-    _setup = setup
-    def setup(**kwargs):
-        if kwargs.has_key("classifiers"):
-            del kwargs["classifiers"]
-            del kwargs["download_url"]
-        _setup(**kwargs)	
 
 def createScript(scriptFile, sourceFile):
     from distutils import sysconfig
@@ -65,7 +57,7 @@ def createScript(scriptFile, sourceFile):
     return LOCAL_SCRIPT
 
 data_files = [
-		   ('share/rx4rdf',[ 'changelog.txt', 'COPYING', 'README.txt'] ),
+		   ('share/rx4rdf',[ 'COPYING', 'README.txt'] ),
 		   ('share/rx4rdf/rdfscribbler',glob.glob('rdfscribbler/*') ),
 		   ('share/rx4rdf/docs',glob.glob('docs/*') ),
         ]
@@ -102,3 +94,11 @@ markup languages for authoring XML and RDF, and RDFScribbler, for viewing and ed
 	              createScript('zml', 'zml.py'),
 	          ]
 	  )
+
+if sys.version_info < (2, 3):
+    _setup = setup
+    def setup(**kwargs):
+        if kwargs.has_key("classifiers"):
+            del kwargs["classifiers"]
+            del kwargs["download_url"]
+        _setup(**kwargs)	
