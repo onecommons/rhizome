@@ -6,28 +6,47 @@
     http://rx4rdf.sf.net    
 """
 
-from rx import racoon, utils
+from rx import racoon, utils, logging
 import unittest
 
-
 class RacoonTestCase(unittest.TestCase):
+    def setUp(self):
+        logging.BASIC_FORMAT = "%(asctime)s %(levelname)s %(name)s:%(message)s"
+        logging.root.setLevel(logging.INFO)
+        logging.basicConfig()
+
     def testAuth(self):
-        root = racoon.Root(['-a', 'testAuthAction.py'])
+        root = racoon.Root(a='testAuthAction.py')
         unauthorized = root.rdfDom.findSubject( 'http://rx4rdf.sf.net/ns/auth#Unauthorized' )
         #the guest user has no rights
         user = root.rdfDom.findSubject( root.BASE_MODEL_URI+'users/guest' )
         start = root.rdfDom.findSubject( root.BASE_MODEL_URI+'test-resource1' )        
         assert user
         result = root.runActions('test', utils.kw2dict(__user=[user], start=[start]))
-        print result, unauthorized 
+        #print result, unauthorized 
         self.failUnless( unauthorized == result)
         #the super user always get in
         user = root.rdfDom.findSubject( root.BASE_MODEL_URI+'users/admin' )
         assert user
         result = root.runActions('test', utils.kw2dict(__user=[user], start=[start]))
-        print result, unauthorized 
+        #print result, start 
         self.failUnless( start == result)
+
+    def testMinimalApp(self):
+        root = racoon.Root(a='testMinimalApp.py')
+        result = root.runActions('http-request', utils.kw2dict(_name='foo'))
+        #print type(result), result
+        response = "<html><body>page content.</body></html>"
+        self.failUnless(response == result)
         
+        result = racoon.InputSource.DefaultFactory.fromUri('site:///foo').read()    
+        #print type(result), repr(result), result
+        self.failUnless(response == result)
+        
+        result = root.runActions('http-request', utils.kw2dict(_name='jj'))
+        #print type(result), result
+        self.failUnless( '<html><body>not found!</body></html>' == result)
+                
     def testXPathSecurity(self):
         '''
         test that we can't access insecure 4Suite extension functions
@@ -53,6 +72,7 @@ if __name__ == '__main__':
     try:
         test=sys.argv[sys.argv.index("-r")+1]
         tc = RacoonTestCase(test)
+        tc.setUp()
         getattr(tc, test)() #run test
     except (IndexError, ValueError):
         unittest.main()

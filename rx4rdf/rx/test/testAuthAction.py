@@ -27,7 +27,7 @@ resourceAuthorizationAction.assign("test3", '(%(findTokens)s)[. = $__user/auth:h
 #resourceAuthorizationAction.assign("test2", 
 # '%(findTokens)s[.=$__user/auth:has-rights-to/* or .=$__user/auth:has-role/*/auth:has-rights-to/*]'%locals(), post=True)
 
-finishAction = Action('.', lambda result, kw, contextNode, retVal: contextNode ) 
+finishAction = Action(['.'], lambda result, kw, contextNode, retVal: contextNode ) 
 
 actions = { 'test' : [startAction, resourceAuthorizationAction, finishAction] }
 

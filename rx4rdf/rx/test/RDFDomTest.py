@@ -221,6 +221,15 @@ class RDFDomTestCase(unittest.TestCase):
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless( res1 )
 
+    def testId(self):
+        #use this one because all resources appear as an object at least once
+        self.loadModel(cStringIO.StringIO(self.loopModel) )
+        #we need to add the predicate filter to force the nodeset in doc order so we can compare it
+        xpath = "(id(/*/*/*))[true()]"  
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        res2 = self.rdfDom.evalXPath( '/*',  self.model1NsMap)
+        self.failUnless(res1 == res2)
+        
     def testDiff(self):
         self.loadModel("about.rx.nt")
         updateDom = self.getModel("about.diff1.nt")
@@ -256,7 +265,7 @@ class RDFDomTestCase(unittest.TestCase):
         #and add the statements
         addStatements(self.rdfDom, statements)
         return statements, nodesToRemove
-
+    
     def testMerge(self):
         self.loadModel("about.rx.nt")
         updateDom = self.getModel("about.diff1.nt")
