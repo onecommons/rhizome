@@ -262,7 +262,9 @@ else:
             mapContext.varBindings[(RXWIKI_XPATH_EXT_NS, 'current')] = node
             result = exp.evaluate(mapContext)
             if type(result) != type([]):
-                result = String2NodeSet(mapContext, unicode(result))
+                if not isinstance(result, unicode):
+                    result = unicode(str(result), 'utf8')                
+                result = String2NodeSet(mapContext, result)
             l.extend( result  )
             return l
         #note: our XPath function wrapper will remove duplicate nodes
@@ -412,6 +414,30 @@ else:
         else:
            raise RuntimeError('unknown type specified %s' % cmptype)
         return Xbool(result)
+
+    #utility function, c.f. Ft.Xml.Xslt.Processor._normalizeParams
+    def toXPathDataType(value, ownerDocument):
+        #todo: handle XML-RPC classes DateTime and Binary
+        #todo: handle dictionaries that have keys as strings by using
+        # the dictionary name as the namespace (optional param)
+        if isinstance(value, ( types.ListType, types.TupleType ) ):
+            newvalue = []
+            for item in value:
+                if getattr(item, 'nodeType', None):
+                    newvalue.append(item)
+                else:
+                    if not isinstance(item, unicode):
+                        item = unicode(str(item), 'utf8')
+                    newvalue.append( ownerDocument.createTextNode(item))
+            return newvalue
+        else:
+            import Ft.Xml.XPath
+            assert isinstance(value, (type(''), Ft.Xml.XPath.boolean.BooleanType,
+                                     type(True), type(u''), type(1), type(1.0), type(None)) )\
+                   or getattr(value, 'nodeType', None), 'not a valid XPath datatype %s: ' % type(value)
+            #todo: if is string: string = unicode(string,'utf8')
+            #todo: add externalobject wrapper class if not an XPath class or UnicodeError is thrown (to handle binary strings)
+            return value
 
     ############################################################
     ##Racoon defaults
@@ -644,8 +670,10 @@ else:
                 #print 'to resolve!', name, ' ', uri, paramMap
                 contents = self.server.requestDispatcher.invoke__(name, **paramMap)
                 #print 'resolved', name, ': ', contents
-                return StringIO.StringIO( str(contents) ) #without the str() unicode values won't be converted correctly
-            except AttributeError: #not found
+                if isinstance(contents, unicode):
+                    contents = contents.encode('utf8')
+                return StringIO.StringIO( contents )
+            except AttributeError, e: #not found'
                 raise UriException(UriException.RESOURCE_ERROR, uri, 'Not Found')
 
     def getFileCacheKey(path, maxSize = 0):    
@@ -1120,7 +1148,8 @@ else:
             (RXWIKI_XPATH_EXT_NS, 'evaluate') : self.Evaluate
             })        
             #add most kws to vars (skip references to non-simple types):
-            vars = dict( [( (None, x[0]), utils.toXPathDataType(x[1], self.rdfDom) ) for x in kw.items()\
+            #todo: use of toXPathDataType is inconsistent -- should use throughout -- especially with prevkw
+            vars = dict( [( (None, x[0]), toXPathDataType(x[1], self.rdfDom) ) for x in kw.items()\
                           if x[0] not in self.COMPLEX_REQUESTVARS and x[0] != '_metadatachanges'] )
             #magic constants:
             vars[(None, 'STOP')] = self.STOP_VALUE
@@ -1337,6 +1366,8 @@ else:
             
             oldNss = context.processorNss.copy()
             context.processorNss.update(self.nsMap)
+            DOMnsMap = dict([(y, x) for x,y in getattr(context.node.ownerDocument, 'nsRevMap', {}).items()] )
+            context.processorNss.update(DOMnsMap)
             xpath = StringValue(expr)
             #use if caches available
             compExpr = self.expCache.getValue(xpath) #todo: nsMap should be part of the key -- until then clear the cache if you change that!        
@@ -2002,7 +2033,7 @@ else:
         #print 'args', kw
         return kw
 
-    DEFAULT_cmd_usage = 'python [raccoon.py -l [log.config] -r -d [debug.pkl] -x -s server.cfg -p path -m [store.nt] -a config.py [config specific options]'
+    DEFAULT_cmd_usage = 'python raccoon.py -l [log.config] -r -d [debug.pkl] -x -s server.cfg -p path -m store.nt -a config.py [config specific options]'
     cmd_usage = '''\nusage:
     -h this help message
     -s server.cfg specify an alternative server.cfg
