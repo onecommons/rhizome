@@ -5,7 +5,7 @@
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
-import unittest, os, os.path, glob
+import unittest, os, os.path, glob, tempfile
 from Ft.Xml import XPath, InputSource
 from Ft.Rdf import Util
 import cStringIO
@@ -58,8 +58,8 @@ class RDFDomTestCase(unittest.TestCase):
 
     model2 = r'''<urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#Contents> .
 <urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "ndKxl8RGTmr3uomnJxVdGnWgXuA=" .
-<urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> <http://rx4rdf.sf.net/ns/archive#hasContent> " llll" .
-<urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> <http://rx4rdf.sf.net/ns/archive#content-length> "5" .
+<urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> <http://rx4rdf.sf.net/ns/archive#hasContent> " llll"@en-US .
+<urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> <http://rx4rdf.sf.net/ns/archive#content-length> "5"^^http://www.w3.org/2001/XMLSchema#int .
 <http://4suite.org/rdf/banonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 <http://4suite.org/rdf/banonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://rx4rdf.sf.net/ns/wiki#name> "HomePage" .
 <http://4suite.org/rdf/banonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://rx4rdf.sf.net/ns/archive#created-on> "1057802436.437" .
@@ -93,18 +93,16 @@ class RDFDomTestCase(unittest.TestCase):
                 if os.path.exists(f):
                     os.unlink(f)            
             return initRedlandHashBdbModel("RDFDomTest", source)
-            
-    def loadModel(self, source, type='nt'):
-        self.model = self.loadFtModel(source, type)
-        #self.model = self.loadRedlandModel(source, type)
-        self.nsMap = {u'http://rx4rdf.sf.net/ns/archive#':u'arc',
-               u'http://www.w3.org/2002/07/owl#':u'owl',
-               u'http://purl.org/dc/elements/1.1/#':u'dc',
-               }
-        self.rdfDom = RDFDoc(self.model, self.nsMap)
+
+    def loadRdflibModel(self, source, type='nt'):
+        dest = tempfile.mktemp()
+        if type == 'rdf':
+            type = 'xml'
+        return initRDFLibModel(dest, source, type)
 
     def getModel(self, source, type='nt'):
         model = self.loadFtModel(source, type)
+        #model = self.loadRdflibModel(source, type)
         #self.model = self.loadRedlandModel(source, type)
         self.nsMap = {u'http://rx4rdf.sf.net/ns/archive#':u'arc',
                u'http://www.w3.org/2002/07/owl#':u'owl',
@@ -116,7 +114,7 @@ class RDFDomTestCase(unittest.TestCase):
         pass
 
     def testDom(self):
-        self.loadModel(cStringIO.StringIO(self.model1) )
+        self.rdfDom = self.getModel(cStringIO.StringIO(self.model1) )
 
         #print self.model.getResources()
         #print self.rdfDom
@@ -144,8 +142,28 @@ class RDFDomTestCase(unittest.TestCase):
         #they have the same string value but occupy different positions in the tree
         self.failUnless(res4[0] != res5[0] and res4[0].data == res5[0].data)
 
+    def testLangAndDatatype(self):
+        self.rdfDom = self.getModel(cStringIO.StringIO(self.model2) )
+        
+        xpath = "/*[.='urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=']/a:hasContent"
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        xpath = "/*[.='urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=']/a:hasContent[@xml:lang='en-US']"
+        res2 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        xpath = "/*[.='urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=']/a:hasContent[@xml:lang='de']"
+        res3 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless(res1 == res2 and res2 and not res3)
+
+        xpath = "/*[.='urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=']/a:content-length[@rdf:datatype='http://www.w3.org/2001/XMLSchema#int']"
+        res4 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        xpath = "/*[.='urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=']/a:content-length[@rdf:datatype='http://www.w3.org/2001/XMLSchema#int']"
+        res5 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)        
+        xpath = "/*[.='urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=']/a:content-length[@rdf:datatype='http://www.w3.org/2001/XMLSchema#anyURI']"
+        res6 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+
+        self.failUnless(res4 == res5 and res4 and not res6)
+        
     def timeXPath(self):
-        self.loadModel(cStringIO.StringIO(self.model1) )
+        self.rdfDom = self.getModel(cStringIO.StringIO(self.model1) )
         start = time.time()
         for i in xrange(100):        
             xpath = "/*[wiki:name/text()='HomePage']/a:has-expression/*/a:hasContent/text()"
@@ -153,7 +171,7 @@ class RDFDomTestCase(unittest.TestCase):
         print time.time() - start
 
     def testLoop(self):
-        self.loadModel(cStringIO.StringIO(self.loopModel) )
+        self.rdfDom = self.getModel(cStringIO.StringIO(self.loopModel) )
         
         xpath = '/*'
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
@@ -184,7 +202,7 @@ class RDFDomTestCase(unittest.TestCase):
         self.rdfDom.globalRecurseCheck = 0
             
     def testDocIndex(self):
-        self.loadModel("about.rx.nt")
+        self.rdfDom = self.getModel("about.rx.nt")
         xpath = "*/wiki:revisions/*"
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
        
@@ -200,7 +218,7 @@ class RDFDomTestCase(unittest.TestCase):
         self.failUnless(res1[0].docIndex < res2[0].docIndex)
 
     def testLists(self):
-        self.loadModel("about.rx.nt")
+        self.rdfDom = self.getModel("about.rx.nt")
         xpath = "*/wiki:revisions/*/rdf:first/@listID='http://4suite.org/rdf/anonymous/xc52aaabe-6b72-42d1-8772-fcb90303c24b_5'"
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)        
         self.failUnless( res1 )
@@ -221,9 +239,35 @@ class RDFDomTestCase(unittest.TestCase):
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless( res1 )
 
+    def testContainers(self):
+        self.rdfDom = self.getModel("about.containertest.nt")
+        xpath = "*/wiki:revisions/*/rdf:li/@listID='http://www.w3.org/1999/02/22-rdf-syntax-ns#_1'"
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)        
+        self.failUnless( res1 )
+
+        xpath = "*[wiki:name='about']/wiki:revisions/*/rdf:li"
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless( len(res1)==2 )
+
+        xpath = "*[wiki:name='about']/wiki:revisions/rdf:Seq/rdf:li/*"
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless( len(res1)==2 )
+
+        xpath = "*[wiki:name='about']/wiki:revisions/*/rdf:_1"
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless( len(res1)==0 )
+
+        xpath = "*[wiki:name='about']/wiki:revisions/*/rdf:li[1]='http://4suite.org/rdf/anonymous/xc52aaabe-6b72-42d1-8772-fcb90303c24b_4'"
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless( res1 )
+
+        xpath = "*[wiki:name='about']/wiki:revisions/*/rdf:li[2]='http://4suite.org/rdf/anonymous/x467ce421-1a30-4a2f-9208-0a4b01cd0da1_9'"
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless( res1 )
+
     def testId(self):
         #use this one because all resources appear as an object at least once
-        self.loadModel(cStringIO.StringIO(self.loopModel) )
+        self.rdfDom = self.getModel(cStringIO.StringIO(self.loopModel) )
         #we need to add the predicate filter to force the nodeset in doc order so we can compare it
         xpath = "(id(/*/*/*))[true()]"  
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
@@ -231,7 +275,7 @@ class RDFDomTestCase(unittest.TestCase):
         self.failUnless(res1 == res2)
         
     def testDiff(self):
-        self.loadModel("about.rx.nt")
+        self.rdfDom = self.getModel("about.rx.nt")
         updateDom = self.getModel("about.diff1.nt")
         updateNode = updateDom.findSubject('http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2')
         self.failUnless( updateNode )
@@ -267,14 +311,14 @@ class RDFDomTestCase(unittest.TestCase):
         return statements, nodesToRemove
     
     def testMerge(self):
-        self.loadModel("about.rx.nt")
+        self.rdfDom = self.getModel("about.rx.nt")
         updateDom = self.getModel("about.diff1.nt")
         statements, nodesToRemove = mergeDOM(self.rdfDom, updateDom ,
             ['http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2'])                
         #nothing should have changed
         self.failUnless( not statements and not nodesToRemove )
 
-        self.loadModel("about.rx.nt")
+        self.rdfDom = self.getModel("about.rx.nt")
         updateDom = self.getModel("about.diff2.nt")
         #we've added and removed one non-list statement and changed the first list item
         statements, nodesToRemove = self._mergeAndUpdate(updateDom ,
@@ -285,7 +329,7 @@ class RDFDomTestCase(unittest.TestCase):
             ['http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2'])
         self.failUnless( not statements and not nodesToRemove )
 
-        self.loadModel("about.rx.nt")        
+        self.rdfDom = self.getModel("about.rx.nt")        
         updateDom = self.getModel("about.diff3.nt")
         #with this one we've just re-ordered the list,
         statements, nodesToRemove = self._mergeAndUpdate(updateDom ,
@@ -299,7 +343,7 @@ class RDFDomTestCase(unittest.TestCase):
         
     def testXUpdate(self):       
         '''test xupdate'''
-        self.loadModel("rdfdomtest1.rdf",'rdf')
+        self.rdfDom = self.getModel("rdfdomtest1.rdf",'rdf')
         xupdate=r'''<?xml version="1.0" ?> 
         <xupdate:modifications version="1.0" xmlns:xupdate="http://www.xmldb.org/xupdate" 
         xmlns="http://rx4rdf.sf.net/ns/archive#" 
@@ -343,7 +387,7 @@ class RDFDomTestCase(unittest.TestCase):
         self.failUnless( currentStmts == expectedStmts , 'statements differ: '+`d.get_opcodes()` )
 
     def testXslt2(self):
-        self.loadModel(cStringIO.StringIO(self.model2) )
+        self.rdfDom = self.getModel(cStringIO.StringIO(self.model2) )
         xslStylesheet=r'''<x:stylesheet version="1.0"
                             xmlns:a="http://rx4rdf.sf.net/ns/archive#"
                             xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"
@@ -373,7 +417,7 @@ class RDFDomTestCase(unittest.TestCase):
         #PrettyPrint(self.rdfDom)
 
     def timeXslt(self):
-        self.loadModel(cStringIO.StringIO(self.model2) )
+        self.rdfDom = self.getModel(cStringIO.StringIO(self.model2) )
         start = time.time()
         for i in xrange(40):
             #'identity stylesheet'
@@ -391,7 +435,7 @@ class RDFDomTestCase(unittest.TestCase):
     
     def testXslt(self):       
         '''test rxslt'''
-        self.loadModel(cStringIO.StringIO(self.model1) )
+        self.rdfDom = self.getModel(cStringIO.StringIO(self.model1) )
         todoxslStylesheet=r'''<?xml version="1.0" ?>        
         <xsl:stylesheet version="1.0"
                 xmlns:xsl="http://www.w3.org/1999/XSL/Transform">

@@ -38,6 +38,22 @@ class utilsTestCase(unittest.TestCase):
         for term in parseExpr:
             pass#print term
 
+    def testNtiples(self):
+        #test character escaping 
+        s1 = r'''bug: File "g:\_dev\rx4rdf\rx\Server.py", '''
+        n1 = r'''_:x1f6051811c7546e0a91a09aacb664f56x142 <http://rx4rdf.sf.net/ns/archive#contents> "bug: File \"g:\\_dev\\rx4rdf\\rx\\Server.py\", ".'''
+        [(subject, predicate, object, objectType)] = [x for x in parseTriples([n1])]
+        self.failUnless(s1 == object)
+        #test xml:lang support
+        n2 = r'''_:x1f6051811c7546e0a91a09aacb664f56x142 <http://rx4rdf.sf.net/ns/archive#contents> "english"@en-US.'''
+        [(subject, predicate, object, objectType)] = [x for x in parseTriples([n2])]
+        self.failUnless(object=="english" and objectType == 'en-US')
+        #test datatype support
+        n3 = r'''_:x1f6051811c7546e0a91a09aacb664f56x142 <http://rx4rdf.sf.net/ns/archive#contents>'''\
+        ''' "1"^^http://www.w3.org/2001/XMLSchema#int.'''
+        [(subject, predicate, object, objectType)] = [x for x in parseTriples([n3])]
+        self.failUnless(object=="1" and objectType == 'http://www.w3.org/2001/XMLSchema#int')
+    
     def testDynException(self):
         _defexception = DynaExceptionFactory(__name__)
         _defexception('test dyn error') #defines exception NotFoundError
