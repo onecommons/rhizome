@@ -1,8 +1,8 @@
                             README
 
                          Rx4RDF and Rhizome
-                         Version 0.4.2
-                         Nov 24, 2004
+                         Version 0.4.2b
+                         Nov 26, 2004
  
   Introduction
   ------------

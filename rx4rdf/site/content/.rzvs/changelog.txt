@@ -1,6 +1,12 @@
 Rx4RDF and Rhizome Changelog
 ============================
 
+Changes in Version 0.4.2b (Nov. 26, 2004)
+---------------------------------------
+Bug fix release:
+* utils:   fix embarrassing last-minute breaking of BlackListHTMLSanitizer
+* Raccoon: make request recording and playback cross platform (pickle as binary files) 
+
 Changes in Version 0.4.2 (Nov. 24, 2004)
 ---------------------------------------
 Minor release:

@@ -119,7 +119,7 @@ The follow attributes may also appear:
 <        note: 
 put listID in a namespace? renamed is to memberID?
 <        note: 
-actually a model can have more than only resource that reifies the same statement -- in that case, which one should the "rdf:ID attribute be set to?
+A model can have more than one resource that reifies the same statement -- in that case, which one should the "rdf:ID" attribute be set to?
 <<<<<<<<<
 The sibling order of the predicate element is determined by sorting the tuple (element namespace URI, element local name, element string value) except in the special cases "rdf:li" and "rdf:first" Predicate Element (see below).
 
@@ -151,7 +151,7 @@ If RDF container or collection resource is the subject of statements that don't 
 [QNames|http://www.w3.org/TR/REC-xml-names#NT-QName] are converted to URI references by concating the QName's [namespace name|http://www.w3.org/TR/REC-xml-names/#dt-NSName] (the URI) with the local name, unless the local name is a sequence of one or more '_' characters, in which case the local name is substituted with a possibly empty string equal to the local name minus one of the '_'.  This rule enables QNames to be created for URIs whose last character of a URI is not an XML [NameChar|http://www.w3.org/TR/REC-xml#NT-NameChar] or otherwise can't be transformed into a QName.
 
 The RxPath processor MUST provide a way to specify a set of prefixes to [namespace name|http://www.w3.org/TR/REC-xml-names/#dt-NSName] (URI) mappings. Those mappings MUST be used for Node Tests (see below) and for Predicate Element names. When an RxPath processor encounters a URI reference that can not be mapped to a QName it SHOULD generate an namespace mapping. As implied by the QName rule above, if the processsor can not find a good point to split the URI, the local name will be '_'; conversely, if a split if found and the characters after the split consist solely of one or more '_', a '_' should be appended to the local name.
-	 note: 
+<	 note: 
 Should we say anything about where and what Namespace nodes should appear in the data model?
 
 <    s2 title="Modifications to the Data Model"
@@ -216,7 +216,7 @@ RxPath processors MUST support all the [core functions|http://www.w3.org/TR/xpat
 
 In addition a RxPath processor MUST support the following additional functions:
 <      note: 
-should these functions be in extention namespace?
+should these functions be in an extension namespace?
 <<<<<<<
 +//boolean// is-predicate(//nodeset//?)=  This function returns true if all the nodes in the argument nodeset are Predicate Elements. If the nodeset is empty it returns false. If the argument is omitted, it defaults to a node-set with the context node as its only member.
 
@@ -245,7 +245,8 @@ Note: [xsl:copy|http://www.w3.org/TR/xslt#copying] behaves the same as in XSLT 1
 
 <  s1 title="RxUpdate":
 RxUpdate is a language for updating an RDF model. It is syntactically and semantically identical to [XUpdate Working Draft|http://www.xmldb.org/xupdate/xupdate-wd.html] except for the changes described here.   
-	note: `Todo! rdf:resource, garbage collection, white space nodes, other constraints, no atomicity requirement?, predicate elements with no children assumed to have an empty literals, make xupdate:value-of same as XSLT?
+<	note: 
+Todo! rdf:resource, garbage collection, white space nodes, other constraints, no atomicity requirement?, predicate elements with no children assumed to have an empty literals
 <   s2 title="xupdate:if":    
 <   s2 title="xupdate:message":    
 <   
@@ -320,7 +321,7 @@ Should we specify anything how inferences and entailments appear in the model? F
 This section contain informal comments on the why certain approaches were taken. 
 <    s2 title="deviation from XPath semantics":             
 <      s3 title="descendant axis":     
-The constraints on the descendant axis enable it to behave like a transitive join, an intuitive behavior for a RDF query language. Perhaps more importantly, the XPath rule would require the processor to exhaustively follow every statement with an resource as an object, a potentially extremely expensive approach. Also, placing the ispredicate() constraint on descendant and ancestor axes enables it to be possible to static analyze an RxPath expression to determine if each step is referring to a subject, predicate, or object. With this it would be much more difficult efficiently implement many kinds RxPath implementations, for example, an RxPath -> SQL converter.
+The constraints on the descendant axis enable it to behave like a transitive join, an intuitive behavior for a RDF query language. Perhaps more importantly, the XPath rule would require the processor to exhaustively follow every statement with an resource as an object, a potentially extremely expensive approach. Also, placing the ispredicate() constraint on descendant and ancestor axes enables it to be possible to static analyze an RxPath expression to determine if each step is referring to a subject, predicate, or object. Without this it would be much more difficult efficiently implement many kinds RxPath implementations, for example, an RxPath -> SQL converter.
 <    s2 title="Special handling of RDF"
 <      s3 title="containers and collections":
 It would be very tedious to query lists without special mapping rules. For examples, here's an RxPath expression for selecting all the items in a list:     

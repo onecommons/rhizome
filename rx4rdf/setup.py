@@ -4,7 +4,7 @@ import sys, glob, os, os.path, tempfile
 from distutils.core import setup
 #import py2exe
 
-version_string = "0.4.2"
+version_string = "0.4.2b"
 
 PACKAGE_NAME = 'rx4rdf'
 
