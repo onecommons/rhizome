@@ -627,7 +627,7 @@ Their value can be either an URI or a QName.
           return triples
           
     def doExport(self, dir, xpath=None, filter='wiki:name', name=None,
-                 static=False, noalias=False, **kw):
+                 static=False, noalias=False, astriples=None, **kw):
          '''
 Export command line option
 Exports the content of each item in the site as a file.  Also, for each file, 
@@ -640,11 +640,16 @@ Options:
         (those that require parameters) are skipped.
 -noalias Don't create static copies of page aliases (use with -static only)
 -label Name of revision label
+-astriples filepath Export the selected resources as an NTriples file. External content is
+                    inserted in the file as string literals.
 '''
          assert not (xpath and name), self.server.cmd_usage
          if not xpath and name: xpath = '/a:NamedContent[wiki:name="%s"]' % name
          else: xpath = xpath or ('/a:NamedContent[%s]' % filter) 
+         
          results = self.server.evalXPath(xpath)
+         if astriples:
+             stmts = []
          for item in results:
              name = self.server.evalXPath('string(wiki:name)', node = item)
              assert name
@@ -684,28 +689,30 @@ Options:
              else:
                  #just run the revision action and the contentAction
                  #todo: process patch
-                 content = self.server.doActions([self.findRevisionAction, self.findContentAction], kw.copy(), item)
+                 content = self.server.doActions([self.findRevisionAction,
+                                    self.findContentAction], kw.copy(), item)
 
                  format = self.server.evalXPath(
-'string((wiki:revisions/*/rdf:first)[last()]/wiki:Item/a:contents/a:ContentTransform/a:transformed-by/wiki:ItemFormat)',
+                    'string((wiki:revisions/*/rdf:first)[last()]/wiki:Item/'
+                    'a:contents/a:ContentTransform/a:transformed-by/wiki:ItemFormat)',
                      node = item)
                  ext = os.path.splitext(name)[1]
                  if not ext and format:                 
                     if self.exts.get(format):
                         name += '.' + self.exts[format]
                  
-             if content is None:
-                 continue
-                
-             dir = dir.replace(os.sep, '/')
-             path = dir+'/'+ name
-             try: os.makedirs(os.path.split(path)[0])
-             except os.error:
-                 #traceback.print_exc()
-                 pass 
-             itemfile = file(path, 'w+b')
-             itemfile.write( content)
-             itemfile.close()
+             if not astriples:
+                 if content is None:
+                     continue                 
+                 dir = dir.replace(os.sep, '/')
+                 path = dir+'/'+ name
+                 try: os.makedirs(os.path.split(path)[0])
+                 except os.error:
+                     #traceback.print_exc()
+                     pass 
+                 itemfile = file(path, 'w+b')
+                 itemfile.write( content)
+                 itemfile.close()
 
              if static:
                  if not noalias:
@@ -718,7 +725,42 @@ Options:
                              pass 
                          itemfile = file(path, 'w+b')
                          itemfile.write( content)
-                         itemfile.close()                        
+                         itemfile.close()
+             elif astriples:
+                 from rx.utils import Res
+
+                 resources = self.server.evalXPath(
+                     '''. | (wiki:revisions/*/rdf:first)[last()]/wiki:Item |
+                       ((wiki:revisions/*/rdf:first)[last()]/wiki:Item//a:contents/node())''',
+                     node = item)[:-1] #skip final text() or ContentLocation                 
+
+                 lastContents = resources[-1] #should be the last contents, i.e. a ContentTransform
+                 assert self.server.evalXPath('self::a:ContentTransform', node = lastContents), resources
+
+                 wikiItem = resources[1] #should be the Item                 
+                 assert self.server.evalXPath('self::wiki:Item', node = wikiItem), wikiItem.childNodes
+                 
+                 #replace a:content statement
+                 for res in resources:
+                     for stmt in res.getModelStatements():
+                         #todo: handle binary files                     
+                         if (stmt.predicate == 'http://rx4rdf.sf.net/ns/archive#contents'
+                             and stmt.subject == lastContents.uri):
+                             stmts.append( RxPath.Statement(lastContents.uri,
+                                'http://rx4rdf.sf.net/ns/archive#contents',
+                                content, objectType=RxPath.OBJECT_TYPE_LITERAL))
+                         elif stmt.predicate == 'http://rx4rdf.sf.net/ns/wiki#revisions':
+                             lres = Res()
+                             stmts.append( RxPath.Statement(stmt.subject,
+                                        stmt.predicate,
+                                        RxPath.BNODE_BASE+lres.uri[2:],
+                                        objectType=RxPath.OBJECT_TYPE_RESOURCE) )                             
+                             lres['rdf:first'] = Res(wikiItem.uri)
+                             lres['rdf:rest'] = Res('rdf:nil')
+                             lres['rdf:type'] = Res('rdf:List')
+                             stmts.extend( lres.toStatements() )                                                  
+                         else:
+                             stmts.append(stmt)                 
              else:
                  lastrevision = self.server.evalXPath(
                      '''(wiki:revisions/*/rdf:first)[last()]/wiki:Item |
@@ -729,6 +771,11 @@ Options:
                  metadatafile = file(path + METADATAEXT, 'w+b')
                  metadatafile.write( metadata)
                  metadatafile.close()
+         if astriples:             
+             stream = file(astriples, 'w+b')
+             #apologies, write triples sucks
+             utils.writeTriples(stmts,stream)
+             stream.close()
                  
     ######content processing####
     def processZMLSideEffects(self, contextNode, kw):
@@ -806,7 +853,8 @@ Options:
         elif not node:
             return ''#empty nodeset
         #print 'getc', node
-        return self.server.doActions([self.findContentAction], {}, node)
+        return self.server.doActions([self.findContentAction,
+            self.processContentAction], {'action': 'view-source'}, node)
 
     def hasPage(self, context, resultset = None):
         '''
@@ -938,7 +986,7 @@ Options:
         return self._saveContents(filepath, contents, filename, indexURI, title,previousRevisionDigest)
     
     def _saveContents(self, filepath, contents, altfilename=None, indexURI=None,
-                      title='',previousRevisionDigest=''):
+                      title='',previousRevisionDigest='', maxLiteral=None):
         '''        
         this is kind of ugly; XUpdate doesn't have an eval() function, so we
         build up a string of xml and then parse it and then return the doc as
@@ -946,13 +994,15 @@ Options:
         '''
         if indexURI:
             self.addToIndex(indexURI, contents, title)
+        if maxLiteral is None:
+            maxLiteral = self.MAX_MODEL_LITERAL
 
         #print >>sys.stderr, 'sc', filepath, title, contents
         ns = '''xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'
             xmlns:a="http://rx4rdf.sf.net/ns/archive#"
             xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"'''
         contentLength = len(contents)
-        if filepath and self.MAX_MODEL_LITERAL > -1 and contentLength > self.MAX_MODEL_LITERAL:            
+        if filepath and maxLiteral > -1 and contentLength > maxLiteral:
             #save as file
             dir = os.path.split(filepath)[0]
             try: 
@@ -1033,7 +1083,7 @@ Options:
                     "<a:transformed-by>"
                     "<rdf:Description rdf:about='http://www.w3.org/2000/09/xmldsig#base64'/>"
                     "</a:transformed-by>"
-                    "<a:contents>%(xml)s</a:contents>"
+                    "<a:contents>%(contents)s</a:contents>"
                    "</a:ContentTransform>" % locals())
 
         #print >>sys.stderr, 'sc', xml
@@ -1091,11 +1141,21 @@ Options:
                             self.index.index(_resource = resource, contents = contents, title = title)
 
         def addToIndex(self, resource, contents, title=''):
+            if not self.index:
+                return
             #delete the existing resource if necessary
             self.index.delete(resource = resource)
-            self.index.index(_resource = resource, contents = contents, title = title)
+            #lupy.store.writeString seems to assume the string is unicode since it tries to encode it as utf8
+            #so try to create a unicode string here by assuming the string is utf8
+            if not isinstance(contents, unicode):
+                contents = contents.decode('utf8')
+            if not isinstance(title, unicode):
+                title = title.decode('utf8')
+            self.index.index(_resource=resource, contents=contents,title=title)
 
         def deleteFromIndex(self, resource):
+            if not self.index:
+                return
             self.index.delete(resource = resource)
 
         def findInIndex(self, query, maxResults = sys.maxint):
