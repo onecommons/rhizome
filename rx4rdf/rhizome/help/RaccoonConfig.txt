@@ -9,8 +9,14 @@
 #default: -p argument if set, otherwise the RACCOONPATH environment variable if set, otherwise the current directory
 PATH = '.;..'
 
-#ROOT_PATH specifies base URL that this application runs on 
-ROOT_PATH = "cgi-bin/rhizome"
+#appBase specifies base URL that this application runs on 
+#default: '/'
+appBase = "/cgi-bin/rhizome"
+
+#appName is a short name for this application, must be unique within the current Raccoon process
+#default: if only one application is running, "root", if multiple are, 
+#BASE_MODEL_URI with non-alphanumeric characters replaced with "_"
+appName = "root"
 
 #the __include__ function includes another Raccoon configuration file
 __include__('../rhizome/rhizome-config.py')
@@ -98,6 +104,11 @@ MAX_CACHEABLE_FILE_SIZE=10192  #only cache files under 10K in size
 #Also stylesheets with xsl:import, xsl:include, xinclude or external entity references will not be cached.
 #default is True
 LIVE_ENVIRONMENT = True
+
+#defaultPageName specifies the name of the page to be invoke if the request URL doesn't include a path 
+#e.g. http://www.example.org/ is equivalent to http://www.example.org/index 
+#default is 'index'
+#defaultPageName=home.html
 
 #if DEFAULT_MIME_TYPE is set then this MIME type will be set on any request that doesn't set its own mimetype 
 #and Raccoon can't guess its MIME type

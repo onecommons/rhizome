@@ -9,6 +9,7 @@ As an optimization it only set when one of these config options are set:
 'undefinedPageIndicator', 'externalLinkIndicator', 'interWikiLinkIndicator'
  (see rhizome.processZMLSideEffects() )
 -->
+<x:param name='_APP_BASE'/>
 <x:output method='html' encoding="UTF-8" indent='no' />
 
 <x:template match='a'>
@@ -19,7 +20,8 @@ otherwise
     <a copy-attributes><img>text</a>
 -->
     <x:choose>
-    <x:when test='@undefined and not(wf:has-page(@href))'>        
+    <!-- the href has already been converted from a site: url to an http: url, so we need to convert it back to an internal name -->
+    <x:when test='@undefined and not(wf:has-page(f:if(starts-with(@href,$_APP_BASE), substring-after(@href, $_APP_BASE), @href )))'>        
         <a>
         <x:copy-of select="@node()[.!='IgnorableMetadata']" />
         <x:apply-templates/><sup>?</sup></a>

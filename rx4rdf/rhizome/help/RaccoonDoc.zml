@@ -49,6 +49,30 @@ Raccoon is an application server that runs a given application and is always in 
 ^^run-raccoon^^ is a simple shell script or batch file that just invokes ^^python <python lib dir>/site-packages/rx/raccoon.py^^. This will launch Raccoon's built-in http server, which runs on port 8000 by default. You can change this by editing ^^server.cfg^^ (see below in Configuration). If you don't want to run the built-in http server, use the ^^-x^^ option and Raccoon will exit after it processes the application's start-up actions and command line arguments. (Note that any options directed towards Raccoon should appear before the ^^-a^^ argument.)
  
 ^^<python scrips dir>/run-raccoon -x -a your-app-config.py  --app-specific-arg^^
+
+!!Running multiple applications 
+A single instance of Raccoon can be used to run multiple applications with different base URLs or different hostnames. The functionality is provided by a simple Raccoon application (called ^^root-config^^) that dispatches incoming HTTP requests to the appropriate application. ^^root-config^^'s data store contains the configuration settings describing how the request should be delegates and Raccoon is launched with ^^root-config^^.  A typical root-config looks like:
+
+p"""
+__include__('/usr/share/rx4rdf/rhizome/root-config.py')
+
+APPLICATION_MODEL = rxml.zml2nt(nsMap = nsMap, contents='''
+ {http://www.foo.com/}:
+   config:hostname: "foo.com"
+   config:hostname: "foo.org"
+   config:config-path: "foo/foo-config.py"
+   config:path: "foo"
+   config:appName: "foo"
+
+ {http://bar.org/bar/}:
+   config:appBase: "/bar"   
+   config:config-path: "bar/bar-config.py"
+   config:path: "bar"
+   config:appName: "bar"
+''')
+"""
+
+For more information, see the comments in ^^root-config.py^^ found in the rhizome directory.
  
 !!Running with Apache
 Although Raccoon comes with a built-in web server, it can be configured to run behind an Apache web server. There are several different ways to do this. The Raccoon HTTP server is derived from the CherryPy server and a how-to on running with Apache can be found on its website [here|http://cp1.cherrypy.org/static/html/howto/node3.html].
@@ -68,7 +92,7 @@ The http server config specified using '-s' command line argument. If that is mi
 
 The logging config file is specified using '-l' command line argument. If '-l' isn't followed by a file path, Raccoon tries to load a file called 'log.config' in the current directory.  Raccoon uses the standard log facilities available in Python 2.3 (and uses a back-ported version of the logging library when running on Python 2.2) and the config file format is documented in the Python 2.3 library documentation. The sample log.config file that ships with Raccoon lists the names of the available loggers.
 
-!Command Line Arguements
+!Command Line Arguments
 
 p'''raccoon.py [Raccoon options] -a config.py [app. config specific options]'''
 
@@ -144,8 +168,8 @@ For all requests, Raccoon will add these variables to the request metadata:
 
 In addition, when a request dictionary is mapped to XPath variables, the following XPath variables are added:
 +STOP=When an action's match expression evaluates to this variable, the RequestProcessor will stop evaluating the rest of the action's match expressions.
-+ROOT_PATH=The value of the ROOT_PATH setting
-+BASE_MODEL_URI=The value of the BASE_MODEL_URI setting
++_APP_BASE=The value of the ^^appBase^^ config setting
++BASE_MODEL_URI=The value of the ^^BASE_MODEL_URI^^ config setting
 
 __Request Triggers__
 
@@ -159,7 +183,7 @@ Raccoon invokes the following request triggers (or request types). The applicati
 * URL query parameters and form variables (with HTTP POST requests) are mapped to request keys of the same name. There is no distinction between form variables and query parameters. If a parameter or form variable appears multiple times in a request, their values are combined into a list. If the body of a HTTP POST request is an XML-RPC payload then each XML-RPC parameter will be mapped to request keys named '0', '1', '2', etc. (starting with '0').
 :In addition, these special keys will be added: 
 
-*^^_name^^ is the name or path of the request; the part of the request path after the base of the URL that the application is running on (as set by the 'ROOT_PATH' config setting). If the resulting path is empty or "/", _name will be set by the value of the ^^defaultPageName^^ server setting (default 'index').
+*^^_name^^ is the name or path of the request; the part of the request path after the base of the URL that the application is running on (as set by the 'appBase' config setting). If the resulting path is empty or "/", _name will be set by the value of the ^^defaultPageName^^ server setting (default 'index').
 
 *The ^^_request^^ object has the following properties: 
 ++browserUrl=The absolute URL of the request. This is mapped to an XPath variable named "_url".

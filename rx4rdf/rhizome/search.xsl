@@ -321,7 +321,7 @@ No results found.
 </xsl:if>
 <br/>
 <!-- site-template.xsl uses $_rsslink -->
-<a href='{wf:assign-metadata("_rsslink", concat($_base-url,"search?view=rss&amp;search=", f:escape-url($search)) )}' type="application/rss+xml">
+<a href='{wf:assign-metadata("_rsslink", concat($_base-url,"/search?view=rss&amp;search=", f:escape-url($search)) )}' type="application/rss+xml">
   <img border='0' src='site:///rss.png' alt='RSS .91 of this search'/></a>
       </xsl:otherwise>
       </xsl:choose> 
