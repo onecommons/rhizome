@@ -13,10 +13,11 @@ from __future__ import generators
 from rx import utils
 from Ft.Lib.boolean import false as XFalse, true as XTrue, bool as Xbool
 from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, Util, BNODE_BASE, BNODE_BASE_LEN,RDF_MS_BASE
+import Ft.Rdf.Model
 from Ft.Xml.XPath.Conversions import StringValue, NumberValue
 from Ft.Xml import XPath, InputSource, SplitQName, EMPTY_NAMESPACE
 from Ft.Rdf.Statement import Statement
-from rx.utils import generateBnode, removeDupsFromSortedList
+from rx.utils import generateBnode
 import os.path, sys
 
 from rx import logging #for python 2.2 compatibility
@@ -25,6 +26,10 @@ log = logging.getLogger("RxPath")
 #from Ft.Rdf import RDF_MS_BASE -- for some reason we need this to be unicode for the xslt engine:
 RDF_MS_BASE=u'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
 OBJECT_TYPE_XMLLITERAL='http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral'
+
+#If true, the RDFLib RDF/XML parser will be used instead of the broken 4Suite one
+#this is set to True if RDFLib is installed 
+useRDFLibParser = False
 
 def createDOM(model, nsRevMap = None):
     from rx import RxPathDom
@@ -63,6 +68,16 @@ class Model(object):
     def removeStatement(self, statement ):
         '''removes the statement'''
 
+def removeDupStatementsFromSortedList(aList):       
+    def removeDups(x, y):
+        if not x or x[-1] != y:            
+            x.append(y)
+        else: #x[-1] == y but Statement.__cmp__ doesn't consider the reified URI
+            if y.uri: #the reified statement URI
+                x[-1].uri = y.uri #note: we only support one reification per statement
+        return x
+    return reduce(removeDups, aList, [])
+
 def getResourcesFromStatements(stmts):
     '''
     given a lists of statements return all the resources that appear as either or subject or object,
@@ -90,7 +105,7 @@ def getResourcesFromStatements(stmts):
             resources.append(uri)    
     resources.sort()
     return resources
-
+    
 class FtModel(Model):
     '''
     wrapper around 4Suite's Ft.Rdf.Model
@@ -117,9 +132,9 @@ class FtModel(Model):
         ''' Return all the statements in the model that match the given arguments.
         Any combination of subject and predicate can be None, and any None slot is
         treated as a wildcard that matches any value in the model.'''
-        statements = self.model.complete(subject, predicate, None) 
+        statements = self.model.complete(subject, predicate, None)
         statements.sort()
-        return removeDupsFromSortedList(statements)
+        return removeDupStatementsFromSortedList(statements)
                      
     def addStatement(self, statement ):
         '''add the specified statement to the model'''
@@ -148,11 +163,11 @@ class MultiModel(Model):
         self.models[0].rollback()        
 
     def getResources(self):
-        statements = []
+        resources = []
         for model in self.models:
-            statements += model.getResources()
-        statements.sort()
-        return removeDupsFromSortedList(statements)
+            resources += model.getResources()
+        resources.sort()
+        return utils.removeDupsFromSortedList(resources)
                     
     def getStatements(self, subject = None, predicate = None):
         ''' Return all the statements in the model that match the given arguments.
@@ -162,7 +177,7 @@ class MultiModel(Model):
         for model in self.models:
             statements += model.getStatements(subject, predicate)
         statements.sort()
-        return removeDupsFromSortedList(statements)
+        return removeDupStatementsFromSortedList(statements)
                      
     def addStatement(self, statement ):
         '''add the specified statement to the model'''
@@ -268,7 +283,7 @@ class TransactionModel(object):
                     statements.append( stmt[0] )
         
         statements.sort()
-        return removeDupsFromSortedList(statements)
+        return removeDupStatementsFromSortedList(statements)
 
     def addStatement(self, statement ):
         '''add the specified statement to the model'''
@@ -293,9 +308,6 @@ class NTriplesFileModel(FtModel):
             memorymodel, memorydb = utils.DeserializeFromN3File(inputfile)
         FtModel.__init__(self, memorymodel)
 
-    def begin(self):
-        self.model._driver.begin()
-
     def commit(self, **kw):
         self.model._driver.commit()
         outputfile = file(self.path, "w+", -1)
@@ -303,23 +315,26 @@ class NTriplesFileModel(FtModel):
         utils.writeTriples(stmts, outputfile)
         outputfile.close()
         
-    def rollback(self):
-        self.model._driver.rollback()
-
-class _IncrementalNTriplesFileModelBase(NTriplesFileModel):
-
-    def commit(self, **kw):
-        self.model._driver.commit()
-
+class _IncrementalNTriplesFileModelBase(object):
+    '''
+    Incremental save changes to an NTriples "transaction log"
+    Use in a class hierarchy for Model where self has a path attribute
+    and TransactionModel is preceeds this in the MRO.
+    '''
+    #just so we can call _unmapStatements
+    dummyFtModel = Ft.Rdf.Model.Model(None)
+    
+    def commit(self, **kw):                
         import os.path, time
         if os.path.exists(self.path):
+            #self.model._driver.commit() #memory based stores don't need this
             outputfile = file(self.path, "a+")
             def unmapQueue():
                 for stmt in self.queue:
                     if stmt[0] is utils.Removed:
-                        yield utils.Removed, self.model._unmapStatements( (stmt[1],))[0]
+                        yield utils.Removed, self.dummyFtModel._unmapStatements( (stmt[1],))[0]
                     else:
-                        yield self.model._unmapStatements( (stmt[0],))[0]
+                        yield self.dummyFtModel._unmapStatements( (stmt[0],))[0]
                         
             comment = kw.get('source','')
             if isinstance(comment, (type([]), type(()))):
@@ -332,12 +347,9 @@ class _IncrementalNTriplesFileModelBase(NTriplesFileModel):
             outputfile.write("#end " + time.asctime() + ' ' + comment + "\n")
             outputfile.close()
         else: #first time
-            outputfile = file(self.path, "w+")
-            stmts = self.model._driver._statements['default'] #get statements directly, avoid copying list
-            utils.writeTriples(stmts, outputfile)
-            outputfile.close()
+            super(_IncrementalNTriplesFileModelBase, self).commit()
 
-class IncrementalNTriplesFileModel(TransactionModel, _IncrementalNTriplesFileModelBase): pass
+class IncrementalNTriplesFileModel(TransactionModel, _IncrementalNTriplesFileModelBase, NTriplesFileModel): pass
 
 def initFileModel(location, defaultModel):
     '''
@@ -364,7 +376,11 @@ try:
         if node.is_blank():
             return BNODE_BASE + node.blank_identifier
         elif node.is_literal():
-            return unicode(node.literal_value['string'])
+            literal = node.literal_value['string']
+            if type(literal) != type(u''):
+                return unicode(literal, 'utf8')
+            else:
+                return literal
         else:
             return unicode(node.uri)
 
@@ -375,17 +391,23 @@ try:
             return RDF.Node(uri_string=uri)
 
     def statement2Redland(statement):
-        if statement.objectType == OBJECT_TYPE_LITERAL:            
-            object = RDF.Node(literal=statement.object)            
-        else:
+        if statement.objectType == OBJECT_TYPE_RESOURCE:            
             object = URI2node(statement.object)
+        else:
+            kwargs = { 'literal':statement.object}
+            if statement.objectType.find(':') > -1:
+                kwargs['datatype'] = statement.objectType
+            elif len(statement.objectType) > 1: #must be a language id
+                kwargs['language'] = statement.objectType
+            object = RDF.Node(**kwargs)            
         return RDF.Statement(URI2node(statement.subject), URI2node(statement.predicate), object)
 
     def redland2Statements(redlandStatements):
         '''RDF.Statement to Statement'''
         for stmt in redlandStatements:
-            if stmt.object.is_literal():
-                objectType = OBJECT_TYPE_LITERAL
+            if stmt.object.is_literal():                
+                objectType = stmt.object.literal_value.get('language') or \
+                             stmt.object.literal_value.get('datatype') or OBJECT_TYPE_LITERAL
             else:
                 objectType = OBJECT_TYPE_RESOURCE            
             yield Statement(node2String(stmt.subject), node2String(stmt.predicate),
@@ -424,7 +446,7 @@ try:
                 predicate = URI2node(predicate)                
             statements = list( redland2Statements( self.model.find_statements(RDF.Statement(subject, predicate)) ) )
             statements.sort()
-            return removeDupsFromSortedList(statements)
+            return removeDupStatementsFromSortedList(statements)
                          
         def addStatement(self, statement ):
             '''add the specified statement to the model'''            
@@ -457,6 +479,129 @@ try:
     
 except ImportError:
     log.debug("Redland not installed")
+
+try:
+    import rdflib
+    from rdflib.Literal import Literal
+    from rdflib.BNode import BNode
+    from rdflib.URIRef import URIRef
+    
+    useRDFLibParser = True
+    
+    def statement2rdflib(statement):
+        if statement.objectType == OBJECT_TYPE_RESOURCE:            
+            object = RDFLibModel.URI2node(statement.object)
+        else:
+            kwargs = {}
+            if statement.objectType.find(':') > -1:
+                kwargs['datatype'] = statement.objectType
+            elif len(statement.objectType) > 1: #must be a language id
+                kwargs['lang'] = statement.objectType
+            object = Literal(statement.object, **kwargs)            
+        return (RDFLibModel.URI2node(statement.subject), RDFLibModel.URI2node(statement.predicate), object)
+
+    def rdflib2Statements(rdflibStatements):
+        '''RDFLib triple to Statement'''
+        for (subject, predicate, object) in rdflibStatements:
+            if isinstance(object, Literal):                
+                objectType = object.language or object.datatype or OBJECT_TYPE_LITERAL
+            else:
+                objectType = OBJECT_TYPE_RESOURCE            
+            yield Statement(RDFLibModel.node2String(subject), RDFLibModel.node2String(predicate),
+                            RDFLibModel.node2String(object), objectType=objectType)
+
+    class RDFLibModel(Model):
+        '''
+        wrapper around rdflib's TripleStore
+        '''
+
+        def node2String(node):
+            if isinstance(node, BNode):
+                return BNODE_BASE + unicode(node[2:])
+            else:
+                return unicode(node)
+        node2String = staticmethod(node2String)
+        
+        def URI2node(uri): 
+            if uri.startswith(BNODE_BASE):
+                return BNode('_:'+uri[BNODE_BASE_LEN:])
+            else:
+                return URIRef(uri)
+        URI2node = staticmethod(URI2node)
+        
+        def __init__(self, tripleStore):
+            self.model = tripleStore
+
+        def begin(self):
+            pass
+
+        def commit(self):
+            pass
+
+        def rollback(self):
+            pass
+            
+        def getResources(self):
+            '''All resources referenced in the model, include resources that only appear as objects in a triple.
+               Returns a list of resources are sorted by their URI reference
+            '''                    
+            stmts = rdflib2Statements( self.model.triples( (None, None, None)) ) 
+            return getResourcesFromStatements(stmts)
+        
+        def getStatements(self, subject = None, predicate = None):
+            ''' Return all the statements in the model that match the given arguments.
+            Any combination of subject and predicate can be None, and any None slot is
+            treated as a wildcard that matches any value in the model.'''
+            if subject:
+                subject = self.URI2node(subject)
+            if predicate:
+                predicate = self.URI2node(predicate)                
+            statements = list( rdflib2Statements( self.model.triples((subject, predicate, None)) ) )
+            statements.sort()
+            return removeDupStatementsFromSortedList(statements)
+                         
+        def addStatement(self, statement ):
+            '''add the specified statement to the model'''            
+            self.model.add( statement2rdflib(statement) )
+
+        def removeStatement(self, statement ):
+            '''removes the statement'''
+            self.model.remove( statement2rdflib(statement))
+
+    class RDFLibFileModel(RDFLibModel):
+        def __init__(self, inputfile, outputpath, format="xml"):        
+            self.path = outputpath
+            self.format = format
+
+            from rdflib.TripleStore import TripleStore                                    
+            RDFLibModel.__init__(self, TripleStore())
+            
+            if isinstance(inputfile, ( type(''), type(u'') )): #assume its a file path or URL                
+                self.model.load(inputfile,format) #model is the tripleStore                            
+            else: #assume its is a file stream of NTriples
+                makebNode = lambda bNode: BNODE_BASE + bNode
+                for stmt in utils.parseTriples(inputfile,makebNode):
+                    self.addStatement( Statement(stmt[0], stmt[1], stmt[2], '', '', stmt[3]) ) 
+    
+        def commit(self):
+            self.model.save(self.path, self.format)
+
+    class TransactionalRDFLibFileModel(TransactionModel, RDFLibFileModel): pass
+    
+    def initRDFLibModel(location, defaultModel, format="xml"):
+        '''
+        If location doesn't exist create a new model and initialize it with the statements specified in defaultModel,
+        which should be a NTriples file object. Whenever changes to the model are committed, location will be updated.
+        '''        
+        if os.path.exists(location):
+            source = location
+        else:
+            source = defaultModel
+            
+        return TransactionalRDFLibFileModel(source, location, format)
+    
+except ImportError:
+    log.debug("rdflib not installed")
         
 def splitUri(uri):
     '''
@@ -910,12 +1055,16 @@ def addDOM(sourceDom, updateDOM, authorize=None):
 ##    return nodeset[0].parentNode and isPredicate(context, nodeset[0].parentNode)
 
 def isPredicate(context, nodeset=None):
+    '''
+    return true if the nodeset is not empty and all the nodes in the nodeset
+    are predicate nodes, otherwise return false.
+    '''
     if nodeset is None:
         nodeset = [ context.node ]
         
     if nodeset and nodeset[0].nodeType == Node.ELEMENT_NODE and nodeset[0].parentNode\
        and isResource(context, [nodeset[0].parentNode]):
-        if nodeset[1:]:
+        if len(nodeset)>1:
             return isPredicate(context, nodeset[1:])
         else:
             return XTrue #we made it to the end 
@@ -923,12 +1072,16 @@ def isPredicate(context, nodeset=None):
         return XFalse
 
 def isResource(context, nodeset=None):
+    '''
+    return true if the nodeset is not empty and all the nodes in the nodeset
+    are resource nodes, otherwise return false.
+    '''
     if nodeset is None:
         nodeset = [ context.node ]
         
     if nodeset and nodeset[0].nodeType == Node.ELEMENT_NODE\
        and nodeset[0].getAttributeNS(RDF_MS_BASE, 'about'):#or instead use: and not isPredicate(context, nodeset[0])
-        if nodeset[1:]:
+        if len(nodeset) > 1:
             return isResource(context, nodeset[1:])
         else:
             return XTrue #we made it to the end 
@@ -997,7 +1150,7 @@ def getURIFromElement(context, nodeset=None):
         try:
             namespace = context.processorNss[prefix]
         except KeyError:
-            raise XPath.RuntimeException(RuntimeException.UNDEFINED_PREFIX,
+            raise XPath.RuntimeException(XPath.RuntimeException.UNDEFINED_PREFIX,
                                    prefix)       
         return namespace + getURIFragmentFromLocal(local)
     else:
@@ -1059,9 +1212,6 @@ def cmpStatements(self,other):
     if isinstance(other,Statement):        
         return cmp( (self.subject,self.predicate,self.object, self.objectType, self.scope),
                     (other.subject,other.predicate, other.object, self.objectType, other.scope))
-    #import traceback
-    #traceback.print_stack(file=sys.stderr)
-    #print >>sys.stderr, 'comparing??????', self, other
     return cmp(str(self),str(other)) #should this be here?
 
 Statement.__cmp__ = cmpStatements
