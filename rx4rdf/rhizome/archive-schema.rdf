@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE rdf:RDF [
+     <!ENTITY rdf  "http://www.w3.org/1999/02/22-rdf-syntax-ns#" >
+     <!ENTITY rdfs "http://www.w3.org/2000/01/rdf-schema#" >
+     <!ENTITY xsd  "http://www.w3.org/2001/XMLSchema#" >
+     <!ENTITY owl  "http://www.w3.org/2002/07/owl#" >
+     <!ENTITY archive "http://rx4rdf.sf.net/ns/archive#">
+   ]>
+
+<rdf:RDF
+  xmlns="&archive;"
+  xmlns:owl ="&owl;"
+  xml:base="http://rx4rdf.sf.net/ns/archive#"
+  xmlns:rdf ="&rdf;"
+  xmlns:rdfs="&rdfs;"  
+>
+
+<owl:Ontology rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/" >
+  <owl:versionInfo>April 18. 2003, v0.1</owl:versionInfo>
+  <dc:title>scalable content ontology</dc:title>
+  <dc:creator>Adam Souzis</dc:creator>
+  <dc:subject>ontology for representing content and collections of content</dc:subject>
+  <dc:description>By a scalable ontology we mean one that provides more precise representation of content enabling widely disparate sources, system and authorities to annotate and reference each other. Ontologies and generally don't have a way of expressing what a content URL denotes - they just accept the naive assumation that an URI denotes the same thing across time and space. Furthermore, current content management systems (using this term broadly) are closed systems where they control their URI space and can make assumptions about it.
+  </dc:description>
+  <dc:date>2003-04-10</dc:date>
+  <dc:language>en</dc:language>
+  <dc:identifier>http://rx4rdf.sf.net/ns/archive</dc:identifier>
+</owl:Ontology>
+
+<owl:Class rdf:ID="ContentRep" />   
+
+<owl:Class rdf:ID="NamedContent" >   
+<rdfs:subClassOf rdf:resource="#ContentRep" />  
+</owl:Class>
+
+<!-- this base class applies to an resource that denotes content (hmm, define content) and is appropriate to be the subject of metadata about that content.
+We define a set of subclasses that are progressively more specific about the exact content the resource denotes.
+NamedContent: a general identifier of content, based on some or any intension - the specific content can vary depending on the context, such as time and place
+ContentLocation: is your everyday, in the wild URL that denotes a file at given location 
+ContentSource: a resource similar to a ContentLocation, but specifies addition properties to remove any ambiguity about the location (fixing the place)
+ContentInstance: ContentSource fixed in the time and specifies any transformation that might have applies 
+Contents: a resource that denotes a fixed set of bytes. Because we can use a secure digest as the resource URI anyone can independently come up with its name
+
+Assertions about content (metadata) can applied to any of these subclasses based on the level of knowledge about the content: 
+when NamedContent is the subject it asserts invariants that hold as long as content is appropriately given that name
+when Content assertions about a specific representation 
+Assertions about ContentInstances, ContentSources and ContentLocations may introduce ambiguity but appropriate when that is the only information available
+
+Summary of relations:
+content <-> instance -> csource -> clocation
+--> 
+<owl:ObjectProperty rdf:about="#has-expression" >  
+<rdfs:domain rdf:resource="#NamedContent" />
+<rdfs:range rdf:resource="#ContentRep" />
+</owl:ObjectProperty>  
+
+<owl:Class rdf:ID="Contents" >
+  <rdfs:subClassOf rdf:resource="#ContentRep" />  
+<!-- represents a particular ordered set of bytes. external constraint: resource id should be urn:md5: or urn:sha: -->
+  <rdfs:subClassOf >  
+      <owl:Restriction> <!-- require a sha1-digest -->
+          <owl:onProperty rdf:resource="#sha1-digest"/>
+          <owl:cardinality rdf:datatype="&xsd;nonNegativeInteger">1</owl:cardinality>
+      </owl:Restriction>
+  </rdfs:subClassOf>    
+</owl:Class>
+
+<owl:DatatypeProperty rdf:about="#hasContent">  
+  <rdfs:domain rdf:resource="#Contents" />
+  <rdfs:range rdf:resource="&rdfs;Literal"/>
+  <rdf:type rdf:resource="&owl;FunctionalProperty" />
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:about="#contentLength">  
+<!-- in bytes -->
+  <rdfs:range rdf:resource="&xsd;nonNegativeInteger"/>
+  <rdf:type rdf:resource="&owl;FunctionalProperty" />
+</owl:DatatypeProperty>
+
+<!-- 
+    content-instance & its properties 
+    A content-instance deterministically yields a particular stream of bytes
+-->
+<owl:Class rdf:ID="ContentInstance">
+<rdfs:subClassOf rdf:resource="#ContentRep" />  
+</owl:Class>
+
+<owl:ObjectProperty rdf:about="#has-instance" >  
+<rdfs:domain rdf:resource="#Contents" />
+<rdfs:range rdf:resource="#ContentInstance" />
+</owl:ObjectProperty>  
+
+<owl:ObjectProperty rdf:about="#instance-of" >  
+<rdfs:domain rdf:resource="#ContentInstance" />
+<rdfs:range rdf:resource="#Contents" />
+<owl:inverseOf rdf:resource="#has-instance"/>
+</owl:ObjectProperty>  
+
+<owl:DatatypeProperty rdf:about="#as-of">  
+  <rdfs:domain rdf:resource="#ContentInstance" />
+  <rdf:range rdf:resource="&xsd;dateTime"/>
+</owl:DatatypeProperty>
+
+<owl:ObjectProperty rdf:about="#from-source" >  
+<rdfs:domain rdf:resource="#ContentInstance" />
+<rdfs:range rdf:resource="#ContentSource" />
+</owl:ObjectProperty>  
+
+<owl:ObjectProperty rdf:about="#source-of" >  
+<rdfs:domain rdf:resource="#content-source" />
+<rdfs:range rdf:resource="#ContentInstance" />
+<owl:inverseOf rdf:resource="#from-source"/>
+</owl:ObjectProperty>  
+
+<owl:ObjectProperty rdf:about="#transformed-by" >  
+<rdfs:domain rdf:resource="#ContentInstance" />
+<rdfs:range rdf:resource="#transform-routine" />
+</owl:ObjectProperty>  
+
+<!-- 
+    Class routine and its subclasses & instances
+        
+    A routine is a deterministic operations that take a stream of bytes as input 
+    TODO: rename!
+-->
+
+<owl:Class rdf:ID="routine" />
+
+<owl:Class rdf:ID="transform-routine" >
+<!-- a routine that deterministically outputs another stream of bytes -->
+<rdfs:subClassOf rdf:resource="#routine" />  
+</owl:Class>
+
+<transform-routine about="#quote" />
+<transform-routine about="#xdelta1.1-patch" />
+<transform-routine about="#xdelta1.1-diff" />
+<transform-routine about="#xslt" />
+
+<transform-routine about="http://www.w3.org/TR/2001/REC-xml-c14n-20010315" >
+<rdfs:label>Canonical XML (omits comments)</rdfs:label>
+</transform-routine>
+
+<transform-routine about="http://www.w3.org/TR/2001/REC-xml-c14n-20010315#WithComments" >
+<rdfs:label>Canonical XML</rdfs:label>
+</transform-routine>
+
+<!--  do we need this?
+<owl:Class rdf:ID="xdelta-patch-instance" equivalent-to intersectionof content-instance restriction cardinality 1 transform-routine=xdelta-patch, and exists diff-file />
+-->
+
+<!-- 
+    Class content-source and its subclasses and properties
+-->
+<owl:Class rdf:ID="ContentSource">
+<!-- 
+The location of a ContentSource isn't identified by its resource id but rather by its content-source-locator properties. This is because URL is not necessary universal and may need addition properties to get enough context to retrieve a sufficiently specific stream of bytes. Examples: of such properties are volume-name and host-name for a file scheme URL, or http-request-headers for an http scheme URL. These properties are indentified as being of type content-source-locator. -->
+  <rdfs:subClassOf rdf:resource="#ContentRep" />  
+  <rdfs:subClassOf >  
+      <owl:Restriction> <!-- require at least one content-source-locator property  -->
+          <owl:onProperty rdf:resource="#content-source-locator"/>
+          <owl:minCardinality rdf:datatype="&xsd;nonNegativeInteger">1</owl:minCardinality>
+      </owl:Restriction>
+  </rdfs:subClassOf>    
+</owl:Class>
+
+<rdf:Property rdf:about="#content-source-locator" />
+
+<owl:Class rdf:ID="ContentLocation">
+<rdfs:subClassOf rdf:resource="#ContentRep" />  
+</owl:Class>
+
+<owl:Class rdf:ID="FileLocation" >
+<rdfs:subClassOf rdf:resource="#ContentLocation" />  
+</owl:Class>
+
+<owl:ObjectProperty rdf:about="#url">  
+  <rdfs:domain rdf:resource="#ContentSource" />
+  <rdf:range rdf:resource="#ContentLocation"/>
+  <rdf:type rdf:resource="#content-source-locator" />
+  <rdf:type rdf:resource="&owl;FunctionalProperty" />
+</owl:ObjectProperty>
+
+<owl:Class rdf:ID="FileSource" >
+<rdfs:subClassOf rdf:resource="#ContentSource" />  
+<!-- external constraint: url must be absolute file URL, if host name is not URL host-name property must be present -->
+</owl:Class>
+
+<!-- properties of FileSource -->
+<owl:DatatypeProperty rdf:about="#host-name">  
+  <rdfs:domain rdf:resource="#FileSource" />
+  <rdfs:range rdf:resource="&rdfs;Literal"/>
+  <rdf:type rdf:resource="#content-source-locator" />
+  <rdf:type rdf:resource="&owl;FunctionalProperty" />
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:about="#volume-name">  
+<!-- maybe a necessary identifier for removable media -->
+  <rdfs:domain rdf:resource="#FileSource" />
+  <rdfs:range rdf:resource="&rdfs;Literal"/>
+  <rdf:type rdf:resource="#content-source-locator" />
+  <rdf:type rdf:resource="&owl;FunctionalProperty" />
+</owl:DatatypeProperty>
+
+<!-- 
+    digest properties
+-->
+
+<owl:DatatypeProperty rdf:about="#digest">  
+<!-- but why bother with the range when don't gain much and then you'll need to use rdf:dataType in every instance
+  <rdf:range rdf:resource="&xsd;hexBinary"/>
+-->
+   <rdfs:range rdf:resource="&rdfs;Literal"/>
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:ID="nilsimsa">
+<rdfs:subPropertyOf rdf:resource="#digest" />
+<!-- hex digits -->
+<rdf:type rdf:resource="&owl;FunctionalProperty" />
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:ID="oneway-digest">
+<rdfs:subPropertyOf rdf:resource="#digest" />
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:ID="sha1-digest">
+<rdfs:subPropertyOf rdf:resource="#oneway-digest" />
+<rdf:type rdf:resource="&owl;FunctionalProperty" />
+<!-- base64 -->
+<!-- really this is an inverse functional property but it's also a DatatypeProperty but we don't declare this so we're not restricted to owl full -->
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:ID="md5-digest">
+<rdfs:subPropertyOf rdf:resource="#oneway-digest" />
+<rdf:type rdf:resource="&owl;FunctionalProperty" />
+<!-- base64 -->
+<!-- really this is an inverse functional property but it's also a DatatypeProperty but we don't declare this so we're not restricted to owl full -->
+</owl:DatatypeProperty>
+
+<owl:DatatypeProperty rdf:ID="hmac-digest">
+<rdfs:subPropertyOf rdf:resource="#oneway-digest" />
+<rdf:type rdf:resource="&owl;FunctionalProperty" />
+<!-- really this is an inverse functional property but it's also a DatatypeProperty but we don't declare this so we're not restricted to owl full -->
+</owl:DatatypeProperty>
+
+<!-- 
+generic metadata for any ContentRep
+ -->
+<owl:DatatypeProperty rdf:about="#content-type">  
+<!-- mime-type. use dc or some other standard?  -->
+  <rdfs:domain rdf:resource="#ContentRep"/>
+  <rdfs:range rdf:resource="&rdfs;Literal"/>
+  <rdf:type rdf:resource="&owl;FunctionalProperty" />
+</owl:DatatypeProperty>
+
+<owl:ObjectProperty rdf:about="#byte-rep-of" >  
+<!-- short-cut for making assertions about the content: implies raw bytes (#quote) "transformation" -->
+<!-- make subproperty of instance-of? -->
+<rdfs:domain rdf:resource="#ContentRep" />
+<rdfs:range rdf:resource="#Contents" />
+<rdf:type rdf:resource="&owl;FunctionalProperty" />
+</owl:ObjectProperty>  
+
+</rdf:RDF>
