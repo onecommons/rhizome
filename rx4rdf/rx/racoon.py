@@ -26,6 +26,7 @@ except ImportError:
     import StringIO
 from rx import logging #for python 2.2 compatibility
 log = logging.getLogger("racoon")
+_defexception = utils.DynaExceptionFactory(__name__)
 
 #xpath variable namespaces:
 RXIKI_HTTP_REQUEST_HEADER_NS = 'http://rx4rdf.sf.net/ns/racoon/http-request-header#'
@@ -113,15 +114,15 @@ def If(context, cond, v1, v2=None):
     else:
         return parser.new().parse(Conversions.StringValue(v2)).evaluate(context)
     
-def HasMetaData(kw, context, name):
+def HasMetaData(context, name):
     def _test(local, dict):
         if dict.has_key(local):
             return True
         else:
             return False
-    return _onMetaData(kw, context, name, _test)
+    return _onMetaData(context, name, _test)
 
-def GetMetaData(kw, context, name):
+def GetMetaData(context, name):
     '''
     the advantage of using this instead of a variable reference is that it just returns 0 if the name doesn't exist, not an error
     '''
@@ -130,9 +131,9 @@ def GetMetaData(kw, context, name):
             return dict[local]
         else:
             return False
-    return _onMetaData(kw, context, name, _get)
+    return _onMetaData(context, name, _get)
 
-def AssignMetaData(kw, context, name, val):
+def AssignMetaData(context, name, val):
     '''
     new variable and values don't affect corresponding xpath variable 
     '''
@@ -141,18 +142,20 @@ def AssignMetaData(kw, context, name, val):
         dict[local] = val
         return val
     #print >>sys.stderr,'AssignMetaData ', name, ' ' , val
-    return _onMetaData(kw, context, name, _assign)
+    return _onMetaData(context, name, _assign)
 
-def RemoveMetaData(kw, context, name):
+def RemoveMetaData(context, name):
     def _delete(local, dict):
         if dict.has_key(local):
             del dict[local]
             return True
         else:
             return False
-    return _onMetaData(kw, context, name, _delete)
+    return _onMetaData(context, name, _delete)
 
 def _onMetaData(kw, context, name, func):
+    kw = context.varBindings[(None, '_kw')]
+    
     (prefix, local) = SplitQName(name)
     if prefix:
         try:
@@ -191,6 +194,11 @@ DefaultExtFunctions = {
 (RXWIKI_XPATH_EXT_NS, 'file-exists'):  FileExists,
 (RXWIKI_XPATH_EXT_NS, 'if'): If,
 (RXWIKI_XPATH_EXT_NS, 'ospath2pathuri'): OsPath2PathUri,
+#these ones require context.kw to be set:
+(RXWIKI_XPATH_EXT_NS, 'assign-metadata') : AssignMetaData,
+(RXWIKI_XPATH_EXT_NS, 'remove-metadata') : RemoveMetaData,
+(RXWIKI_XPATH_EXT_NS, 'has-metadata') : HasMetaData,
+(RXWIKI_XPATH_EXT_NS, 'get-metadata') : GetMetaData,        
 }
 
 DefaultNsMap = { 'owl': 'http://www.w3.org/2002/07/owl#',
@@ -348,10 +356,14 @@ class SiteUriResolver(Uri.SchemeRegistryResolver):
         except AttributeError: #not found
             raise UriException(UriException.RESOURCE_ERROR, uri, 'Not Found')
 
+_defexception('expression will fail')
+    
 class Action(object):    
-    def __init__(self, queries, action = None, matchFirst = True, forEachNode = False, depthFirst = True, requiresContext = False):
+    def __init__(self, queries, action = None, matchFirst = True, forEachNode = False,
+                 depthFirst = True, requiresContext = False):#, cachePredicateFactory = defaultCacheKeyPredicateFactory):
         '''Queries is a list of RxPath expressions associated with this action
-Action must be a function with this signature:    
+        
+action must be a function with this signature:    
 def action(resultNodeset, kw, contextNode, retVal) where:
     resultNodeset is result of the RxPath expression associated with this action
     kw is dictionary of the parameters associated with the request
@@ -371,8 +383,12 @@ otherwise the action will be called once and whole nodeset will passed as the re
         self.requiresContext = requiresContext
         self.depthFirst = depthFirst
         self.preVars = {}
-        self.postVars = {}
+        self.postVars = {}        
         # self.requiresRetVal = requiresRetVal not yet implemented
+        #if cachePredicateFactory:
+        #    self.cachePredicate = cachePredicateFactory(self)
+        #else:
+        self.cachePredicate = None
 
     def assign(self, varName, *exps, **kw):
         '''
@@ -385,6 +401,59 @@ otherwise the action will be called once and whole nodeset will passed as the re
             self.postVars[varName] = exps
         else:
             self.preVars[varName] = exps
+
+#functions used by the caches
+def _getKeyFromXPathExp(compExpr, context):
+    '''
+    return the key for the expression given a context.
+    The key consists of:
+        context.node, (var1, value1), (var2, value2), etc. for each var referenced in the expression
+        
+    If the expression contains an function that dynamically evaluates an XPath string we throw MRUCache.NotCacheable
+    '''
+    #todo: allow the user to indicate extension function that should throw not NotCacheable
+    key = [ context.node ] 
+    for field in compExpr:
+        if isinstance(field, XPath.ParsedExpr.ParsedVariableReferenceExpr):
+           value = field.evaluate(context) #may raise RuntimeException.UNDEFINED_VARIABLE
+           (prefix, local) = field._key
+           if prefix:            
+               expanded = (context.processorNss[prefix], local)
+           else:
+               expanded = self._key           
+           key.append( (expanded, value) )
+        elif isinstance(field, XPath.ParsedExpr.FunctionCall):
+            #todo: should resolve the qname 
+           if field._name in ['wf:if','xf:evaluate', 'f:evaluate','dyn:evaluate']:
+               raise MRUCache.NotCacheable
+
+    return tuple(key)
+
+def _evaluateXPathExp(compExpr, context):
+    res = compExpr.evaluate(context)
+    def hasSideEffect(field):
+        if isinstance(field, XPath.ParsedExpr.FunctionCall):
+            #todo: should resolve the qname 
+            if field._name in ['wf:remove-metadata', 'wf:assign-metadata']:
+                return field
+    #figure out sideeffect
+    callList = [node for node in compExpr if hasSideEffect(node)]
+    return res, callList
+
+def _processXPathExpSideEffects(cacheValue, compExpr, context):
+    callList = cacheValue[1] #cacheValue is (result, callList)
+    for function in callList:
+        function.evaluate(context) #invoke the function with a side effect
+
+def _resetFunctions(compiledExp, textExp):
+    '''because the function map are not part of the key for the
+       expression cache we need to clear out _func field after retrieving
+       the expression from the cache, forcing _func from being recalculated
+       in order to guard against the function map values changing.
+    '''
+    for field in compiledExp:
+        if isinstance(field, XPath.ParsedExpr.FunctionCall):
+            field._func = None
 
 ############################################################
 ##Racoon main class
@@ -406,7 +475,8 @@ class Root(object):
 
     import MRUCache
     import Ft.Xml.XPath
-    expCache = MRUCache.MRUCache(200, XPath.Compile)
+            
+    expCache = MRUCache.MRUCache(200, XPath.Compile, sideEffectsCalc=_resetFunctions)
     
     def __init__(self,argv):
         self.requestContext = {}
@@ -544,6 +614,7 @@ class Root(object):
                                         
         self.revNsMap = dict(map(lambda x: (x[1], x[0]), self.nsMap.items()) )#reverse namespace map #todo: bug! revNsMap doesn't work with 2 prefixes one ns
         self.rdfDom = RDFDoc(model, self.revNsMap)
+        self.rdfDom.queryCache = MRUCache.MRUCache(200, _evaluateXPathExp, _getKeyFromXPathExp, _processXPathExpSideEffects)
         lock.release()
 ##        outputfile = file('debug.xml', "w+", -1)
 ##        from Ft.Xml.Domlette import Print, PrettyPrint
@@ -578,15 +649,11 @@ class Root(object):
     def mapToXPathVars(self, kw):
         '''map request kws to xpath vars (include http request headers)'''
         extFuncs = self.extFunctions.copy()
-        extFuncs.update({
-        (RXWIKI_XPATH_EXT_NS, 'assign-metadata') : lambda context, name, val: AssignMetaData(kw, context, name, val),
-        (RXWIKI_XPATH_EXT_NS, 'remove-metadata') : lambda context, name: RemoveMetaData(kw, context, name),
-        (RXWIKI_XPATH_EXT_NS, 'has-metadata') : lambda context, name: HasMetaData(kw, context, name),
-        (RXWIKI_XPATH_EXT_NS, 'get-metadata') : lambda context, name: GetMetaData(kw, context, name),        
-        })
         #add most kws to vars (skip references to non-simple types):
         vars = dict( [( (None, x[0]), x[1] ) for x in kw.items()\
-                      if x[0] not in self.COMPLEX_REQUESTVARS] )       
+                      if x[0] not in self.COMPLEX_REQUESTVARS] )
+        #this should only be accessed by the xx-metadata functions:
+        vars[(None, '_kw')] = kw
         #magic constants:
         vars[(None, 'STOP')] = 0
         vars[(None, 'ROOT_PATH')] = self.ROOT_PATH        
@@ -615,10 +682,14 @@ class Root(object):
     def evalXPath(self, xpath,  vars=None, extFunctionMap = None, node = None):
         #print 'eval node', node        
         try:
+            node = node or self.rdfDom
             if not vars:
-                context = node or self.rdfDom 
+                context = node
                 vars = { (None, '_context'): [ context ] } #we also set this in doActions()
-            return evalXPath(self.rdfDom, xpath, nsMap = self.nsMap, vars=vars, extFunctionMap = extFunctionMap , node = node, expCache = self.expCache)
+                
+            context = XPath.Context.Context(node, varBindings = vars,
+                        extFunctionMap = extFunctionMap, processorNss = nsMap)
+            return evalXPath(xpath, context, expCache = self.expCache, getattr(self.rdfDom, 'queryCache', None))
         except (RuntimeException), e:
             if e.errorCode == RuntimeException.UNDEFINED_VARIABLE:                            
                 log.debug(e.message) #undefined variables are ok
@@ -799,12 +870,14 @@ class Root(object):
         except (NameError), e:              
             contents = "<pre>Unable to invoke script: \nerror:\n%s\nscript:\n%s</pre>" % (str(e), contents)
         return contents
-   
+        
     def processXslt(self, source, contents, kw = None, uri='path:'):
         if kw is None: kw = {}
-        vars, extFunMap = self.mapToXPathVars(kw)
-        from Ft.Xml.Xslt.Processor import Processor
-        processor = Processor()
+        vars, extFunMap = self.mapToXPathVars(kw)        
+        processor = utils.XsltProcessor()
+        
+        def contextHook(context): context.varBindings[(None, '_kw')] = kw
+        processor.contextSetterHook = contextHook 
         #print 'xslt ', uri
         #print 'xslt template:', source
         #print 'xslt source: ', contents
@@ -936,18 +1009,18 @@ cmd_usage = '''\nusage:
 -a [config.py] run the application specified
 '''
 
-if __name__ == '__main__':
+def main(argv):
     eatNext = False
     mainArgs, rootArgs = [], []
-    for i in range(1, len(sys.argv)):
-        if sys.argv[i] == '-a':
-            rootArgs += sys.argv[i:]
+    for i in range(len(argv)):
+        if argv[i] == '-a':
+            rootArgs += argv[i:]
             break        
-        if sys.argv[i] in ['-d', '-r', '-x', '-s', '-l', '-h', '--help'] or (eatNext and sys.argv[i][0] != '-'):
-            eatNext = sys.argv[i] in ['-d', '-s', '-l']
-            mainArgs.append( sys.argv[i] )
+        if argv[i] in ['-d', '-r', '-x', '-s', '-l', '-h', '--help'] or (eatNext and argv[i][0] != '-'):
+            eatNext = argv[i] in ['-d', '-s', '-l']
+            mainArgs.append( argv[i] )
         else:
-            rootArgs.append( sys.argv[i] )
+            rootArgs.append( argv[i] )
             
     if '-l' in mainArgs:
         try:
@@ -971,7 +1044,7 @@ if __name__ == '__main__':
         logging.basicConfig()
 
     root = Root(rootArgs)
-       
+    print 'ma', mainArgs  
     if '-h' in mainArgs or '--help' in mainArgs:
         #print DEFAULT_cmd_usage,'[config specific options]'
         print root.cmd_usage
@@ -990,4 +1063,9 @@ if __name__ == '__main__':
         sys.argv = mainArgs #hack for Server
         import Server
         debug = '-r' in mainArgs
+        print 'starting server!'
         Server.start_server(root, debug) #kicks off the whole process
+        print 'dying!'
+
+if __name__ == '__main__':
+    main(sys.argv[1:])
