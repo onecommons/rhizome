@@ -1,0 +1,78 @@
+Rx4RDF requires Python 2.2 or later and [4Suite 1.0a1|http://4suite.org] or later. 
+
+Rx4RDF is known to run on Linux, Windows NT & 2000, and Cygwin and should work on any platform that supports Python and 4Suite.
+
+On Windows, [Win32 Extensions for Python|http://www.python.org/windows/win32all] must be installed or interprocess file locking will be disabled (which is needed if you have multiple Raccoon processes accessing the same model).
+
+[Source (zip)|http://sourceforge.net/project/showfiles.php?group_id=85676]
+
+[Source (tar.gz)|http://sourceforge.net/project/showfiles.php?group_id=85676]
+
+If you're just interested in ZML you just need this one Python [file|http://sourceforge.net/project/showfiles.php?group_id=85676].
+
+!Install
+This is a standard Python source distribution. To install:
+# Unzip
+# Run ^^python <unzip dir>/setup.py install^^
+
+This installs:
+* a package named "rx" in the Python ^^site-packages^^ directory
+* shell scripts or .bat files for running Raccoon and ZML in the Python scripts directory
+* a directory named "rx4rdf" containing documentation, Rhizome pages, and other ancillary files in the Python share directory.
+
+!Quick Start
+Once you've installed Rx4RDF, use this guide to quickly start playing with its various components:
+
+!!RxPath
+To run a query on an RDF or NTriples file:
+
+^^python <python lib dir>/site-packages/rx/RxPathDom.py myrdf.rdf \[RxPath expression]
+
+If \[RxPath expression] is omitted it will start in interactive mode.
+
+!!Raccoon and Rhizome
+Run a local copy of this site:
+
+#^^cd <unzip dir>/site
+#either:
+##^^<python script dir>/run-raccoon -a site-config.py^^ or
+##^^python <python lib dir>/site-packages/rx/raccoon.py -a site-config.py
+#Browse to [http://localhost:8000] (edit server.cfg to change the port).
+
+To start a fresh Rhizome site, just run Rhizome from the directory where you want the site to live:
+
+#^^cd <directory of the new site>
+#^^<python script dir>/run-raccoon -a <python share dir>/rx4rdf/rhizome/rhizome-config.py
+
+!!RxSLT, RxUpdate, ZML
+To experiment with RxSLT, RxUpdate, or ZML run an instance of Rhizome and create or edit pages with this format.  Or see RxPath.py or zml.py for programmatic interfaces.
+
+!!ZML
+Convert ZML to XML:
+
+^^<python script dir>/zml \[-p] \[-d] \[-mm MyMarkupMapFactory()] zmlsample.zml
+or
+^^python <python lib dir>/site-packages/rx/zml.py \[-p] \[-d] \[-mm MyMarkupMapFactory()] zmlsample.zml
+
+Convert ZML to XML:
+^^<python script dir>/zml -z xmlsample.xml
+
+Options: 
+:-z convert from XML to ZML (if omitted: ZML to XML)
+:-p pretty print
+:-d show debug output
+
+ZML to XML options:
+:-m               assume ZML source is in markup mode
+:-r \[rootelement] wrap in root element (default: "zml")
+:-mm markupmap    \[string that evaluates to a Python class compatible with rx.zml.DefaultMarkupMapFactory]
+
+!!RxML
+Convert a RDF or NTriples file to RxML/ZML:
+
+^^python <python lib dir>/site-packages/rx/rxml.py -r myrdf.rdf
+
+Convert a RxML/XML file to RDF (NTriples):
+
+^^python <python lib dir>/site-packages/rx/rxml.py -n myrdf.rdf
+

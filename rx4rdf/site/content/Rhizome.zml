@@ -1,0 +1,49 @@
+__Rhizome__ is a [Wiki|http://c2.com/cgi/wiki]-like content management and delivery system that exposes the entire site -- content, structure, and metadata as editable [rx4rdf:RDF]. This means that instead of just creating a site with URLs that correspond to a page of HTML, with Rhizome you can create URLs that represent just about anything, such as:
+* structural components of content (such as a bullet point or a definition).
+* abstract entities that can be presented in different ways depending on the context.
+* relationships between entities or content, such as annotations or categories.
+
+Rhizome is designed to enable non-technical users to create these representations in an easy, ad-hoc manner. To this end, it includes a text formatting language which similar to a [Wiki|http://c2.com/cgi/wiki]'s but lets you author arbitrary XML content and RDF metadata. And for developers, this allows both content and structure to be easily repurposed and complex web applications rapidly developed. 
+
+The long-term [vision|rx4rdf:RhizomeStatus] is that each Rhizome site will intertwine together, forming an emergent fuzzy taxonomy over a peer-to-peer network.
+
+The nearer-term goals of Rhizome are:
+* To allow (relatively) non-technical folk to create "[Semantic web|http://www.w3.org/2001/sw]"-enabled web sites.
+* To provide a platform for the rapid-development of web applications
+* To provide a test-bed for experimenting with new forms of collaborative knowledge production and communication
+* A showcase and test-bed for its underlying technologies: [rx4rdf:Rx4RDF], [ZML], and [rx4rdf:Raccoon]
+
+!Features
+
+Wiki ease
+
+* All the functionality of a Wiki: public and automatic creation of pages and links using simple text formatting rules
+* But the same [formatting rules|ZML] can used to author arbitrary HTML, XML and RDF 
+* And you can create and edit not just content but also the metadata, site structure and appearance, even application behavior
+* Including dynamic pages: supports XSLT, [RxSLT], Python, [RxUpdate]
+* Thus enabling dynamic, rule and context based presentation of content
+
+Advanced Content Management functionality
+
+* pages can consist of any content: xml, html, binary, etc.
+* content, metadata and site structure is a stored as RDF: enabling it be repurposable, human editable, application agnostic, etc.
+* flexible authorization and security model 
+* staging/release workflow
+* native versioning of content and metadata, conflict detection
+* supports local file system or browser-based development 
+* can generate static websites
+* import/export of content and metadata
+* flexible backend: supports multiple RDF engines (Redland, 4Suite) with multiple datastores: file based, SQL databases, embeddable databases (Sleepycat, Metakit)
+
+!Easy authoring and Rapid Development
+XHTML or arbitrary XML can be authored in [ZML] in a manner very similar to Wiki text formatting rules.  Rhizome comes with built-in support for [Apache Forrest|http://xml.apache.org/forrest/index.html] document types and has preliminary support for [DocBook|http://www.docbook.org].  You can also easily view and edit RDF metadata for the site using [RxML].
+
+Almost all of Rhizome's functionality can be found its dynamic pages, which are written in [RxSLT], XSLT, and [RxUpdate].  These can be edited like any other page, making it easy to add and change functionality without restarting the server.  You can use RxUpdate to migrate the underlying schema at run-time.  Rhizome supports fine-grained authorization and versioning of both metadata and content, so you have some guard rails too.
+
+!Documentation and Configuration
+See the [Rhizome Manual] for general documentation.
+
+For more technical details see ^^rhizome/rhizome-config.py^^ -- the core behavior of Rhizome is defined in there and the comments should be useful to read. Also, see the pages on [Raccoon].
+
+!Status
+Rhizome's young but it can run small-scale websites (such as the this [one|about]). See [RhizomeStatus] for more details.

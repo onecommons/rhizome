@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import sys, glob, os.path
+import sys, glob, os, os.path, tempfile
 from distutils.core import setup
 #import py2exe
 
-version_string = "0.2.0"
+version_string = "0.3.0"
 
 PACKAGE_NAME = 'rx4rdf'
 
@@ -34,10 +34,40 @@ if sys.version_info < (2, 3):
             del kwargs["download_url"]
         _setup(**kwargs)	
 
+def createScript(scriptFile, sourceFile):
+    from distutils import sysconfig
+    install_dir = sysconfig.get_python_lib() + os.sep + 'rx'
+    source_py = install_dir + os.sep + sourceFile
+    
+    script_suffix = ''
+    script_str = '#! /bin/sh\n\n%s %s "$@"\n' % (sys.executable, source_py)
+    if sys.platform == 'win32' :
+        arg_str = '%1 %2 %3 %4 %5 %6 %7 %8 %9'
+        script_str = '%s %s %s\n' % (sys.executable, source_py, arg_str)
+        script_suffix = '.bat'
+
+    LOCAL_SCRIPT = scriptFile + script_suffix
+    LOCAL_SCRIPT = os.path.join(tempfile.gettempdir(), LOCAL_SCRIPT)
+    try :
+        os.unlink(LOCAL_SCRIPT)
+    except :
+        pass
+    
+    try :
+        fp = open(LOCAL_SCRIPT, "w")
+        fp.write(script_str)
+        fp.close()
+        if sys.platform != 'mac' :
+            os.chmod(LOCAL_SCRIPT, 0755)
+    except :
+        print "Unable to create utility script."
+        raise
+    return LOCAL_SCRIPT
 
 data_files = [
-		    ('share/rx4rdf',[ 'changelog.txt', 'COPYING', 'README.txt'] ),
+		   ('share/rx4rdf',[ 'changelog.txt', 'COPYING', 'README.txt'] ),
 		   ('share/rx4rdf/rhizome',glob.glob('rhizome/*') ),
+		   ('share/rx4rdf/rhizome',glob.glob('rhizome/help') ),
 		   ('share/rx4rdf/rdfscribbler',glob.glob('rdfscribbler/*') ),
 		   ('share/rx4rdf/docs',glob.glob('docs/*') ),
         ]
@@ -66,5 +96,8 @@ Rhizome, a wiki-like content management and delivery system with wiki-like
 markup languages for authoring XML and RDF, and RDFScribbler, for viewing and editing RDF models.""",	  
 #packaging info:	  	  
       packages = ['rx', 'rx/logging22', 'rx/test'],
-	  data_files = data_files
+	  data_files = data_files,
+	  scripts = [ createScript('run-raccoon', 'raccoon.py'),
+	              createScript('zml', 'zml.py'),
+	          ]
 	  )

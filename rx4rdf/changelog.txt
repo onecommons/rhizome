@@ -1,6 +1,80 @@
 Rx4RDF and Rhizome Changelog
 ============================
 
+Changes in Version 0.3 (May 11, 2004)
+---------------------------------------
+Major changes and bug fixes:
+
+Security related:
+* Raccoon:  Python content processor disabled by default
+* Rhizome: creating python or RxUpdate pages require pre-defined access tokens 
+           (see rhizome/save.xml)
+* Rhizome: admin password digest no longer stored in model 
+* Raccoon: disable unsafe 4Suite XPath/Xslt extension functions
+* Raccoon: added transaction log/audit trail of changes to the model
+* Raccoon: added various authorization hooks
+* Rhizome: added authorization of assign-metadata (see rhizome.authorizeMetadata())
+* Rhizome: add fine-grained authorization when modifying the model
+* Rhizome: add class-based authorization and priority to access tokens 
+* Rhizome: add authorization model with secure defaults 
+* Rhizome: added private seed for generating secure hashes
+
+ZML: 
+** Renamed RhizML to ZML
+** made ZML.py standalone (no dependency on rx package)
+** added xml to zml option
+** added #?zml prolog with optional markup map URI
+** lines that begin with #! are ignored
+** lines that begin with #? are treated as processor instructions 
+** leading '<' are treated as spaces
+** \Uxxxxxxxx and \uXXXX are converted to character references (&#xXXX;)
+** have two modes for parsing: "markup" and "mixed"
+** lines like "#?zml markup" or "#?zml" set the parser in and out of markup mode   
+** in markup mode, wiki text is not allowed
+** in mixed mode a line must start with a '<' to be treated as markup, otherwise it's wiki text 
+** in mixed mode leading space continues the previous line (instead of trailing \ as before)
+
+Other:
+* Rhizome: support for aliases of page names
+* Rhizome: support for interwiki links (see rhizome/intermap.txt)
+* Rhizome: added preview option in edit page
+* Rhizome: added Wiki-style link display options (see rhizome/wiki2html.xsl)
+* Raccoon: Etag are now set on all responses and If-None-Match honored
+* Raccoon: the xml/html content processor now fixes up 'site:' URLs
+* utils:   added class for fixing up links in HTML and XML
+* Raccoon: content processors can now dynamically chain formats based on content
+           (for XSLT and RxSLT stylesheets, use assign-metadata('_format','format'))
+* RxUpdate:added define-template and call-template elements
+* Rhizome: added support for hierarchical names and folders
+* Rhizome: added folder view handler (see rhizome/dir.xsl)
+* Rhizome: revisions saved as diffs are now saved to disk like other content
+* RxPath:  added sort() extension function that sorts a node set like XSLT's sort element
+* RxUpdate:attribute values in literal elements are now treated as attribute value templates
+* Rhizome: default template less ugly
+* Rhizome: added RxML, RxML Edit, and RxPathDOM output to search
+* Raccoon: bug fix: convert response status code to an int (fixes login error on IE 6)
+* Rhizome: enable the creation of anonymous entries (see save.xml)
+* RxUpdate:added include element
+* RxPath:  RDF containers (rdf:Seq, rdf:Bag, rdf:Alt) are now implemented as 
+           described in the RxPath spec.
+* RxPath:  Descendant axes are now implemented as described in the RxPath spec.
+* utils:   Diff and patching bug fixes, add fast diff for sorted lists
+* Raccoon: Add MRU file cache (disabled by default)
+* RxPath:  diffing and 2-way merge RxPath DOMs and nodes
+* Rhizome: new defaults to enable viewing, editing, and deleting resources regardless of type
+* Rhizome: added RxML template disposition for creating new resources
+* Rhizome: added Recent Changes page
+* Rhizome: added administration page and new resource templates
+* RxPath:  added core RxPath functions for mapping URIs to QNames (and implemented id())
+* RxPath:  added "uri" attribute to Predicate elements
+* Rhizome: added sha1 digest and content length to the model when saving content
+* Raccoon: added an option whicn adds an identifying statement each time a model is committed.
+* Rhizome: better handling of content-type response header
+* Rhizome: new metadata view and search display make browsing the model much easier.
+* Rhizome: added print view template and link 
+* Raccoon: various minor refactorings for usability and flexibility
+* Rhizome: added help pages
+
 Changes in Version 0.2 (Feb. 29, 2004)
 ---------------------------------------
 Major changes and bug fixes:
@@ -19,9 +93,9 @@ Changes include:
 * RxUpdate: implemented xupdate:variable element/instruction
 * Racoon: added cacheing of RxPath expression parsing, stylesheet parsing, 
   RxPath evaluation, and Racoon Actions. 
-  (See docs/RacoonCaches for config options.
+  (See docs/RacoonCaches for config options.)
 * Racoon: partial support for virtual host names. 
-  (See rx/rhizome/server.cfg for config options.)
+  (See rhizome/server.cfg for config options.)
 * utils: added iterators and visitors for compiled XPath expressions
 * utils: utility classes for generating exception classes and patching 3rd-party classes
 * Rhizome: rewrote saving content logic, including allowing external 

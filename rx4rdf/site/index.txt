@@ -1,10 +1,16 @@
-[Rx4RDF|RxPathSpec] is a specification and reference implementation for querying, transforming and updating W3C's [RDF] by specifying a deterministic mapping of the RDF model to the XML data model defined by [XPath|http://www.w3.org/TR/xpath]. Rx4RDF shields developers from the complexity of RDF by enabling you to use familar XML technologies like XPath, XSLT and XUpdate. We call their RDF equivalents [RxPath], [RxSLT], and [RxUpdate] respectively. 
+Rx4RDF is a set of technologies designed to make W3C's [RDF] more accessible and easier to use. 
+
+[RxPath|RxPathSpec] is a specification and reference implementation for querying, transforming and updating [RDF] by specifying a deterministic mapping of the RDF model to the XML data model defined by [XPath|http://www.w3.org/TR/xpath]. Rx4RDF shields developers from the complexity of RDF by enabling you to use familar XML technologies like XPath, XSLT and XUpdate. We call their RDF equivalents [RxPath], [RxSLT], and [RxUpdate] respectively. 
+
+[ZML] is a [Wiki|http://c2.com/cgi/wiki]-like text formatting language that lets you write arbitrary XML or HTML, enabling you to author XML documents with (nearly) the same ease as a Wiki entry.
+
+[RxML] is an alternative XML serialization for RDF that is designed for easy authoring in [ZML], allowing novices to author and edit RDF metadata. 
 
 Building on top of Rx4RDF is an application stack that allows RDF to be used to rapidly build web applications:
 
-* [Racoon] is a simple application server that uses an RDF model for its data store, roughly analogous to RDF as [Apache Cocoon|http://cocoon.apache.org/] is to XML. [Racoon] uses [RxPath] to translate arbitary requests to RDF resources, each of which can be associated with [RxSLT] and [RxUpdate] stylesheets.
-* [Rhizome] is a general purpose content management and delivery system that runs on [Racoon]. It is dynamic and self-editable like a [Wiki|http://c2.com/cgi/wiki] but uses [RhizML] and [RxML] to enable structured content and editable metadata. This site is run on [Rhizome]. \<BR/>[RhizML] is a [Wiki|http://c2.com/cgi/wiki]-like text formatting language that lets you write arbitrary XML or HTML, enabling you to author XML documents with (nearly) the same ease as a Wiki entry. \<BR/>[RxML] is an alternative XML serialization for RDF that is designed for easy authoring in [RhizML], allowing novices to author and edit RDF metadata. 
-* [RDFScribbler] is another application built on [Racoon]. It is a simple web application that can display and edit any arbitrary RDF model using RxSLT and RxUpdate.
+* [Raccoon] is a simple application server that uses an RDF model for its data store, roughly analogous to RDF as [Apache Cocoon|http://cocoon.apache.org/] is to XML. [Raccoon] uses [RxPath] to translate arbitary requests to RDF resources, each of which can be associated with [RxSLT] and [RxUpdate] stylesheets.
+* [Rhizome] is a general purpose content management and delivery system that runs on [Raccoon]. It is dynamic and self-editable like a [Wiki|http://c2.com/cgi/wiki] but uses [ZML] and [RxML] to enable structured content and editable metadata. This site is run on [Rhizome]. 
+* [RDFScribbler] is another application built on [Raccoon]. It is a simple web application that can display and edit any arbitrary RDF model using RxSLT and RxUpdate.
 
 See also:
 
@@ -12,11 +18,18 @@ See also:
 
 [Rhizome Vision|RhizomeStatus]
 
-
 !!Latest News
+\[12 May 2004]
+
+Version 0.3.0 of Rx4RDF and Rhizome released. 
+
+This release is focused on making Rhizome usable for running small-scale web sites and includes much improved documentation, fine-grained authorization, and enough new features to put it on par with a full-featured Wiki. Plus a bunch of other stuff.
+
+[Download] it or view the [changelog|Rx4RDFChangelog]
+
 \[29 February 2004]
 
-Version 0.2.0 of Rx4RDF and Rhizome released. [RxPath] has been completely reimplemented, much faster and robust. [Racoon] is also now much faster with the introduction of extensive caching. And, of course, several enhancements were made to [Rhizome]. [Download] it or view the [changelog|Rx4RDFChangelog]
+Version 0.2.0 of Rx4RDF and Rhizome released. [RxPath] has been completely reimplemented, much faster and robust. [Raccoon] is also now much faster with the introduction of extensive caching. And, of course, several enhancements were made to [Rhizome]. [Download] it or view the [changelog|Rx4RDFChangelog]
 
 \[15 December 2003]
 

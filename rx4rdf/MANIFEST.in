@@ -7,6 +7,7 @@ recursive-include rx/logging22 *
 include site/*
 include src/*
 recursive-include docs *
+global-exclude .cvsignore
 global-exclude *.bak *.bk? *.nt *.metarx *.pyc *.log *.lock
 global-include site/wikistore.nt
 global-exclude */CVS/*

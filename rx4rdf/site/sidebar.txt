@@ -1,6 +1,6 @@
 !!!About
 *[Home|index]
-*[FAQ|faq]
+*[FAQ]
 *[Download]
 *[Status]
 *[About|about]
@@ -12,10 +12,10 @@
 *[RxML]
 
 !!!Rhizome
-*[Racoon]
+*[Raccoon]
 *[Rhizome]
 *[RDFScribbler]
-*[RhizML]
+*[ZML]
 
 
 [\<img src='http://sourceforge.net/sflogo.php?group_id=85676&amp;type=1'/>|http://sf.net/projects/rx4rdf]

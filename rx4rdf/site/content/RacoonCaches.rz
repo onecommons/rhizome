@@ -1,7 +1,0 @@
-Racoon uses several MRU (most recently used) caches:
-+XPath parser cache=This caches XPath expression strings so they don't need to be repeatedly parsed.
-+XPath processing cache=This caches the result of evaluating an XPath expression. Certain XPath extension functions have side effects or can not be analyzed for dependencies and so any XPath expressions that references such a function is not cacheable. You can declare addition XPath functions as not cacheable by setting the  NOT_CACHEABLE_FUNCTIONS config setting.
-+stylesheet parser cache=This caches XSLT and RxSLT stylesheets so they don't need to be repeatedly parsed.
-+Action cache=This caches the result of executing an Action. For an action to be cachable you must assign it a CacheKeyPredicate. Racoon provides cache predicates for cacheing RxSLT and XSLT actions. See the documentation on the Action class for more details.
-
-Both the Action cache and XPath processing cache are invalidated when the underlying model changes. The other caches last for the lifetime of the Python process.

@@ -1,14 +1,18 @@
 [Rhizome] was written with two goals in mind: one, a sample application to demonstrate and experiment with [Rx4RDF|index] technologies. Two, a personal tool to allow me to take notes in a wide variety of contexts -- plain text files, blog entries, comments in source code, MS Word/Open Office documents, etc -- and keep an archive that keeps track of locations and can automatically (based on metadata rules) republish the content in a variety of formats: e.g. assemble the notes into the outline of a formal document in [DocBook|http://docbook.org], or as a collection of interlinked pages on a Wiki-like website. 
 
-See also: [Todo list|RhizomeTodo] to meet the above goal
-
 But Rhizome could evolve into much more. There's no immediate plans, so whether it does or not depends the level of interest out there -- so let me know! 
 
 Here are some directions Rhizome could evolve:
 * __Short term__: Most obviously, turn [Rhizome] into a polished, production-ready Wiki-like web application.
-** Improve [Racoon] performance and robustness, see [RacoonStatus]
-** Add a bunch of little Wiki features and configuration options
+** Improve [Raccoon] performance and robustness: pretty much done, see [RaccoonStatus]
+** Improve the scalability of the RxPath engine (right now I wouldn't run a Rhizome site with more than a few hundred pages)
+** Add a bunch of little Wiki features and configuration options. Pretty much done, Rhizome now has all the features you'd expect in a Wiki except for:
+*** Show Page References, Orphaned pages
+*** Subscribe to page change notifications
+*** Display differences between revisions
 * __Medium term__:  an application that combines the best of discussion lists, blogs, and wikis. Think of it as an message forum where forums are trees with leaves that are "permathreads" and you can subscribe to any branch. Quoting is fine grained, and replies can be typed, e.g. "question", "factual correction", "opinion", allowing each leaf can be treated and viewed as a collaborative wiki entry.
+** Support for "shredding" XML documents into RDF statements
+** Support for RDF contexts and views
 * __Long term__:  Rhizomes' intertwine forming a P2P infrastructure. Content is distributed among nodes in a semantic web cloud of RDF, allowing the management and hosting costs of running a node to be negliable. End-users run nodes that act like news aggregators and their choices feedback into the system. 
 ** Integrate with a P2P routing infrastructure 
 ** Collaborative filtering, web of trust 
