@@ -55,9 +55,9 @@ contentHandlerQueries= [
 
 #context is now a content resource, now set the context to a version of the resource
 revisionQueries=[
-'wiki:revisions/*[number($revision)]', #view a particular revision e.g. mypage.html?revision=3
-'wiki:revisions/*[wiki:has-label=$label]', #view a particular label if specified
-'wiki:revisions/*[last()]', #get the last revision
+'(wiki:revisions/*/rdf:first/*)[number($revision)]', #view a particular revision e.g. mypage.html?revision=3
+'wiki:revisions/*/rdf:first/*[wiki:has-label=$label]', #view a particular label if specified
+'(wiki:revisions/*/rdf:first/*)[last()]', #get the last revision
 ]
 
 #todo: revision queries to support draft/release workflow
@@ -71,7 +71,7 @@ revisionQueries=[
 
 #finally have a resource, get its content
 contentQueries=[
-'''wf:if(a:contents/a:ContentCollection, "wf:assign-metadata('REDIRECT', 'dir.xsl')")''', #todo
+#'''wf:if(a:contents/a:ContentCollection, "wf:assign-metadata('REDIRECT', 'dir.xsl')")''', #todo
 './/a:contents/text()', 
 'wf:openurl(.//a:contents/a:ContentLocation)', #contents stored externally
 'wf:openurl(wf:ospath2pathuri($externalfile))', #external file
@@ -167,7 +167,7 @@ contentProcessors = {
     #this stylesheet transforms kw['_contents'] not the rdf model
     'http://www.w3.org/1999/XSL/Transform' : lambda self, contents, kw, result, context:\
         self.processXslt(contents, kw['_contents'], kw, uri=self.evalXPath( 
-            'concat("site:///", (/a:NamedContent[wiki:revisions/*[.=$_context]]/wiki:name)[1])',node=context) ), 
+            'concat("site:///", (/a:NamedContent[wiki:revisions/*/*[.=$_context]]/wiki:name)[1])',node=context) ), 
     'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
         lambda self, contents, kw, result, context, rhizml=rhizml, mmf=rx.rhizome.MarkupMapFactory(): rhizml.rhizmlString2xml(contents,mmf)
 }
@@ -175,8 +175,8 @@ contentProcessors = {
 contentProcessorCachePredicates = {
     'http://www.w3.org/1999/XSL/Transform' : lambda self, result, kw, contextNode,
       contents:\
-          self.partialXsltCacheKeyPredicate(contents, kw, contextNode, self.evalXPath( 
-            'concat("site:///", (/a:NamedContent[wiki:revisions/*[.=$_context]]/wiki:name)[1])',
+          self.partialXsltCacheKeyPredicate(contents, kw['_contents'], kw, contextNode, self.evalXPath( 
+            'concat("site:///", (/a:NamedContent[wiki:revisions/*/*[.=$_context]]/wiki:name)[1])',
             node=contextNode)) , 
     
     'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
@@ -200,7 +200,10 @@ extFunctions = {
 }
 
 STORAGE_PATH = "./wikistore.nt"
-STORAGE_TEMPLATE_PATH = "./wikistore-template.nt"
+#STORAGE_PATH = "./wikistore.bdb"
+#import RxPath
+#initModel = RxPath.initRedlandHashBdbModel
+
 
 ##############################################################################
 ## Define the template for a Rhizome site
@@ -347,3 +350,20 @@ APPLICATION_MODEL= addStructure('http://rx4rdf.sf.net/ns/wiki#ItemFormat', itemF
                    + addStructure('http://rx4rdf.sf.net/ns/wiki#ItemDisposition', itemDispositions)\
                   + addStructure('http://rx4rdf.sf.net/ns/wiki#DocType', docTypes)
 
+#we add these functions to the config namespace so that config files that include this can access them
+#making it easy to extend or override the rhizome default template
+def __addItem__(name, rhizome=rhizome, configlocals=locals(), **kw):
+    templateMap=configlocals['templateMap']
+    templateMap[name] = rhizome.addItem(name, **kw)
+    configlocals['STORAGE_TEMPLATE']= "".join(templateMap.values())
+
+def __addSiteVars__(siteVars, rxml=rxml, configlocals=locals()):
+    templateMap=configlocals['templateMap']
+    templateMap['@sitevars'] = rxml.rhizml2nt(contents=siteVars, nsMap=configlocals['nsMap'])
+    configlocals['STORAGE_TEMPLATE']= "".join(templateMap.values())
+
+def __addRxML__(contents, rxml=rxml, configlocals=locals()):
+    configlocals['STORAGE_TEMPLATE'] += rxml.rhizml2nt(contents=contents, nsMap=configlocals['nsMap'])
+
+def __addTriples__(triples, configlocals=locals()):
+    configlocals['STORAGE_TEMPLATE'] += triples

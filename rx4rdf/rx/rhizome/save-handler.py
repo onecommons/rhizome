@@ -7,10 +7,9 @@ def _req_default_save(self, **kw):
     label = ''#kw['label']
     authtoken = kw['authtoken']
     #sha = utils.shaDigestString(contents)
-    itemURI = generateBnode()
+    itemURI = utils.generateBnode()
     nameURI = self.BASE_MODEL_URI + filter(lambda c: c.isalnum() or c in '_-./', wikiname) #note filter: URI fragment might not match wikiname
     patchRefURI = itemURI #if we create a patch, its base should be this content
-    listURI = generateBnode()
     
     #update algorithm:
     #    if currentcontent:
@@ -24,7 +23,7 @@ def _req_default_save(self, **kw):
     if not kw.get('minor_edit'):
         #given a tree like: item/contents/dynamic-transform/contents/static-transform1/contents/static-transform2/contents/text()
         #1. start with the latest revision:
-        currentItemXpath = '/*[wiki:name/text()="%s"]/wiki:revisions/*[last()]' % wikiname
+        currentItemXpath = '(/*[wiki:name/text()="%s"]/wiki:revisions/*/rdf:first/*)[last()]' % wikiname
     ##    #2. descendent-or-self subject with a contents predicate that not pointing dynamic transform
     ##    #  (because we don't support subclasses yet we need the starts-with() hackery
     ##    nonDynamicContentXPath = './/*[a:contents[not( starts-with(*/a:transformed-by/*/@rdf:about, "http://rx4rdf.sf.net/ns/wiki#item-format-"))]]'
@@ -39,14 +38,14 @@ def _req_default_save(self, **kw):
                 patchTupleList = utils.diff(contents, oldContents) #compare  
                 if patchTupleList is not None:
                     patch = pickle.dumps(patchTupleList)
-                    patchTransformURI = generateBnode()
+                    patchTransformURI = utils.generateBnode()
     kw['patch'] = patch
     #note: we just compared the raw content, so any encoding has to happen after diff-ing
 
     format = kw['format']
     if not format: 
         format = 'http://rx4rdf.sf.net/ns/wiki#item-format-binary'  #unnecessary, but for now always have a format
-    formatTransformURI = generateBnode()        
+    formatTransformURI = utils.generateBnode()        
     patchRefURI = formatTransformURI #patch base should be innermost content
     
     encodedURI = ''    
@@ -54,7 +53,7 @@ def _req_default_save(self, **kw):
         try:
             contents.encode('ascii') #test to see if is just ascii (all <128)
         except UnicodeError:
-            encodedURI = generateBnode()
+            encodedURI = utils.generateBnode()
             patchRefURI = encodedURI#we want our patch to reference the raw content (thus the innermost content resource)
             contents = base64.encodestring(contents)
 
@@ -65,7 +64,7 @@ def _req_default_save(self, **kw):
         if wikiname.find('.') == -1 and self.rhizome.exts.get(format):
             filepath += '.' + self.rhizome.exts[format]
         try: 
-           os.makedirs(self.SAVE_DIR)
+           os.makedirs(self.SAVE_DIR) #todo
         except OSError: pass #dir might already exist
         f = file(filepath, 'wb')
         f.write(contents)
@@ -93,38 +92,45 @@ def _req_default_save(self, **kw):
     <xu:if test='number($startTime) &lt; /*[wiki:name/text()="%(wikiname)s"]/a:last-modified/text()'>
         <xu:message text="Conflict: Item has been modified after you started editing this item!" terminate="yes" />
     </xu:if>
-    <xu:if test='$patch and /*[wiki:name/text()="%(wikiname)s"]/wiki:revisions/*'>  
-        <xu:update select='(/*[wiki:name/text()="%(wikiname)s"]/wiki:revisions/*[last()]//a:contents)[last()]'>
-            <rdf:Description rdf:about='%(patchTransformURI)s' />
-        </xu:update>
-        <xu:append select='/'>
+    <xu:if test='$patch and /*[wiki:name/text()="%(wikiname)s"]/wiki:revisions/*/rdf:first'>  
+    <!--
+        <xu:remove select='(/*[wiki:name/text()="%(wikiname)s"]/wiki:revisions/*/rdf:first/*//a:contents)[last()]' />       
+        <xu:append select='(/*[wiki:name/text()="%(wikiname)s"]/wiki:revisions/*/rdf:first/*//a:contents)[last()]/..'>       
+     -->
+        <xu:replace select='(/*[wiki:name/text()="%(wikiname)s"]/wiki:revisions/*[last()]//a:contents)[last()]'>
+          <a:contents>
             <a:ContentTransform rdf:about='%(patchTransformURI)s'>
                 <a:transformed-by><rdf:Description rdf:about='http://rx4rdf.sf.net/ns/content#pydiff-patch-transform'/></a:transformed-by>
                 <a:contents><xu:value-of select='$patch'/></a:contents>
                 <a:pydiff-patch-base><rdf:Description rdf:about='%(patchRefURI)s' /></a:pydiff-patch-base>
             </a:ContentTransform>
-        </xu:append>
+          </a:contents>
+       </xu:replace>
     </xu:if>
 
     <!-- if the wikiname does not exist, add it now -->    
     <xu:if test='not(/*[wiki:name/text()="%(wikiname)s"])'>
         <xu:append select='/'>
 			<NamedContent rdf:about='%(nameURI)s'>
-			<wiki:name>%(wikiname)s</wiki:name>
-			<a:last-modified>%(curtime).3f</a:last-modified>
-			<wiki:revisions listID='%(listURI)s' />
+			<wiki:name>%(wikiname)s</wiki:name>			
+			<!-- add empty list resource that will be appended to below -->
+			<wiki:revisions><rdf:List/></wiki:revisions>
 			</NamedContent>
         </xu:append>
     </xu:if>
-    <xu:if test='/*[wiki:name/text()="%(wikiname)s"]/a:last-modified'>
-        <xu:update select='/*[wiki:name/text()="%(wikiname)s"]/a:last-modified'>%(curtime).3f</xu:update>
-    </xu:if>
+    
+    <!-- update last modified -->
+    <xu:remove select='/*[wiki:name/text()="%(wikiname)s"]/a:last-modified'/> 
+    <xu:append select='/*[wiki:name/text()="%(wikiname)s"]'>
+        <a:last-modified>%(curtime).3f</a:last-modified>
+    </xu:append>
+
     
     <!-- don't bother saving the last revision if this was just a minor edit
     todo: this doesn't delete the actual content if stored in an external file
     -->    
     <xu:if test='wf:get-metadata("minor_edit") and /*[wiki:name/text()="%(wikiname)s"]/wiki:revisions/*'>
-    <xu:remove select='/*[wiki:name/text()="%(wikiname)s"]/wiki:revisions/*[last()]'/>
+    <xu:remove select='(/*[wiki:name/text()="%(wikiname)s"]/wiki:revisions/*/rdf:first)[last()]'/>
     </xu:if>
 
     <!-- set access control: remove previous, add selected, if any -->
@@ -172,8 +178,10 @@ def _req_default_save(self, **kw):
         <xu:if test="wf:assign-metadata('_update-trigger', 'revision-added')" /> <!-- do nothing - just for the side-effect -->
     </xu:append>
     
-    <xu:append select='/*[wiki:name/text()="%(wikiname)s"]/wiki:revisions'>
+    <xu:append select='/*[wiki:name/text()="%(wikiname)s"]/wiki:revisions/*'>
+      <rdf:first>
         <wiki:Item rdf:about='%(itemURI)s' />
+       </rdf:first>
     </xu:append>
         
 	</xu:modifications>

@@ -16,7 +16,7 @@
 <!-- this edit page is always html, not the content's mimetype -->
 <xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />
 <xsl:variable name='item' select="/*[wiki:name/text()=$_name]" />
-<xsl:variable name='revision' select="$item/wiki:revisions/*[last()]" />
+<xsl:variable name='revision' select="($item/wiki:revisions/*/rdf:first/*)[last()]" />
 <xsl:variable name='transforms' select="$revision//a:contents/*" />	
 
 <xsl:template match="/" >
@@ -31,7 +31,7 @@
         Edit Metadata
          <br/>
 	<textarea NAME="metadata" ROWS="30" COLS="75" STYLE="width:100%" WRAP="off">
-	<xsl:value-of select="wf:get-rdf-as-rhizml($item | $revision | $transforms | $item/wiki:revisions/*//a:contents/*)" />
+	<xsl:value-of select="wf:get-rdf-as-rhizml($item | $revision | $transforms)" />
 	</textarea>
 	<br/>
 	<input TYPE="submit" NAME="save" VALUE="Save" />

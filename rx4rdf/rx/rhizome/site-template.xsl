@@ -17,15 +17,21 @@
     <xsl:param name="session:login" />
     <xsl:param name="session:message" />
     <xsl:param name="_url" />		 
-    <xsl:param name="response-header:content-type"/>
+    <xsl:param name="response-header:content-type"/>    
+    <xsl:param name="previous:_static" />
     
     <xsl:output method='html' indent='no' />
     
 <xsl:template match="/">
 <!-- this page is always html, not the content's mimetype -->
 <xsl:variable name='prev-content-type' select="$response-header:content-type" />
+
+<xsl:if test="not($previous:_static)" >
 <xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />
+</xsl:if>
+
 <xsl:variable name='title' select="f:if($previous:title, $previous:title, f:if($_prevnode/wiki:title, $_prevnode/wiki:title, $_name) )" />
+
 <!-- html template based on http://www.projectseven.com/tutorials/css_t/example.htm 
     (well, not much anymore, gave up and started using nested tables)
 -->
@@ -45,6 +51,8 @@
 <!-- Header -->
 <td id="header" width="100%" colspan="2">
 <div style='float: right'> 
+
+<xsl:if test="not($previous:_static)" >
          <xsl:choose>
             <xsl:when test="$session:login">
 Welcome <xsl:value-of select="$session:login" />
@@ -63,6 +71,7 @@ Password<input TYPE="password" NAME="password" SIZE="10" />
 Or <a href="users-guest?action=new">signup</a>
            </xsl:otherwise>
         </xsl:choose>
+</xsl:if>
 &#xa0;<xsl:value-of select="$session:message" disable-output-escaping='yes' />
 </div>    
 <a href="index"><img border="0" src="{/*[wiki:name='site-template']/wiki:header-image}" /></a><xsl:value-of disable-output-escaping='yes' select="/*[wiki:name='site-template']/wiki:header-text" />
@@ -129,6 +138,7 @@ Or <a href="users-guest?action=new">signup</a>
 <!-- Footer -->
 <tr>
 <td id="footer" width="100%" colspan="2">
+<xsl:if test="not($previous:_static)" >
 <p>
 <div style='float: right'><a href="edit">New</a>&#xa0;<a href="list?type=all">List</a></div>
 
@@ -150,6 +160,7 @@ Type<select name="searchType">
 &#xa0;<input type="submit" value="search" name="Search"/>    
 
 </form></p>
+</xsl:if>
 </td>
 </tr>
 </table>

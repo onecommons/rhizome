@@ -25,7 +25,7 @@
 <xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />
 
 <xsl:variable name='namedContent' select="/*[wiki:name/text()=$target]" />
-<xsl:variable name='item' select="$namedContent/wiki:revisions/*[last()]" />
+<xsl:variable name='item' select="($namedContent/wiki:revisions/*/rdf:first/*)[last()]" />
 
 <xsl:variable name="contents">
      <xsl:choose>
@@ -94,8 +94,7 @@
             </xsl:call-template>
 	</xsl:for-each>
 	</select>    
-	&#xa0;Item Type:
-	<select name="disposition" size="1" width="100">	
+	&#xa0;Item Type:&#xa0;<select name="disposition" size="1" width="100">	
         <xsl:for-each select="/wiki:ItemDisposition">
             <xsl:variable name="i" select="./@rdf:about" />
             <xsl:call-template name="add-option" >
@@ -121,7 +120,7 @@
 	    </xsl:for-each>
 	</select>	
 	<br />
-	<input TYPE="checkbox" NAME="minor_edit" VALUE="on" />This change is a minor edit.<br/>
+	<!-- todo breaks version diffs, disable for now <input TYPE="checkbox" NAME="minor_edit" VALUE="on" />This change is a minor edit.<br/> -->
 	<input TYPE="submit" NAME="save" VALUE="Save" />
 		
 	<!-- todo: <input TYPE="submit" NAME="preview" VALUE="Preview" /> -->	

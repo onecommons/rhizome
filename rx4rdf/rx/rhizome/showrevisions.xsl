@@ -12,7 +12,7 @@
     <br />
     <table>
     <tr><td>Revision </td><td>Created On</td><td>By</td><td>Label</td></tr> 
-    <xsl:for-each select="*[wiki:name/text()=$_name]/wiki:revisions/*">
+    <xsl:for-each select="*[wiki:name/text()=$_name]/wiki:revisions/*/rdf:first/*">
         <tr><td><a href="{$_name}?revision={position()}" ><xsl:value-of select='position()'/></a></td>
             <td><xsl:value-of select='xf:pytime-to-exslt(a:created-on/text())'/></td>
             <td><a href='users-{wiki:created-by/*/wiki:login-name}'><xsl:value-of select='wiki:created-by/*/wiki:login-name'/></a></td>
