@@ -3,7 +3,7 @@
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
-__all__ = ["racoon", "RDFDom", "RDFDomTest", "DomTree", "utils", 
+__all__ = ["racoon", "RDFDom", "DomTree", "utils", 
            "rxml", "rhizome", "rhizml", "rhizmltokenize",
            "Server", "XUpdate", "glock", "metakitdriver"]
 

@@ -11,8 +11,8 @@ from Ft.Rdf import Util
 import cStringIO
 from Ft.Xml.Lib.Print import PrettyPrint
 
-from RDFDom import *
-import utils
+from rx.RDFDom import *
+from rx import utils
 import difflib
 
 class RDFDomTestCase(unittest.TestCase):
@@ -107,7 +107,7 @@ class RDFDomTestCase(unittest.TestCase):
         self.failUnless(res4 == res5)
 
     def testDocIndex(self):
-        self.loadModel("test/about.rx.nt")
+        self.loadModel("about.rx.nt")
         xpath = "*/wiki:revisions/*"
         res1 = evalXPath(self.rdfDom, xpath,  self.model1NsMap)
         xpath = "(*/wiki:revisions/*//a:contents)[last()]"
@@ -122,7 +122,7 @@ class RDFDomTestCase(unittest.TestCase):
 
     def testXUpdate(self):       
         '''test xupdate'''
-        self.loadModel("test/rdfdomtest1.rdf",'rdf')
+        self.loadModel("rdfdomtest1.rdf",'rdf')
         xupdate=r'''<?xml version="1.0" ?> 
         <xupdate:modifications version="1.0" xmlns:xupdate="http://www.xmldb.org/xupdate" 
         xmlns="http://rx4rdf.sf.net/ns/archive#" 
@@ -191,6 +191,7 @@ class RDFDomTestCase(unittest.TestCase):
 	    </xsl:template>         
         </xsl:stylesheet>'''
         result = applyXslt(self.rdfDom, xslStylesheet)
+        #todo assert something!
         #print 'XLST2 ', result
         #PrettyPrint(self.rdfDom)
     
@@ -229,16 +230,10 @@ class RDFDomTestCase(unittest.TestCase):
         </xsl:stylesheet>
         '''
       
-        outputXml = r'''<?xml version="1.0" encoding="UTF-8"?>
-<rdfdom><rdf:Description xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" rdf:about="http://rx4rdf.sf.net/ns/archive"/><owl:Ontology xmlns:owl="http://www.w3.org/2002/07/owl#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" rdf:about="http://rx4rdf.sf.net/ns/archive/archive-example.rdf"><ns4:_ xmlns:ns4="http://purl.org/dc/elements/1.1/creator">Adam Souzis</ns4:_><ns5:_ xmlns:ns5="http://purl.org/dc/elements/1.1/date">2003-04-10</ns5:_><ns6:_ xmlns:ns6="http://purl.org/dc/elements/1.1/identifier">http://rx4rdf.sf.net/ns/archive</ns6:_><ns7:_ xmlns:ns7="http://purl.org/dc/elements/1.1/language">en</ns7:_><ns8:_ xmlns:ns8="http://purl.org/dc/elements/1.1/title">archive instance</ns8:_><arc:imports xmlns:arc="http://rx4rdf.sf.net/ns/archive#"><rdf:Description rdf:about="http://rx4rdf.sf.net/ns/archive"/></arc:imports><rdf:type><rdf:Description rdf:about="http://www.w3.org/2002/07/owl#Ontology"/></rdf:type><owl:versionInfo>v0.1 April 20, 2003</owl:versionInfo></owl:Ontology><rdf:Description xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" rdf:about="http://www.w3.org/2002/07/owl#Ontology"/></rdfdom>'''
-
         result = applyXslt(self.rdfDom, xslStylesheet)
-        print outputXml
-        print '------------------------------------\n\n'
-        print result
-        d = difflib.Differ()
-        #print list(d.compare(result,outputXml))
-        self.failUnless( result == outputXml,'xml output does not match')
+        #d = difflib.Differ()
+        #print list(d.compare(result,outputXml)) #list of characters, not lines!
+        self.failUnless( result == file('testXslt1.xml').read(),'xml output does not match')
        
 if __name__ == '__main__':
     import sys
