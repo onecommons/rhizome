@@ -1,0 +1,27 @@
+ prefixes:
+     wiki: `http://rx4rdf.sf.net/ns/wiki#
+     a: `http://rx4rdf.sf.net/ns/archive#
+     bnode: `bnode:
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+     rdf: `http://www.w3.org/1999/02/22-rdf-syntax-ns#
+     rdfs: `http://www.w3.org/2000/01/rdf-schema#     
+     auth: `http://rx4rdf.sf.net/ns/auth#
+     kw:   "http://rx4rdf.sf.net/ns/kw#"
+     base: `%(base)s
+     
+ ;create a new keyword resource
+ 
+ ;note: keyword resources are created automatically when you save a page with keywords
+ ;so you might not need to create them here.
+ 
+ ;(you probably want to rename the resource id to something like kw:keywordname)
+ bnode:newKeyword:
+  rdf:type: wiki:Keyword  
+  
+  ;you should give this a human-readable name 
+  ;rdfs:label: `keywordname
+  ;rdfs:comment: `describe the keyword if you'd like
+
+  ;the wiki:name should be prefixed with "keywords\" and match the name used by rdfs:label 
+  ;wiki:name `keywords\keywordname
+  

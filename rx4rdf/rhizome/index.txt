@@ -1,7 +1,7 @@
 !Welcome to Rhizome
 You've just installed Rhizome.   
 
-[Rhizome|http://rx4rdf.liminalzone.org/Rhizome] is like a [WikiWiki|http://c2.com/cgi/wiki?WikiWiki] but you can create pages in many different formats including XML and HTML and have complete control over the appearance of your site. 
+[Rhizome|http://rx4rdf.liminalzone.org/Rhizome] is like a [WikiWiki|http://c2.com/cgi/wiki?WikiWikiWeb] but you can create pages in many different formats including XML and HTML and have complete control over the appearance of your site. 
 
 !Getting Started 
 The one of the first things you probably want to do is edit this [page|index?action=edit] and the [sidebar|sidebar?action=edit] page (which creates the navigation menu to the left). 
@@ -12,4 +12,4 @@ For information, consult the documentation that came with this installation or v
 
 !Using
 
-The menu bar at the bottom of the page lists basic commands available to the user. If you familar with [Wikis|http://c2.com/cgi/wiki?WikiWiki], Rhizome should be familar. Rhizome extends the standard Wiki [text formatting rules] so you can create arbitrary XML and HTML. To learn more and experiment, you can safely edit the [SandBox]. 
+The menu bar at the bottom of the page lists basic commands available to the user. If you familar with [Wikis|http://c2.com/cgi/wiki?WikiWikiWeb], Rhizome should be familar. Rhizome extends the standard Wiki [text formatting rules] so you can create arbitrary XML and HTML. To learn more and experiment, you can safely edit the [ZML Sandbox] or the [RxML Sandbox]. To peek into the innards of Rhizome, check out the [administration] page.

@@ -1,0 +1,26 @@
+#?zml markup
+#?raccoon-format http://rx4rdf.sf.net/ns/wiki#item-format-rxslt
+x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
+    xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+    xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#',
+    xmlns:f = 'http://xmlns.4suite.org/ext',
+    xmlns:a="http://rx4rdf.sf.net/ns/archive#",
+    xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#",
+    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#",
+    xmlns:auth="http://rx4rdf.sf.net/ns/auth#",
+    exclude-result-prefixes = "f wf a wiki rdf rdfs auth"
+    ) 
+
+    x:template match='/'
+        h3:
+          `All Keywords
+        table
+          x:for-each select='/wiki:Keyword | id(/*/wiki:about/*)'
+               tr: 
+                td: 
+                 a href='''site:///keywords/{local-name-from-uri(.)}?about={f:escape-url(.)}'''
+                  x:value-of select='f:if(namespace-uri-from-uri(.)="http://rx4rdf.sf.net/ns/kw#",local-name-from-uri(.), name-from-uri(.))'                          
+                 ' (' 
+                 x:value-of select='count(/*[wiki:about=current()])'
+                 ')'
+        "To manage keywords, go the \<a href='administration'>administration\</a> page "
