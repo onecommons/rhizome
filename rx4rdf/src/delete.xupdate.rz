@@ -1,0 +1,5 @@
+ xu:modifications (version="1.0" xmlns:xu="http://www.xmldb.org/xupdate", 
+    xmlns:a="http://rx4rdf.sf.net/ns/archive#",
+    xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#",
+    xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#')            
+  xu:remove select='/*[wiki:name[.=$_name]]'

@@ -1,0 +1,37 @@
+ xu:modifications(version="1.0" xmlns:xu="http://www.xmldb.org/xupdate", 
+    xmlns:a="http://rx4rdf.sf.net/ns/archive#",
+    xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#",
+    xmlns:response-header='http://rx4rdf.sf.net/ns/racoon/http-response-header#',
+    xmlns:wf="http://rx4rdf.sf.net/ns/racoon/xpath-ext#",
+    xmlns:f='http://xmlns.4suite.org/ext',
+    xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#')
+  
+  ; validate fields
+  xu:if test="not($loginname)"
+     xu:message terminate='yes' text="login name must be specified"  
+
+  xu:if test="$password != $confirm-password"
+   xu:message terminate='yes' text="password must match"
+   
+  ; if we're a creating a new user check for duplicates
+  xu:if test="$action='creation' and /wiki:User[wiki:login-name=$loginname]":
+    xu:message terminate='yes' text='name already taken: please choose new login name'
+
+  xu:if test="$action='creation'": 
+     ; new user     
+     xu:append select='/':
+      wiki:User 
+        xu:attribute name="rdf:about": xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname)"
+        wiki:login-name: xu:value-of select="$loginname"
+      ;todo: add private security token and assign it to the user 
+     
+  ;update values   
+  xu:append select='/wiki:User[wiki:login-name=$loginname]':
+   ;if the password is not equal to hash of the current password, set it
+   xu:if test="not(/wiki:User[wiki:login-name=$loginname]/wiki:sha1-password) or $password != /wiki:User[wiki:login-name=$loginname]/wiki:sha1-password"
+     wiki:sha1-password: xu:value-of select="f:sha-hash($password)"
+   wiki:fullname: xu:value-of select="$fullname"
+   wiki:email: xu:value-of select="$email"
+  
+  ;just for side-effect
+  xu:if test="wf:assign-metadata('itemname', concat('users-',$loginname))"

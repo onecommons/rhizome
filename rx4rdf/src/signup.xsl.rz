@@ -1,0 +1,41 @@
+ x:stylesheet (version="1.0" xmlns:x="http://www.w3.org/1999/XSL/Transform",
+    xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+    xmlns:wf='http://rx4rdf.sf.net/ns/racoon/xpath-ext#',
+    xmlns:f = 'http://xmlns.4suite.org/ext',
+    xmlns:a="http://rx4rdf.sf.net/ns/archive#",
+    xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#",
+    exclude-result-prefixes = "f wf a wiki rdf"
+    ) 
+  x:param name="_resource"
+  x:param name="action"
+   
+  x:template match='/':  	    `
+    x:variable name='user' select='f:if($action!="new", $_resource)'
+    x:variable name='title' select='''wf:assign-metadata('title', 
+f:if($user, concat('Edit Profile of ', $user/wiki:login-name), 'Register new user'))'''
+
+    x:value-of select='$title'    
+    hr
+    form action="{concat('users-',$_resource/wiki:login-name)}" method='post':
+     table:         
+         x:choose
+          x:when test='not($user)': 
+           tr: 
+             td: `*Login name:     
+             td: input type=text name=loginname
+          x:otherwise:
+         tr:
+             td: `Password:     
+             td: input type=password name=password value="{$user/wiki:sha1-password}"
+         tr: 
+             td: `Confirm Password:          
+             td: input type=password name=confirm-password value="{$user/wiki:sha1-password}"         
+         tr: 
+             td: `email:     
+             td: input type=text name=email value="{$user/wiki:email}" 
+         tr: 
+             td: `Full Name:     
+             td: input type=text name=fullname value="{$user/wiki:fullname}"           
+         tr: 
+             td: input type=submit name=action value="{f:if($user,'save','creation')}": `Signup
+             
