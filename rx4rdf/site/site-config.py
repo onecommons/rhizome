@@ -33,6 +33,12 @@ __addRxML__(replace = '@sitevars', contents = '''
  base:site-template:
   wiki:header-image: `Rx4RDFlogo.gif
   wiki:header-text: `
+  wiki:uses-theme: base:default-theme
+  
+ #unfortunately we also have to add this alias in addition to setting wiki:uses-theme
+ #because site-template.xsl can only statically import an URL
+ {http://rx4rdf.sf.net/site/default/theme.xsl}:
+   wiki:alias: `theme.xsl
 
  base:ZML:
   wiki:alias: `zml
@@ -42,7 +48,7 @@ __addRxML__(replace = '@sitevars', contents = '''
   wiki:alias: `rhizome
 
  base:Raccoon: 
-  wiki:alias: `Racoon 
+  wiki:alias: `Racoon
     
  #rhizome-config leaves the index and sidebar pages publicly editable, lock them down:
  base:index:
