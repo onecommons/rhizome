@@ -91,7 +91,7 @@ myresource:
   author: `john
   author: `betty
 </source>'''
-results in different statement than this:
+results in different RDF statements than this:
 
 r'''<source>
 myresource:
@@ -102,7 +102,7 @@ myresource:
 
 !Blank nodes. 
 
-[Blank nodes|http://www.w3.org/TR/2003/WD-rdf-concepts/#section-blank-nodes] are designated by a resource whose URI reference that begins with "^^http://rx4rdf.sf.net/anonymous#^^". The portion of the URI after this serves as the identifier for the node. Conventionally, the "bNode" prefix is associated with the ^^http://rx4rdf.sf.net/anonymous#^^ URI. Also, a ^^rx:resource^^ element without an ^^id^^ attribute (or an ^^id^^ with an empty value) is treated as a blank node.
+[Blank nodes|http://www.w3.org/TR/2003/WD-rdf-concepts/#section-blank-nodes] are designated by a resource whose URI reference that begins with "^^bnode:^^". The portion of the URI after this serves as the identifier for the node. Conventionally (and obviously), the "bnode" prefix is associated with the ^^bnode:^^ URI. Also, a ^^rx:resource^^ element without an ^^id^^ attribute (or an ^^id^^ with an empty value) is treated as a blank node.
 
 Below is example of a typical usage of blank nodes:
 
@@ -111,15 +111,15 @@ rx:
  prefixes:
      a: `http://rx4rdf.sf.net/ns/archive#
      wiki: `http://rx4rdf.sf.net/ns/wiki#
-     bNode: `http://4suite.org/rdf/anonymous/
+     bnode: `bnode:
      default-ns: `http://rx4rdf.sf.net/ns/rxml#
 
  resource id='mailto:omaas@example.com':
     name: `Oedipa Maas 
     address:
- 	bNode:address1
+ 	bnode:address1
 
- bNode:address1:
+ bnode:address1:
    street: `123 1st street
    city: `San Narcisco
    state: `CA
@@ -133,7 +133,19 @@ An individual statement (a declaration of a property value pair for a particular
 
 !Resource types and classes.  
 
-RxML provides no special way to indicate the class of a resource -- so typically the class is declared with a property of ^^rdf:type^^ whose value is the class resource.
+RxML provides ^^rx:a^^ element which can be used as a synonym for the ^^rdf:type^^ property, providing a concise way to express the type of a resource. For example, the following example declares a resource of type "wiki:Item":
+
+r'''<source>
+rx:
+ prefixes:
+     wiki: `http://rx4rdf.sf.net/ns/wiki#
+     bnode: `bnode:
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+
+ bnode:blankNode1:
+     a: wiki:Item
+</source>'''
+
 
 !^^rx:query^^
 
@@ -147,31 +159,30 @@ Below is an example written in [ZML] that demonstrates all the features of RxML.
 '''\<source>
 rx:
  prefixes:
-     a: `http://rx4rdf.sf.net/ns/archive#
+     arch: `http://rx4rdf.sf.net/ns/archive#
      wiki: `http://rx4rdf.sf.net/ns/wiki#
-     bNode: `http://4suite.org/rdf/anonymous/
+     bnode: `bnode:
      default-ns: `http://rx4rdf.sf.net/ns/rxml#
      rdf: `http://www.w3.org/1999/02/22-rdf-syntax-ns#
 
- bNode:blankNode1: ;a comment
-     a:last-modified: `1062022787.468
+ bnode:blankNode1: ;a comment
+     a: a:NamedContent
+     arch:last-modified: `1062022787.468
      wiki:name stmtID='http://rx4rdf.sf.net/ns/archive#': `RxML
      wiki:revisions listType='rdf:Bag': 
-         bNode:x87d0723b-fad6-488a-abcb-04b1d9323368_195
+         bnode:x87d0723b-fad6-488a-abcb-04b1d9323368_195
          l xml:lang=en: `some text
          xml:
            html:
              body:
                r"some <b>xml</b> content"
          resource id='http://asdfasdf'
-     rdf:type: 
-         a:NamedContent
  
  ; child properties are applied to each node in
  ; the nodeset returned by the xpath expression
  query select='\*': 
      prop1:dsa:
-      bNode:blankNode1
+      bnode:blankNode1
 \</source>
 '''
 
@@ -219,8 +230,8 @@ resQueryElement = element rx:res-query {
 
 resourceIdAttribute = attribute id { URI-reference }?
 
-#any QName except if in the rx namespace 	
-propertyElement = element * - (local:* | rx:*)  { 
+#rx:a or any QName except if in the rx namespace 	
+propertyElement = element (* - (local:* | rx:*)) | rx:a { 
 	propertyAttribute*,
 	text | propertyValueElement* 
 }
@@ -231,7 +242,7 @@ propertyResourceElement = element rx:resource {
 	text | propertyValueElement* 
 }
 
-propertyAttribute = attribute rx:list | list | rx:stmt | stmt { URI-reference }
+propertyAttribute = attribute rx:list | list | rx:stmtID | stmtID { URI-reference }
 	| attribute rx:listType | listType  {
 	  "rdf:List" | "rdf:Seq" | "rdf:Bag" | "rdf:Alt" 
 	  }
