@@ -92,10 +92,12 @@ if __name__ == '__main__':
     DEBUG = sys.argv.count('--debug')
     if DEBUG:
         del sys.argv[sys.argv.index('--debug')]
+
     try:
         test=sys.argv[sys.argv.index("-r")+1]
-        tc = RaccoonTestCase(test)
-        tc.setUp()
-        getattr(tc, test)() #run test
     except (IndexError, ValueError):
         unittest.main()
+    else:
+        tc = RhizomeTestCase(test)
+        tc.setUp()
+        getattr(tc, test)() #run test
