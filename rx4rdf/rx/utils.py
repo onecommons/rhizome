@@ -7,7 +7,7 @@
 """
 from __future__ import generators
 import os.path
-import os, sys, sha, types
+import os, sys, sha, types, re
 from stat import *
 from time import *
 from types import *
@@ -884,7 +884,7 @@ class NestedException(Exception):
         Exception.__init__(self, msg)
             
 class DynaException(Exception):
-    def __init__(self, msg = None, ):
+    def __init__(self, msg = None):
         if not msg is None:
             self.msg = msg        
         Exception.__init__(self, msg)
@@ -905,7 +905,7 @@ class DynaExceptionFactory(object):
         self.base = base
                         
     def __call__(self, name, msg = None):
-        classname = name.title().replace(' ','') #generate classname: capitalize then remove spaces
+        classname = ''.join([word[0].upper()+word[1:] for word in name.split()]) #can't use title(), it makes other characters lower
         dynaexception = getattr(self.module, classname, None)
         if dynaexception is None:
             #create a new class derived from the base Exception type
@@ -1040,7 +1040,7 @@ except ImportError: #don't create a dependency on Ft.Xml.XPath
 
 import HTMLParser
     
-class LinkFixer(HTMLParser.HTMLParser):
+class LinkFixer(HTMLParser.HTMLParser, object):
     def __init__(self, out):
         HTMLParser.HTMLParser.__init__(self)
         self.out = out
@@ -1062,18 +1062,24 @@ class LinkFixer(HTMLParser.HTMLParser):
         each comment: value (starts with '<!--')
         each doctype declaration: value (starts with '<!')
         each processor instruction: value (starts with '<?')
+
+        If a non-zero value is returned, doFixup will be called, with the return value passed in as a hint.
         '''
         return False
 
-    def doFixup(self, tag, name, value):
+    def doFixup(self, tag, name, value, hint):
+        '''
+        See needsFixup for an explanation of the parameters.
+        '''
         return value
     
     def handle_starttag(self, tag, attrs):
         self.tagStack.append(tag)
         changes = []
         for name, value in attrs:
-            if self.needsFixup(tag, name, value): 
-                newvalue = self.doFixup(tag, name, value)
+            hint = self.needsFixup(tag, name, value)
+            if hint:
+                newvalue = self.doFixup(tag, name, value, hint)
                 changes.append( (value, newvalue) )
         tagtext = self.get_starttag_text()        
         for old, new in changes:            
@@ -1137,28 +1143,126 @@ class LinkFixer(HTMLParser.HTMLParser):
             tag = self.tagStack[-1]
         else:
             tag = None
-        if self.needsFixup(tag, None, data): 
-            data = self.doFixup(tag, None, data)
+        hint = self.needsFixup(tag, None, data)
+        if hint:
+            data = self.doFixup(tag, None, data, hint)
         self.out.write(data)    
 
+    in_cdata_section = False
+    def updatepos(self, i, j):
+        #htmlparser doesn't support CDATA sections hence this terrible hack
+        #which rely on the fact that this will be called right after
+        #parse_declaration (which calls unknown_decl)
+        if self.in_cdata_section:
+            self.handle_data(self.rawdata[i:j])
+            self.in_cdata_section = False
+        return HTMLParser.HTMLParser.updatepos(self, i, j)
+        
+    def unknown_decl(self, data):
+        if data.startswith('CDATA['):
+            self.in_cdata_section = True
+        else:
+            return HTMLParser.HTMLParser.unknown_decl(self, data)
+        
     # Overridable -- handle comment
     def handle_comment(self, data):
+        if self.tagStack:
+            tag = self.tagStack[-1]
+        else:
+            tag = None
         data = '<!--'+data+'-->'
-        if self.needsFixup(None, None, data): 
-            data = self.doFixup(None, None, data)                
+        hint = self.needsFixup(tag, None, data)
+        if hint:
+            data = self.doFixup(None, None, data, hint)                
         self.out.write(data)    
 
     # Overridable -- handle declaration
     def handle_decl(self, data):
         data = '<!'+data+'>'
-        if self.needsFixup(None, None, data): 
-            data = self.doFixup(None, None, data)        
+        hint = self.needsFixup(None, None, data)
+        if hint:
+            data = self.doFixup(None, None, data, hint)        
         self.out.write(data)    
 
     # Overridable -- handle processing instruction
     def handle_pi(self, data):
         data = '<?'+data+'>' #final ? is included in data 
-        if self.needsFixup(None, None, data): 
-            data = self.doFixup(None, None, data)        
+        hint = self.needsFixup(None, None, data)
+        if hint:
+            data = self.doFixup(None, None, data, hint)        
         self.out.write(data)    
 
+class BlackListHTMLSanitizer(LinkFixer):
+    '''
+    Filters outs attribute and elements that match the blacklist.
+    If an element's name matches the element black list, its begin and end tags will be stripped out;
+    however, the element's content will remain.
+
+    The goals of the default filters are to:
+    * prevent javascript from being executed.
+    * prevent dangerous objects from be embedded (e.g. using <iframe>, <object>)
+    They does not prevent:
+    * Using CSS to change the look of page elements outside the user's page real estate
+    * Embedding (potentially dangerous or unacceptable) external images
+    However, external stylesheets are banned because they may can contain
+    Javascript (in the form of a javascript: URL)
+    '''
+    super = LinkFixer #overriding this lets us chain to another LinkFixer using inheritance
+    
+    SANITIZE = 'sanitize'
+    
+    blacklistedElements = ['script','link', #ban link to avoid external stylesheets
+                    'bgsound', 'iframe', 'frame', 'object', 'param', 'embed','applet']
+    blacklistedAttributes = dict( [(re.compile(name), re.compile(value)) for name, value in 
+           {'src|href|link|lowsrc|url|usemap|background|action': 'javascript:.*',
+            'style': r'.*javascript:.*', 
+            'http-equiv|on.*': '.*', #disallow these attributes
+            }.items()] )
+    #scan for content that appears either as text or in a comment
+    blacklistedContent = {
+        #avoid url() with javascript and don't let external stylesheets be imported
+        re.compile('style'): re.compile(r'javascript:|@import')
+        } 
+
+    def onStrip(self, tag, name, value):
+        '''
+        Override this to do something (e.g. log a warning or raise an error)
+        '''
+        
+    def handle_starttag(self, tag, attrs):
+        tag = tag.split(':')[-1] #we ignore namespace prefixes
+        if not tag in self.blacklistedElements:            
+            return self.super.handle_starttag(self, tag, attrs)
+        self.onStrip(tag, None, None)
+                
+    def handle_endtag(self, tag):
+        tag = tag.split(':')[-1] #we ignore namespace prefixes
+        self.currentValue = ''
+        if not tag in self.blacklistedElements:
+            return self.super.handle_endtag(self, tag)
+        
+    def needsFixup(self, tag, name, value):
+        if name: #its an attribute
+            name = name.split(':')[-1] #we ignore namespace prefixes
+            for namepattern, valuepattern in self.blacklistedAttributes.items():
+                if re.match(namepattern,name):
+                    if valuepattern is None:
+                        return self.SANITIZE
+                    value = self.reallyUnescape(value)
+                    if re.match(valuepattern,value):
+                        return self.SANITIZE
+        else:
+            if tag is not None:
+                tag = tag.split(':')[-1] #we ignore namespace prefixes
+                for tagpattern, contentpatten in self.blacklistedContent.items():
+                    if re.match(tagpattern,tag):
+                        if re.search(self.blacklistedContent[tag], value):
+                            return self.SANITIZE
+        return self.super.needsFixup(self, tag, name, value)
+
+    def doFixup(self, tag, name, value, hint):
+        if hint == self.SANITIZE:
+            self.onStrip(tag, name, value)
+            return ''
+        else:
+            return self.super.doFixup(self, tag, name, value)
