@@ -1,0 +1,1054 @@
+<html>
+  <head>
+    <meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+    <title>RxPath Specification Proposal</title>
+  </head>
+  <body bgcolor="#EFEFEF" marginheight="0" link="#0F4CC8" marginwidth="0" topmargin="0" alink="#0F4CC8" text="#1E1446" vlink="#0F4CC8" leftmargin="0">
+    <table cellpadding="0" width="100%" border="0" cellspacing="0">
+      <tr>
+        <h1 align="center">RxPath Specification Proposal</h1>
+        <td width="100%" align="left" valign="top"><table cellpadding="5" width="100%" cellspacing="0" border="0">
+            <tr>
+              <td><div align="center">
+                  <table cellpadding="0" width="60%" align="center" cellspacing="0" border="0">
+                    <tbody>
+                      <tr>
+                        <td bgcolor="#64697C"><table cellpadding="1" width="100%" cellspacing="1" border="0">
+                            <tr>
+                              <td bgcolor="#A8ADD5" align="center" valign="center"><font color="#000000" size="-1" face="arial,helvetica,sanserif"><b>Authors</b></font></td>
+                            </tr>
+                            <tr>
+                              <td bgcolor="#C5CADD" align="left" valign="center"><font color="#000000" size="-1" face="arial,helvetica,sanserif"><b>Adam Souzis</b> - asouzis@users.sf.net</font></td>
+                            </tr>
+                            <tr>
+                              <td bgcolor="#A8ADD5" align="center" valign="center"><font color="#000000" size="-1" face="arial,helvetica,sanserif"><b>Status</b></font></td>
+                            </tr>
+                            <tr>
+                              <td bgcolor="#C5CADD" align="left" valign="center"><font color="#000000" size="-1" face="arial,helvetica,sanserif"><b>Initial Draft - Last Revised Feb 15, 2004</b></font></td>
+                            </tr>
+                            <tr>
+                              <td bgcolor="#A8ADD5" align="center" valign="center"><font color="#000000" size="-1" face="arial,helvetica,sanserif"><b>Notice</b></font></td>
+                            </tr>
+                            <tr>
+                              <td bgcolor="#C5CADD" align="left" valign="center"><font color="#000000" size="-1" face="arial,helvetica,sanserif">This document is the inital draft of a proposal, its goal is to get feedback on overall approach and specific issues.
+</font></td>
+                            </tr>
+                            <tr>
+                              <td bgcolor="#A8ADD5" align="center" valign="center"><font color="#000000" size="-1" face="arial,helvetica,sanserif"><b>Abstract</b></font></td>
+                            </tr>
+                            <tr>
+                              <td bgcolor="#C5CADD" align="left" valign="center"><font color="#000000" size="-1" face="arial,helvetica,sanserif">This specification defines RxPath, a mapping between the RDF Abstract Syntax to the XPath Data Model.  
+</font></td>
+                            </tr>
+                          </table></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div><br><div align="right">
+                  <table cellpadding="1" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td bgcolor="#C5CADD" width="100%"><font color="#000000" size="+1" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b>Table of Contents</b></i></font></td>
+                    </tr>
+                  </table>
+                  <br>
+                  <br>
+                  <table cellpadding="0" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td><font color="#000000" face="arial,helvetica,sanserif">1 <a href="#id25593656">Introduction</a><br>&nbsp;&nbsp;&nbsp;&nbsp;1.1 <a href="#id25664344">RxPath By Example</a><br>&nbsp;&nbsp;&nbsp;&nbsp;1.2 <a href="#id25592624">Conventions and Terminology</a><br>2 <a href="#id25602672">Requirements</a><br>3 <a href="#id23738120">Data Model</a><br>&nbsp;&nbsp;&nbsp;&nbsp;3.1 <a href="#id25640888">Subject Element</a><br>&nbsp;&nbsp;&nbsp;&nbsp;3.2 <a href="#id25600752">Blank Nodes</a><br>&nbsp;&nbsp;&nbsp;&nbsp;3.3 <a href="#id27113760">Predicate Elements</a><br>&nbsp;&nbsp;&nbsp;&nbsp;3.4 <a href="#id25723088">Object Nodes</a><br>&nbsp;&nbsp;&nbsp;&nbsp;3.5 <a href="#id27130296">Recursive Nodes</a><br>&nbsp;&nbsp;&nbsp;&nbsp;3.6 <a href="#id26057232">RDF Containers and Collections</a><br>&nbsp;&nbsp;&nbsp;&nbsp;3.7 <a href="#id25720416">Namespaces and QNames</a><br>&nbsp;&nbsp;&nbsp;&nbsp;3.8 <a href="#id27158744">Modifications to the Data Model</a><br>4 <a href="#id27161480">RxPath Expression Semantics</a><br>&nbsp;&nbsp;&nbsp;&nbsp;4.1 <a href="#id25665920">Circular References</a><br>&nbsp;&nbsp;&nbsp;&nbsp;4.2 <a href="#id27170280">Node Tests</a><br>&nbsp;&nbsp;&nbsp;&nbsp;4.3 <a href="#id27175488">String Value</a><br>&nbsp;&nbsp;&nbsp;&nbsp;4.4 <a href="#id26055624">Axes</a><br>&nbsp;&nbsp;&nbsp;&nbsp;4.5 <a href="#id27197568">Node identity</a><br>&nbsp;&nbsp;&nbsp;&nbsp;4.6 <a href="#id27199088">Core Functions</a><br>5 <a href="#id27130032">RxSLT</a><br>&nbsp;&nbsp;&nbsp;&nbsp;5.1 <a href="#id27128120">Patterns</a><br>&nbsp;&nbsp;&nbsp;&nbsp;5.2 <a href="#id27221104">xsl:copy-of</a><br>6 <a href="#id27225784">RxUpdate</a><br>&nbsp;&nbsp;&nbsp;&nbsp;7 <a href="#id27228696">xupdate:if</a><br>&nbsp;&nbsp;&nbsp;&nbsp;7.1 <a href="#id27229224">xupdate:message</a><br></font><p></p><font face="arial,helvetica,sanserif"><b>Appendices</b></font><p></p><font color="#000000" face="arial,helvetica,sanserif">A <a href="#id27230000">Open Issues</a><br>B <a href="#id27234152">Normative References</a><br>C <a href="#id27248248">Other References</a><br>D <a href="#id27252024">Commentary</a><br>&nbsp;&nbsp;&nbsp;&nbsp;D.1 <a href="#id27253264">deviation from XPath behavior</a><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;D.1.1 <a href="#id27253792">descendant axis</a><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;D.1.2 <a href="#id27256840">string value</a><br>&nbsp;&nbsp;&nbsp;&nbsp;D.2 <a href="#id27257232">Special handling RDF</a><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;D.2.1 <a href="#id27257688">containers and collections</a><br></font></td>
+                    </tr>
+                  </table>
+                  <br>
+                  <br>
+                </div><div align="right">
+                  <table cellpadding="1" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td bgcolor="#C5CADD" width="100%"><font color="#000000" size="+1" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id25593656">Introduction</a></b></i></font></td>
+                    </tr>
+                  </table>
+                  <br>
+                  <table cellpadding="0" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">RxPath is a language for addressing parts of a RDF model. It is syntactically identical to XPath 1.0 and is very similar semantically. Each 
+                            <a href="http://www.w3.org/TR/xpath#NT-Step">Step</a> in a RxPath expression corresponds to navigating the node and edge in a graph representing a collection of RDF statements. This is achieved by mapping 
+                            <a href="RDF">RDF</a>'s abstract syntax to XPath's Data Model. This is done by mapping a collection of RDF statements (a RDF model) into a tree where the top-level nodes represent all the resources in the model, their children all the predicates and all the objects as the predicates' children. 
+
+                          </p><p align="justify">There have been other attempts at mapping RDF to the XPath data model (see references below for some). Generally, these mappings have been either 
+                            <a href="http://www.idealliance.org/papers/xml2001/papers/html/03-01-04.html">syntactic</a>, such as transformations of RDF/XML that yield to consistent querying, or 
+                            <a href="http://www-db.research.bell-labs.com/user/pfps/papers/yin-yang.pdf">semantic</a>, such as building a new shared model for representing both XML and RDF. The approach here is essentially syntactic but the transformation is of the abstract RDF syntax, not the RDF/XML serialization, and the result can be an impossible structure (i.e. an infinitely deep tree), so any implementation of RxPath must take into account the semantics of the RDF model for that and other reasons.
+
+                          </p><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id25664344">RxPath By Example</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">The following examples illustrate RxPath. They are based on the example RDF statements found in 
+                                      <a href="http://www.w3.org/TR/rdf-syntax-grammar">RDF Syntax</a>, include the namespace prefixes used in those examples. 
+
+                                    </p><blockquote>
+                                      <dl>
+                                        <li>
+                                          <strong>Example 1</strong> - This RxPath expression returns a nodeset of all the resources in the model:
+
+                                        </li>
+                                      </dl>
+                                    </blockquote><p align="justify">
+                                      <code><font face="courier, monospaced">/*
+</font></code>
+                                    </p><blockquote>
+                                      <dl>
+                                        <li>
+                                          <strong>Example 2</strong> - This RxPath expression returns a nodeset of all the predicates in the model (and therefore all the statements):      
+
+                                        </li>
+                                      </dl>
+                                    </blockquote><p align="justify">
+                                      <code><font face="courier, monospaced">/*/*
+</font></code>
+                                    </p><p align="justify">The next 2 examples demonstrate how Name Test matches the type of a resource or the property name of a predicate:
+
+                                    </p><blockquote>
+                                      <dl>
+                                        <li>
+                                          <strong>Example 3</strong> - This expression returns all the resource with the rdf:type of class 
+                                          <code><font face="courier, monospaced">ex:Document</font></code>:
+
+                                        </li>
+                                      </dl>
+                                    </blockquote><p align="justify">
+                                      <code><font face="courier, monospaced">/ex:Document
+</font></code>
+                                    </p><blockquote>
+                                      <dl>
+                                        <li>
+                                          <strong>Example 4</strong> - This expression returns the objects of all the property 
+                                          <code><font face="courier, monospaced">dc:title</font></code>:
+
+                                        </li>
+                                      </dl>
+                                    </blockquote><p align="justify">
+                                      <code><font face="courier, monospaced">/*/dc:title/*
+</font></code>
+                                    </p><blockquote>
+                                      <dl>
+                                        <li>
+                                          <strong>Example 5</strong> - This expression finds the full name of all the people that are editors of a resource:
+
+                                        </li>
+                                      </dl>
+                                    </blockquote><p align="justify">
+                                      <code><font face="courier, monospaced">/*/ex:editor/*/ex:fullName/*
+</font></code>
+                                    </p><p align="justify">Note how the expression is evaluated as if object node has the same children as its equivalent top-level resource node.
+
+                                    </p><p align="justify">RxPath defines resource elements (subject and object) as having a string value equal to the resource's RDF URI reference (i.e. the value of its 
+                                      <code><font face="courier, monospaced">rdf:about</font></code> attribute) 
+
+                                    </p><blockquote>
+                                      <dl>
+                                        <li>
+                                          <strong>Example 6</strong> - Find all objects of the resource with URI reference "http://example.com/example#foo":
+
+                                        </li>
+                                      </dl>
+                                    </blockquote><p align="justify">
+                                      <code><font face="courier, monospaced">/*[.="http://example.com/example#foo"]/*/*
+</font></code>
+                                    </p><blockquote>
+                                      <dl>
+                                        <li>
+                                          <strong>Example 7</strong> - Find all the statements with a 
+                                          <code><font face="courier, monospaced">dc:title</font></code> predicate and an object which a literal equal to "A marvelous thing"
+
+                                        </li>
+                                      </dl>
+                                    </blockquote><p align="justify">
+                                      <code><font face="courier, monospaced">/*/dc:title[.="A marvelous thing"] 
+</font></code>
+                                    </p><p align="justify">Here the string value of the predicate element follows the XPath rule, thus matching the object value (its child)
+
+                                    </p><p align="justify">Two more similar examples: 
+
+                                    </p><blockquote>
+                                      <dl>
+                                        <li>
+                                          <strong>Example 8</strong> - All resources with a property rdfs:label with value "my label":
+
+                                        </li>
+                                      </dl>
+                                    </blockquote><p align="justify">
+                                      <code><font face="courier, monospaced">/*[rdfs:label='my label']
+</font></code>
+                                    </p><blockquote>
+                                      <dl>
+                                        <li>
+                                          <strong>Example 9</strong> - Find all the statements with that have the resource "http://example.com/example#bar": as its object:
+
+                                        </li>
+                                      </dl>
+                                    </blockquote><p align="justify">
+                                      <code><font face="courier, monospaced">/*/*[.='http://example.com/example#bar']
+</font></code>
+                                    </p><p align="justify">RxPath expressions can follow transitive properties by using the descendant axis: 
+
+                                    </p><blockquote>
+                                      <dl>
+                                        <li>
+                                          <strong>Example 10</strong> - Find all the decendant files of a folder named "foldername":
+
+                                        </li>
+                                      </dl>
+                                    </blockquote><p align="justify">
+                                      <code><font face="courier, monospaced">/fs:Folder[fs:file-name="foldername"]//fs:has-child/fs:File
+</font></code>
+                                    </p><p align="justify">Inverse transitive queries can be done the same way: 
+
+                                    </p><blockquote>
+                                      <dl>
+                                        <li>
+                                          <strong>Example 11</strong> - Find all the ancestor folder(s) of the file named "filename":
+
+                                        </li>
+                                      </dl>
+                                    </blockquote><p align="justify">
+                                      <code><font face="courier, monospaced">/fs:Folder[.//fs:has-child/fs:File[fs:file-name="filename"]]
+</font></code>
+                                    </p><blockquote>
+                                      <dl>
+                                        <li>
+                                          <strong>Example 12</strong> - A more complicated expression that does the same thing but returns a nodeset ordered by the ancestor relation.
+
+                                        </li>
+                                      </dl>
+                                    </blockquote><p align="justify">
+                                      <code><font face="courier, monospaced">(//fs:has-child/fs:File[fs:file-name="filename"])[last()]/ancestor::fs:has-child/parent::fs:Folder
+</font></code>
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id25592624">Conventions and Terminology</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">Through out this document anytime a 
+                                      <a href="http://www.w3.org/TR/REC-xml-names#NT-QName">QName</a> appears with the prefix "rdf" it can be assumed that the namespace URI for the QName is "http://www.w3.org/1999/02/22-rdf-syntax-ns#".  
+
+                                    </p><p align="justify">Mentions of XPath always refer to 
+                                      <a href="#XPath">XPath</a> 1.0. 
+
+                                    </p><p align="justify">The uses of "SHOULD", "MAY", and "MUST" are defined in accordance with 
+                                      <a href="http://www.ietf.org/rfc/rfc2119.txt">RFC 2119</a> - "Key words for use in RFCs to Indicate Requirement Levels".
+
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--></font></td>
+                    </tr>
+                  </table>
+                </div><br><!--end s1--><div align="right">
+                  <table cellpadding="1" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td bgcolor="#C5CADD" width="100%"><font color="#000000" size="+1" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id25602672">Requirements</a></b></i></font></td>
+                    </tr>
+                  </table>
+                  <br>
+                  <table cellpadding="0" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">The following requirement drove the design described here:
+
+                            <blockquote>
+                              <ol>
+                                <li> MUST be syntactically identical to XPath.
+
+                                </li>
+                                <li> MUST place no constraints on the underlying RDF Model
+
+                                </li>
+                                <li> All information from the RDF Model MUST be available in the RxPath Data Model
+
+                                </li>
+                                <li> SHOULD enable efficient processing, in particular SQL 
+
+                                </li>
+                                <li> SHOULD be conform closely to ones expectations of how a XPath expressions behave and also follow an intuitive picture of navigating an RDF model visualized as a graph.
+
+                                </li>
+                              </ol>
+                            </blockquote>
+                          </p></font></td>
+                    </tr>
+                  </table>
+                </div><br><!--end s1--><div align="right">
+                  <table cellpadding="1" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td bgcolor="#C5CADD" width="100%"><font color="#000000" size="+1" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id23738120">Data Model</a></b></i></font></td>
+                    </tr>
+                  </table>
+                  <br>
+                  <table cellpadding="0" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">This section describes how to map a given an RDF Model to a representation as an abstract XML document as defined by the 
+                            <a href="http://www.w3.org/TR/xpath#data-model">XPath Data Model</a>. 
+                            Construct an XML document from a RDF model:
+
+                          </p><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id25640888">Subject Element</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">For each resource that appears in the RDF model (as subject or object of a  statement in the model) create an element as a child of the Root node. Each element has an attribute whose namespace URI is "
+                                      <code><font face="courier, monospaced">http://www.w3.org/1999/02/22-rdf-syntax-ns#</font></code>" and local name is "about" and whose value is equal to the resource's RDF Uri Reference. There is one and only one element for each resource and they sibling order is based on sorting their RDF URI References.  The name of each element is "
+                                      <code><font face="courier, monospaced">rdf:Description</font></code>" -- however, see section ?? below for special Node Test rules for matching the element name. We refer to these elements as "Subject Elements".
+
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id25600752">Blank Nodes</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">Each distinct 
+                                      <a href="http://www.w3.org/TR/2003/WD-rdf-concepts/#section-blank-nodes">blank node</a> in a RDF model is replaced with an URI reference that is generated by appending a unique identifier to "
+                                      <code><font face="courier, monospaced">http://rx4rdf.sf.net/anonymous#</font></code>". A RxPath processor SHOULD report an error if a RDF model has a resource with a RDF URI reference that begins with this string. Formally, a RxPath processor always operates on a 
+                                      <a href="http://www.w3.org/TR/rdf-mt/#defgd">ground RDF graph</a> produced by the 
+                                      <a href="http://www.w3.org/TR/rdf-mt/#skolemlemprf">Skolemization</a> of the RDF graph. 
+
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27113760">Predicate Elements</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">For each Subject Element one child element is created for each statement in the RDF model that has the Subject Element's RDF URI reference as the statement's subject. This child element is referred to here as a "Predicate Element". The name of the child element will be QName based on the statement's predicate URI reference (i.e. the property URI). (See section QName mapping).  
+
+                                    </p><p align="justify">The follow attributes may also appear:
+
+                                      <blockquote>
+                                        <ol>
+                                          <li>If the statement has been reified the element will have an "rdf:ID" attribute whose value is the URI reference of the reification statements. 
+
+                                          </li>
+                                          <li>If the object of the statement is a literal the Predicate Element may have 
+                                            <code><font face="courier, monospaced">rdf:datatype</font></code> and/or 
+                                            <code><font face="courier, monospaced">xml:lang</font></code> attributes.
+
+                                          </li>
+                                          <li>If the Predicate Element is named 
+                                            <code><font face="courier, monospaced">rdf:first</font></code> or 
+                                            <code><font face="courier, monospaced">rdf:li</font></code>, it will have a 
+                                            <code><font face="courier, monospaced">listID</font></code> (no namespace URI) attribute whose value is object of the statement. (see list section xxx below)
+
+                                          </li>
+                                        </ol>
+                                      </blockquote>
+                                    </p><p>
+                                      <table cellpadding="0" width="100%" border="0" cellspacing="3">
+                                        <tr>
+                                          <td width="28" valign="top"><img width="28" vspace="0" src="note.gif" border="0" alt="Note" hspace="0" height="29"></td>
+                                          <td valign="top"><font color="#000000" size="-1" face="arial,helvetica,sanserif"><i><p align="justify">put listid in a namespace?
+
+                                                </p></i></font></td>
+                                        </tr>
+                                      </table>
+                                    </p><p align="justify">The sibling order of the predicate element is determined by sorting the tuple (element namespace URI, element local name, element string value) except in the special cases "rdf:li" and "rdf:first" Predicate Element (see below).
+
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id25723088">Object Nodes</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">Each predicate element will have children nodes based on the object of its corresponding statement:
+
+                                      <blockquote>
+                                        <ol>
+                                          <li> If the object of the statement is a literal text node, the child will be a text node. If the literal is xml (i.e. its 
+                                            <code><font face="courier, monospaced">rdf:datatype</font></code> is 
+                                            <code><font face="courier, monospaced">http://www.w3.org/2000/01/rdf-schema#XMLLiteral</font></code>) the 
+                                            <a href="http://www.w3.org/TR/xpath#dt-string-value">string-value</a> of the text node will be within the lexical space defined in RDF Abstract Syntax (see 
+                                            <a href="http://www.w3.org/TR/rdf-concepts/#section-XMLLiteral">section 5</a>).
+
+                                          </li>
+                                          <li> If the object of the statement is a resource, the child will be an Recursive Node equivalent to its corresponding 
+                                            <a href="SubjectElement">Subject Element</a> (see section below). 
+
+                                          </li>
+                                        </ol>
+                                      </blockquote>
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27130296">Recursive Nodes</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">Each 
+                                      <a href="ObjectElement">Object Element</a> is almost completely equivalent its corresponding 
+                                      <a href="SubjectElement">Subject Element</a> -- thus if the resource is the subject of a statement, the 
+                                      <a href="ObjectElement">Object Element</a> will have 
+                                      <a href="PredicateElement">Predicate Element</a>s as children, which in turn may have 
+                                      <a href="ObjectElement">Object Element</a> as its children and so on.  The only attributes that will be differ are its parent and in the case Object Nodes, its siblings (it will not have any). See the section on "Circular References" below on how to handle circular references of recursive nodes.
+
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id26057232">RDF Containers and Collections</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">To provide more natural and expressive queries, RxPath provides special case mappings for RDF Collections and Containers.
+
+                                    </p><p align="justify">A Subject Element whose 
+                                      <code><font face="courier, monospaced">rdf:type</font></code> is 
+                                      <code><font face="courier, monospaced">rdf:Seq</font></code>, 
+                                      <code><font face="courier, monospaced">rdf:Bag</font></code> or 
+                                      <code><font face="courier, monospaced">rdf:Alt</font></code> will have Predicate Element children with a URI reference equivalent to 
+                                      <code><font face="courier, monospaced">rdf:li</font></code>, not 
+                                      <code><font face="courier, monospaced">rdf:_1</font></code>, 
+                                      <code><font face="courier, monospaced">rdf:_2</font></code>, etc.  The sibling order of these children will be ordering by the ordinal value implied by the 
+                                      <code><font face="courier, monospaced">rdf:_<i>n</i></font></code> property names. The Predicate Element MUST have a 
+                                      <code><font face="courier, monospaced">listID</font></code> attribute whose value is equal to its 
+                                      <code><font face="courier, monospaced">rdf:_<i>n</i></font></code> predicate.
+
+                                    </p><p align="justify">A Subject Element whose 
+                                      <code><font face="courier, monospaced">rdf:type</font></code> is 
+                                      <code><font face="courier, monospaced">rdf:List</font></code> will have a child Predicate Element named 
+                                      <code><font face="courier, monospaced">rdf:first</font></code> for each item in the list, with the sibling order corresponding to the order of the items in the list. More precisely, the child Predicate Elements are added (in order) by transitively following the 
+                                      <code><font face="courier, monospaced">rdf:rest</font></code> predicate of the 
+                                      <code><font face="courier, monospaced">rdf:List</font></code> resource, selecting the 
+                                      <code><font face="courier, monospaced">rdf:first</font></code> predicate of each 
+                                      <code><font face="courier, monospaced">rdf:List</font></code> that is object of the current 
+                                      <code><font face="courier, monospaced">rdf:rest</font></code> statement. Only the 
+                                      <code><font face="courier, monospaced">rdf:List</font></code> resource at the head list will appear as a Subject Element in a RxPath Document, the other recursive list resources will not, unless other statements in the RDF model refer to it. 
+                                      <code><font face="courier, monospaced">rdf:rest</font></code> statements will never appear in the RxPath Document. A RxPath implementation MUST add a 
+                                      <code><font face="courier, monospaced">listID</font></code> attribute to each 
+                                      <code><font face="courier, monospaced">rdf:first</font></code> Predicate Element, with the attribute's value equal to the URI reference of the recursive list resource that is the subject of predicate. (Thus the first 
+                                      <code><font face="courier, monospaced">rdf:first</font></code> Predicate Element of a list will have 
+                                      <code><font face="courier, monospaced">listID</font></code> equal to the Subject Element URI reference.) The resource referenced by the 
+                                      <code><font face="courier, monospaced">listID</font></code> URI reference MAY appear as resource in the RDF model (e.g. appear as Subject Element, etc.) but this is not required.
+
+                                    </p><p align="justify">(Note: to express an empty list, use the 
+                                      <code><font face="courier, monospaced">rdf:nil</font></code> resource in place of the list resource as the object of the predicate -- cf. 
+                                      <a href="http://www.w3.org/TR/2003/PR-rdf-syntax-grammar-20031215/#parseTypeCollectionPropertyElt">RDF Syntax 7.2.19</a>.)
+
+                                    </p><p align="justify">(Note also that the child Object Element can be either text or element nodes (literals are valid rdf:list items despite the fact rdf:parseType="Collection" can not express that).)       
+
+                                    </p><p>
+                                      <table cellpadding="0" width="100%" border="0" cellspacing="3">
+                                        <tr>
+                                          <td width="28" valign="top"><img width="28" vspace="0" src="note.gif" border="0" alt="Note" hspace="0" height="29"></td>
+                                          <td valign="top"><font color="#000000" size="-1" face="arial,helvetica,sanserif"><i><p align="justify">Should we call the "rdf:first" predicate something else?  "rdf:first" matches the RDF spec but is unintuitive for predicate meaning list membership.  We could reuse "rdf:li" or add a "rxpath:item".
+
+                                                </p></i></font></td>
+                                        </tr>
+                                      </table>
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id25720416">Namespaces and QNames</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">
+                                      <a href="http://www.w3.org/TR/REC-xml-names#NT-QName">QNames</a> are converted to URI references by concating the QName's 
+                                      <a href="http://www.w3.org/TR/REC-xml-names/#dt-NSName">namespace name</a> (the URI) with the local name, unless the local name is a sequence of one or more '_' characters, in which case the local name is substituted with a possibly empty string equal to the local name minus one of the '_'.  This rule enables QNames to be created for URIs whose last character of a URI is not an XML 
+                                      <a href="http://www.w3.org/TR/REC-xml#NT-NameChar">NameChar</a> or otherwise can't be transformed into a QName.
+
+                                    </p><p align="justify">The RxPath processor MUST provide a way to specify a set of prefixes to 
+                                      <a href="http://www.w3.org/TR/REC-xml-names/#dt-NSName">namespace name</a> (URI) mappings. Those mappings MUST be used for Node Tests (see below) and for Predicate Element names. When an RxPath processor encounters a URI reference that can not be mapped to a QName it SHOULD generate an namespace mapping. As implied by the QName rule above, if the processsor can not find a good point to split the URI, the local name will be '_'; conversely, if a split if found and the characters after the split consist solely of one or more '_', a '_' should be appended to the local name.
+
+                                    </p><p>
+                                      <table cellpadding="0" width="100%" border="0" cellspacing="3">
+                                        <tr>
+                                          <td width="28" valign="top"><img width="28" vspace="0" src="note.gif" border="0" alt="Note" hspace="0" height="29"></td>
+                                          <td valign="top"><font color="#000000" size="-1" face="arial,helvetica,sanserif"><i><p align="justify">Should we say anything about where and what Namespace nodes should appear in the data model?
+
+                                                </p></i></font></td>
+                                        </tr>
+                                      </table>
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27158744">Modifications to the Data Model</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">If a processor allows the data model to modified, e.g. via support for 
+                                      <a href="RxUpdate">RxUpdate</a> or through a programmatic API such as a XML DOM, the resultant DOM should conform to the constraints on the data model described here -- for example, one could not add comment nodes.  If a recursive node is modified referenced node will also be modified.  
+
+                                    </p><p>
+                                      <table cellpadding="0" width="100%" border="0" cellspacing="3">
+                                        <tr>
+                                          <td width="28" valign="top"><img width="28" vspace="0" src="note.gif" border="0" alt="Note" hspace="0" height="29"></td>
+                                          <td valign="top"><font color="#000000" size="-1" face="arial,helvetica,sanserif"><i><p align="justify">Add a constaint that statements can not be modified only added or deleted?
+
+                                                </p></i></font></td>
+                                        </tr>
+                                      </table>
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--></font></td>
+                    </tr>
+                  </table>
+                </div><br><!--end s1--><div align="right">
+                  <table cellpadding="1" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td bgcolor="#C5CADD" width="100%"><font color="#000000" size="+1" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27161480">RxPath Expression Semantics</a></b></i></font></td>
+                    </tr>
+                  </table>
+                  <br>
+                  <table cellpadding="0" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">This section describes how XPath Expressions are applied to the RxPath data model.  RxPath expressions are evaluated exactly as if they were an XPath expressions being applied to an XML document except for the modifications described in this section.
+
+                          </p><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id25665920">Circular References</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">We define 2 modes of behavior for handling circular references (where the ancestor element has the same URI reference as the descendant, as in the case where subject of a statement is that same as its object). When the data model is navigated in the first mode, 
+                                      <code><font face="courier, monospaced">circularity-unchecked</font></code>, circular references are not checked and therefore appear to generate an infinite number of descendant elemnts.  When navigating in the second mode, 
+                                      <code><font face="courier, monospaced">circularity-checked</font></code>, circular references are checked by walking up the element's anscestor axis up to some top-most element, and if an Recusive element has an ancestor with the same URI reference at it does, the Recursive element will appear to have no children.  Which mode is active depends on the context of the XPath expression -- in short, 
+                                      <code><font face="courier, monospaced">circularity-checked</font></code> is active for the 
+                                      <a href="descendant">descendant</a>, 
+                                      <a href="descendant-or-self">descendant-or-self</a>,
+                                      <a href="following">following</a>, 
+                                      <a href="proceeding">proceeding</a> and 
+                                      <a href="FollowingAxes">following axes</a>, and 
+                                      <code><font face="courier, monospaced">circularity-unchecked</font></code> for all other axes. 
+
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27170280">Node Tests</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">A 
+                                      <a href="http://www.w3.org/TR/xpath#node-tests">Node test</a> that is a QName or of the form 
+                                      <code><font face="courier, monospaced"><a href="http://www.w3.org/TR/REC-xml-names#NT-NCName">NCName</a>:*</font></code> matches a Subject or Object element when the statement 
+                                      <code><font face="courier, monospaced">&lt;element URI reference&gt; rdf:type &lt;NodeTest URI reference&gt;</font></code> holds true, where the NodeTest URI reference is the URI obtained from its QName (as descibed above). If the node is a Predicate element, the Node Test matches when the statement 
+                                      <code><font face="courier, monospaced">&lt;element URI reference&gt; rdfs:subPropertyOf &lt;NodeTest URI reference&gt;</font></code> holds true (see 
+                                      <a href="http://www.w3.org/TR/rdf-mt/#rulerdfs6">RDFS entailment rule 6</a>). How these assertions are determined is up to the RxPath processor.  An RxPath processor SHOULD support 
+                                      <a href="http://www.w3.org/TR/rdf-schema/">RDF Schema</a>.
+
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27175488">String Value</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">In RxPath, the 
+                                      <a href="http://www.w3.org/TR/xpath#dt-string-value">string value</a> of a Subject or Object element is its URI reference. Otherwise, RxPath follows XPath. Note that a consequence of this rule is that the string-value of a Predicate element will be the string-value of its Object node -- either a literal or its URI reference.
+
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id26055624">Axes</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">RxPath constrains XPath's descendant axes (descendant, descendant-or-self, following, proceeding) in two ways.
+
+                                    </p><p align="justify">First, RxPath redefines how a 
+                                      <a href="http://www.w3.org/TR/xpath#NT-Step">Step</a> that has one of these axis as its AxisSpecifier is evaluated.  If a node doesn't match the Step's 
+                                      <a href="http://www.w3.org/TR/xpath#node-tests">NodeTest</a> then the node's descendants are not examined for matches. In other words, given a Step with a descendant axis, every ancestor of a matching node (up to the context node) will match NodeTest of the Step.
+
+                                    </p><p>
+                                      <table cellpadding="0" width="100%" border="0" cellspacing="3">
+                                        <tr>
+                                          <td width="28" valign="top"><img width="28" vspace="0" src="note.gif" border="0" alt="Note" hspace="0" height="29"></td>
+                                          <td valign="top"><font color="#000000" size="-1" face="arial,helvetica,sanserif"><i><p align="justify">Should this rule be extended to also cover the Step's Predicates in addition to the NodeTest? This would be more consistent and powerful. But we don't do this because it would extremely difficult to figure out the context position and context size for each 
+                                                  <a href="http://www.w3.org/TR/xpath#predicates">predicate</a> while evaluating the descendants, and changing the rules about how predicates affect the context would probably be too much of divergence from the XPath spec. So we're left with an inconsistency that can lead to subtle bugs.
+
+                                                </p></i></font></td>
+                                        </tr>
+                                      </table>
+                                    </p><p align="justify">Second, a 
+                                      <a href="http://www.w3.org/TR/xpath#NT-Step">Step</a> with one of the descendant axes will only examine Predicate Elements for a match, skipping past Subject and Object elements to only examine their children. An equivalent to this constraint also applies to Steps with an ancestor or ancestor-or-self axis (Subject and Object elements are skipped, only their parents is examined).
+
+                                    </p><p align="justify">When evaluating a Step with a descendant or descendant-or-self axis the RxPath processor MUST enter 
+                                      <code><font face="courier, monospaced">circularity-checked</font></code> mode with the top-most ancestor of the circularity check set to the context node of Step.  When a Step's axis is following or proceeding, at every point in the document tree that the evaluation begins descending a branch the process must enter 
+                                      <code><font face="courier, monospaced">circularity-checked</font></code> mode with the top-most ancestor of the circularity check set to the current node. 
+
+                                    </p><p align="justify">In addition, RxPath changes how 
+                                      <a href="http://www.w3.org/TR/xpath#NT-AbbreviatedAbsoluteLocationPath">AbbreviatedAbsoluteLocationPath</a> and 
+
+                                      <a href="http://www.w3.org/TR/xpath#NT-AbbreviatedRelativeLocationPath">AbbreviatedRelativeLocationPath</a> are expanded:
+
+                                    </p><p align="justify">If a RxPath expression contains a 
+                                      <a href="http://www.w3.org/TR/xpath#NT-AbbreviatedAbsoluteLocationPath">AbbreviatedAbsoluteLocationPath</a>
+                                      or a 
+                                      <a href="http://www.w3.org/TR/xpath#NT-AbbreviatedRelativeLocationPath">AbbreviatedRelativeLocationPath</a>
+                                      and the AxisSpecifier of the expression's next Step is the child axis, the two steps are combined by replacing them with a Step having an AxisSpecifier of descendant and the second Step's NodeTest and Predicates.
+
+                                    </p><p align="justify">Informally: In XPath, the expression 
+
+                                    </p><p align="justify">
+                                      <code><font face="courier, monospaced">*//*[1]</font></code> 
+
+                                    </p><p align="justify">is an abbreviation of 
+
+                                    </p><p align="justify">
+                                      <code><font face="courier, monospaced">*/descendant-or-self::node()/child::*[position()=1]</font></code>
+
+                                    </p><p align="justify">In the RxPath, 
+                                      <code><font face="courier, monospaced">*//*[1]</font></code> would be an abbreviation for
+
+                                    </p><p align="justify">
+                                      <code><font face="courier, monospaced">*/descendant::*[ispredicate()][position()=1]</font></code>
+
+                                    </p><p align="justify">Note that an expression like 
+
+                                      <code><font face="courier, monospaced">*//previous-sibling::*</font></code> or 
+                                      <code><font face="courier, monospaced">*//..</font></code>
+
+                                    </p><p align="justify">would not have the descendant step combined with the next one, e.g. it would expand as:
+
+                                    </p><p align="justify">
+                                      <code><font face="courier, monospaced">*/descendant-or-self::node()[ispredicate()]/previous-sibling::*</font></code>
+
+                                    </p><p align="justify">The combined effect of these rules leaves the descendant axis with a NameTest is equivalent to transitively following a predicate, e.g. 
+                                      <code><font face="courier, monospaced">*<i>has-child/*</i></font></code> finds all (and only) the descendant children.
+
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27197568">Node identity</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">Node identity (as defined in the XPath spec -- used to determine the uniqueness of nodes in a nodeset and by RxSLT's generate-id(), but not node equality) is the same as in XPath -- which implies every recursive node is different each other, even if they refer to same Subject Element.
+
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27199088">Core Functions</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">RxPath processors MUST support all the 
+                                      <a href="http://www.w3.org/TR/xpath#corelib">core functions</a> required by XPath. All functions behave the same specified in XPath except for 
+                                      <b>id()</b> which returns the Subject Element with a URI reference equal to a token specified in the argument string.  
+
+                                    </p><p align="justify">In addition a RxPath processor MUST support the following additional functions:
+
+                                    </p><p>
+                                      <table cellpadding="0" width="100%" border="0" cellspacing="3">
+                                        <tr>
+                                          <td width="28" valign="top"><img width="28" vspace="0" src="note.gif" border="0" alt="Note" hspace="0" height="29"></td>
+                                          <td valign="top"><font color="#000000" size="-1" face="arial,helvetica,sanserif"><i><p align="justify">should these function be in extention namespace?
+
+                                                </p></i></font></td>
+                                        </tr>
+                                      </table>
+                                    </p><blockquote>
+                                      <dl>
+                                        <li>
+                                          <strong><i>boolean</i> isPredicate(<i>nodeset</i>?)</strong> -   Returns true if all the nodes in the argument nodeset are Predicate Elements. If the nodeset is empty it returns false. If the argument is omitted, it defaults to a node-set with the context node as its only member.
+
+                                        </li>
+                                      </dl>
+                                    </blockquote><blockquote>
+                                      <dl>
+                                        <li>
+                                          <strong><i>boolean</i> isResource(<i>nodeset</i>?)</strong> -   Returns true if all the nodes in the argument nodeset are Subject or Object Elements. If the nodeset is empty it returns false. If the argument is omitted, it defaults to a node-set with the context node as its only member.       
+
+                                        </li>
+                                      </dl>
+                                    </blockquote><blockquote>
+                                      <dl>
+                                        <li>
+                                          <strong><i>nodeset</i> getResource(<i>nodeset</i>?)</strong> -   For each node in the argument nodeset, return the element that is the "nearest resource" to the node. If the node is a Subject or Object Element return self. If it is a Predicate Element return its parent (which will be a Subject Element). If it is a text node then return is grandparent (a Subject Element since a text node will always be a literal). If it is a attribute node, apply the above rules to its owner element. All other node types are removed from the resulting nodeset. If the argument is omitted, it defaults to a node-set with the context node as its only member.  
+
+                                        </li>
+                                      </dl>
+                                    </blockquote></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--></font></td>
+                    </tr>
+                  </table>
+                </div><br><!--end s1--><div align="right">
+                  <table cellpadding="1" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td bgcolor="#C5CADD" width="100%"><font color="#000000" size="+1" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27130032">RxSLT</a></b></i></font></td>
+                    </tr>
+                  </table>
+                  <br>
+                  <table cellpadding="0" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">RxSLT is a language for transforming RDF to XML. It is syntactically identical to 
+                            <a href="|http://www.w3.org/TR/xslt">XSLT 1.0</a> and behaves as very similarly. A RxSLT processor behaves indentically to a XSLT 1.0 processor transforming a document whose data model conformed to the Data Model mapping described above; with the following exceptions:
+
+                          </p><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27128120">Patterns</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">Patterns in RxSLT are identical to RxPath expressions that conform to the 
+                                      <a href="http://www.w3.org/TR/xslt#patterns">XLST pattern</a> syntax, with the additional constraint that all Patterns must be absolute.  In other words, we redefine XSLT's 
+                                      <a href="http://www.w3.org/TR/xslt#NT-LocationPathPattern">LocationPathPattern</a> to:
+
+                                    </p><p align="justify">
+                                      <code><font face="courier, monospaced">LocationPathPattern ::= '/' RelativePathPattern?
+</font></code>
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27221104">xsl:copy-of</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">Since RxSLT transforms RDF to XML, we need to define special behavior for 
+                                      <a href="http://www.w3.org/TR/xslt#copy-of">xsl:copy-of</a> to avoid adding Recursive Nodes to the result tree. 
+                                      <code><font face="courier, monospaced">xsl:copy-of</font></code> behaves exactly like XSLT 1.0 except when the current node being copied is a Predicate Node (or a Recursive Node aliasing a Predicate Node) and it has a child Object Element node. In this case, instead of copying the child element, an attribute named 
+                                      <code><font face="courier, monospaced">rdf:resource</font></code> with the value of the URI reference for the Object Element is added to the result tree.
+
+                                    </p><p align="justify">Note: 
+                                      <a href="http://www.w3.org/TR/xslt#copying">xsl:copy</a> behaves the same as in XSLT 1.0.
+
+                                    </p></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--></font></td>
+                    </tr>
+                  </table>
+                </div><br><!--end s1--><div align="right">
+                  <table cellpadding="1" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td bgcolor="#C5CADD" width="100%"><font color="#000000" size="+1" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27225784">RxUpdate</a></b></i></font></td>
+                    </tr>
+                  </table>
+                  <br>
+                  <table cellpadding="0" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">RxUpdate is a language for updating an RDF model. It is syntactically and semantically identical to 
+                            <a href="http://www.xmldb.org/xupdate/xupdate-wd.html">XUpdate Working Draft</a> except for the changes described here.   
+
+                          </p><p>
+                            <table cellpadding="0" width="100%" border="0" cellspacing="3">
+                              <tr>
+                                <td width="28" valign="top"><img width="28" vspace="0" src="note.gif" border="0" alt="Note" hspace="0" height="29"></td>
+                                <td valign="top"><font color="#000000" size="-1" face="arial,helvetica,sanserif"><i>Todo! rdf:resource, garbage collection, white space nodes, other constraints, no atomicity requirement?, predicate elements with no children assumed to have an empty literals, make xupdate:value-of same as XSLT?</i></font></td>
+                              </tr>
+                            </table>
+                          </p></font></td>
+                    </tr>
+                  </table>
+                </div><br><!--end s1--><div align="right">
+                  <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                    <tr>
+                      <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27228696">xupdate:if</a></b></i></font></td>
+                    </tr>
+                  </table>
+                  <br>
+                  <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                    <tr>
+                      <td><font color="#000000" face="Arial, Helvetica, sans-serif"><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27229224">xupdate:message</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--></font></td>
+                    </tr>
+                  </table>
+                </div><br><!--end s2--><div align="right">
+                  <table cellpadding="1" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td bgcolor="#C5CADD" width="100%"><font color="#000000" size="+1" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27230000">Open Issues</a></b></i></font></td>
+                    </tr>
+                  </table>
+                  <br>
+                  <table cellpadding="0" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">See the various "note" paragraphs through out the document (denoted with the Note icon). In addition the following issues are still open questions:
+
+                          </p><p align="justify">Should we specify anything how inferences and entailments appear in the model? For example, you probably don't want a query like 
+                            <code><font face="courier, monospaced">'/*'</font></code> to trigger an exhaustive inferring of every possible resource that could be inferred from the model (given an engine that can do that sort of thing), at least because that can be infinite (e.g. inferring reification entailments). What about the 
+                            <a href="http://www.w3.org/TR/rdf-mt/#simpleRules">entailment rules</a> that allocate a blank node for every name, including literals? That would make the results of queries like 
+                            <code><font face="courier, monospaced">subject/predicate/*</font></code> confusing when the object is a literal.
+
+                          </p></font></td>
+                    </tr>
+                  </table>
+                </div><br><!--end s1--><div align="right">
+                  <table cellpadding="1" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td bgcolor="#C5CADD" width="100%"><font color="#000000" size="+1" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27234152">Normative References</a></b></i></font></td>
+                    </tr>
+                  </table>
+                  <br>
+                  <table cellpadding="0" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td><font color="#000000" face="Arial, Helvetica, sans-serif"><ul>
+                                        
+                            <li>
+                              <b><a name="XML"></a>[<a href="http://www.w3.org/TR/REC-xml">XML</a>]</b> "Extensible Markup Language (XML) 1.0", Tim Bray, Jean Paoli, C. M. Sperberg-McQueen, 10 February 1998
+                            </li>
+                                        
+                            <li>
+                              <b><a name="XML-NS"></a>[<a href="http://www.w3.org/TR/REC-xml-names/">XML-NS</a>]</b> "Extensible Markup Language (XML) 1.0", T. Bray, D. Hollander, A. Layman, 14 January 1999
+                            </li>                
+                                        
+                            <li>
+                              <b><a name="XPath"></a>[<a href="http://www.w3.org/TR/xpath">XPath</a>]</b> "XML Path Language (XPath) Version 1.0", James Clark, Steve DeRose, 16 November 1999
+                            </li>
+                                        
+                            <li>
+                              <b><a name="XSLT"></a>[<a href="http://www.w3.org/TR/xslt">XSLT</a>]</b> "XSL Transformations (XSLT) Version 1.0", James Clark, 16 November 1999
+                            </li>
+                                        
+                            <li>
+                              <b><a name="XUpdate"></a>[<a href="http://www.xmldb.org/xupdate/xupdate-wd.html">XUpdate</a>]</b> "XUpdate - XML Update Language", Andreas Laux, Lars Martin, 14 September 2000
+                            </li>
+                                        
+                            <li>
+                              <b><a name="RDF-Concepts"></a>[<a href="http://www.w3.org/TR/rdf-concepts/">RDF-Concepts</a>]</b> "Resource Description Framework (RDF): Concepts and Abstract Syntax", Graham Kyle, Jeremy Carroll, 23 January 2003
+                            </li>                         
+                                        
+                            <li>
+                              <b><a name="RDF-SEMANTICS"></a>[<a href="http://www.w3.org/TR/rdf-mt">RDF-SEMANTICS</a>]</b> "RDF Semantics", Pat Hayes, 5 September 2003
+                            </li>
+                                        
+                            <li>
+                              <b><a name="RDF-VOCABULARY"></a>[<a href="http://www.w3.org/TR/rdf-schema">RDF-VOCABULARY</a>]</b> "RDF Vocabulary Description Language 1.0: RDF Schema", D. Brickley, R.V. Guha, 5 September 2003
+                            </li>
+                                        
+                            <li>
+                              <b><a name="RFC2119"></a>[<a href="http://www.ietf.org/rfc/rfc2119.txt">RFC2119</a>]</b> "RFC 2119 - Key words for use in RFCs to Indicate Requirement Levels", S. Bradner, March 1997
+                            </li>
+                                     
+                          </ul>
+</font></td>
+                    </tr>
+                  </table>
+                </div><br><!--end s1--><div align="right">
+                  <table cellpadding="1" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td bgcolor="#C5CADD" width="100%"><font color="#000000" size="+1" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27248248">Other References</a></b></i></font></td>
+                    </tr>
+                  </table>
+                  <br>
+                  <table cellpadding="0" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td><font color="#000000" face="Arial, Helvetica, sans-serif"><ul>
+                                        
+                            <li>
+                              <b><a name="Syntactic-Web"></a>[<a href="http://www.idealliance.org/papers/xml2001/papers/html/03-01-04.html">Syntactic-Web</a>]</b> "The Syntactic Web", Jonathan Robie, 2001
+                            </li>                
+                                       
+                            <li>
+                              <b><a name="Yin-Yang"></a>[<a href="http://www-db.research.bell-labs.com/user/pfps/papers/yin-yang.pdf">Yin-Yang</a>]</b> "The Yin/Yang Web: XML Syntax and RDF Semantics", Peter Patel-Schneider, Jerome Simeon, 2002
+                            </li>
+                                     
+                          </ul>
+</font></td>
+                    </tr>
+                  </table>
+                </div><br><!--end s1--><div align="right">
+                  <table cellpadding="1" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td bgcolor="#C5CADD" width="100%"><font color="#000000" size="+1" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27252024">Commentary</a></b></i></font></td>
+                    </tr>
+                  </table>
+                  <br>
+                  <table cellpadding="0" width="98%" cellspacing="0" border="0">
+                    <tr>
+                      <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">This section contain informal comments on the why more certain approaches were taken. 
+
+                          </p><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27253264">deviation from XPath behavior</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><div align="right">
+                                      <table cellpadding="1" width="90%" cellspacing="0" border="0">
+                                        <tr>
+                                          <td bgcolor="#C5CADD" width="100%"><font color="#000000" size="-1" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27253792">descendant axis</a></b></i></font></td>
+                                        </tr>
+                                      </table>
+                                      <br>
+                                      <table cellpadding="0" width="90%" cellspacing="0" border="0">
+                                        <tr>
+                                          <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">The descendant constraints the descendant axis to behave like transitive .  
+                                                Perhaps more importantly, because of the RDF model is not closed-world assumption, you don't it would Descendent axis constaints
+
+                                              </p><p align="justify">By placing the ispredicate() constraint on descendant and ancestor axes enables it to be possible to static analyze an RxPath expression to determine if each step is referring to a subject, predicate, or object. With this it would be much more difficult efficiently implement many kinds RxPath implementations,  for example, an RxPath -&gt; SQL converter.
+
+                                              </p></font></td>
+                                        </tr>
+                                      </table>
+                                    </div><br><!--end s3--><div align="right">
+                                      <table cellpadding="1" width="90%" cellspacing="0" border="0">
+                                        <tr>
+                                          <td bgcolor="#C5CADD" width="100%"><font color="#000000" size="-1" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27256840">string value</a></b></i></font></td>
+                                        </tr>
+                                      </table>
+                                      <br>
+                                      <table cellpadding="0" width="90%" cellspacing="0" border="0">
+                                        <tr>
+                                          <td><font color="#000000" face="Arial, Helvetica, sans-serif"></font></td>
+                                        </tr>
+                                      </table>
+                                    </div><br><!--end s3--></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--><div align="right">
+                            <table cellpadding="1" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td bgcolor="#C5CADD" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27257232">Special handling RDF</a></b></i></font></td>
+                              </tr>
+                            </table>
+                            <br>
+                            <table cellpadding="0" width="95%" cellspacing="0" border="0">
+                              <tr>
+                                <td><font color="#000000" face="Arial, Helvetica, sans-serif"><div align="right">
+                                      <table cellpadding="1" width="90%" cellspacing="0" border="0">
+                                        <tr>
+                                          <td bgcolor="#C5CADD" width="100%"><font color="#000000" size="-1" face="Arial, Helvetica, sans-serif"><img width="5" vspace="0" src="void.gif" hspace="0" border="0" height="5"><i><b><a name="id27257688">containers and collections</a></b></i></font></td>
+                                        </tr>
+                                      </table>
+                                      <br>
+                                      <table cellpadding="0" width="90%" cellspacing="0" border="0">
+                                        <tr>
+                                          <td><font color="#000000" face="Arial, Helvetica, sans-serif"><p align="justify">It would be very tedious to query lists without special mapping rules. For examples, here's an RxPath expression for selecting all the items in a list:           source: 
+                                                /*/predicate/rdf:List//rdf:rest/../rdf:first/* 
+                                                compared to:
+                                                /*/predicate/rdf:List/rdf:first/*
+                                                This assumes the descendant axis follows RxPath's rule (or else it would look far uglier!).  Worse, there would be no way (as far I can figure) to have a single RxPath expression that selected, say, all the first or last items in the list in case where the predicate matches multiple predicates each with a list. E.g.:
+
+                                              </p><div align="center">
+                                                <table cellpadding="0" border="0" cellspacing="4">
+                                                  <tr>
+                                                    <td width="1" height="1" bgcolor="#AAAAAA"><img width="1" vspace="0" src="void.gif" hspace="0" border="0" height="1"></td>
+                                                    <td bgcolor="#AAAAAA" height="1"><img width="1" vspace="0" src="void.gif" hspace="0" border="0" height="1"></td>
+                                                    <td width="1" height="1" bgcolor="#AAAAAA"><img width="1" vspace="0" src="void.gif" hspace="0" border="0" height="1"></td>
+                                                  </tr>
+                                                  <tr>
+                                                    <td width="1" bgcolor="#AAAAAA"><img width="1" vspace="0" src="void.gif" hspace="0" border="0" height="1"></td>
+                                                    <td bgcolor="#ffffff"><pre>/*/predicate/rdf:List/rdf:first/*[1]</pre></td>
+                                                    <td width="1" bgcolor="#AAAAAA"><img width="1" vspace="0" src="void.gif" hspace="0" border="0" height="1"></td>
+                                                  </tr>
+                                                  <tr>
+                                                    <td width="1" height="1" bgcolor="#AAAAAA"><img width="1" vspace="0" src="void.gif" hspace="0" border="0" height="1"></td>
+                                                    <td bgcolor="#AAAAAA" height="1"><img width="1" vspace="0" src="void.gif" hspace="0" border="0" height="1"></td>
+                                                    <td width="1" height="1" bgcolor="#AAAAAA"><img width="1" vspace="0" src="void.gif" hspace="0" border="0" height="1"></td>
+                                                  </tr>
+                                                </table>
+                                              </div></font></td>
+                                        </tr>
+                                      </table>
+                                    </div><br><!--end s3--></font></td>
+                              </tr>
+                            </table>
+                          </div><br><!--end s2--></font></td>
+                    </tr>
+                  </table>
+                </div><br><!--end s1--></td>
+            </tr>
+          </table><!--end content panel--></td>
+      </tr>
+    </table>
+  </body>
+</html>

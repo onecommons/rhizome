@@ -1,0 +1,59 @@
+<html><head><meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type"><title>RxPath</title><link href="basestyles.css" type="text/css" rel="stylesheet"><link href="favicon.ico" rel="icon"></head><body id="bd"><table cellpadding="0" align="center" cellspacing="0" id="mainTable"><tr><td width="100%" id="header" colspan="2"><div style="float: right">
+&nbsp;</div><a href="index"><img src="Rx4RDFlogo.gif" border="0"></a>  Welcome to Rx4Rdf!</td></tr><tr id="titlerow"><td width="120" id="sidebar" height="400"><table cellpadding="0" width="150" cellspacing="20" height="100%"><tr><td valign="top"><h3>About
+</h3><ul><li><a href="index">Home</a>
+</li><li><a href="faq">FAQ</a>
+</li><li><a href="Download">Download</a>
+</li><li><a href="Status">Status</a>
+</li><li><a href="about">About</a>
+</li></ul><h3>Rx4RDF
+</h3><ul><li><a href="RxPath">RxPath</a>
+</li><li><a href="RxSLT">RxSLT</a>
+</li><li><a href="RxUpdate">RxUpdate</a>
+</li><li><a href="RxML">RxML</a>
+</li></ul><h3>Rhizome
+</h3><ul><li><a href="Racoon">Racoon</a>
+</li><li><a href="Rhizome">Rhizome</a>
+</li><li><a href="RDFScribbler">RDFScribbler</a>
+</li><li><a href="RhizML">RhizML</a>
+</li></ul><p><a href="http://sf.net/projects/rx4rdf"><img src='http://sourceforge.net/sflogo.php?group_id=85676&amp;amp;type=1'/></a>
+</p></td></tr><tr><td valign="bottom"><a href="http://rx4rdf.sf.net"><img width="100" style="padding: 0px" height="33" alt="Powered by Rhizome" src="rhizome.gif"></a></td></tr></table></td><td cellpadding="0" width="75%" padding="0" cellspacing="0" id="contentTableCell"><table width="100%" id="contentTable" height="100%"><tr><td valign="top" id="titlebar" height="1">RxPath</td></tr><tr><td id="maincontent" valign="top"><p>RxPath is a language for querying a RDF model. It is syntactically identical to XPath 1.0 and behaves very similarly. 
+</p><p>Compared to other query languages for RDF, it is much more expressive than SQL-like query languages such as <a href="http://swordfish.rdfweb.org/rdfquery/ql">Squish</a> and even if you are not familar with XPath I think it is more intuitive than other graph-traversal query languages like <a href="http://uche.ogbuji.net/tech/rdf/versa/">Versa</a>.
+</p><p>Informally, RxPath is a XPath expression evaluated on RDF model as if it has been transformed into a XML document as follows:
+<ul><li> the document has a root element for every resource in model, with the element name equal to name of the <tt>rdf:type</tt> of the resource
+</li><li> each root element has a child element for each statement the resource is the subject of.  The name of each child is name of the property in the statement. 
+</li><li> Each of these children have child text node if the object of the statement is a literal or a child element if the object is a resource.
+</li><li> Object elements have the same name and children as the equivalent root element for the resource, thus defining a potentially infinitely recursive tree.
+</li></ul></p><p>The formal definition of RxPath can be found in <a href="RxPathSpec">RxPathSpec</a>.
+</p><p>The following examples illustrate RxPath. They are based on the example RDF statements found in <a href="http://www.w3.org/TR/rdf-syntax-grammar">RDF Syntax</a>, include the namespace prefixes used in those examples. 
+</p><dl><dt>Example 1</dt><dd>This RxPath expression returns a nodeset of all the resources in the model:
+</dd></dl><p><tt>/*
+</tt></p><dl><dt>Example 2</dt><dd>This RxPath expression returns a nodeset of all the predicates in the model (and therefore all the statements):      
+</dd></dl><p><tt>/*/*
+</tt></p><p>The next 2 examples demonstrate how Name Test matches the type of a resource or the property name of a predicate:
+</p><dl><dt>Example 3</dt><dd>This expression returns all the resource with the rdf:type of class <tt>ex:Document</tt>:
+</dd></dl><p><tt>/ex:Document
+</tt></p><dl><dt>Example 4</dt><dd>This expression returns the objects of all the property <tt>dc:title</tt>:
+</dd></dl><p><tt>/*/dc:title/*
+</tt></p><dl><dt>Example 5</dt><dd>This expression finds the full name of all the people that are editors of a resource:
+</dd></dl><p><tt>/*/ex:editor/*/ex:fullName/*
+</tt></p><p>Note how the expression is evaluated as if object node has the same children as its equivalent top-level resource node.
+</p><p>RxPath defines resource elements (subject and object) as having a string value equal to the resource's RDF URI reference (i.e. the value of its <tt>rdf:about</tt> attribute) 
+</p><dl><dt>Example 6</dt><dd>Find all objects of the resource with URI reference "http://example.com/example#foo":
+</dd></dl><p><tt>/*[.="http://example.com/example#foo"]/*/*
+</tt></p><dl><dt>Example 7</dt><dd>Find all the statements with a <tt>dc:title</tt> predicate and an object which a literal equal to "A marvelous thing"
+</dd></dl><p><tt>/*/dc:title[.="A marvelous thing"] 
+</tt></p><p>Here the string value of the predicate element follows the XPath rule, thus matching the object value (its child)
+</p><p>Two more similar examples: 
+</p><dl><dt>Example 8</dt><dd>All resources with a property rdfs:label with value "my label":
+</dd></dl><p><tt>/*[rdfs:label='my label']
+</tt></p><dl><dt>Example 9</dt><dd>Find all the statements with that have the resource "http://example.com/example#bar": as its object:
+</dd></dl><p><tt>/*/*[.='http://example.com/example#bar']
+</tt></p><p>RxPath expressions can follow transitive properties by using the descendant axis: 
+</p><dl><dt>Example 10</dt><dd>Find all the decendant files of a folder named "foldername":
+</dd></dl><p><tt>/fs:Folder[fs:file-name="foldername"]//fs:has-child/fs:File
+</tt></p><p>Inverse transitive queries can be done the same way: 
+</p><dl><dt>Example 11</dt><dd>Find all the ancestor folder(s) of the file named "filename":
+</dd></dl><p><tt>/fs:Folder[.//fs:has-child/fs:File[fs:file-name="filename"]]
+</tt></p><dl><dt>Example 12</dt><dd>A more complicated expression that does the same thing but returns a nodeset ordered by the ancestor relation.
+</dd></dl><p><tt>(//fs:has-child/fs:File[fs:file-name="filename"])[last()]/ancestor::fs:has-child/parent::fs:Folder
+</tt></p></td></tr></table></td></tr><tr><td width="100%" id="footer" colspan="2"></td></tr></table><!--(c) 2003-4 by Adam Souzis (asouzis@users.sourceforge.net) All rights reserved--></body></html>

@@ -1,0 +1,38 @@
+<html><head><meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type"><title>RhizML</title><link href="basestyles.css" type="text/css" rel="stylesheet"><link href="favicon.ico" rel="icon"></head><body id="bd"><table cellpadding="0" align="center" cellspacing="0" id="mainTable"><tr><td width="100%" id="header" colspan="2"><div style="float: right">
+&nbsp;</div><a href="index"><img src="Rx4RDFlogo.gif" border="0"></a>  Welcome to Rx4Rdf!</td></tr><tr id="titlerow"><td width="120" id="sidebar" height="400"><table cellpadding="0" width="150" cellspacing="20" height="100%"><tr><td valign="top"><h3>About
+</h3><ul><li><a href="index">Home</a>
+</li><li><a href="faq">FAQ</a>
+</li><li><a href="Download">Download</a>
+</li><li><a href="Status">Status</a>
+</li><li><a href="about">About</a>
+</li></ul><h3>Rx4RDF
+</h3><ul><li><a href="RxPath">RxPath</a>
+</li><li><a href="RxSLT">RxSLT</a>
+</li><li><a href="RxUpdate">RxUpdate</a>
+</li><li><a href="RxML">RxML</a>
+</li></ul><h3>Rhizome
+</h3><ul><li><a href="Racoon">Racoon</a>
+</li><li><a href="Rhizome">Rhizome</a>
+</li><li><a href="RDFScribbler">RDFScribbler</a>
+</li><li><a href="RhizML">RhizML</a>
+</li></ul><p><a href="http://sf.net/projects/rx4rdf"><img src='http://sourceforge.net/sflogo.php?group_id=85676&amp;amp;type=1'/></a>
+</p></td></tr><tr><td valign="bottom"><a href="http://rx4rdf.sf.net"><img width="100" style="padding: 0px" height="33" alt="Powered by Rhizome" src="rhizome.gif"></a></td></tr></table></td><td cellpadding="0" width="75%" padding="0" cellspacing="0" id="contentTableCell"><table width="100%" id="contentTable" height="100%"><tr><td valign="top" id="titlebar" height="1">RhizML</td></tr><tr><td id="maincontent" valign="top"><p><strong>RhizML</strong> is a text format that combines 
+<a href="http://c2.com/cgi/wiki?WikiWikiWeb">WikiWiki</a>-style formatting with an alternative syntax for XML inspired by <a href="SLiP">SLiP</a>. Like the WikiWiki and SLiP formats its goal is to be a human-friendly markup language: simple, clear, and concise.
+</p><p>This combination enables you to author XML documents with (nearly) the same ease as a wiki entry.
+</p><h1>Formatting Rules
+</h1><p>In a nutshell, lines that start with some indention define XML markup, with that indention defining how the markup is nested, a la Python. Lines without indention (i.e. don't start with a space or tab) follow the basic Wiki formatting rules, and this content becomes the child of the last markup element.  Here's a short example:
+
+<pre class="code">
+ html: 
+  header:
+    title: `some raw text here
+  body bgcolor='#CCCCCC' text=black:
+* A bulleted list with a [link | http://www.w3.org]
+
+A blank line means new paragraph
+</pre>
+</p><p>For more examples, try editing a page of this website -- most its content is written in RhizML. In particular try <a href="DocSample?action=edit">DocSample</a> or <a href="faq?action=edit">FAQ</a>.
+</p><p>More Info:
+<dl><dd><a href="TextFormattingRules">TextFormattingRules</a>
+</dd><dd><a href="SLiPvsRhizML">Differences between SLIP and RhizML</a>
+</dd><dd><a href="RhizMLStatus">Implementation Status</a></dd></dl></p></td></tr></table></td></tr><tr><td width="100%" id="footer" colspan="2"></td></tr></table><!--(c) 2003-4 by Adam Souzis (asouzis@users.sourceforge.net) All rights reserved--></body></html>

@@ -1,0 +1,236 @@
+<html><head><meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type"><title>RxML</title><link href="basestyles.css" type="text/css" rel="stylesheet"><link href="favicon.ico" rel="icon"></head><body id="bd"><table cellpadding="0" align="center" cellspacing="0" id="mainTable"><tr><td width="100%" id="header" colspan="2"><div style="float: right">
+&nbsp;</div><a href="index"><img src="Rx4RDFlogo.gif" border="0"></a>  Welcome to Rx4Rdf!</td></tr><tr id="titlerow"><td width="120" id="sidebar" height="400"><table cellpadding="0" width="150" cellspacing="20" height="100%"><tr><td valign="top"><h3>About
+</h3><ul><li><a href="index">Home</a>
+</li><li><a href="faq">FAQ</a>
+</li><li><a href="Download">Download</a>
+</li><li><a href="Status">Status</a>
+</li><li><a href="about">About</a>
+</li></ul><h3>Rx4RDF
+</h3><ul><li><a href="RxPath">RxPath</a>
+</li><li><a href="RxSLT">RxSLT</a>
+</li><li><a href="RxUpdate">RxUpdate</a>
+</li><li><a href="RxML">RxML</a>
+</li></ul><h3>Rhizome
+</h3><ul><li><a href="Racoon">Racoon</a>
+</li><li><a href="Rhizome">Rhizome</a>
+</li><li><a href="RDFScribbler">RDFScribbler</a>
+</li><li><a href="RhizML">RhizML</a>
+</li></ul><p><a href="http://sf.net/projects/rx4rdf"><img src='http://sourceforge.net/sflogo.php?group_id=85676&amp;amp;type=1'/></a>
+</p></td></tr><tr><td valign="bottom"><a href="http://rx4rdf.sf.net"><img width="100" style="padding: 0px" height="33" alt="Powered by Rhizome" src="rhizome.gif"></a></td></tr></table></td><td cellpadding="0" width="75%" padding="0" cellspacing="0" id="contentTableCell"><table width="100%" id="contentTable" height="100%"><tr><td valign="top" id="titlebar" height="1">RxML</td></tr><tr><td id="maincontent" valign="top"><div class="content"><table class="title" summary=""><tr><td valign="middle"><h1>RxML</h1></td></tr></table><p><font size="-2">by&nbsp;Adam Souzis</font></p><ul class="minitoc"><li><a href="#id25535944">Introduction
+</a></li><li><a href="#id25581736">rx:prefixes
+</a></li><li><a href="#id26064048">rx:resource
+</a></li><li><a href="#id26071568">Literal elements
+</a></li><li><a href="#id26074576">Lists 
+</a></li><li><a href="#id26082392">Blank nodes. 
+</a></li><li><a href="#id26085824">Statement Identifiers 
+</a></li><li><a href="#id24518136">Resource types and classes.  
+</a></li><li><a href="#id26093448">rx:query
+</a></li><li><a href="#id26098360">Advanced example. 
+</a></li><li><a href="#id26100560">Comparison between RxML and RDF/XML
+</a></li><li><a href="#id26108856">RELAX NG Compact Schema for RxML
+</a></li></ul><a name="id25535944"></a><h3>Introduction
+</h3><div style="margin-left: 0 ; border: 2px"><p><a href="RxML">RxML</a> is an alternative XML serialization for <a href="RDF">RDF</a> that is designed for easy and simple authoring, particularly in conjunction with <a href="RhizML">RhizML</a>.
+</p></div><p>The structure of a RxML docment is simple: each child of the root <span class="codefrag">rx</span> element represent a resource.  Each child element of the resource element specifies a name-value pair that applies to the resource.  Together the resource and name-value pair form a RDF statement.
+</p><p>Any element name that is not part of RXML namespace (conventially represented as 'rx') is converted to a URI reference as specified by <a href="RxPathSpec">RxPath</a> -- basically, the local name is appended to the namespace URI.  These URI references are treated as the RDF URI reference for the element.  In RDF, both resources and property names are given URI references (actually, a property name <em>is</em> a resource).
+</p><p>Here's a simple example:
+</p><pre class="code">
+&lt;rx xmlns:rx='http://rx4rdf.sf.net/ns/rxml#' 
+xmlns:mysite='http://example.org/mysite/'
+xmlns:dc="http://purl.org/dc/elements/1.1/" &gt;
+  &lt;mysite:page1.html&gt;
+        &lt;dc:author&gt;me&lt;/dc:author&gt;
+        &lt;dc:title&gt;The first page&lt;/dc:title&gt;
+        &lt;dc:relatedTo&gt;&lt;mysite:lastPage.html/&gt;&lt;/dc:relatedTo&gt;
+  &lt;/mysite:page1&gt;
+  
+  &lt;mysite:lastPage.html&gt;
+        &lt;dc:author&gt;me&lt;/dc:author&gt;
+        &lt;dc:title&gt;The last page&lt;/dc:title&gt;
+        &lt;dc:relatedTo&gt;&lt;mysite:page1.html/&gt;&lt;/dc:relatedTo&gt;
+  &lt;/mysite:lastPage.html&gt;  
+&lt;/rx&gt;
+</pre><p>The value of a property can be either literal text or a resource, represented by a resource element -- notice that the value of the 'relatedTo' property in the example above). If the property element has no children, it assumed its value is an empty literal. The value of a properties can also be a list of literals or resources -- see the section on lists below. 
+</p><a name="id25581736"></a><h3>rx:prefixes
+</h3><div style="margin-left: 0 ; border: 2px"><p>You can use the <span class="codefrag">rx:prefixes</span> element to declare prefixes instead of using namespace declarations:
+</p></div><pre class="code">
+&lt;rx&gt;
+ &lt;prefixes&gt;
+     &lt;mysite&gt;http://example.org/mysite/&lt;/mysite&gt;
+     &lt;dc&gt;http://purl.org/dc/elements/1.1/&lt;/dc&gt;
+     &lt;default-ns&gt;http://rx4rdf.sf.net/ns/rxml#&lt;/default-ns&gt;
+ &lt;/prefixes&gt;
+ ....
+&lt;/rx&gt;
+</pre><p>The <span class="codefrag">default-ns</span> child element is equivalent to the "xmlns" attribute for declaring the "default" namespace for non-prefixed element names.
+</p><p>This is convenient for writing RxML in <a href="RhizML">RhizML</a>.  Here is the first example again, written in RhizML and using <span class="codefrag">rx:prefixes</span>:
+</p><pre class="code">
+rx:
+ prefixes:
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+     mysite: `http://example.org/mysite/
+     dc: `http://purl.org/dc/elements/1.1/
+     
+ mysite:page1.html:
+     dc:author: `me
+     dc:title:  `The first Page
+     dc:relatedTo:
+       mysite:lastPage.html
+       
+ mysite:lastPage.html:
+     dc:author: `me
+     dc:title:  `The last Page
+     dc:relatedTo:
+       mysite:page1.html       
+</pre><p>Technical note: if the RxML document is encoded in XML and it contains <span class="codefrag">rx:prefixes</span> element it must include, in the root element, namespace declarations corresponding exactly to all the prefixes declared in the <span class="codefrag">rx:prefixes</span> element. This is to ensure that namespace-aware XML processors can handle the RxML document properly.
+</p><a name="id26064048"></a><h3>rx:resource
+</h3><div style="margin-left: 0 ; border: 2px"></div><p>Sometimes it is not convenient to map an URL to an element name.  In that case, you can use <span class="codefrag">rx:resource</span>, which has an <span class="codefrag">id</span> attribute whose value is the URI reference of the resource. For example, in the example above the <span class="codefrag">&lt;mysite:page1.html&gt;</span> element could haven been replaced with: <span class="codefrag">&lt;resource id="http://example.org/mysite/page1.html"&gt;</span>. If the <span class="codefrag">id</span> attribute is missing or has an empty value, the resource is treated as a <a href="http://www.w3.org/TR/2003/WD-rdf-concepts/#section-blank-nodes">blank node</a>. 
+</p><a name="id26071568"></a><h3>Literal elements
+</h3><div style="margin-left: 0 ; border: 2px"></div><p>If the child of a property element is an element named "rx:xml" the value of the property is the XML contained in that <span class="codefrag">rx:xml</span> element (and, in RDF terms, is treated an XML literal). If the child of a property element is an element named "rx:l" the value of the property is the literal text contained in that <span class="codefrag">rx:l</span> element. A <span class="codefrag">rx:l</span> element can only contain text, but may have two option attributes: the <span class="codefrag">xml:lang</span> attribute whose value declares the language of the literal, and <span class="codefrag">rdf:datatype</span> whose value is a <a href="http://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-datatyped-literals">datatype</a> URI reference that declares the datatype of the literal.
+</p><a name="id26074576"></a><h3>Lists 
+</h3><div style="margin-left: 0 ; border: 2px"></div><p>In addition to literal and resource names, value of a property can also be a list of resources and/or literals. In this case, the property element will have multiple children elements or may have a <span class="codefrag">list</span> attribute. The value of the list is a URI reference naming the list or maybe an empty string (in which case the list resource is treated as a <a href="http://www.w3.org/TR/2003/WD-rdf-concepts/#section-blank-nodes">blank node</a>). In addition to naming the list, the <span class="codefrag">list</span> attribute can be used to indicate a property with one or zero child elements actually has value that is a list with one or zero items.  A property element may also have a <span class="codefrag">listType</span> attribute whose value is one of <span class="codefrag">rdf:List</span> (the default), <span class="codefrag">rdf:Seq</span>, <span class="codefrag">rdf:Bag</span>, or <span class="codefrag">rdf:Alt</span>, which indicates the type of list (and also indicates the existence of a list in the case of one or no children). If an item in a list is a literal it must indicated using a <span class="codefrag">rx:l</span> or <span class="codefrag">rx:xml</span> element -- raw text is not valid in lists.
+</p><p>Note that property that has a list of values is not that same as multiple identical properties each with a value. For example, this snippet:
+</p><pre class="code">
+myresource:
+  author: `john
+  author: `betty
+</pre><p>results in different statement than this:
+</p><pre class="code">
+myresource:
+  authors:
+    rx:l: `john
+    rx:l: `betty
+</pre><a name="id26082392"></a><h3>Blank nodes. 
+</h3><div style="margin-left: 0 ; border: 2px"></div><p><a href="http://www.w3.org/TR/2003/WD-rdf-concepts/#section-blank-nodes">Blank nodes</a> are designated by a resource whose URI reference that begins with "<span class="codefrag">http://rx4rdf.sf.net/anonymous#</span>". The portion of the URI after this serves as the identifier for the node. Conventionally, the "bNode" prefix is associated with the <span class="codefrag">http://rx4rdf.sf.net/anonymous#</span> URI. Also, a <span class="codefrag">rx:resource</span> element without an <span class="codefrag">id</span> attribute (or an <span class="codefrag">id</span> with an empty value) is treated as a blank node.
+</p><p>Below is example of a typical usage of blank nodes:
+</p><pre class="code">
+rx:
+ prefixes:
+     a: `http://rx4rdf.sf.net/ns/archive#
+     wiki: `http://rx4rdf.sf.net/ns/wiki#
+     bNode: `http://4suite.org/rdf/anonymous/
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+
+ resource id='mailto:omaas@example.com':
+    name: `Oedipa Maas 
+    address:
+ 	bNode:address1
+
+ bNode:address1:
+   street: `123 1st street
+   city: `San Narcisco
+   state: `CA
+   postalcode: `94110
+   country: `USA
+</pre><a name="id26085824"></a><h3>Statement Identifiers 
+</h3><div style="margin-left: 0 ; border: 2px"></div><p>An individual statement (a declaration of a property value pair for a particular resource) can be turned into a resource itself by giving it an identifier (in RDF, this is called <a href="http://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-reifying">reification</a>). This is done when the <span class="codefrag">rx:stmtID</span> attribute appears on a property element. The value of <span class="codefrag">rx:stmtID</span> is a URI reference. Reification is useful when you want to attach metadata about the statement itself, for example, to say this asserted by whom or asserted on this data, etc. 
+</p><a name="id24518136"></a><h3>Resource types and classes.  
+</h3><div style="margin-left: 0 ; border: 2px"></div><p>RxML provides no special way to indicate the class of a resource -- so typically the class is declared with a property of <span class="codefrag">rdf:type</span> whose value is the class resource.
+</p><a name="id26093448"></a><h3>rx:query
+</h3><div style="margin-left: 0 ; border: 2px"></div><p>Finally, RxML provides an element that allows a set of properties to be applied to several resources at once: the <span class="codefrag">rx:query</span> element. The element can appear as a child of the root <span class="codefrag">rx</span> element and behaves like a <span class="codefrag">rx:resource</span> element, except that instead of an <span class="codefrag">id</span> attribute, it must have a <span class="codefrag">select</span> attribute whose value is an <a href="RxPath">RxPath</a> expression that must return a nodeset of zero or more resource elements. The property children of the <span class="codefrag">rx:query</span> are applied to each resource referenced by the selected nodeset. It is an error if a <span class="codefrag">rx:stmtID</span> appears on a property element that is a child of a rx:query element (because that property element is actually creating multiple RDF statements, one for each resource). 
+</p><p>A RxML processor that does not support RxPath is not required to support the <span class="codefrag">rx:query</span> element.
+</p><a name="id26098360"></a><h3>Advanced example. 
+</h3><div style="margin-left: 0 ; border: 2px"><p>Below is an example written in <a href="RhizML">RhizML</a> that demonstrates all the features of RxML.
+</p></div><pre class="code">
+rx:
+ prefixes:
+     a: `http://rx4rdf.sf.net/ns/archive#
+     wiki: `http://rx4rdf.sf.net/ns/wiki#
+     bNode: `http://4suite.org/rdf/anonymous/
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+     rdf: `http://www.w3.org/1999/02/22-rdf-syntax-ns#
+
+ bNode:blankNode1: ;a comment
+     a:last-modified: `1062022787.468
+     wiki:name stmtID='http://rx4rdf.sf.net/ns/archive#': `RxML
+     wiki:revisions listType='rdf:Bag': 
+         bNode:x87d0723b-fad6-488a-abcb-04b1d9323368_195
+         l xml:lang=en: `some text
+         xml:
+           html:
+             body:
+               r"some &lt;b&gt;xml&lt;/b&gt; content"
+         resource id='http://asdfasdf'
+     rdf:type: 
+         a:NamedContent
+ 
+ ; child properties are applied to each node in
+ ; the nodeset returned by the xpath expression
+ query select='\*': 
+     prop1:dsa:
+      bNode:blankNode1
+</pre>
+<a name="id26100560"></a><h3>Comparison between RxML and RDF/XML
+</h3><div style="margin-left: 0 ; border: 2px"></div><p>The biggest differences between RxML and RDF/XML are:
+</p><ul><li> The name of a resource element does not specify the <a href="http://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-typed-nodes">type of the resource</a>, as in RDF/XML, but rather the URI of the resource itself.
+</li><li> RxML does not support <a href="http://www.w3.org/2001/10/stripes/">striped syntax</a> -- the object element of a property can not have any children.
+</li><li> There are no alternative syntax shortcuts such as <a href="http://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-empty-property-elements">empty property elements</a> (<span class="codefrag">rdf:resource</span>) and <a href="http://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-property-attributes">property attributes</a>.
+</li></ul><a name="id26108856"></a><h3>RELAX NG Compact Schema for RxML
+</h3><div style="margin-left: 0 ; border: 2px"><pre class="code">
+# RELAX NG Compact Schema for RxML
+
+namespace local = ""
+namespace rx = "http://rx4rdf.sf.net/ns/rxml#"
+namespace rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+
+start = doc
+doc = element rx:rx { 
+     prefixesElement?, (resourceElement* &amp; subjectResourceElement* &amp; resQueryElement)
+}
+
+prefixesElement = element rx:prefixes { prefixesChildElement* }
+
+#any QName except if in the rx namespace (except for rx:default-ns)
+prefixesChildElement = element * - (local:* | rx:*) | rx:default-ns { URI-reference }
+
+#any QName except if in the rx namespace 
+resourceElement = element * - (local:* | rx:*)  { 
+	propertyElement* &amp; propertyResourceElement*
+	}
+
+subjectResourceElement = element rx:resource {
+	resourceIdAttribute, 
+	propertyElement* &amp; propertyResourceElement*
+}
+
+resQueryElement = element rx:res-query {
+	attribute select { text },
+	propertyElement* &amp; propertyResourceElement*
+}
+
+resourceIdAttribute = attribute id { URI-reference }?
+
+#any QName except if in the rx namespace 	
+propertyElement = element * - (local:* | rx:*)  { 
+	propertyAttribute*,
+	text | propertyValueElement* 
+}
+
+propertyResourceElement = element rx:resource {
+	resourceIdAttribute, 
+	propertyAttribute*,
+	text | propertyValueElement* 
+}
+
+propertyAttribute = attribute rx:list | list | rx:stmt | stmt { URI-reference }
+	| attribute rx:listType | listType  {
+	  "rdf:List" | "rdf:Seq" | "rdf:Bag" | "rdf:Alt" 
+	  }
+	
+propertyValueElement = objectResourceElement | rx:resource { resourceIdAttribute } 
+	| literalElement | xmlLiteralElement
+
+#any QName except if in the rx namespace 
+objectResourceElement = element * - (local:* | rx:*) {}
+
+literalElement = element rx:l { 
+	attribute rdf:Datatype {URI-reference }?, 
+	attribute xml:lang { text }?, 
+	text 
+}
+
+xmlLiteralElement element rx:xml { any }
+
+URI-reference = text
+
+any = mixed { element * { attribute * { text }*, any }* }
+</pre></div></div></td></tr></table></td></tr><tr><td width="100%" id="footer" colspan="2"></td></tr></table><!--(c) 2003-4 by Adam Souzis (asouzis@users.sourceforge.net) All rights reserved--></body></html>

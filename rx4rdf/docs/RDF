@@ -1,0 +1,34 @@
+<html><head><meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type"><title>RDF</title><link href="basestyles.css" type="text/css" rel="stylesheet"><link href="favicon.ico" rel="icon"></head><body id="bd"><table cellpadding="0" align="center" cellspacing="0" id="mainTable"><tr><td width="100%" id="header" colspan="2"><div style="float: right">
+&nbsp;</div><a href="index"><img src="Rx4RDFlogo.gif" border="0"></a>  Welcome to Rx4Rdf!</td></tr><tr id="titlerow"><td width="120" id="sidebar" height="400"><table cellpadding="0" width="150" cellspacing="20" height="100%"><tr><td valign="top"><h3>About
+</h3><ul><li><a href="index">Home</a>
+</li><li><a href="faq">FAQ</a>
+</li><li><a href="Download">Download</a>
+</li><li><a href="Status">Status</a>
+</li><li><a href="about">About</a>
+</li></ul><h3>Rx4RDF
+</h3><ul><li><a href="RxPath">RxPath</a>
+</li><li><a href="RxSLT">RxSLT</a>
+</li><li><a href="RxUpdate">RxUpdate</a>
+</li><li><a href="RxML">RxML</a>
+</li></ul><h3>Rhizome
+</h3><ul><li><a href="Racoon">Racoon</a>
+</li><li><a href="Rhizome">Rhizome</a>
+</li><li><a href="RDFScribbler">RDFScribbler</a>
+</li><li><a href="RhizML">RhizML</a>
+</li></ul><p><a href="http://sf.net/projects/rx4rdf"><img src='http://sourceforge.net/sflogo.php?group_id=85676&amp;amp;type=1'/></a>
+</p></td></tr><tr><td valign="bottom"><a href="http://rx4rdf.sf.net"><img width="100" style="padding: 0px" height="33" alt="Powered by Rhizome" src="rhizome.gif"></a></td></tr></table></td><td cellpadding="0" width="75%" padding="0" cellspacing="0" id="contentTableCell"><table width="100%" id="contentTable" height="100%"><tr><td valign="top" id="titlebar" height="1">RDF</td></tr><tr><td id="maincontent" valign="top"><h3>RDF for Beginners and Skeptics
+</h3><p>RDF (Resource Description Framework) is a World Wide Web Consortium (<a href="http://www.w3.org">W3C</a>) standard for describing metadata (primarily) in XML.
+</p><p>Take a casual first glance at RDF -- whether at some <a href="http://www.ilrt.bristol.ac.uk/discovery/rdf/resources/rss.rdf">sample</a> RDF files or at its family of formal <a href="http://www.w3.org/RDF/">specifications</a> -- and it sure looks complicated. But you can safely boil it down to this:
+<ul><li> RDF is simply a standard way to associate properties with URLs (what RDF calls resources)
+</li><li> A property is simply a name-value pair where the value can either be a string of text, another name or a list (of names and strings). In RDF all names are also URLs (resources) -- this way they are guaranteed to be unique (the magic property of URLs). 
+</li><li> The official XML "serialization" of RDF is just one way to describe the above -- there exists other more simpler ways to do the same -- both <a href="RxML">in XML</a> and <a href="http://www.w3.org/TR/rdf-testcases/#ntriples">not in XML</a>. 
+</li><li> That's it! You can bundle together collections of names, call it an 'ontology' and describe the meaning of those names using formal logic (that's what the <a href="http://www.w3.org/2001/sw">"Semantic Web"</a> is about) but that's entirely up to you. All RDF gives you in this regard is standard meanings to a few names (e.g. RDF:type).
+</li><li> OK, that's not exactly it. I left out a few things that you can safely ignore:
+</li><ul><li> RDF lets you (optionally) describe what language a string is in and what datatype it represents (e.g. a number or XML)
+</li><li> RDF lets you distinguish between resources that are private ("blank nodes" -- because you don't need to name them) -- and resources that are public (regular URLs)
+</li><li> RDF has a few reserved properties to enable you to name a specific declaration (assertion) that a particular resource has a particular property. This is called "reification".
+</li></ul></ul></p><h3>Why RDF?
+</h3><ul><li> What XML did for content, RDF does for structure -- by providing a standard way to describe resources the entire website, including its metadata, relationships between pages, etc. becomes repurposable, human editable, application agnostic, etc.
+</li><li> RDF unshackles you from the physical location of files and documents. Because resources (which can be anything) are given universal names, statements about those resources (e.g. annotations, categorization, etc.) can be made anywhere not just in the local XML file or web page containing the resource. 
+</li><li> RDF can provide a level of indirection between the application and data, as its general graph structure can represent all kinds of data, such as relational (SQL) or hierarchical (directories, XML).  Compared to XML data integration strategies, RDF's notion of unique resources and availability of languages for describing the logical relations between data structures (such as <a href="http://www.w3.org/TR/owl-ref/">OWL</a>) make it easy to build abstractions over arbitrary representations of data.
+</li></ul></td></tr></table></td></tr><tr><td width="100%" id="footer" colspan="2"></td></tr></table><!--(c) 2003-4 by Adam Souzis (asouzis@users.sourceforge.net) All rights reserved--></body></html>

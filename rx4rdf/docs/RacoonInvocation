@@ -1,0 +1,35 @@
+<html><head><meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type"><title>Racoon invocation step-by-step</title><link href="basestyles.css" type="text/css" rel="stylesheet"><link href="favicon.ico" rel="icon"></head><body id="bd"><table cellpadding="0" align="center" cellspacing="0" id="mainTable"><tr><td width="100%" id="header" colspan="2"><div style="float: right">
+&nbsp;</div><a href="index"><img src="Rx4RDFlogo.gif" border="0"></a>  Welcome to Rx4Rdf!</td></tr><tr id="titlerow"><td width="120" id="sidebar" height="400"><table cellpadding="0" width="150" cellspacing="20" height="100%"><tr><td valign="top"><h3>About
+</h3><ul><li><a href="index">Home</a>
+</li><li><a href="faq">FAQ</a>
+</li><li><a href="Download">Download</a>
+</li><li><a href="Status">Status</a>
+</li><li><a href="about">About</a>
+</li></ul><h3>Rx4RDF
+</h3><ul><li><a href="RxPath">RxPath</a>
+</li><li><a href="RxSLT">RxSLT</a>
+</li><li><a href="RxUpdate">RxUpdate</a>
+</li><li><a href="RxML">RxML</a>
+</li></ul><h3>Rhizome
+</h3><ul><li><a href="Racoon">Racoon</a>
+</li><li><a href="Rhizome">Rhizome</a>
+</li><li><a href="RDFScribbler">RDFScribbler</a>
+</li><li><a href="RhizML">RhizML</a>
+</li></ul><p><a href="http://sf.net/projects/rx4rdf"><img src='http://sourceforge.net/sflogo.php?group_id=85676&amp;amp;type=1'/></a>
+</p></td></tr><tr><td valign="bottom"><a href="http://rx4rdf.sf.net"><img width="100" style="padding: 0px" height="33" alt="Powered by Rhizome" src="rhizome.gif"></a></td></tr></table></td><td cellpadding="0" width="75%" padding="0" cellspacing="0" id="contentTableCell"><table width="100%" id="contentTable" height="100%"><tr><td valign="top" id="titlebar" height="1">Racoon invocation step-by-step</td></tr><tr><td id="maincontent" valign="top"><p>To illustrate how Racoon works let's walk through the steps it takes to serve a page.
+</p><ol><li> Run racoon.py -a rhizome-config.py
+</li><ol><li> Racoon executes the rhizome-config.py file, setting all the variables declared there, including:
+</li><ol><li> <tt>PATH</tt> which specifies the directory search path for Racoon
+</li><li> <tt>STORAGE_TEMPLATE</tt> which specifies (in <a href="http://www.w3.org/TR/rdf-testcases/#ntriples">NTriples</a>) the site structure for a new site. There's a helper function <tt>__addItem__</tt> to update this variable and the line <br /><tt>__addItem__('index',loc='path:index.txt', format='rhizml', disposition='entry', owner=None)</tt> <br />adds a page named 'index' with the assertion that its contents is stored in "path:index.txt"
+</li><li> Perhaps most importantly, the config file must a set a dictionary called <tt>actions</tt> that maps trigger names to a pipeline of Actions that are invoked in order. Racoon currently uses two triggers: <tt>handle-request</tt>, which is invoked by http requests and by the 'site:' scheme URL resolver, and <tt>run-cmds</tt>, which is invoked on start-up to handle command line arguements.
+</li></ol><li> Racoon next tries to load the model store specified in the <tt>STORAGE_PATH</tt> or with the -m option. If it is not found, it creates a new store using <tt>STORAGE_TEMPLATE</tt>.
+</li><li> If there were any command line arguments listed after the '-a' they are mapped to a dictionary of XPath variables and the 'run-cmd' Action pipeline is invoked with them.
+</li><li> Racoon starts its http server, listening on port 8000 by default
+</li></ol><li> retrieve http://localhost:8000/index with your browser
+</li><ol><li> Racoon maps the HTTP request to XPath variables, using different namespaces for the request and response headers, query parameters, cookies, etc.
+</li><li> Racoon then invokes the Action pipeline associated with 'handle-request'. For each Action Racoon invokes each RxPath query until it find a match and then passes on the result to the next Action. The result of the final action is returned to browser.
+</li><ol><li> The first action (<tt>findResourceAction</tt>) will match this expression <tt>/a:NamedContent[wiki:name=$_name]</tt>, selecting the resource added to the template by the above <tt>__addItem__</tt> call.
+</li><li> Skipping ahead to the 5th Action (<tt>findContentAction</tt>), our request will match <tt>wf:openurl(.//a:contents/a:ContentLocation)</tt>. Since <tt>.//a:contents/a:ContentLocation</tt> points to the "path:index.txt" a:ContentLocation resource, <tt>wf:openurl</tt> will retrieve that URL.
+</li><li> To resolve the URL Racoon uses its custom URL resolver which supports the internal 'path:' scheme, which finds the first file on Racoon's PATH config variable. For example, if you are running site-config.py, Racoon will find the index.txt in the site directory before it finds the index.txt in the rx/rhizome directory.  Using path: URLs provides both security (by restricting access to the file system) and modularity, now you don't need to modify rhizome directly, enabling you easily upgrade rhizome, etc. 
+</li><li> The next Action tranforms the content based on its format (Rhizml, XSLT, etc.) and the final Action looks for any template pages that may applied to it. This Action may invoke another series of Actions and so on and so on. For example, if the page isn't HTML it will try to find an appropriate stylesheet, and those results may be further transformed by the site-template XSL script.
+</li><li> Finally, we've processed all the Actions and the results are delivered to the browser.</li></ol></ol></ol></td></tr></table></td></tr><tr><td width="100%" id="footer" colspan="2"></td></tr></table><!--(c) 2003-4 by Adam Souzis (asouzis@users.sourceforge.net) All rights reserved--></body></html>
