@@ -645,7 +645,35 @@ except ImportError:
 ##########################################################################
 ## public utility functions
 ##########################################################################
-class RDFSSchema(object):
+class BaseSchema(object):
+    '''
+    A "null" schema that does nothing. Illustrates the minimum
+    interfaces that must be implemented.
+    '''
+    
+    def isCompatibleType(self, testType, wantType):
+        if wantType[-1] == '*':
+            return testType.startswith(wantType[:-1])
+        else:
+            return testType == wantType
+                         
+    def isCompatibleProperty(self, testProp, wantProp):
+        if wantProp[-1] == '*':
+            return testProp.startswith(wantProp[:-1])
+        else:
+            return testProp == wantProp
+
+    def findStatements(self, uri, stmts):
+        return []
+       
+    def addToSchema(self, stmts): pass
+    def removeFromSchema(self, stmts): pass
+    
+    def begin(self): pass
+    def commit(self, **kw): pass
+    def rollback(self): pass
+           
+class RDFSSchema(BaseSchema):
     '''
     This is a temporary approach that provides partial support of RDF Schema.
 
@@ -841,7 +869,7 @@ class RDFSSchema(object):
             subTypes = map.get(wantType, [wantType])            
             return testType in subTypes
             
-    def makeClosure(self, map):
+    def _makeClosure(self, map):
         #for each sub class, get its subclasses and append them
         def close(done, super, subs):
             done[super] = dict([(x,1) for x in subs]) #a set really
@@ -916,12 +944,12 @@ class RDFSSchema(object):
                 self.currentSuperProperties.setdefault(stmt.predicate, [stmt.predicate])
 
         if typesChanged:
-            self.currentSubTypes = self.makeClosure(self.currentSubTypes)
+            self.currentSubTypes = self._makeClosure(self.currentSubTypes)
             if not self.inTransaction:
                 self.subtypes = self.currentSubTypes
             
         if propsChanged:
-            self.currentSubProperties = self.makeClosure(self.currentSubProperties)
+            self.currentSubProperties = self._makeClosure(self.currentSubProperties)
             if not self.inTransaction:
                 self.subproperties = self.currentSubProperties
         
@@ -961,7 +989,7 @@ class RDFSSchema(object):
                 for supertype in v:
                     newsubtypes.setdefault(supertype, []).append(k)
 
-            self.currentSubTypes = self.makeClosure(newsubtypes)
+            self.currentSubTypes = self._makeClosure(newsubtypes)
             if not self.inTransaction:
                 self.subtypes = self.currentSubTypes
             
@@ -971,7 +999,7 @@ class RDFSSchema(object):
                 for superprop in v:
                     newsubprops.setdefault(superprop, []).append(k)
             
-            self.currentSubProperties = self.makeClosure(newsubprops)
+            self.currentSubProperties = self._makeClosure(newsubprops)
             if not self.inTransaction:
                 self.subproperties = self.currentSubProperties
 

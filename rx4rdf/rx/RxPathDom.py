@@ -1309,7 +1309,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     nextIndex = 0 #never used
     defaultNsRevMap = { RDF_MS_BASE : 'rdf', RDF_SCHEMA_BASE : 'rdfs' }
     
-    def __init__(self, model, nsRevMap = None):        
+    def __init__(self, model, nsRevMap = None, schemaClass = RxPath.RDFSSchema):        
         self.rootNode = self
         self.ownerDocument = self #bug in dom implementation?
         self.model = model
@@ -1320,6 +1320,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
             self.nsRevMap[RDF_SCHEMA_BASE] = 'rdfs'
 
         self.revision = 0
+        self.schemaClass = schemaClass
         self.schema = None
     
     def _get_childNodes(self):
@@ -1328,7 +1329,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
             #todo: remove this temporary hack
             if not self.schema:
                 #set this the first time the DOM is loaded
-                self.schema = RxPath.RDFSSchema()
+                self.schema = self.schemaClass()
                 stmts = self.model.getStatements()
                 self.schema.addToSchema(stmts)                                
                 
