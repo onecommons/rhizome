@@ -36,9 +36,12 @@
 </xsl:if>
 <pre>
     <xsl:variable name='fixup' select="&quot;&lt;a href='site:///.?action=view-metadata&amp;amp;about=%(encodeduri)s'>%(res)s&lt;/a>&quot;" />
-    <!-- there's an absurd level of string escaping going on here! -->
+    <!-- there's an absurd level of string escaping going on here! XML escaping (twice!), URL encoding, and Python string interpolation
+    The original string is:
+    /*/*[is-subproperty-of(@uri,'%(encodeduri)s')]
+    -->
     <xsl:variable name='fixupPredicate' select=
-    "&quot;&lt;a href='site:///search?search=%%2F*%%2F*%%5B%%40uri%%3D%%27%(encodeduri)s%%27%%5D&amp;amp;searchType=RxPath&amp;amp;view=html&amp;amp;title=Property%%20Usage'>%(predicate)s&lt;/a>&quot;" />
+    "&quot;&lt;a href='site:///search?search=%%2F*%%2F*%%5Bis-subproperty-of%%28%%40uri%%2C%%27%(encodeduri)s%%27%%29%%5D&amp;amp;searchType=RxPath&amp;amp;view=html&amp;amp;title=Property%%20Usage'>%(predicate)s&lt;/a>&quot;" />
                
     <xsl:value-of disable-output-escaping='yes' select="wf:get-rdf-as-rxml($__resource, '', $fixup, $fixupPredicate)" />
 </pre>

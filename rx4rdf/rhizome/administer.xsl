@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <x:stylesheet xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" 
 xmlns:wf="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#" 
 xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" 
@@ -16,11 +16,11 @@ exclude-result-prefixes="f wf a wiki rdf rdfs auth" version="1.0">
         <tr>
           <td><x:value-of select='$resName' /></td>
           <td>
-             <!-- /*[rdf:type='uri'] -->
-            <a href="site:///search?search=%2F*%5Brdf:type%3D%27{f:escape-url(string(.))}%27%5D&amp;searchType=RxPath&amp;view=list">List </a>
+             <!-- /*[is-instance-of(.,'uri')] -->
+            <a href="site:///search?search=%2F*%5Bis-instance-of%28.%2C%27{f:escape-url(string(.))}%27%29%5D&amp;searchType=RxPath&amp;view=list">List </a>
           </td>
           <td>
-            <a href="site:///search?search=%2F*%5Brdf:type%3D%27{f:escape-url(string(.))}%27%5D&amp;searchType=RxPath&amp;view=edit">Edit All </a>
+            <a href="site:///search?search=%2F*%5Bis-instance-of%28.%2C%27{f:escape-url(string(.))}%27%29%5D&amp;searchType=RxPath&amp;view=edit">Edit All </a>
           </td>
           <x:if test='$shownew'>
           <td>
@@ -48,7 +48,7 @@ exclude-result-prefixes="f wf a wiki rdf rdfs auth" version="1.0">
       select all the classes that are handled in one way or the other      
       -->                    
       <x:call-template name='rows'>
-        <x:with-param name='search' select="id(/*/wiki:action-for-type/*)[. != uri('wiki:Any')]" />
+        <x:with-param name='search' select="id(/*/wiki:action-for-type/*)[. != uri('rdfs:Resource')]" />
         <x:with-param name='shownew' select="true()" />
       </x:call-template>
       </table>  

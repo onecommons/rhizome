@@ -51,10 +51,10 @@ resourceQueries=[
 #   and see if the user or one of its roles has rights to any of them
 
 filterTokens = '''auth:guarded-by/auth:AccessToken[auth:has-permission=$__authAction]
-  [not($__authProperty) or not(auth:with-property) or auth:with-property=$__authProperty]
+  [not($__authProperty) or not(auth:with-property) or is-subproperty-of($__authProperty,auth:with-property)]
   [not($__authValue) or not(auth:with-value) or auth:with-value=$__authValue]'''
 
-findTokens = '''(./%(filterTokens)s  | ./rdf:type/*/%(filterTokens)s)''' % locals()
+findTokens = '''(./%(filterTokens)s  | ./rdf:type/*/%(filterTokens)s | ./rdf:type/*//rdfs:subClassOf/*/%(filterTokens)s)''' % locals()
 
 #note: save.xml and edit.xsl have expressions that you may need to change if you change this expression
 rhizome.authorizationQuery = locals().get('unAuthorizedExpr', '''not($__user/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser') and
@@ -68,8 +68,13 @@ contentHandlerQueries= [
 #don't do anything with external files:
 'f:if(self::text(), $STOP)', 
 #if the request has an action associated with it:
-'/*[wiki:handles-action=$__authAction][wiki:action-for-type = $__context | $__context/rdf:type]', #todo: use compatibleType() function
-"/*[wiki:handles-action=$__authAction][wiki:action-for-type='http://rx4rdf.sf.net/ns/wiki#Any']", #get the default handler
+#find the action that handles the most derived subtype of the resource
+#here's simplifed version of the expression: /*[action-for-type = ($__context_subtypes[.= action-for-type])[1] ]
+'''/*[wiki:handles-action=$__authAction][wiki:action-for-type = 
+   (($__context/rdf:type/* | $__context/rdf:type/*//rdfs:subClassOf/*)
+    [.= /*[wiki:handles-action=$__authAction]/wiki:action-for-type])[1]]''',
+#get the action default handler (we don't yet support inferencing of rdfs:Resource as the base subtype, so we need this as a separate rule)
+"/*[wiki:handles-action=$__authAction][wiki:action-for-type='http://www.w3.org/2000/01/rdf-schema#Resource']", 
 #if the resource is content
 'self::a:NamedContent',
 #default if nothing matches for any real resource (i.e. an resource element)
@@ -323,10 +328,6 @@ validateExternalRequest=rhizome.validateExternalRequest
 authorizeAdditions=rhizome.authorizeAdditions
 authorizeRemovals=rhizome.authorizeRemovals
 authorizeXPathFuncs=rhizome.authorizeXPathFuncs
-authPredicates=['http://www.w3.org/1999/02/22-rdf-syntax-ns#first', 
- 'http://www.w3.org/1999/02/22-rdf-syntax-ns#li', 
- 'http://rx4rdf.sf.net/ns/wiki#revisions', 
- 'http://rx4rdf.sf.net/ns/archive#contents' ]
 
 ##############################################################################
 ## Define the template for a Rhizome site
@@ -336,9 +337,9 @@ templateList = [rhizome._addItemTuple('_not_found',loc='path:_not_found.xsl', fo
  rhizome._addItemTuple('edit',loc='path:edit.xsl', format='rxslt', disposition='entry', handlesAction=['edit', 'new']),
  rhizome._addItemTuple('save',loc='path:save.xml', format='rxupdate', disposition='handler', handlesAction=['save', 'creation']),
  rhizome._addItemTuple('confirm-delete',loc='path:confirm-delete.xsl', format='rxslt', disposition='entry', 
-                        handlesAction=['confirm-delete'], actionType='http://rx4rdf.sf.net/ns/wiki#Any'),
+                        handlesAction=['confirm-delete'], actionType='rdfs:Resource'),
  rhizome._addItemTuple('delete', loc='path:delete.xml', format='rxupdate', disposition='handler', 
-                        handlesAction=['delete'], actionType='http://rx4rdf.sf.net/ns/wiki#Any'),
+                        handlesAction=['delete'], actionType='rdfs:Resource'),
  rhizome._addItemTuple('basestyles.css',format='text', loc='path:basestyles.css'),
  rhizome._addItemTuple('edit-icon.png',format='binary',loc='path:edit.png'),
  #rhizome._addItemTuple('list',loc='path:list-pages.xsl', format='rxslt', disposition='entry'),
@@ -346,9 +347,9 @@ templateList = [rhizome._addItemTuple('_not_found',loc='path:_not_found.xsl', fo
  rhizome._addItemTuple('item-disposition-handler-template',loc='path:item-disposition-handler.xsl', format='rxslt', 
                         disposition='entry', handlesDisposition='handler'),
  rhizome._addItemTuple('save-metadata',loc='path:save-metadata.xml', format='rxupdate', 
-      disposition='handler', handlesAction=['save-metadata'], actionType='http://rx4rdf.sf.net/ns/wiki#Any'),
+      disposition='handler', handlesAction=['save-metadata'], actionType='rdfs:Resource'),
  rhizome._addItemTuple('edit-metadata',loc='path:edit-metadata.xsl', format='rxslt', disposition='entry', 
-            handlesAction=['edit-metadata', 'edit'], actionType='http://rx4rdf.sf.net/ns/wiki#Any'),
+            handlesAction=['edit-metadata', 'edit'], actionType='rdfs:Resource'),
  rhizome._addItemTuple('_not_authorized',contents="<div class='message'>Error. You are not authorized to perform this operation on this page.</div>",
                   format='xml', disposition='entry'),
 rhizome._addItemTuple('search', format='rxslt', disposition='entry', loc='path:search.xsl'),
@@ -359,7 +360,7 @@ rhizome._addItemTuple('signup', format='zml', disposition='entry', loc='path:sig
 rhizome._addItemTuple('save-user', format='rxupdate', disposition='handler', loc='path:signup-handler.xml',
                       handlesAction=['save', 'creation'], actionType='http://xmlns.com/foaf/0.1/Person'),
 rhizome._addItemTuple('default-resource-viewer',format='rxslt', disposition='entry', loc='path:default-resource-viewer.xsl',
-                    handlesAction=['view-metadata'], actionType='http://rx4rdf.sf.net/ns/wiki#Any'),
+                    handlesAction=['view-metadata'], actionType='rdfs:Resource'),
 rhizome._addItemTuple('preview', loc='path:preview.xsl', disposition='short-display', format='rxslt'),
 rhizome._addItemTuple('wiki2html.xsl', loc='path:wiki2html.xsl', format='http://www.w3.org/1999/XSL/Transform', handlesDoctype='wiki'),
 rhizome._addItemTuple('intermap.txt',format='text', loc='path:intermap.txt'),
@@ -367,7 +368,7 @@ rhizome._addItemTuple('dir', format='rxslt', disposition='entry', loc='path:dir.
                       handlesAction=['view'], actionType='http://rx4rdf.sf.net/ns/wiki#Folder'),
 rhizome._addItemTuple('rxml-template-handler',loc='path:rxml-template-handler.xsl', format='rxslt', 
                         disposition='entry', handlesDisposition='rxml-template'),               
-rhizome._addItemTuple('generic-new-template', loc='path:generic-new-template.txt', handlesAction=['new'], actionType='wiki:Any',
+rhizome._addItemTuple('generic-new-template', loc='path:generic-new-template.txt', handlesAction=['new'], actionType='rdfs:Resource',
             disposition='rxml-template', format='text', title='Create New Resource'), 
 rhizome._addItemTuple('rxml2rdf',loc='path:rxml2rdf.py', format='python', disposition='complete'),
 rhizome._addItemTuple('default-error-handler', loc='path:default-error-handler.xsl', disposition='entry', doctype='xhtml', format='rxslt'), 
@@ -487,7 +488,6 @@ siteVars =\
 '''% {'base' : rhizome.BASE_MODEL_URI }
 templateList.append( ('@sitevars', rxml.zml2nt(contents=siteVars, nsMap=nsMap)) )
 
-
 #add the authorization and authentification structure
 
 #secureHashSeed is a string that is combined with plaintext when generating a secure hash of passwords
@@ -517,6 +517,15 @@ authStructure =\
  auth:Unauthorized:
   rdf:type: auth:Unauthorized
 
+ #we make these properties subproperties of "auth:requires-authorization-for"
+ #for Rhizome's fine-grained authentication routine which
+ #inverse transitively follows those relations to find authorizing resources 
+ #to test whether a statement can be added or removed 
+ rdfs:member: rdfs:subPropertyOf: auth:requires-authorization-for
+ rdf:first: rdfs:subPropertyOf: auth:requires-authorization-for
+ wiki:revisions: rdfs:subPropertyOf: auth:requires-authorization-for
+ a:contents: rdfs:subPropertyOf: auth:requires-authorization-for
+ 
  auth:permission-remove-statement
   rdf:type: auth:Permission
  
@@ -679,18 +688,32 @@ authStructure =\
 
  # access tokens guards common to all resources
  # (currently only fine-grained authentication checks this)
- # if we supported owl we could have owl:Thing as the subject instead 
+ # if we fully supported rdfs we could have rdfs:Resource as the subject instead
+ # or if we supported owl, the subject could be owl:Thing
  # and we wouldn't need a seperate check in the authorizationQuery
  base:common-access-checks:
   auth:guarded-by: base:all-resources-guard 
+  auth:guarded-by: base:change-schema-token
   
  base:all-resources-guard:
    rdf:type: auth:AccessToken   
-   rdfs:comment: `protects all resources from having its access tokens added or removed
+   rdfs:comment: `protects every resource from having its access tokens added or removed
    auth:has-permission: auth:permission-add-statement
    auth:has-permission: auth:permission-remove-statement
    auth:with-property:  auth:guarded-by
    auth:priority: 100
+
+ #for now only let the administrator change the schema
+ base:change-schema-token:
+  rdf:type: auth:AccessToken
+  rdfs:label: `guards any statements that changes the schema
+  auth:has-permission: auth:permission-add-statement
+  auth:has-permission: auth:permission-remove-statement   
+  auth:with-property: rdfs:subClassOf
+  auth:with-property: rdfs:subPropertyOf
+  auth:with-property: rdfs:domain
+  auth:with-property: rdfs:range
+  auth:priority: 100
 ''' % {'base' : rhizome.BASE_MODEL_URI }
 
 #add actions:
@@ -720,6 +743,9 @@ modelVars =\
 templateList.append( ('@model', rxml.zml2nt(contents=modelVars, nsMap=nsMap)) )
    
 def name2uri(name, nsMap = nsMap):
+    '''
+    if the name's prefix in nsMap it is expanded otherwise we assume its a URI and return it as is.
+    '''
     i = name.find(':')
     prefix = name[:i]
     if prefix in nsMap:
@@ -728,6 +754,7 @@ def name2uri(name, nsMap = nsMap):
         return name
     
 def addStructure(type, structure, extraProps=[], name2uri=name2uri):
+    '''Structure is a sequence consisting of at least the resource URI and a label, followed by one literal for each extra property.'''
     n3 = ''
     type = name2uri(type)
     for props in structure:
@@ -812,6 +839,15 @@ itemFormats = [ ('http://rx4rdf.sf.net/ns/wiki#item-format-binary', 'Binary', 'a
 APPLICATION_MODEL= addStructure('http://rx4rdf.sf.net/ns/wiki#ItemFormat', itemFormats,
     ['http://rx4rdf.sf.net/ns/archive#content-type'])\
    + '''<%susers/admin> <%s> "%s" .\n''' % (rhizome.BASE_MODEL_URI, passwordHashProperty, adminShaPassword)
+
+#add the schema to APPLICATION_MODEL
+import os.path
+from rx import utils
+#4Suite's RDF parser can't parse archive-schema.rdf so we have to load a NTriples file instead
+schema = utils.convertToNTriples(os.path.split(_rhizomeConfigPath)[0]+'/archive-schema.nt')
+#to regenerate: change above to end in .rdf and uncomment this line:
+#file(os.path.split(_rhizomeConfigPath)[0]+'/archive-schema.nt', 'w').write(schema)
+APPLICATION_MODEL += schema
 
 #we add these functions to the config namespace so that config files that include this can access them
 #making it easy to extend or override the rhizome default template
