@@ -28,10 +28,11 @@ log = logging.getLogger("rhizome")
 class DocumentMarkupMap(rhizml.LowerCaseMarkupMap):
     TT = 'code'
     A = 'link'
+    SECTION = 'section'
     
     def __init__(self):
         super(DocumentMarkupMap, self).__init__()
-        self.wikiStructure['!'] = ('section', 'title')
+        self.wikiStructure['!'] = (self.SECTION, 'title')
 
     def H(self, level, line):
         return 'section'
@@ -40,13 +41,15 @@ class TodoMarkupMap(rhizml.LowerCaseMarkupMap):
     pass #todo
 
 class SpecificationMarkupMap(DocumentMarkupMap):
+    SECTION = 's'
+    
     def __init__(self):
         super(SpecificationMarkupMap, self).__init__()        
-        self.wikiStructure['!'] = ('s', None)
+        self.wikiStructure['!'] = (self.SECTION, None)
 
     def canonizeElem(self, elem):
-        if isinstance(elem, type(()) ) and elem[0][0] == 's':
-            return 's' #map sections elems to s
+        if isinstance(elem, type(()) ) and elem[0][0] == 's' and elem[0][-1:].isdigit():
+            return 's' #map section elems to s
         else:
             return elem
         
@@ -70,12 +73,12 @@ class Rhizome:
     def __init__(self, server):
         self.server = server
 
-    def getResourceAction(self, resultNodeset, kw, contextNode, retVal): 
-        kw['_contents'] = retVal            
-        kw['_prevnode'] = [ contextNode ] #nodeset containing current resource
-        if kw.has_key('revision'):
-            del kw['revision'] #don't apply this to the template resource
-        return self.server.doActions(self.handleRequestSequence[1:], kw, resultNodeset) #the resultNodeset is the contextNode so skip the find resource step
+    def processTemplateAction(self, resultNodeset, kw, contextNode, retVal):
+        #the resultNodeset is the template resource
+        #so skip the first few steps that find the page resource
+        actions = self.handleRequestSequence[3:]
+        return self.server.callActions(actions, [ '_user', '_name' ],
+                                       resultNodeset, kw, contextNode, retVal)
     
     def doImport(self, path, recurse=False, r=False, disposition='entry', xupdate="path:import.xml", format='', dest=None, **kw):
           '''Import command line option
@@ -184,7 +187,7 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
               lock.release()              
           
     def doExport(self, dir, xpath=None, filter='wiki:name', name=None, static=False, **kw):
-    	 '''
+         '''
 Export command line option
 Exports the content of each item in the site as a file.  Also, for each file, 
 created a matching file with ".metarx" appended that contains the metadata for that item.
@@ -218,7 +221,7 @@ Options:
              content = None
              if static:
                  try:
-                     content = kw['__requestor__'].invoke(orginalName) 
+                     content = kw['__requestor__'].invoke__(orginalName) 
                      #todo: do we need any special link fixup?
                      #todo: what about external files (e.g. images)
                      #todo: change extension based on output mime type
@@ -227,8 +230,10 @@ Options:
                  except AttributeError:
                      log.warning('%s is dynamic, can not do static export', name)
                      pass #note: only works with static site (ones with no arguments to pass
-             else:                              #just run the revision action and the contentAction
-                  content = self.server.doActions([self.getRevisionAction, self.getContentAction], kw.copy(), item)             
+             else:
+                 #just run the revision action and the contentAction
+                 #todo: process patch
+                 content = self.server.doActions([self.findRevisionAction, self.findContentAction], kw.copy(), item)             
              if content is None:
                  continue
                 
@@ -258,7 +263,7 @@ Options:
 
         #get the contents of the resource which this patch will use as the base to run its patch against
         #todo: issue kw.copy() is not a deep copy -- what to do?
-        base = self.server.doActions([self.getContentAction, self.processContentAction], kw.copy(), patchBaseResource)
+        base = self.server.doActions([self.findContentAction, self.processContentAction], kw.copy(), patchBaseResource)
         patch = pickle.loads(str(contents))
         return utils.patch(base,patch)
 
@@ -283,9 +288,10 @@ Options:
     def addItemTuple(self, name, **kw):
         return [(name, self.addItem(name, **kw))]
 
-    def addItem(self, name, loc=None, contents=None, disposition = 'complete',
+    def addItem(self, name, loc=None, contents=None, disposition = 'complete', 
                 format='binary', doctype='', handlesDoctype='', handlesDisposition='',
-                baseURI=None, owner='http://rx4rdf.sf.net/ns/wiki#owner-system'):
+                handlesAction='', actionType='http://rx4rdf.sf.net/ns/archive#NamedContent',
+                baseURI=None, owner='http://rx4rdf.sf.net/site/users-admin', authorizationGroup=''):
         if format.isalpha(): #if not a URI
            format = 'http://rx4rdf.sf.net/ns/wiki#item-format-' + format
         if not baseURI:
@@ -301,11 +307,8 @@ Options:
         else:
             contentTriples = ''' <http://rx4rdf.sf.net/ns/archive#contents> "%(contents)s" .''' % locals()
 
-        if format == 'http://rx4rdf.sf.net/ns/wiki#item-format-binary': 
-            contentTriples = '_:' + itembNode + contentTriples
-        else:
-            contentbNode = namebNode + '1Content'
-            contentTriples = '''_:%(itembNode)s <http://rx4rdf.sf.net/ns/archive#contents> _:%(contentbNode)s .
+        contentbNode = namebNode + '1Content'
+        contentTriples = '''_:%(itembNode)s <http://rx4rdf.sf.net/ns/archive#contents> _:%(contentbNode)s .
     _:%(contentbNode)s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
     _:%(contentbNode)s <http://rx4rdf.sf.net/ns/archive#transformed-by> <%(format)s> .
     _:%(contentbNode)s %(contentTriples)s''' % locals()
@@ -316,8 +319,22 @@ Options:
             handlesDoctype = "<%(nameUriRef)s> <http://rx4rdf.sf.net/ns/wiki#handles-doctype> <http://rx4rdf.sf.net/ns/wiki#doctype-%(handlesDoctype)s>.\n" % locals()
         if handlesDisposition:    
             handlesDisposition = "<%(nameUriRef)s> <http://rx4rdf.sf.net/ns/wiki#handles-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-%(handlesDisposition)s>.\n" % locals()
-        if owner:    
-            owner = "<%(nameUriRef)s> <http://rx4rdf.sf.net/ns/wiki#owned_by> <%(owner)s>.\n" % locals()
+        handlesActions=''
+        if handlesAction:            
+            for action in handlesAction:
+                handlesActions += '<%(nameUriRef)s> <http://rx4rdf.sf.net/ns/wiki#handles-action> "%(action)s".\n' % locals()
+        if handlesAction and actionType:
+            actionType = '<%(nameUriRef)s> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <%(actionType)s>.\n' % locals()
+        else:
+            actionType = ''
+
+        if authorizationGroup:    
+            authorizationGroup = '<%(nameUriRef)s> <http://rx4rdf.sf.net/ns/auth#member-of> <%(authorizationGroup)s>.\n' % locals()
+            
+        if owner:
+            if owner == 'http://rx4rdf.sf.net/site/users-admin': #fix up to be the admin user for this specific site
+                owner = self.BASE_MODEL_URI + 'users-admin'
+            owner = "<%(itembNode)s> <http://rx4rdf.sf.net/ns/wiki#created-by> <%(owner)s>.\n" % locals()
         else:
             owner = ''
             
@@ -330,4 +347,4 @@ Options:
     _:%(itembNode)s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
     _:%(itembNode)s <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
     _:%(itembNode)s <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-%(disposition)s> .
-    %(doctype)s%(handlesDoctype)s%(handlesDisposition)s%(owner)s%(contentTriples)s\n'''% locals() 
+    %(doctype)s%(handlesDoctype)s%(handlesDisposition)s%(handlesActions)s%(actionType)s%(authorizationGroup)s%(owner)s%(contentTriples)s\n'''% locals() 

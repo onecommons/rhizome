@@ -7,37 +7,37 @@ You can always [Edit|?action=edit] this page (use the link at the bottom of this
 
 !Hyperlinks
 
-You can create links to internal or external web pages by putting the name in brackets. External links must be a complete URL, while internal pages just need to be the name of page. For example, to point at the java.sun.com home page, use [[http://java.sun.com], which becomes [http://java.sun.com/] or [[Java home page|http://java.sun.com], which becomes [Java home page|http://java.sun.com], while this page can be linked to like this: [[text formatting rules]: [text formatting rules].
+You can create links to \[[internal]] or external web pages by putting the name in brackets. External links must be a complete URL, while internal pages just need to be the name of page. For example, to point at the java.sun.com home page, use \[http://java.sun.com], which becomes [http://java.sun.com/] or \[Java home page|http://java.sun.com], which becomes [Java home page|http://java.sun.com], while this page can be linked to like this: \[text formatting rules]: [text formatting rules].
 
 To add a new page you just create a link to it from somewhere else. After all, there isn't much point in having a page if you can't access it! You'll then see a small question mark after the page name when you return to that page. Then click on it and you have created a new page!
 
-If you want to use brackets in regular text start with two instead one, like this: [[[[sic], to avoid creating a link.
+If you want to use brackets in regular text start with two instead one, like this: \\\[sic], to avoid creating a link. If you want to wrap a link in brackets that should work as is: [[sdf]] or \[[sdf]]
 
 !Adding pictures
 
-If you create a link to an image it will be automatically inlined. For example, this is an inlined PNG image: [http://www.ecyrd.com/~jalkanen/test.png]. If you specify link text ([[this one here|http://example.com/example.png]) it becomes
+If you create a link to an image it will be automatically inlined. For example, this is an inlined PNG image: [http://www.ecyrd.com/~jalkanen/test.png]. If you specify link text (\[this one here|http://example.com/example.png]) it becomes
 the ALT text for those who either can't or don't want to view images. 
 If you don't want the image to be inlined, used this link annotation:
-[[wiki:xlink-replace: http://www.ecyrd.com/~jalkanen/test.png]:
+[[wiki:xlink-replace; http://www.ecyrd.com/~jalkanen/test.png]:
 
-[not inlined|wiki:xlink-replace: http://www.ecyrd.com/~jalkanen/test.png] (Link annotation is an advanced feature that is not documented yet -- sorry.)
+[not inlined|wiki:xlink-replace; http://www.ecyrd.com/~jalkanen/test.png] (Link annotation is an advanced feature that is not documented yet -- sorry.)
 
 !Footnotes
 
 These are a special kind of hyperlink.  By using nothing but a number inside
-a hyperlink you create a reference to a footnote, like this [[1], which 
-creates a footnote[1].  To make the actual footnote, you just put a [[#1]
+a hyperlink you create a reference to a footnote, like this \[#1], which 
+creates a footnote[#1].  To make the actual footnote, you just put a \[&1]
 where you want that footnote to point at.  Look below to find the footnote.
 
-You can also make a named footnote, just as if you were doing a normal hyperlink.  For example, this refers to the same footnote[Footnote number 1|1] as the footnote above, but this refers to another footnote[2].
+You can also make a named footnote, just as if you were doing a normal hyperlink.  For example, this refers to the same footnote[Footnote number 1|#1] as the footnote above, but this refers to another footnote[#2].
 
 !Bulleted lists
 Use an asterisk (*) in the first column to make bulleted lists. Use more asterisks for deeper indentation. For example:
- r'''<pre class='code'>
+ pr'''
 * One
 * Two
 * Three
-** Three.One</pre>'''
+** Three.One'''
 
 creates
 * One
@@ -71,12 +71,23 @@ If you want to write the list item on multiple lines, add a '\\' at the end of t
 
 !Indentation and Definition lists
 
-A simple way to make definition lists is to use the ';:' -construct:
+A simple way to make definition lists is to use the '+=' -construct:
 
-;__Construct__:''Something you use to do something with''
++__Construct__=''Something you use to do something with''
 
 : Starting with a ':' causes text to be indented like this (useful because remember, you can't start lines with spaces or tabs!).
 :: Multiple colons create greater indentation, like the '::' used here.
+
+!Block Quotes
+
+Two or more :: alone on a line starts (or ends) a block quote, for extended quotations
+::
+Extended quotes can have:
+* lists
+* rules
+---- 
+etc. ~~ -- anonymous
+::
 
 !Text effects
 
@@ -91,7 +102,28 @@ Start a line with an exclamation mark (!) to make a heading.
                  
 !Preformatted text
 
-If you want to add a block of unformatted text that doesn't follow any of these rules, for now you must create markup text -- see [Markup Formatting Rules] or edit this page for an example.
+If you want to add a block of unformatted text that doesn't follow any of these rules, start a new line in a quotation block that begins and ends with either """ or '''.  
+If you want to preserve whitespace start the quote with p''' or p""". 
+p'''here's 
+  some text with 
+        strange text 
+     formatting 
+           preserved'''
+           
+If you want to turn off markup escaping so you enter HTML or XML markup directly into the document start the quote with r''' or r""". (You can combine both prefixes, e.g. pr""".)  For more info, see [Markup Formatting Rules] or edit this page for an example.
+
+!Character escaping
+If you want to display characters preceed the first character with a \\ e.g. here \// is displayed instead starting italics text.
+
+!Line Breaks and Continuations
+Occasionally you may want to create a line break without creating a new paragraph, for example in list bullet item. User \~~ to create a line break:
+
+* this item is on ~~ two lines
+
+If you want to continue a line so the next line is combined with the first (for example, to make the "source" text more readable), place a \\ at the end of the line:
+
+* this item breaks across\
+ two lines in the source text 
 
 !Tables
 
@@ -115,6 +147,6 @@ gives you the following table.  Note how you can use links also inside tables.
 
 ----
 
-[#1] Here's the footnote I mentioned.
+\[[&1]] Here's the footnote I mentioned.
 
-[The other footnote|#2] The other footnote.  Note how it's name is different?
+[[The other footnote|&2]] The other footnote.  Note how it's name is different?

@@ -4,5 +4,4 @@
     xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"
     xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >
     <xu:remove select='/*[wiki:name[text()=$_name]]'/>
-    <!-- todo: remove orphaned content too -->
 </xu:modifications>

@@ -21,8 +21,8 @@
 <xsl:variable name='transforms' select="$revision//a:contents/*" />	
 
 <xsl:template match="/" >
-<form METHOD="POST" ACTION="metadata_save" ENCTYPE="multipart/form-data">	
-   	<input TYPE="hidden" NAME="itemname" VALUE="{$_name}" />
+<form METHOD="POST" ACTION="{$_name}" ENCTYPE="multipart/form-data">	
+    <input TYPE="hidden" NAME="action" VALUE="save-metadata" />    
 	<input TYPE="hidden" NAME="about" VALUE="{$item}" />
         <input TYPE="hidden" NAME="about" VALUE="{$revision}" />
         <xsl:for-each select="$transforms">

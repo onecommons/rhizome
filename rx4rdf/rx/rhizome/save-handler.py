@@ -3,6 +3,7 @@ def _req_default_save(self, **kw):
     #print 'saving...'
     wikiname = kw['itemname'] 
     contents = kw['file'] or kw['contents']
+    title = kw['title']
     #sha = utils.shaDigestString(contents)
     itemURI = generateBnode()
     nameURI = self.BASE_MODEL_URI + filter(lambda c: c.isalnum() or c in '_-./', wikiname) #note filter: URI fragment might not match wikiname
@@ -31,7 +32,7 @@ def _req_default_save(self, **kw):
         oldcontentXPath = '(' + currentItemXpath + nonDynamicContentXPath + ')[last()]'
         oldContentResource = self.evalXPath(oldcontentXPath, kw)
         if oldContentResource:
-            oldContents = self.doActions([self.rhizome.getContentAction, self.rhizome.processContentAction], kw.copy(), oldContentResource[0])         
+            oldContents = self.doActions([self.rhizome.findContentAction, self.rhizome.processContentAction], kw.copy(), oldContentResource[0])         
             if oldContents:
                 patchTupleList = utils.diff(contents, oldContents) #compare  
                 if patchTupleList is not None:
@@ -103,7 +104,7 @@ def _req_default_save(self, **kw):
     </xu:if>
     
     <!-- don't bother saving the last revision if this was just a minor edit
-    todo: this doesn't delete the actual content: relie on bNode garbage collection?
+    todo: this doesn't delete the actual content if stored in an external file
     -->    
     <xu:if test='wf:get-metadata("minor_edit") and /*[wiki:name/text()="%(wikiname)s"]/wiki:revisions/*'>
     <xu:remove select='/*[wiki:name/text()="%(wikiname)s"]/wiki:revisions/*[last()]'/>
@@ -133,8 +134,12 @@ def _req_default_save(self, **kw):
             <xu:if test='wf:get-metadata("doctype")'>
                 <wiki:doctype><xu:attribute name="rdf:resource"><xu:value-of select="$doctype"/></xu:attribute></wiki:doctype>
             </xu:if>
+            <xu:if test='$title'>
+                <wiki:title>%(title)s</wiki:title>
+            </xu:if>
             <a:created-on>%(curtime).3f</a:created-on>
-        </wiki:Item>        
+            <wiki:created-by><xu:attribute name="rdf:resource"><xu:value-of select="$_user"/></xu:attribute></wiki:created-by>
+        </wiki:Item>        	    
         <xu:if test="wf:assign-metadata('revision-added', '%(itemURI)s')" /> <!-- do nothing - just for the side-effect -->
         <xu:if test="wf:assign-metadata('_update-trigger', 'revision-added')" /> <!-- do nothing - just for the side-effect -->
     </xu:append>

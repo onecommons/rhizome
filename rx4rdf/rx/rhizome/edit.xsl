@@ -45,17 +45,18 @@
 	
 <xsl:template match="/" name="edit-main" >
 <xsl:param name="itemname" select="$target" />
-<form METHOD="POST" ACTION="save" ENCTYPE="multipart/form-data">
+<form METHOD="POST" ACTION="{f:if($item,$itemname, 'save')}" ENCTYPE="multipart/form-data">
+    <input TYPE="hidden" NAME="action" VALUE="{f:if($item,'save','creation')}" />    
 	<xsl:if test='string-length($itemname) > 0'>		
 	    <input TYPE="hidden" NAME="itemname" VALUE="{$itemname}" />
 	    <xsl:variable name='title' select="wf:assign-metadata('title', concat('Editing ', $itemname))" />
 	</xsl:if>	
 	<xsl:if test='string-length($itemname)=0'>
-	    Name <input TYPE="text" NAME="itemname" VALUE="" SIZE="20" MAXLENGTH="100" />
-	    <br />
+	    Name <input TYPE="text" NAME="itemname" VALUE="" SIZE="20" MAXLENGTH="100" />	    
 	    <xsl:variable name='title' select="wf:assign-metadata('title', 'New Item')" />
-        </xsl:if>
-
+    </xsl:if>
+    Title <input TYPE="text" NAME="title" VALUE="{$item/wiki:title}" SIZE="80" MAXLENGTH="100" />
+    <br/>
 	<input TYPE="hidden" NAME="startTime" VALUE="{wf:current-time()}" />
 	Upload File:<input TYPE='file' name='file' /><br /> OR edit text here: <br />
 	<textarea NAME="contents" ROWS="20" COLS="65" STYLE="width:100%" WRAP="virtual">
@@ -110,15 +111,16 @@
 <a href="RhizML">RhizML</a> Formatting Quick Reference (see <a href="TextFormattingRules">TextFormattingRules</a> for more info)
 <pre class="code">
 ----             Horizontal ruler
-[text|type: link]Create a hyperlink. where "link" can be either an internal 
+[text|ann; link] Create a hyperlink. where "link" can be either an internal 
 		 page name or an external link (e.g http://).  
-		 Both type and text may be omitted.
+		 Both annotation and text may be omitted.
 *                Make a bulleted list (must be in first column). Use more (**) 
                  for deeper indentations.
 #                Make a numbered list (must be in first column). Use more (##, ###) 
                  for deeper indentations.
-:                Colon causes text to be indented                 
-;term:def        Defines 'term' with 'def'.  
+:                Indent line
+::		 (on a line by itself) Start (or end) a block quote.
++term=def        Defines 'term' with 'def'.  
 !, !!, !!!       Start a line with an exclamation mark (!) to make a heading. 
                  !! makes a sub-heading, !!! a sub-sub-heading, etc. (up to 6)
 __bold__         Makes text bold.
@@ -126,7 +128,7 @@ __bold__         Makes text bold.
 ^^monospace^^    Makes text in monospaced font.
 |text|more text| Makes a table. Double bars for a table heading.
 \                If in-line: Use to escape these special formatting characters. 
-                 At end of line: Treat next line as continuation of this line.
+                 At end of line: Treat next line as continuation of this line.                               
 </pre>
 </xsl:template>
 </xsl:stylesheet>

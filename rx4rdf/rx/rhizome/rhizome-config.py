@@ -6,34 +6,60 @@
     http://rx4rdf.sf.net    
 """
 
+import rx.rhizome
+if not hasattr(__server__, 'rhizome') or not __server__.rhizome: #make executing this config file idempotent
+    rhizome = rx.rhizome.Rhizome(__server__)
+    __server__.rhizome = rhizome
+else:
+    rhizome = __server__.rhizome
+
+rhizome.BASE_MODEL_URI = locals().get('BASE_MODEL_URI', __server__.BASE_MODEL_URI)
+
 ##############################################################################
 ## the core of Rhizome: here we define the pipeline for handling requests
 ##############################################################################
-#find 1st match, context is root
+
+#map the request to a resource in the model, finds 1st match, context is root
 resourceQueries=[
-'/*[wiki:name=$action]', #invoke action, e.g. mypage.html?action=edit
 '/*[wiki:name=$_name]',  #view the resource
+"xf:if(starts-with($_name,'users-'), /*[wiki:login-name=substring($_name, 7)] )", #treat anything under /users/ as user
 #name not found, see if there's an external file on the Racoon path with this name:
 '''wf:if(wf:file-exists($_name), "wf:assign-metadata('externalfile', wf:string-to-nodeset($_name))")''',
-"$NOTFOUND", #just a debugging hack to generate a message "warning: variable $NOTFOUND not defined"
 "/*[wiki:name='_not_found']", #invoke the not found page 
 ]
 
-#context is now the resource, now set the context to a version of the resource
-revisionQueries=[
-'wiki:revisions/*[number($revision)]', #view a particular revision e.g. mypage.html?revision=3
-#todo: select the released version if not specified and owner isn't current user
-'wiki:revisions/*[last()]', #get the latest if not specified
+#now see if we're authorized to handle this request
+#if we're not, the resource context will be set to _not_authorized
+#2 checks:
+#1. super-user can always get in
+#2. if either the resource or an authorization group it belongs to requires an auth token,
+#   make sure the user or one of its roles has that token 
+authorizationQueries=[
+'''xf:if ( not($_user/auth:has-role/auth:super-user) and 
+    count(./auth:needs-token/*[auth:action=$authAction] | ./auth:member-of/*/auth:needs-token/*[auth:action=$authAction])
+!= count( ($authResource/auth:needs-token/*[auth:action=$authAction] | $authResource/auth:member-of/*/auth:needs-token/*[auth:action=$authAction])
+    [$authResource=$_user/auth:has-token/* or $authResource=$_user/auth:has-role/*/auth:has-token/*] ), /*[wiki:name='_not_authorized'])''',    
+   #if we made it here, we're authorized to access the resource - now we can change the resource context if necessary
+   #'/*[wiki:name=$action]/wiki:revisions/*[last()]' #choose the resource that handles the action, e.g. the edit from when mypage.html?action=edit
 ]
 
-#now see if we're authorized to handle this request
-#simple authorization system for now: all 'system' owned resources are read-only
-authorizationQueries=['''xf:if(wiki:item-disposition='http://rx4rdf.sf.net/ns/wiki#item-disposition-handler'
-   and not(wf:has-metadata('itemname')), /*[wiki:name='_not_authorized'])''', #must have itemname defined
-'''xf:if(wiki:item-disposition='http://rx4rdf.sf.net/ns/wiki#item-disposition-handler'
-   and /*[wiki:name=$itemname]/wiki:owned_by='http://rx4rdf.sf.net/ns/wiki#owner-system',
-   /*[wiki:name='_not_authorized'])''', #if not authorized, set the context to the _not_authorized page
-   '.', #if we made it here, we're authorized - don't change the context
+#now find a resource that will be used to display the resource
+contentHandlerQueries= [
+#if the request has an action associated with it
+'/*[wiki:handles-action=$authAction][wiki:action-for-type = $_context/rdf:type]', #[compatibleTypes(wiki:action-for-type/*,$_context/rdf:type/*)]',
+#if the resource is content
+'self::a:NamedContent',
+#default for any real resource (i.e. an resource element)
+"xf:if(not(self::text()), /*[wiki:name='default-resource-viewer'])"
+]
+
+#context is now a content resource, now set the context to a version of the resource
+revisionQueries=[
+'wiki:revisions/*[number($revision)]', #view a particular revision e.g. mypage.html?revision=3
+'wiki:revisions/*[has-label=$label]', #view a particular label if specified 
+#select the released version if not otherwise specified and the owner isn't the current user
+"xf:if(not(wiki:revisions/*[last()]/wiki:owned_by[$user]), wiki:revisions/*[has-label='_released'])",
+'wiki:revisions/*[last()]', #get the latest if we're the owner
 ]
 
 #finally have a resource, get its content
@@ -51,33 +77,43 @@ encodingQueries=[
 
 # we're done processing request, see if there are any template resources we want to pass the results onto.
 templateQueries=[
-'''$REDIRECT''', #set this to the resource you want to redirect to
+#'''$REDIRECT''', #set this to the resource you want to redirect to
 '''xf:if($externalfile,$STOP)''', #short circuit -- $STOP is a magic variable that stops the evaluation of the queries
-'/*[wiki:handles-doctype/*=$_context/wiki:doctype/*]',
-'''xf:if(wiki:item-disposition/*='http://rx4rdf.sf.net/ns/wiki#item-disposition-complete', $STOP)''', #short circuit
-'''xf:if(wiki:item-disposition/*='http://rx4rdf.sf.net/ns/wiki#item-disposition-template', $STOP)''', #short circuit
-'/*[wiki:handles-disposition=$_context/wiki:item-disposition]',
+'/*[wiki:handles-doctype/*=$_doctype]',
+'''xf:if($_disposition='http://rx4rdf.sf.net/ns/wiki#item-disposition-complete', $STOP)''', #short circuit
+'''xf:if($_disposition='http://rx4rdf.sf.net/ns/wiki#item-disposition-template', $STOP)''', #short circuit
+'/*[wiki:handles-disposition=$_disposition]',
 #'''/*[wiki:name='_default-template']''', #todo??
 ]
 
-import rx.rhizome
-if not hasattr(__server__, 'rhizome') or not __server__.rhizome: #make executing this config file idempotent
-    rhizome = rx.rhizome.Rhizome(__server__)
-    __server__.rhizome = rhizome
-else:
-    rhizome = __server__.rhizome
-rhizome.BASE_MODEL_URI = locals().get('BASE_MODEL_URI', __server__.BASE_MODEL_URI)
+findResourceAction = Action(resourceQueries)
+#we want the first Action to set the $_user variable
+findResourceAction.assign("_user", '/wiki:User[wiki:login-name=$session:login]',
+                         "/wiki:User[wiki:login-name='guest']")
+findResourceAction.assign("_resource", '.', post=True)
 
-rhizome.getRevisionAction = Action(revisionQueries)
-rhizome.getContentAction = Action(contentQueries, lambda result, kw, contextNode, retVal, self=__server__:\
+authorizationAction = Action(authorizationQueries)
+authorizationAction.assign("authResource", ".") 
+authorizationAction.assign("authAction", '$action', "'view'") #default to 'view' if not specified
+
+rhizome.findRevisionAction = Action(revisionQueries)
+rhizome.findContentAction = Action(contentQueries, lambda result, kw, contextNode, retVal, self=__server__:\
                                   self.getStringFromXPathResult(result), requiresContext = True) #get its content
 rhizome.processContentAction = Action(encodingQueries, __server__.processContents, matchFirst = False, forEachNode = True) #process the content 
 
-handleRequestSequence = [ Action(resourceQueries), rhizome.getRevisionAction, #first find the resource
-      Action(authorizationQueries), #see if the user is authorized to access it
-      rhizome.getContentAction,#then get its content
+templateAction = Action(templateQueries, rhizome.processTemplateAction)
+#setup these variables to give content a chance to have dynamically set them
+templateAction.assign("_doctype", '$_doctype', "wiki:doctype/*")
+templateAction.assign("_disposition", '$_disposition', "wiki:item-disposition/*")
+
+handleRequestSequence = [ findResourceAction, #first map the request to a resource
+      authorizationAction, #see if the user is authorized to access it                          
+      Action(contentHandlerQueries), #find a resource that can display this resource
+      rhizome.findRevisionAction, #get the appropriate revision
+      authorizationAction, #see if the user is authorized for this revision
+      rhizome.findContentAction,#then get its content
       rhizome.processContentAction, #process the content            
-      Action(templateQueries, rhizome.getResourceAction), #invoke a templates
+      templateAction, #invoke a template
     ]
 
 rhizome.handleRequestSequence = handleRequestSequence
@@ -95,13 +131,16 @@ actions = { 'handle-request' : handleRequestSequence,
 nsMap = {'a' : 'http://rx4rdf.sf.net/ns/archive#',
         'dc' : 'http://purl.org/dc/elements/1.1/#',
         'wiki' : "http://rx4rdf.sf.net/ns/wiki#",
+         'auth' : "http://rx4rdf.sf.net/ns/auth#",
+         'base' : rhizome.BASE_MODEL_URI
          }
 
 import os 
 PATH= __server__.PATH + os.pathsep + os.path.split(__configpath__[-1])[0]
 
-cmd_usage = '''--import [dir or filepath] [--recurse] [--dest path] [--xupdate url] [--format format] [--disposition disposition]
-            --export dir [--static]'''
+cmd_usage = '''\n\nrhizome-config.py specific:
+--import [dir or filepath] [--recurse] [--dest path] [--xupdate url] [--format format] [--disposition disposition]
+--export dir [--static]'''
 
 # we define a couple of content processor here instead of in Racoon because
 # they make assumptions about the underlying schema 
@@ -114,9 +153,9 @@ contentProcessors = {
             'concat("site:///", (/a:NamedContent[wiki:revisions/*[.=$_context]]/wiki:name)[1])',node=context) ), 
     'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
         lambda self, contents, kw, result, context, rhizml=rhizml, mmf=rx.rhizome.MarkupMapFactory(): rhizml.rhizmlString2xml(contents,mmf)
-    #'http://rx4rdf.sf.net/ns/wiki#item-format-wikiml-akara' : lambda self, contents, *args: rhizome.processAkaraMarkup(contents),
 }
 
+import rxml
 def getrxrxity(context, resultset = None, comment = ''):
       import rxml
       if resultset is None:
@@ -133,21 +172,33 @@ STORAGE_TEMPLATE_PATH = "./wikistore-template.nt"
 ##############################################################################
 ## Define the template for a Rhizome site
 ##############################################################################
+
 templateList = rhizome.addItemTuple('_not_found',loc='path:_not_found.xsl', format='rxslt', disposition='entry')\
-+ rhizome.addItemTuple('edit',loc='path:edit.xsl', format='rxslt', disposition='entry')\
-+ rhizome.addItemTuple('save',loc='path:save-handler.py', format='python', disposition='handler')\
-+ rhizome.addItemTuple('delete', loc='path:delete.xml', format='rxupdate', disposition='handler')\
++ rhizome.addItemTuple('edit',loc='path:edit.xsl', format='rxslt', disposition='entry', handlesAction=['edit'])\
++ rhizome.addItemTuple('save',loc='path:save-handler.py', format='python', disposition='handler', handlesAction=['save', 'creation'])\
++ rhizome.addItemTuple('confirm-delete',loc='path:confirm-delete.xsl', format='rxslt', disposition='entry', handlesAction=['confirm-delete'])\
++ rhizome.addItemTuple('delete', loc='path:delete.xml', format='rxupdate', disposition='handler', handlesAction=['delete'])\
 + rhizome.addItemTuple('basestyles.css',format='text', loc='path:basestyles.css')\
-+ rhizome.addItemTuple('edit-icon.png',loc='path:edit.png')\
++ rhizome.addItemTuple('edit-icon.png',format='binary',loc='path:edit.png')\
 + rhizome.addItemTuple('list',loc='path:list-page.py', format='python', disposition='entry')\
-+ rhizome.addItemTuple('showrevisions',loc='path:showrevisions.xsl', format='rxslt', disposition='entry')\
++ rhizome.addItemTuple('showrevisions',loc='path:showrevisions.xsl', format='rxslt', disposition='entry',handlesAction=['showrevisions'])\
 + rhizome.addItemTuple('dump.xml', contents="print __requestor__.server.dump()", format='python')\
 + rhizome.addItemTuple('item-disposition-handler-template',format='python', disposition='entry', handlesDisposition='handler',
-          contents="print '''<div class='message'>Completed <b>%(_name)s</b> of <a href='%(itemname)s'><b>%(itemname)s<b></a>!</div>'''%locals()")\
-+ rhizome.addItemTuple('metadata_save',contents="__requestor__.server.rhizome.metadata_save(about, metadata)", format='python', disposition='handler')\
-+ rhizome.addItemTuple('edit-metadata',loc='path:edit-metadata.xsl', format='rxslt', disposition='entry')\
+          contents="print '''<div class='message'>Completed <b>%(action)s</b> of <a href='%(itemname)s'><b>%(itemname)s<b></a>!</div>'''% _prevkw")\
++ rhizome.addItemTuple('save-metadata',contents="__requestor__.server.rhizome.metadata_save(about, metadata)",
+                       format='python', disposition='handler', handlesAction=['save-metadata'])\
++ rhizome.addItemTuple('edit-metadata',loc='path:edit-metadata.xsl', format='rxslt', disposition='entry', handlesAction=['edit-metadata'])\
 + rhizome.addItemTuple('_not_authorized',contents="<div class='message'>Error. You are not authorized to perform this operation on this page.</div>",
-                  format='xml', disposition='entry')
+                  format='xml', disposition='entry')\
++rhizome.addItemTuple('search', format='rxslt', disposition='complete', loc='path:search.xsl')\
++rhizome.addItemTuple('login', format='rxslt', disposition='complete', loc='path:login.xsl')\
++rhizome.addItemTuple('logout', format='rxslt', disposition='complete', loc='path:logout.xsl')\
++rhizome.addItemTuple('signup', format='rxslt', disposition='entry', loc='path:signup.xsl',
+                      handlesAction=['edit', 'new'], actionType='http://rx4rdf.sf.net/ns/wiki#User')\
++rhizome.addItemTuple('save-user', format='rxupdate', disposition='handler', loc='path:signup-handler.xml',
+                      handlesAction=['save', 'creation'], actionType='http://rx4rdf.sf.net/ns/wiki#User')\
++ rhizome.addItemTuple('default-resource-viewer',format='python', disposition='entry',
+          contents="import rxml; _response.headerMap['content-type']='text/plain'; print rxml.getRXAsRhizmlFromNode(_resource)")
 #+ rhizome.addItemTuple('_default-template',loc='path:_default_template.xsl', disposition='template', format='rxslt')\
 
 #forrest templates, essentially recreates forrest/src/resources/conf/sitemap.xmap 
@@ -165,11 +216,65 @@ templateList += rhizome.addItemTuple('index',loc='path:index.txt', format='rhizm
 +rhizome.addItemTuple('MarkupFormattingRules',loc='path:MarkupFormattingRules.txt', format='rhizml', disposition='entry')\
 +rhizome.addItemTuple('RhizML',loc='path:RhizML.rz', format='rhizml', disposition='entry')\
 +rhizome.addItemTuple('SandBox', format='rhizml', disposition='entry', owner=None,
-	contents="Feel free to [edit|?action=edit] this page to experiment with [RhizML]...")
+	contents="Feel free to [edit|?action=edit] this page to experiment with [RhizML]...")\
 
+#add the authorization and authentification structure
+#uses one of two config settings: ADMIN_PASSWORD or ADMIN_PASSWORD_SHA (use the latter if you don't want to store the password in clear text)
+#otherwise default password is 'admin'
+
+adminShaPassword = locals().get('ADMIN_PASSWORD_SHA') #hex encoding of the sha1 digest
+if not adminShaPassword:
+    import sha
+    adminShaPassword = sha.sha( locals().get('ADMIN_PASSWORD','admin') ).hexdigest()    
+#rxml
+authStructure =\
+'''
+ rx:resource id='%(base)susers-guest':
+  rdf:type: wiki:User
+  wiki:login-name: `guest
+  auth:has-role: wiki:role-guest
+
+ rx:resource id='%(base)susers-admin':
+  rdf:type: wiki:User
+  wiki:login-name: `admin
+  wiki:sha1-password: `%(adminShaPassword)s
+  auth:has-role: auth:role-superuser
+
+ wiki:role-guest:
+  rdf:type: auth:Role
+  
+ auth:role-superuser:
+  rdf:type: auth:Role
+
+ ; the AuthorizationGroup for the structural pages
+ base:auth-template-forstructure:
+  rdf:type: auth:AuthorizationGroup
+  auth:needs-token: base:auth-token-forstructure
+
+ base:auth-token-forstructure
+    rdf:type: auth:AccessToken
+    auth:action: `edit
+    auth:action: `new
+    auth:action: `creation
+    auth:action: `save
+    auth:action: `delete    
+    auth:action: `edit-metadata    
+    auth:action: `save-metadata
+''' % {'base' : rhizome.BASE_MODEL_URI, 'adminShaPassword' : adminShaPassword }
+templateList.append( (None, rxml.rhizml2nt(contents=authStructure, nsMap=nsMap)) )
+
+siteVars =\
+'''
+ base:site-template:
+  wiki:header-image: `underconstruction.gif
+  wiki:header-text: `Header, site title goes here: edit the<a href="site-template?action=edit-metadata">site template</a>
+''' 
+templateList.append( ('@sitevars', rxml.rhizml2nt(contents=siteVars, nsMap=nsMap)) )
+   
 templateMap = dict(templateList) #create a map so derived sites can replace pages: for example, see site-config.py
 STORAGE_TEMPLATE = "".join(templateMap.values()) #create a NTriples string
 
+#define the APPLICATION_MODEL (static, read-only statements in the 'application' scope)
 def addStructure(type, structure):
     n3 = ''
     for name, label in structure:
