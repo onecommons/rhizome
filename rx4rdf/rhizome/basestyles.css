@@ -135,6 +135,16 @@ h2 { font-size: 130%; }
   padding: 5px
 }
 
+/* for diff-revisions */  
+   #difflib_chg_to_top th, #difflib_chg_to_top td
+     { border: 0; border-spacing: 0px; padding: 0; font-size: smaller; }  
+  .diff_header {background-color:#e0e0e0}
+  td.diff_header {text-align:right; border:0}
+  .diff_next {background-color:#c0c0c0}
+  .diff_add {background-color:#aaffaa}
+  .diff_chg {background-color:#ffff77}
+  .diff_sub {background-color:#ffaaaa}
+  
 /* for forrest skin: */
 
 table .title {
