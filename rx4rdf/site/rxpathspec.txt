@@ -2,10 +2,11 @@
   header:
    title: `RxPath Specification Proposal
    type: `Initial Draft
-   version: `Aug 29 2003
+   version: `Last Revised Feb 15, 2004
    authors:
      person name = 'Adam Souzis' email="asouzis@users.sf.net"
    status:
+Revision Feb 15, 2004 Minor changes (mostly editorial)
 Initial Draft Aug 28, 2003
    notice: 
 This document is the inital draft of a proposal, its goal is to get feedback on overall approach and specific issues.
@@ -18,7 +19,7 @@ RxPath is a language for addressing parts of a RDF model. It is syntactically id
 There have been other attempts at mapping RDF to the XPath data model (see references below for some). Generally, these mappings have been either [syntactic|http://www.idealliance.org/papers/xml2001/papers/html/03-01-04.html], such as transformations of RDF/XML that yield to consistent querying, or [semantic|http://www-db.research.bell-labs.com/user/pfps/papers/yin-yang.pdf], such as building a new shared model for representing both XML and RDF. The approach here is essentially syntactic but the transformation is of the abstract RDF syntax, not the RDF/XML serialization, and the result can be an impossible structure (i.e. an infinitely deep tree), so any implementation of RxPath must take into account the semantics of the RDF model for that and other reasons.
 
      s2 title="RxPath By Example":
-The following examples illustrate RxPath. They are based on the example RDF statements found [RDF Syntax|http://www.w3.org/TR/rdf-syntax-grammar], include the namespace prefixes used in those examples. 
+The following examples illustrate RxPath. They are based on the example RDF statements found in [RDF Syntax|http://www.w3.org/TR/rdf-syntax-grammar], include the namespace prefixes used in those examples. 
 
 +Example 1=This RxPath expression returns a nodeset of all the resources in the model:
 
@@ -48,11 +49,11 @@ RxPath defines resource elements (subject and object) as having a string value e
 
 +Example 6=Find all objects of the resource with URI reference "http://example.com/example#foo":
 
-^^/*[[.="http://example.com/example#foo"]/*/*
+^^/*\[.="http://example.com/example#foo"]/*/*
 
 +Example 7=Find all the statements with a ^^dc:title^^ predicate and an object which a literal equal to "A marvelous thing"
 
-^^/*/dc:title[[.="A marvelous thing"] 
+^^/*/dc:title\[.="A marvelous thing"] 
 
 Here the string value of the predicate element follows the XPath rule, thus matching the object value (its child)
 
@@ -60,27 +61,27 @@ Two more similar examples:
 
 +Example 8=All resources with a property rdfs:label with value "my label":
 
-^^/*[[rdfs:label='my label']
+^^/*\[rdfs:label='my label']
 
 +Example 9=Find all the statements with that have the resource "http://example.com/example#bar": as its object:
 
-^^/*/*[[.='http://example.com/example#bar']
+^^/*/*\[.='http://example.com/example#bar']
 
 RxPath expressions can follow transitive properties by using the descendant axis: 
 
 +Example 10=Find all the decendant files of a folder named "foldername":
 
-^^/fs:Folder[[fs:file-name="foldername"]\//fs:has-child/fs:File
+^^/fs:Folder\[fs:file-name="foldername"]\//fs:has-child/fs:File
 
 Inverse transitive queries can be done the same way: 
 
 +Example 11=Find all the ancestor folder(s) of the file named "filename":
 
-^^/fs:Folder[[.\//fs:has-child/fs:File[[fs:file-name="filename]]
+^^/fs:Folder\[.\//fs:has-child/fs:File\[fs:file-name="filename"]]
 
 +Example 12=A more complicated expression that does the same thing but returns a nodeset ordered by the ancestor relation.
 
-^^(\//fs:has-child/fs:File[[fs:file-name="filename])[[last()]/ancestor::fs:has-child/parent::fs:Folder
+^^(\//fs:has-child/fs:File\[fs:file-name="filename"])\[last()]/ancestor::fs:has-child/parent::fs:Folder
 
      s2 title="Conventions and Terminology":
 Through out this document anytime a [QName|http://www.w3.org/TR/REC-xml-names#NT-QName] appears with the prefix "rdf" it can be assumed that the namespace URI for the QName is "http://www.w3.org/1999/02/22-rdf-syntax-ns#".  
@@ -113,9 +114,10 @@ For each Subject Element one child element is created for each statement in the 
 The follow attributes may also appear:
 #If the statement has been reified the element will have an "rdf:ID" attribute whose value is the URI reference of the reification statements. 
 #If the object of the statement is a literal the Predicate Element may have ^^rdf:datatype^^ and/or ^^xml:lang^^ attributes.
-#If the Predicate Element is named ^^rdf:first^^, it MAY have a ^^listID^^ (no namespace URI) attribute whose value is object of the statement. (see list section xxx below)
+#If the Predicate Element is named ^^rdf:first^^ or ^^rdf:li^^, it will have a ^^listID^^ (no namespace URI) attribute whose value is object of the statement. (see list section xxx below)
          note: 
 put listid in a namespace?
+
 
 The sibling order of the predicate element is determined by sorting the tuple (element namespace URI, element local name, element string value) except in the special cases "rdf:li" and "rdf:first" Predicate Element (see below).
 
@@ -126,16 +128,16 @@ Each predicate element will have children nodes based on the object of its corre
 # If the object of the statement is a resource, the child will be an Recursive Node equivalent to its corresponding [Subject Element] (see section below). 
 
      s2 title="Recursive Nodes"
-Each [Object Element] is almost completely equivalent its corresponding [Subject Element] -- thus if the resource is the subject of a statement, the [Object Element] will have [Predicate Element]s as children, which in turn may have [Object Element] as its children and so on.  The only attributes that will be differ are its parent and in the case Object Nodes, its siblings (it will not have any).
-       s3 title="Circular References"
-We define 2 modes of behavior for handling circular references (where the ancestor element has the same URI reference as the descendant, as in the case where subject of a statement is that same as its object). When the data model is navigated in the first mode, ^^circularity-unchecked^^, circular references are not checked and therefore appear to generate an infinite number of descendant elemnts.  When navigating in the second mode, ^^circularity-checked^^, circular references are checked by walking up the element's anscestor axis up to some top-most element (see section ?? below), and if an Recusive element has an ancestor with the same URI reference at it does, the Recursive element will appear to have no children.  Which mode is active depends on the context of the XPath expression -- in short, ^^circularity-checked^^ is active for the [descendant], [descendant-or-self],[following], [proceeding] and [following axes], and ^^circularity-unchecked^^ for all other axes. 
+Each [Object Element] is almost completely equivalent its corresponding [Subject Element] -- thus if the resource is the subject of a statement, the [Object Element] will have [Predicate Element]s as children, which in turn may have [Object Element] as its children and so on.  The only attributes that will be differ are its parent and in the case Object Nodes, its siblings (it will not have any). See the section on "Circular References" below on how to handle circular references of recursive nodes.
 
      s2 title="RDF Containers and Collections"
 To provide more natural and expressive queries, RxPath provides special case mappings for RDF Collections and Containers.
 
-A Subject Element whose ^^rdf:type^^ is ^^rdf:Seq^^, ^^rdf:Bag^^ or ^^rdf:Alt^^ will have Predicate Element children with a URI reference equivalent to ^^rdf:li^^, not ^^rdf:_1^^, ^^rdf:_2^^, etc.  The sibling order of these children will be ordering by ordinal in the ^^rdf:_//n//^^ properties.
+A Subject Element whose ^^rdf:type^^ is ^^rdf:Seq^^, ^^rdf:Bag^^ or ^^rdf:Alt^^ will have Predicate Element children with a URI reference equivalent to ^^rdf:li^^, not ^^rdf:_1^^, ^^rdf:_2^^, etc.  The sibling order of these children will be ordering by the ordinal value implied by the ^^rdf:_//n//^^ property names. The Predicate Element MUST have a ^^listID^^ attribute whose value is equal to its ^^rdf:_//n//^^ predicate.
 
-A Subject Element whose ^^rdf:type^^ is ^^rdf:List^^ will have a child Predicate Element named ^^rdf:first^^ for each item in the list, with the sibling order corresponding to the order of the items in the list. More precisely, the child Predicate Elements are added (in order) by transitively following the ^^rdf:rest^^ predicate of the ^^rdf:List^^ resource, selecting the ^^rdf:first^^ predicate of each ^^rdf:List^^ that is object of the current ^^rdf:rest^^ statement. Only the ^^rdf:List^^ resource at the head list will appear as a Subject Element in a RxPath Document, the other recursive list resources will not, unless other statements in the RDF model refer to it. ^^rdf:rest^^ statements will never appear in the RxPath Document. A RxPath implementation MAY add a ^^listID^^ attribute to each ^^rdf:first^^ Predicate Element, with the attribute's value equal to the URI reference of the recursive list resource that is the subject of predicate. (Thus the first ^^rdf:first^^ Predicate Element of a list will have ^^listID^^ equal to the Subject Element URI reference.) The resource referenced by the ^^listID^^ URI reference MAY appear as resource in the RDF model (e.g. appear as Subject Element, etc.) but this is not required.
+A Subject Element whose ^^rdf:type^^ is ^^rdf:List^^ will have a child Predicate Element named ^^rdf:first^^ for each item in the list, with the sibling order corresponding to the order of the items in the list. More precisely, the child Predicate Elements are added (in order) by transitively following the ^^rdf:rest^^ predicate of the ^^rdf:List^^ resource, selecting the ^^rdf:first^^ predicate of each ^^rdf:List^^ that is object of the current ^^rdf:rest^^ statement. Only the ^^rdf:List^^ resource at the head list will appear as a Subject Element in a RxPath Document, the other recursive list resources will not, unless other statements in the RDF model refer to it. ^^rdf:rest^^ statements will never appear in the RxPath Document. A RxPath implementation MUST add a ^^listID^^ attribute to each ^^rdf:first^^ Predicate Element, with the attribute's value equal to the URI reference of the recursive list resource that is the subject of predicate. (Thus the first ^^rdf:first^^ Predicate Element of a list will have ^^listID^^ equal to the Subject Element URI reference.) The resource referenced by the ^^listID^^ URI reference MAY appear as resource in the RDF model (e.g. appear as Subject Element, etc.) but this is not required.
+
+(Note: to express an empty list, use the ^^rdf:nil^^ resource in place of the list resource as the object of the predicate -- cf. [RDF Syntax 7.2.19| http://www.w3.org/TR/2003/PR-rdf-syntax-grammar-20031215/#parseTypeCollectionPropertyElt].)
 
 (Note also that the child Object Element can be either text or element nodes (literals are valid rdf:list items despite the fact rdf:parseType="Collection" can not express that).)       
          note: 
@@ -156,6 +158,9 @@ Add a constaint that statements can not be modified only added or deleted?
    s1 title="RxPath Expression Semantics":      
 This section describes how XPath Expressions are applied to the RxPath data model.  RxPath expressions are evaluated exactly as if they were an XPath expressions being applied to an XML document except for the modifications described in this section.
 
+     s2 title="Circular References"
+We define 2 modes of behavior for handling circular references (where the ancestor element has the same URI reference as the descendant, as in the case where subject of a statement is that same as its object). When the data model is navigated in the first mode, ^^circularity-unchecked^^, circular references are not checked and therefore appear to generate an infinite number of descendant elemnts.  When navigating in the second mode, ^^circularity-checked^^, circular references are checked by walking up the element's anscestor axis up to some top-most element, and if an Recusive element has an ancestor with the same URI reference at it does, the Recursive element will appear to have no children.  Which mode is active depends on the context of the XPath expression -- in short, ^^circularity-checked^^ is active for the [descendant], [descendant-or-self],[following], [proceeding] and [following axes], and ^^circularity-unchecked^^ for all other axes. 
+
      s2 title="Node Tests"
 A [Node test|http://www.w3.org/TR/xpath#node-tests] that is a QName or of the form ^^[NCName|http://www.w3.org/TR/REC-xml-names#NT-NCName]:*^^ matches a Subject or Object element when the statement ^^<element URI reference> rdf:type <NodeTest URI reference>^^ holds true, where the NodeTest URI reference is the URI obtained from its QName (as descibed above). If the node is a Predicate element, the Node Test matches when the statement ^^<element URI reference> rdfs:subPropertyOf <NodeTest URI reference>^^ holds true (see [RDFS entailment rule 6|http://www.w3.org/TR/rdf-mt/#rulerdfs6]). How these assertions are determined is up to the RxPath processor.  An RxPath processor SHOULD support [RDF Schema|http://www.w3.org/TR/rdf-schema/].
 
@@ -165,12 +170,12 @@ In RxPath, the [string value|http://www.w3.org/TR/xpath#dt-string-value] of a Su
      s2 title="Axes" 
 RxPath constrains XPath's descendant axes (descendant, descendant-or-self, following, proceeding) in two ways.
 
-First, RxPath redefines how a [Step|http://www.w3.org/TR/xpath#NT-Step] that has one of these axis as its AxisSpecifier are evaluated.  If a node doesn't match the Step's [NodeTest|http://www.w3.org/TR/xpath#node-tests] then the node's descendants are not examined for matches. In other words, given a Step with a descendant axis, every ancestor of a matching node (up to the context node) will match NodeTest of the Step.
+First, RxPath redefines how a [Step|http://www.w3.org/TR/xpath#NT-Step] that has one of these axis as its AxisSpecifier is evaluated.  If a node doesn't match the Step's [NodeTest|http://www.w3.org/TR/xpath#node-tests] then the node's descendants are not examined for matches. In other words, given a Step with a descendant axis, every ancestor of a matching node (up to the context node) will match NodeTest of the Step.
          note:
 Should this rule be extended to also cover the Step's Predicates in addition to the NodeTest? This would be more consistent and powerful. But we don't do this because it would extremely difficult to figure out the context position and context size for each [predicate|http://www.w3.org/TR/xpath#predicates] while evaluating the descendants, and changing the rules about how predicates affect the context would probably be too much of divergence from the XPath spec. So we're left with an inconsistency that can lead to subtle bugs.
 
 
-Second, a [Step|http://www.w3.org/TR/xpath#NT-Step] with one of the descendant axes will only examine Predicate Elements for match and will skip Subject and Object elements and only examine their children. An equivalent to this constraint also applies to Steps with an ancestor or ancestor-or-self axis (Subject and Object elements are skipped, only their parent is examined).
+Second, a [Step|http://www.w3.org/TR/xpath#NT-Step] with one of the descendant axes will only examine Predicate Elements for a match, skipping past Subject and Object elements to only examine their children. An equivalent to this constraint also applies to Steps with an ancestor or ancestor-or-self axis (Subject and Object elements are skipped, only their parents is examined).
 
 When evaluating a Step with a descendant or descendant-or-self axis the RxPath processor MUST enter ^^circularity-checked^^ mode with the top-most ancestor of the circularity check set to the context node of Step.  When a Step's axis is following or proceeding, at every point in the document tree that the evaluation begins descending a branch the process must enter ^^circularity-checked^^ mode with the top-most ancestor of the circularity check set to the current node. 
 
@@ -183,22 +188,22 @@ and the AxisSpecifier of the expression's next Step is the child axis, the two s
 
 Informally: In XPath, the expression 
 
-^^*\//*[[1]^^ 
+^^*\//*\[1]^^ 
 
 is an abbreviation of 
 
-^^*/descendant-or-self::node()/child::*[[position()=1]^^
+^^*/descendant-or-self::node()/child::*\[position()=1]^^
 
-In the RxPath, ^^*\//*[[1]^^ would be an abbreviation for
+In the RxPath, ^^*\//*\[1]^^ would be an abbreviation for
   
-^^*/descendant::*[[ispredicate()][[position()=1]^^
+^^*/descendant::*\[ispredicate()]\[position()=1]^^
 
 Note that an expression like 
 ^^*\//previous-sibling::*^^ or ^^*\//..^^
 
 would not have the descendant step combined with the next one, e.g. it would expand as:
 
-^^*/descendant-or-self::node()[[ispredicate()]/previous-sibling::*^^
+^^*/descendant-or-self::node()\[ispredicate()]/previous-sibling::*^^
 
 The combined effect of these rules leaves the descendant axis with a NameTest is equivalent to transitively following a predicate, e.g. ^^*//has-child/*^^ finds all (and only) the descendant children.
 
@@ -232,7 +237,7 @@ Note: [xsl:copy|http://www.w3.org/TR/xslt#copying] behaves the same as in XSLT 1
 
    s1 title="RxUpdate":
 RxUpdate is a language for updating an RDF model. It is syntactically and semantically identical to [XUpdate Working Draft|http://www.xmldb.org/xupdate/xupdate-wd.html] except for the changes described here.   
-	note: `Todo! rdf:resource, garbage collection, white space nodes, other constraints, no atomicity requirement?, predicate elements with no children assumed to have an empty literals
+	note: `Todo! rdf:resource, garbage collection, white space nodes, other constraints, no atomicity requirement?, predicate elements with no children assumed to have an empty literals, make xupdate:value-of same as XSLT?
     s2 title="xupdate:if":    
     s2 title="xupdate:message":    
     
