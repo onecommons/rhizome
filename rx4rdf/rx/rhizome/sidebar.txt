@@ -1,5 +1,0 @@
-!!About
-*[Home|index]
-
-Edit [sidebar|sidebar?action=edit]
-to add your links.
