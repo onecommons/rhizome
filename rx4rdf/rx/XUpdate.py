@@ -88,6 +88,10 @@ class Processor:
     def popResult(self):
         return self.writers.pop().getResult()
 
+    def output(self):
+        """Returns the current output writer"""
+        return self.writers[-1]
+
     def execute(self, node, xupdate, variables=None, extFunctionMap = None):
         variables = variables or {}
         context = Context.Context(node, varBindings=variables, extFunctionMap=extFunctionMap)
