@@ -26,7 +26,7 @@ class Handler(object):
     def text(self, string): pass
     def whitespace(self, string): pass
     def endDocument(self): pass
-        
+
 class OutputHandler(Handler):
     def __init__(self, output):
         self.output = output
@@ -68,6 +68,22 @@ class OutputHandler(Handler):
     def endDocument(self):
         self.__finishElement()
 
+class Annotation(object):
+    '''
+    An link annotation is really just a simple representation of an XML element.
+
+    Attributes:
+    name is None or a qname or simple name
+    attribs is a list of (name, value) pairs (where name may be a qname)
+    child is None, a (unicode) string, or an annotation
+
+    Note: if the annotation is just text, self.child will be set but self.name will be None
+    '''
+    def __init__(self, name=None):
+        self.name = name
+        self.attribs = []
+        self.child = None
+
 class MarkupMap(object):
     '''
     Derive from this class to wiki markup output.
@@ -76,8 +92,8 @@ class MarkupMap(object):
     The element method is used as an dictionary keys, so tuples, not lists, must be used.
     '''
     #block
-    UL, OL, LI, DL, DD, DT, P, HR = 'UL', 'OL', 'LI', 'DL', 'DD', 'DT', 'P', 'HR'    
-    blockElems = [ 'UL', 'OL', 'LI', 'DL', 'DD', 'DT', 'P', 'HR' ] 
+    UL, OL, LI, DL, DD, DT, P, HR, PRE, BLOCKQUOTE, SECTION = 'UL', 'OL', 'LI', 'DL', 'DD', 'DT', 'P', 'HR', 'PRE', 'BLOCKQUOTE', 'SECTION'
+    blockElems = [ 'UL', 'OL', 'LI', 'DL', 'DD', 'DT', 'P', 'HR', 'PRE', 'BLOCKQUOTE', 'SECTION'] 
     #header
     H1, H2, H3, H4, H5, H6 = 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'
     headerElems = [ 'H1', 'H2', 'H3', 'H4', 'H5', 'H6' ]
@@ -85,16 +101,21 @@ class MarkupMap(object):
     TABLE, TR, TH, TD = 'TABLE', 'TR', 'TH', 'TD' # this is valid too: ('TABLE', (('class','"wiki"'),) ) (but attributes must be in a tuple not a list)
     tableElems = [ 'TABLE', 'TR', 'TH', 'TD' ]
     #inline:
-    I, B, TT, A, IMG, SPAN = 'EM', 'STRONG', 'TT', 'A', 'IMG', 'SPAN'
-    inlineElems = [ 'I', 'B', 'TT', 'A', 'IMG', 'SPAN' ]
+    I, B, TT, A, IMG, SPAN, BR = 'EM', 'STRONG', 'TT', 'A', 'IMG', 'SPAN', 'BR'
+    inlineElems = [ 'I', 'B', 'TT', 'A', 'IMG', 'SPAN', 'BR']
 
     INLINE_IMG_EXTS = ['.png', '.jpg', '.gif']
         
     def __init__(self):
+        #wikistructure maps syntax that correspond to strutural elements that only contain block elements (as opposed to inline elements)
         #create per instance instead of at the class level so the attributes are lazily evaluated, making subclassing less tricky
-        self.wikiStructure = { '*' : [self.UL, self.LI ], '#' : [self.OL, self.LI], ':' : [self.DL, self.DD ], ';' : [self.DL, self.DT ], '|' : [self.TABLE, self.TR]}
+        self.wikiStructure = { '*' : [self.UL, self.LI ], '#' : [self.OL, self.LI],
+                               ':' : [self.DL, self.DD ], '+' : [self.DL, self.DT ],'|' : [self.TABLE, self.TR] }
 
     def canonizeElem(self, elem):
+        '''        
+        implement if you have elements that might vary from instance to instance, e.g. map H4 -> H or (elem, attribs) -> elem
+        '''
         return elem
     
     def H(self, level, line):
@@ -116,10 +137,11 @@ class MarkupMap(object):
         '''
         return getattr(self, self.headerElems[level-1]) #evaluate lazily
                 
-    def mapTypeToMarkup(self, type, typeAttribs, name):        
+    def mapAnnotationsToMarkup(self, annotations, name):
+        type = annotations[0].name or annotations[0].child
         return self.SPAN, [('class',xmlquote(type) )], name
 
-    def mapLinkToMarkup( self, link, name, type, isImage, isAnchorRef, isAnchorName):
+    def mapLinkToMarkup( self, link, name, annotations, isImage, isAnchorName):
         '''
         return (element, attrib list, text)
         '''
@@ -128,24 +150,21 @@ class MarkupMap(object):
                 name = link[len('site://'):]
             else:
                 name = link
-        if isAnchorRef or isAnchorName:
-            name = '[' + name + ']'
         
         if link.startswith('site://'):            
-            link = link[len('site://'):] #todo! only support site with no structure -- hack for now
+            link = link[len('site://'):] #todo! this only support sites with no real hierarchy -- hack for now (should fix up link)
         
-        if isImage and (not type or type[0] != 'wiki:xlink-replace'):
+        if isImage and (annotations is None or \
+                   not [annotation for annotation in annotations if annotation.name == 'wiki:xlink-replace']):
             attribs = [ ('src', xmlquote(link)), ('alt', xmlquote(name)) ]
             return self.IMG, attribs, ''
         else:
-            if isAnchorRef:
-                link = '#' + link
             if isAnchorName:
-                attribs = [('class','"footnote"'), ('name', xmlquote(link)) ]
+                attribs = [('name', xmlquote(link)) ]
             else:
                 attribs = [ ('href', xmlquote(link)) ]
-            if type:
-                attribs += [ ('rel', xmlquote(type[0])) ]
+            if annotations:
+                attribs += [ ('rel', xmlquote(annotations[0].name)) ]
             return self.A, attribs, name
 
 #create a MarkupMap subclass with lowercase versions of all the elements names
@@ -221,10 +240,15 @@ def stripQuotes(strQuoted, checkEscapeXML=True):
             return strQuoted[1:].replace('&', '&amp;').replace('<', '&lt;').rstrip() + ' '  
         else:
             return strQuoted[1:].replace('&', '&amp;').replace('<', '&lt;')
-    escapeXML = checkEscapeXML and strQuoted[0] != 'r' #we xml escape strings unless raw quote type is specifed        
+    escapeXML = checkEscapeXML and not (strQuoted[0] in 'rR' or (strQuoted[0] in 'pP' and strQuoted[1] in 'rR'))#we xml escape strings unless raw quote type is specifed        
     #python 2.2 and below won't eval unicode strings while in unicode, so temporarily encode as UTF-8
     #NOTE: may cause some problems, but good enough for now
     strUTF8 = strQuoted.encode("utf-8")
+    #remove p prefix from string
+    if strUTF8[0] in 'pP':
+        strUTF8 = 'u' + strUTF8[1:]
+    elif strUTF8[0] in 'rR' and strUTF8[1] in 'pP':
+        strUTF8 = 'ur' + strUTF8[2:]
     strUnquoted = eval(strUTF8)
     if escapeXML:
         #escape and then remove the \ for any \< or \&
@@ -258,30 +282,55 @@ def rhizmlString2xml(strText, markupMapFactory=None, handler=None):
     return contents
 
 def _group(*choices): return '(' + '|'.join(choices) + ')'
-defexp =  r':(?!//)' #ignore cases like http://
+defexp =  r'\='
 tableexp= r'\|' 
 bold= r'__'
 italics= r'(?<!:)//' #ignore cases like http://
-monospace= r'\^\^' 
-linkexp = r'(?<!\[)\[.*?\]'#any [.*] except when a [ is behind the leading [
-#match unless proceeded by an odd number of \
-inlineprog = re.compile(r'(((?<!\\)(\\\\)+)|[^\\]|^)'+_group(defexp,tableexp,bold,monospace,italics,linkexp))
+monospace= r'\^\^'
+brexp= r'\~\~' 
+linkexp = r'\[.*?\]'#any [.*] except when a [ is behind the leading
+#todo linkexp doesn't handle ] in annotation strings or IP6 hostnames in URIs
+#match any of the above unless proceeded by an odd number of \
+inlineprog = re.compile(r'(((?<!\\)(\\\\)+)|[^\\]|^)'+_group(defexp,tableexp,bold,monospace,italics,linkexp,brexp))
 
 def inlineTokenMap(st):
     return { '/' : st.mm.I, '_' : st.mm.B, '^' : st.mm.TT}
 
-def parseLinkType(string):
+def parseLinkType(string, annotationList = None):
+    '''
+    parse the annotation string e.g.:
+    foo:bar attribute='value': foo:child 'sometext'; foo:annotation2; 'plain text annotation';
+    returns a list of Annotations
+    '''
     class TypeParseHandler(Handler):
-        def __init__(self):
-            self.attribs = []
-        def startElement(self, element):            
-            self.element = element
-        def attrib(name, value): 
-            self.attribs.append( (name, value) )
-    
-    handler = TypeParseHandler()
+        def __init__(self, annotationList):            
+            self.annotation = Annotation()
+            self.annotationList = annotationList
+            self.annotationList.append( self.annotation )
+            
+        def startElement(self, element):
+            if self.annotation.name == None:
+                self.annotation.name = element
+            else:
+                assert self.annotation.child == None
+                self.annotation.child = Annotation(element)
+                self.annotation = self.annotation.child
+                
+        def attrib(self, name, value):            
+            self.annotation.attribs.append( (name, value) )
+            
+        def text(self, string):
+            self.annotation.child = string
+            
+        def comment(self, string):
+            #anything after the ; is another annotation, if anything            
+            parseLinkType(string, self.annotationList)
+        
+    if annotationList is None:
+        annotationList = []
+    handler = TypeParseHandler(annotationList)    
     rhizmlString2xml(' '+string, handler=handler) #add some indention
-    return handler.element, handler.attribs
+    return annotationList
  
 def _handleInlineWiki(st, handler, string, wantTokenMap=None, userTextHandler=None):
     inlineTokens = inlineTokenMap(st)
@@ -289,7 +338,7 @@ def _handleInlineWiki(st, handler, string, wantTokenMap=None, userTextHandler=No
         wantTokenMap = inlineTokens
     if userTextHandler is None:
         userTextHandler = lambda s: handler.text(s)
-    textHandler = lambda s: userTextHandler(re.sub(r'(?<!\\)\\(?!\\)', '', xmlescape(s)) ) #xmlescape then strip out \ (but not \\) 
+    textHandler = lambda s: userTextHandler(re.sub(r'\\(.)',r'\1', xmlescape(s)) ) #xmlescape then strip out \ (but not \\) 
     pos = 0
     while 1:
         match = inlineprog.search(string[pos:]) #we can't do search(string, pos) because of ^ in our regular expression
@@ -301,8 +350,8 @@ def _handleInlineWiki(st, handler, string, wantTokenMap=None, userTextHandler=No
             elem = wantTokenMap.get(token)
             if elem:                
                 textHandler(string[pos:start])
-                if token == ':':
-                    del wantTokenMap[':'] #only do this once per line
+                if token == '=':
+                    del wantTokenMap['='] #only do this once per line
                 elif token == '|':
                     if string[start+1] == '|': #|| = header                    
                         cell = st.mm.TH
@@ -326,13 +375,14 @@ def _handleInlineWiki(st, handler, string, wantTokenMap=None, userTextHandler=No
                     st.popWikiStack() #pop the DT or last TD or TH
                     st.pushWikiStack(elem) #push the DD or TD or TH
                 pos = end
+            elif token == '~': #<BR>
+                textHandler(string[pos:start])
+                st.pushWikiStack(st.mm.BR)
+                st.popWikiStack()
+                pos = end
             elif token == '[': #its a link
                 #print 'link ', string[start:end]
-                if string[start+1] == '[':  #handle case like [[not a link]
-                    textHandler( string[pos:start+1] )
-                    pos = start+2 #skip one of the brackets
-                    continue
-                if string[start+1] == ']':  #handle case like [] just print it 
+                if string[start+1] == ']':  #handle special case of [] -- just print it 
                     textHandler( string[pos:start+1] )
                     pos = start+1 
                     continue
@@ -345,8 +395,8 @@ def _handleInlineWiki(st, handler, string, wantTokenMap=None, userTextHandler=No
                 if len(nameAndLink) == 1:
                     name = None
                 else:
-                    name = nameAndLink[0].strip()
-                    namechunks = [] #fix up any wiki markup 
+                    name = nameAndLink[0].strip()                    
+                    namechunks = [] #parse any wiki markup in the name
                     _handleInlineWiki(st, handler, name, None, lambda s: namechunks.append(s))
                     name = ''.join(namechunks)                    
                 linkinfo = nameAndLink[-1].strip()
@@ -354,19 +404,20 @@ def _handleInlineWiki(st, handler, string, wantTokenMap=None, userTextHandler=No
                 words = linkinfo.split()
                 if len(words) > 1:
                     #print 'word ', words
-                    if words[-1][-1] == ':': #type delinator at end, no link (there's no valid URL that ends in ':', right?)
+                    if words[-1][-1] == ';': #last character is the annotation delineator, so there's no link
+                        #todo: actually, a valid URL could end in a ';' but that is an extremely rare case we don't support
                         link = None
                         type = ' '.join(words)
-                    elif words[-2][-1] == ':':
+                    elif words[-2][-1] == ';':
                         link = words[-1]
                         type = ' '.join(words[:-1])
                     else: #must be a link like [this is also a link] handled below
                         assert name is None, 'link names or URLs can not have spaces'
                         type = None
                     if type:
-                        type = parseLinkType(type) #type is now a tuple
+                        type = parseLinkType(type) #type is a list of Annotations
                 else:
-                    type = None                    
+                    type = None
                                                         
                 #support: [this is also a link] creates a hyperlink to an internal WikiPage called 'ThisIsAlsoALink'.
                 if name is None and len(words) > 1 and [word for word in words if word.isalnum()]: #if no punctuation etc.
@@ -380,16 +431,16 @@ def _handleInlineWiki(st, handler, string, wantTokenMap=None, userTextHandler=No
 
                 if link:                                                          
                     isInlineIMG = link[link.rfind('.'):].lower() in st.mm.INLINE_IMG_EXTS
-                    isFootNote = link.isdigit()            
-                    isAnchor = link[0] == '#' and link[1:].isdigit()
+                    isFootNote = link[0] == '#'
+                    isAnchor = link[0] == '&'
                     if isAnchor:
-                        link = link[1:] #strip #
+                        link = link[1:] #strip &
                     if not isFootNote and not isAnchor and link.find(':') == -1: #not a uri, assume is a wiki name
                         link = 'site://' + link
-                    element, attribs, text = st.mm.mapLinkToMarkup(link, name, type, isInlineIMG, isFootNote, isAnchor)
+                    element, attribs, text = st.mm.mapLinkToMarkup(link, name, type, isInlineIMG, isAnchor)
                 else: #no link, just a type
                     assert(type)
-                    element, attribs, text = st.mm.mapTypeToMarkup(type[0], type[1], name)
+                    element, attribs, text = st.mm.mapAnnotationsToMarkup(type, name)
                 
                 handler.startElement(element)
                 for name, value in attribs:
@@ -415,24 +466,28 @@ def handleInlineWiki(st, handler, string, wantTokenMap ):
         return _handleInlineWiki(st, handler, string, wantTokenMap)
         st.in_wikicont = 0
             
-def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False):
+def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False, rootElement = None):
     """
     given a string of rhizml, return a str of xml
     """
     #debug = 1
     if mmf is None:
         mmf=DefaultMarkupMapFactory()
-    def pushWikiStack(wikiElem):
+        
+    def addWikiElem(wikiElem):
         if isinstance(wikiElem, type( () )):
             attribs = wikiElem[1]
             elem = wikiElem[0]
         else:
             attribs = []
             elem = wikiElem
-        st.wikiStack.append(wikiElem)
         handler.startElement(elem)
         for name, value in attribs:
             handler.attrib(name, value)
+            
+    def pushWikiStack(wikiElem):
+        addWikiElem(wikiElem)
+        st.wikiStack.append(wikiElem)
         
     def popWikiStack(untilElem = None):        
         while st.wikiStack:
@@ -460,6 +515,8 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False):
     st.attribs = []
     st.pushWikiStack = pushWikiStack
     st.popWikiStack = popWikiStack
+    #the stack of elements created by wiki markup that has yet to be closed
+    #should maintain this order: nestable block elements (e.g. section, blockquote)*, block elements (e.g. p, ol/li, table/tr)+, inline elements*
     st.wikiStack = []
     st.mm = mmf.getDefault()
     elementStack = []
@@ -467,18 +524,21 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False):
     output = StringIO.StringIO()
     outputHandler = handler or OutputHandler(output)
     handler = utils.InterfaceDelegator( [ outputHandler, MarkupMapFactoryHandler(st, mmf) ] )
+
+    def stringToText(token):
+        preformatted = token[0] in 'Pp' or (token[0] in 'rR' and token[1] in 'pP')
+        string = stripQuotes(token)
+        if preformatted:
+            addWikiElem(st.mm.PRE)            
+        handler.text(string)
+        if preformatted:
+            if isinstance(st.mm.PRE, type( () )):
+                handler.endElement(st.mm.PRE[0])
+            else:
+                handler.endElement(st.mm.PRE)
              
     def handleWikiML(string):
-        '''
-        the following works:
-          *
-          #
-          :
-          ;:
-          ----
-          !
-          bold, italics, tt, etc. use html <b> <i> <tt>
-          markup is passed-through so &lt; and &amp; is necessary (todo escape at least &?)
+        '''          
           \ to continue line
           linking:
             [name] internal link (site:name)
@@ -492,33 +552,48 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False):
         escaping:
            line starts with "`"  raw contents (as markup)
            line starts with \'\'\' or """ or r\'\'\' or r""" raw (as markup) multilines      
-        todo: other formating:
-            br
-            blockquote
-            pre
-            comments
         '''
         lead = string[0]
         if lead == '`': #treat just like STRLINE token
             handler.text( stripQuotes(string) ) 
             return
 
-        newStructureElem = st.mm.wikiStructure.get(lead, [None])[0]        
-        if st.wikiStack and st.wikiStack[-1] != newStructureElem: #entering new structure e.g. from # to |
-            while st.wikiStack and st.wikiStack[-1] not in [st.mm.P, newStructureElem]:
-                popWikiStack()
+        if lead == COMMENTCHAR: #treat just like COMMENT token
+            handler.comment( string[1:] )
+            return
+        
+        if not len(string.strip().strip(':')): #all characters are ':' so treat as blockquote (instead of indent)
+            newStructureElem = st.mm.BLOCKQUOTE
+        else:
+            newStructureElem = st.mm.wikiStructure.get(lead, [None])[0]
+        #if we're change to a new structure: e.g. from OL to TABLE or UL to None (inline markup)
+        #close the current parent elements until we encounter nestable block element or P (latter only in the case going from inline to inline)
+        if st.wikiStack and st.wikiStack[-1] != newStructureElem: 
+            while st.wikiStack and st.mm.canonizeElem(st.wikiStack[-1]) not in \
+                  [st.mm.SECTION, st.mm.BLOCKQUOTE, st.mm.P, newStructureElem]:
+               popWikiStack()
+
+        if newStructureElem == st.mm.BLOCKQUOTE: #note: too difficult to allow blockquotes to nest
+            inBlockQuote = wikiStructureStack.get(st.mm.BLOCKQUOTE, 0)
+            if inBlockQuote: #close block quote
+                while wikiStructureStack.get(st.mm.BLOCKQUOTE, 0):
+                    popWikiStack() #will decrement wikiStructureStack
+            else: #open block quote
+                pushWikiStack(st.mm.BLOCKQUOTE)
+                wikiStructureStack[st.mm.BLOCKQUOTE] = 1
+            return
             
         if string.startswith('----'):
             pushWikiStack(st.mm.HR)
             popWikiStack() #empty element pop the HR
             return
-                
-        pos = 0
-        if lead in '*#:-!;|':
+
+        pos = 0                                
+        if lead in '*#:-!+|':
             while string[pos] == lead:
-                pos += 1
+                pos += 1        
             done = False
-            parent, elem = st.mm.wikiStructure.get(lead, (None, None))
+            parent, lineElem = st.mm.wikiStructure.get(lead, (None, None))
             structureElem = parent
             if lead == '!':
                 hlevel = pos
@@ -527,13 +602,13 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False):
                 #hlevel = 7 - pos #h1 thru h6
                 #if hlevel < 1:
                 #    hlevel = 1
-                helem = st.mm.H(hlevel, string[pos:])
-                if not parent: #not structural (like <section>), just a line element (like <H1>)
+                helem = st.mm.H(hlevel, string[pos:]) 
+                if not parent: #wasn't in wikiStructure so its not structural (like <section>), just a line element (like <H1>)
                     pushWikiStack(helem)
                     st.toClose += 1
                     done = True
                 else:
-                    structureElem = helem
+                    structureElem = helem #use helem instead of parent
             if not done:
                 if lead == '|': #tables don't nest
                     level = 1
@@ -541,25 +616,28 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False):
                     level = pos                
                 #print 'pos wss ', pos, wikiStructureStack
                 #close or deepen the outline structure till it matches the level
-                while level < wikiStructureStack.get(parent, 0):
-                    popWikiStack() #will decrement wikiStructureStack
-                currlevel = wikiStructureStack.get(parent, 0)                    
+                closeSameLevel = parent in [st.mm.SECTION] #when we encounter a nestable element close and restart the same level
+                while level-closeSameLevel < wikiStructureStack.get(parent, 0):
+                    popWikiStack() #will decrement wikiStructureStack                
+                currlevel = wikiStructureStack.get(parent, 0)
                 while level > currlevel:
                     pushWikiStack(structureElem)
                     currlevel += 1
                 wikiStructureStack[parent] = level
-                if elem:
-                    pushWikiStack(elem)
+                if lineElem:
+                    pushWikiStack(lineElem)
                     st.toClose += 1
         else:
-            if not st.wikiStack: #if no structural element is specfied and the wikistack is empty (eg. we're starting out) start a P
+            #if no structural element is specfied and the wikistack is empty (eg. we're starting out)
+            #or only contains elements that require block elem children, start a P
+            if not st.wikiStack or st.mm.canonizeElem(st.wikiStack[-1]) in [st.mm.SECTION, st.mm.BLOCKQUOTE]:
                pushWikiStack(st.mm.P) 
-            if lead == '\\' and string[1] in '*#:-!;| ': #handle escape 
+            if lead == '\\' and string[1] in '*#:-!+| ': #handle escape 
                 pos += 1
 
         wantTokenMap = inlineTokenMap(st)
-        if lead == ';':
-            wantTokenMap[':'] = st.mm.DD
+        if lead == '+':
+            wantTokenMap['='] = st.mm.DD
         elif lead == '|':
             if pos == 2: #||
                 cell = st.mm.TH
@@ -605,9 +683,8 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False):
                 return
             elif type in [STRLINE, STRING]:
                 #encounting a string with no indention immediately after a FREESTR:
-                #just write out the string at the same markup level 
-                string = stripQuotes(token)                
-                handler.text(string)
+                #just write out the string at the same markup level
+                stringToText(token)
                 st.nlcount = 0
                 return
             elif type == NEWLINE:
@@ -637,18 +714,18 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False):
         if type == NAME:
             if st.in_attribs:
                 st.attribs.append(token)
-            elif st.in_elemchild:
-                handler.text(token)
+            #elif st.in_elemchild:
+            #    handler.text(token)              
             else:
                 elementStack.append(token)
                 st.in_attribs = 1
                 st.lineElems += 1                
-        elif type in [STRLINE, STRING]:
-            string = stripQuotes(token)
+        elif type in [STRLINE, STRING]:            
             if not st.in_attribs:
-                handler.text(string)
+                stringToText(token)                
             else:
                 assert type != STRLINE
+                string = stripQuotes(token)
                 st.attribs.append(xmlquote(string))
         elif type == OP:
             if token == ':':
@@ -703,16 +780,14 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False):
                     
     rhizmltokenize.tokenize(fd.readline, tokeneater=tokenHandler)
     handler.endDocument()
+    
+    if rootElement: 
+      xml = "<%s>%s</%s>" % (rootElement, output.getvalue(), rootElement)
+    else:
+      xml = output.getvalue()
+
     if prettyprint:
         import Ft.Xml
-        #todo add root element option
-        #if rootElement is None:
-        #    rootElement = 'rhizml' #default
-        #if rootElement: #skip rootElement == '' (-r 
-        #   xml = <%s>%s</%s> % rootElement, output.getvalue(), rootElement
-        #else:
-        #  xml = output.getvalue()
-        xml = '<rhizml>'+output.getvalue()+'</rhizml>'  
         xmlInputSrc = Ft.Xml.InputSource.DefaultFactory.fromString(xml)
         prettyOutput = StringIO.StringIO()
         reader = Ft.Xml.Domlette.NonvalidatingReader
@@ -720,26 +795,40 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False):
         Ft.Xml.Lib.Print.PrettyPrint(xmlDom, stream=prettyOutput)
         return prettyOutput.getvalue()
     else:
-        return output.getvalue()
+        return xml
     
-if __name__ == '__main__':                     # testing
+if __name__ == '__main__':             
+    def opt(opt, default):
+        value = False
+        try:
+            i = sys.argv.index(opt)
+            value = default
+            if sys.argv[i+1][0] != '-':
+                value = sys.argv[i+1]
+        except:
+            pass
+        return value
+    
+    def switch(opt):
+        switch = opt in sys.argv
+        return switch
+        
     import sys
-    debug = '-d' in sys.argv
-    if debug: sys.argv.remove('-d')    
-    prettyprint = '-p' in sys.argv
-    if prettyprint: sys.argv.remove('-p')
-    try:
-        #import rx.rhizome       
-        klass = sys.argv[sys.argv.index("-m")+1]
+    debug = switch('-d')
+    prettyprint = switch('-p')
+    rootElement = opt('-r', 'rhizml')
+    try:            
+        klass = opt('-m', '')
         index = klass.rfind('.')
         if index > -1:
            module = klass[:index]
            __import__(module)        
         mmf= eval(klass) 
-    except (IndexError, ValueError, ImportError):
+    except:
         mmf = None
     
-    if len(sys.argv) > 1:
-        print rhizml2xml(open(sys.argv[-1]), mmf, debug, prettyprint=prettyprint)
+    if len(sys.argv) > 1 and sys.argv[-1][0] != '-':
+        print rhizml2xml(open(sys.argv[-1]), mmf, debug, prettyprint=prettyprint, rootElement = rootElement)
     else:
-        print rhizml2xml(sys.stdin, mmf, debug, prettyprint=prettyprint)
+        #print rhizml2xml(sys.stdin, mmf, debug, prettyprint=prettyprint, rootElement = rootElement)
+        print "usage: -d(ebug) -r [rootelement] -m markupmapclass -p(rettyprint) file"

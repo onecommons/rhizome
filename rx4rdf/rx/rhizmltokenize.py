@@ -24,7 +24,7 @@ import string, re
 from token import *
 
 import token
-__all__ = [x for x in dir(token) if x[0] != '_'] + ["COMMENT", "tokenize", "NL", 'STRLINE', 'FREESTR','WHITESPACE']
+__all__ = [x for x in dir(token) if x[0] != '_'] + ["COMMENT", "tokenize", "NL", 'STRLINE', 'FREESTR','WHITESPACE', 'COMMENTCHAR']
 del token
 
 COMMENT = N_TOKENS
@@ -72,10 +72,10 @@ Double = r'[^"\\]*(?:\\.[^"\\]*)*"'
 Single3 = r"[^'\\]*(?:(?:\\.|'(?!''))[^'\\]*)*'''"
 # Tail end of """ string.
 Double3 = r'[^"\\]*(?:(?:\\.|"(?!""))[^"\\]*)*"""'
-Triple = group("[uU]?[rR]?'''", '[uU]?[rR]?"""')
+Triple = group("[pP]?[rR]?'''", '[pP]?[rR]?"""')
 # Single-line ' or " string.
-String = group(r"[uU]?[rR]?'[^\n'\\]*(?:\\.[^\n'\\]*)*'",
-               r'[uU]?[rR]?"[^\n"\\]*(?:\\.[^\n"\\]*)*"')
+String = group(r"[pP]?[rR]?'[^\n'\\]*(?:\\.[^\n'\\]*)*'",
+               r'[pP]?[rR]?"[^\n"\\]*(?:\\.[^\n"\\]*)*"')
 
 # Because of leftmost-then-longest match semantics, be sure to put the
 # longest operators first (e.g., if = came before ==, == would get
@@ -92,9 +92,9 @@ PlainToken = group(Funny, String, Name, Number)
 Token = Ignore + PlainToken
 
 # First (or only) line of ' or " string.
-ContStr = group(r"[uU]?[rR]?'[^\n'\\]*(?:\\.[^\n'\\]*)*" +
+ContStr = group(r"[pP]?[rR]?'[^\n'\\]*(?:\\.[^\n'\\]*)*" +
                 group("'", r'\\\r?\n'),
-                r'[uU]?[rR]?"[^\n"\\]*(?:\\.[^\n"\\]*)*' +
+                r'[pP]?[rR]?"[^\n"\\]*(?:\\.[^\n"\\]*)*' +
                 group('"', r'\\\r?\n'))
 PseudoExtras = group(r'\\\r?\n', Comment, Triple, StrLine)
 PseudoToken = Whitespace + group(PseudoExtras, Funny, ContStr, Name, Number) 
@@ -104,14 +104,14 @@ tokenprog, pseudoprog, single3prog, double3prog = map(
 endprogs = {"'": re.compile(Single), '"': re.compile(Double),
             "'''": single3prog, '"""': double3prog,
             "r'''": single3prog, 'r"""': double3prog,
-            "u'''": single3prog, 'u"""': double3prog,
-            "ur'''": single3prog, 'ur"""': double3prog,
-            "R'''": single3prog, 'R"""': double3prog,
+            "p'''": single3prog, 'p"""': double3prog,
+            "pr'''": single3prog, 'pr"""': double3prog,
+            "P'''": single3prog, 'R"""': double3prog,
             "U'''": single3prog, 'U"""': double3prog,
-            "uR'''": single3prog, 'uR"""': double3prog,
-            "Ur'''": single3prog, 'Ur"""': double3prog,
-            "UR'''": single3prog, 'UR"""': double3prog,
-            'r': None, 'R': None, 'u': None, 'U': None}
+            "pR'''": single3prog, 'pR"""': double3prog,
+            "Pr'''": single3prog, 'Pr"""': double3prog,
+            "PR'''": single3prog, 'PR"""': double3prog,
+            'r': None, 'R': None, 'p': None, 'p': None}
 
 tabsize = 8
 
@@ -155,8 +155,8 @@ def tokenize_loop(readline, tokeneater, useFreestr = True):
         doIndent = True
         if useFreestr and line and not continued and not contstr and not line[0].isspace():# and line[0] not in '\'"': #free-form text
             if line[0] in ("'", '"') or \
-               line[:2] in ("r'", 'r"', "R'", 'R"',"u'", 'u"', "U'", 'U"') or \
-               line[:3] in ("ur'", 'ur"', "Ur'", 'Ur"', "uR'", 'uR"', "UR'", 'UR"' ):
+               line[:2] in ("r'", 'r"', "R'", 'R"',"p'", 'p"', "P'", 'P"') or \
+               line[:3] in ("pr'", 'pr"', "Pr'", 'Pr"', "pR'", 'pR"', "PR'", 'PR"' ):
               doIndent = False #this is a quoted string but treat like wiki markup (don't dedent)
             else:
               if line.rstrip()[-1] !=  '\\':
@@ -169,7 +169,7 @@ def tokenize_loop(readline, tokeneater, useFreestr = True):
         if contstr:                            # continued string
             if not line:
                 #raise TokenError, ("EOF in multi-line string", strstart)
-                if contstr[0] in 'uUrR':
+                if contstr[0] in 'pPrR':
                     if contstr[1] in 'rR':
                         delim = contstr[2] * 3
                     else:
@@ -267,9 +267,9 @@ def tokenize_loop(readline, tokeneater, useFreestr = True):
                     tokeneater(STRLINE, token, spos, epos, line)                    
                 elif token in ("'''", '"""',               # triple-quoted
                                "r'''", 'r"""', "R'''", 'R"""',
-                               "u'''", 'u"""', "U'''", 'U"""',
-                               "ur'''", 'ur"""', "Ur'''", 'Ur"""',
-                               "uR'''", 'uR"""', "UR'''", 'UR"""'):
+                               "p'''", 'p"""', "P'''", 'P"""',
+                               "pr'''", 'pr"""', "Pr'''", 'Pr"""',
+                               "pR'''", 'pR"""', "PR'''", 'PR"""'):
                     endprog = endprogs[token]
                     endmatch = endprog.match(line, pos)
                     if endmatch:                           # all on one line
@@ -284,9 +284,9 @@ def tokenize_loop(readline, tokeneater, useFreestr = True):
                         break
                 elif initial in ("'", '"') or \
                     token[:2] in ("r'", 'r"', "R'", 'R"',
-                                  "u'", 'u"', "U'", 'U"') or \
-                    token[:3] in ("ur'", 'ur"', "Ur'", 'Ur"',
-                                  "uR'", 'uR"', "UR'", 'UR"' ):
+                                  "p'", 'p"', "P'", 'P"') or \
+                    token[:3] in ("pr'", 'pr"', "Pr'", 'Pr"',
+                                  "pR'", 'pR"', "PR'", 'PR"' ):
                     if token[-1] == '\n':                  # continued string
                         strstart = (lnum, start)
                         endprog = (endprogs[initial] or endprogs[token[1]] or
