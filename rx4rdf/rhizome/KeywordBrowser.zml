@@ -1,0 +1,162 @@
+#?zml markup
+#?raccoon-format http://rx4rdf.sf.net/ns/wiki#item-format-rxslt
+x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
+    xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+    xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#',
+    xmlns:f = 'http://xmlns.4suite.org/ext',
+    xmlns:a="http://rx4rdf.sf.net/ns/archive#",
+    xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#",
+    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#",
+    xmlns:auth="http://rx4rdf.sf.net/ns/auth#",
+    exclude-result-prefixes = "f wf a wiki rdf rdfs auth"
+    ) 
+    x:import href='search.xsl'
+    
+    x:param name='__resource'
+    ;if the disjunction and topics parameters aren't specified, see if this page is handling a Keyword resource
+    x:param name='disjunction' select='''f:if($__resource/rdf:type = 'http://rx4rdf.sf.net/ns/wiki#Keyword', 
+               concat("[wiki:about='", $__resource, "']"), "[wiki:about]")'''
+    x:param name='topics' select='''f:if($__resource/rdf:type = 'http://rx4rdf.sf.net/ns/wiki#Keyword', 
+               string($__resource), "")'''
+    x:param name=maxResources select='1'
+    x:param name='summary'
+    
+    x:template name='resource-row'
+       x:param name=othertopics 
+
+       tr: 
+        td: 
+          a href='site:///.?about={.}'
+           ; choose the best name for the resource using this order: title, non-anonymous name, auto-summary, rdfs:label, name-from-uri
+           x:variable name=pagename select='''f:if( (./wiki:revisions/*/rdf:first/*)[last()]/wiki:title, 
+                (./wiki:revisions/*/rdf:first/*)[last()]/wiki:title,
+               f:if(./wiki:name-type = uri("wiki:name-type-anonymous")
+                 and (./wiki:revisions/*/rdf:first/*)[last()]/wiki:auto-summary, 
+                (./wiki:revisions/*/rdf:first/*)[last()]/wiki:auto-summary, ./wiki:name))''' 
+           x:value-of select='''f:if($pagename, $pagename, f:if(./rdfs:label,
+                                        ./rdfs:label, name-from-uri(.)))'''
+          x:if test='$othertopics'
+           ' ('
+           x:for-each select='$othertopics'
+            a href="site:///keyword-browser?disjunction=[wiki:about='{f:escape-url(.)}']&topics={f:escape-url(.)}&summary={$summary}" 
+             x:value-of select='f:if(namespace-uri-from-uri(.)="http://rx4rdf.sf.net/ns/kw#",local-name-from-uri(.), name-from-uri(.))'
+             ' '              
+           ')'
+        
+    x:template name=check-topic-resource
+     x:param name=currentResource
+     ;the remaining topics this resource has
+     x:param name=topics
+     ;the orginal list of topics this resource has
+     x:param name=alltopics
+     x:param name=resWithTopics
+
+     x:choose 
+      x:when test='not($topics)'
+         ;got to the end of the list without finding a subtopic, so display this resource         
+         x:for-each select='$currentResource'
+          x:choose:
+            x:when test='$summary'           
+              x:call-template name='make-summary'            
+            x:otherwise
+              x:call-template name='resource-row'
+                x:with-param name=othertopics select='$alltopics'
+      x:when test='count($resWithTopics[wiki:about = $topics[1] ]) > $maxResources':
+        ;this topic is has already been listed, so stop recursing because now we don't want to list this resource
+      x:otherwise    
+        x:call-template name=check-topic-resource
+         x:with-param name=currentResource select='$currentResource'
+         x:with-param name=resWithTopics select='$resWithTopics'
+         x:with-param name=topics select='$topics[position()!=1]'
+         x:with-param name=alltopics select='$alltopics'
+    
+    x:template match='/'
+        x:variable name=topicList select="wf:split($topics, '\\')"
+        
+        x:if test='$topicList'
+         h3:              
+          'Resources that have all of these keywords: '
+          x:for-each select='$topicList'                
+            i: x:value-of select='f:if(namespace-uri-from-uri(.)="http://rx4rdf.sf.net/ns/kw#",local-name-from-uri(.), name-from-uri(.))'
+            x:text: ' '                
+            
+        ;find all the resources that have each of these topics
+        x:variable name='resWithTopics' select='wf:evaluate(concat("/*",$disjunction))'
+        ;find the other topics these resources have
+        x:variable name='subtopics' select='id($resWithTopics/wiki:about[not(.=$topicList)])'
+
+        ;for-each topic that is assigned to a resource that also has all the current topics:        
+        x:variable name='topics-to-list'
+          x:for-each select='$subtopics'
+            ;if there is more than n resources that has the current topics plus the this topic, list the topic
+            x:variable name=count select='count($resWithTopics[wiki:about=current()])'
+            x:if test='$count > $maxResources'
+               tr: 
+                td: 
+                 a href='''site:///keyword-browser?disjunction={f:escape-url($disjunction)}[wiki:about='{
+                        f:escape-url(current() )}']&topics={f:escape-url(f:join($topicList | current(), '\\'))}&summary={$summary}'''
+                  x:value-of select='f:if(namespace-uri-from-uri(.)="http://rx4rdf.sf.net/ns/kw#",local-name-from-uri(.), name-from-uri(.))'                          
+                 ' (' 
+                 x:value-of select='$count'
+                 ')'
+        
+        x:if test='string($topics-to-list)'
+          table:
+           tr: th: `Grouped By Keywords
+           x:copy-of select='$topics-to-list'
+                      
+        ;now list the resources that aren't covered by the above subtopics
+        x:variable name='resources-to-list'
+          x:for-each select='$resWithTopics'      
+            ;if none of the extra topics that each resource may have is shared by more than one subtopic, list that resource
+            x:call-template name=check-topic-resource    
+             x:with-param name=currentResource select='.'
+             x:with-param name=resWithTopics select='$resWithTopics'
+             x:with-param name=topics select='wiki:about[not(.=$topicList)]'
+             x:with-param name=alltopics select='wiki:about[not(.=$topicList)]'
+
+        x:if test='string($resources-to-list)'
+          br          
+          x:if test='$summary':
+           x:if test='string($topics-to-list)'
+             ;only show this if we displayed the grouped by table
+             `Resources with no more shared keywords              
+             br
+           x:call-template name=add-summary-javascript    
+           div id='fixeddiv':
+             x:copy-of select='$resources-to-list'          
+          x:if test='not($summary)':
+           table:
+            x:if test='string($topics-to-list)'
+              ;only show the header if we displayed the grouped by table
+              tr: th: `Resources with no more shared keywords 
+            x:copy-of select='$resources-to-list'
+              
+        x:if test='$resWithTopics and $topics'    
+          br
+          `All resources with these keywords (
+          x:value-of select='count($resWithTopics)'
+          ` )
+          x:choose:
+            x:when test='$summary'           
+              x:if test='not(string($resources-to-list))'
+                x:call-template name=add-summary-javascript    
+              br
+              div id='fixeddiv':
+                x:for-each select='$resWithTopics'            
+                 x:call-template name='make-summary'            
+            x:otherwise             
+             table 
+              x:for-each select='$resWithTopics'
+                x:call-template name='resource-row'
+                  x:with-param name=othertopics select='./wiki:about[not(.=$topicList)]'
+
+        x:choose:
+          x:when test='$summary'                     
+           hr
+           a href='site:///keyword-browser?disjunction={f:escape-url($disjunction)}&topics={f:escape-url($topics)}':
+              `List View
+          x:otherwise              
+           a href='site:///keyword-browser?disjunction={f:escape-url($disjunction)}&topics={f:escape-url($topics)}&summary=1':
+              `Summary View
+          
