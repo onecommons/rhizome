@@ -678,7 +678,7 @@ def descendants(self, context, nodeTest, node, nodeSet, startNode=None):
             if childNodes:
                 self.descendants(context, nodeTest, child, nodeSet, startNode)
     return (nodeSet, 0)
-XPath.ParsedAxisSpecifier.AxisSpecifier.descendents = descendants
+XPath.ParsedAxisSpecifier.AxisSpecifier.descendants = descendants
 
 def findNextStep(parsed):
     #currently only works in the context of a ParsedAbbreviatedAbsoluteLocationPath
@@ -724,7 +724,7 @@ def _descendants(self, context, nodeset, startNode=None):
                     
         if child.nodeType == Node.ELEMENT_NODE:
             self._descendants(context, nodeset, startNode)
-XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath._descendents = _descendants
+XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath._descendants = _descendants
 
 #patch XPath.ParsedNodeTest.QualifiedNameTest:
 _QualifiedNameTest_oldMatch = XPath.ParsedNodeTest.QualifiedNameTest.match.im_func
