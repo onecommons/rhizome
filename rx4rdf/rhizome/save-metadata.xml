@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xu:modifications version="1.0" xmlns:xu="http://www.xmldb.org/xupdate" 
-xmlns:wf="http://rx4rdf.sf.net/ns/racoon/xpath-ext#" 
+xmlns:wf="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#" 
 xmlns:f="http://xmlns.4suite.org/ext" >
   <xu:if test="wf:has-metadata('resource')">
     <xu:variable name="dummy" select="wf:save-metadata($metadata, $__user, $resource)"/>

@@ -2,7 +2,7 @@
     xmlns:a="http://rx4rdf.sf.net/ns/archive#",
     xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#",
     xmlns:auth="http://rx4rdf.sf.net/ns/auth#",
-    xmlns:wf="http://rx4rdf.sf.net/ns/racoon/xpath-ext#",
+    xmlns:wf="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#",
     xmlns:f='http://xmlns.4suite.org/ext', 
     xmlns:rdfs='http://www.w3.org/2000/01/rdf-schema#',
     xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#')

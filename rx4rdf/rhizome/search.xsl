@@ -5,10 +5,10 @@
 		xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
 		xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
 		xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'
-		xmlns:wf='http://rx4rdf.sf.net/ns/racoon/xpath-ext#'
+		xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'
 		xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
 		xmlns:f = 'http://xmlns.4suite.org/ext'
-		xmlns:response-header = 'http://rx4rdf.sf.net/ns/racoon/http-response-header#'
+		xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
 		exclude-result-prefixes = "rdfs f wf a wiki auth rdf response-header" >
 
 <xsl:param name="search" />
@@ -85,7 +85,7 @@ No results found.
 </xsl:if>
 <pre>
 <xsl:variable name='fixup' select="&quot;&lt;a href='site:///.?action=view-metadata&amp;amp;about=%(encodeduri)s'>%(res)s&lt;/a>&quot;" />
-<xsl:value-of disable-output-escaping='yes' select="wf:get-rdf-as-rhizml($results, '', $fixup)" />
+<xsl:value-of disable-output-escaping='yes' select="wf:get-rdf-as-rxml($results, '', $fixup)" />
 </pre>
        </xsl:when>
        <xsl:when test="$view = 'edit'">
@@ -103,7 +103,7 @@ No results found.
         Edit Metadata
          <br/>
 	<textarea NAME="metadata" ROWS="30" COLS="75" STYLE="width:100%" WRAP="off">
-	<xsl:value-of select="wf:get-rdf-as-rhizml($results)" />
+	<xsl:value-of select="wf:get-rdf-as-rxml($results)" />
 	</textarea>
 	<br/>
 	<input TYPE="submit" NAME="save" VALUE="Save" />	

@@ -4,7 +4,7 @@
 		xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"
 		xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
 		xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'
-		xmlns:wf='http://rx4rdf.sf.net/ns/racoon/xpath-ext#'
+		xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'
 		xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
 		xmlns:f = 'http://xmlns.4suite.org/ext'
 		exclude-result-prefixes = "f wf a wiki rdf" >

@@ -4,9 +4,9 @@
         xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"
         xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
         xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'
-        xmlns:wf='http://rx4rdf.sf.net/ns/racoon/xpath-ext#'
+        xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'
         xmlns:f = 'http://xmlns.4suite.org/ext'
-        xmlns:response-header='http://rx4rdf.sf.net/ns/racoon/http-response-header#'
+        xmlns:response-header='http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
         exclude-result-prefixes = "f wf a wiki rdf response-header" >		
     <xsl:param name="_contents" />		
     <xsl:param name="_previousContext" />		        

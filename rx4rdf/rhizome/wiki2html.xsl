@@ -1,11 +1,11 @@
-<x:stylesheet version="1.0" xmlns:x="http://www.w3.org/1999/XSL/Transform" xmlns:wf="http://rx4rdf.sf.net/ns/racoon/xpath-ext#" xmlns:f="http://xmlns.4suite.org/ext" 
-xmlns:previous = 'http://rx4rdf.sf.net/ns/racoon/previous#'
+<x:stylesheet version="1.0" xmlns:x="http://www.w3.org/1999/XSL/Transform" xmlns:wf="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#" xmlns:f="http://xmlns.4suite.org/ext" 
+xmlns:previous = 'http://rx4rdf.sf.net/ns/raccoon/previous#'
 exclude-result-prefixes="previous f wf">
 <!--
 note: this template is only called if the 'wiki' doctype is set. 
 As an optimization it only set when one of these config options are set: 
 'undefinedPageIndicator', 'externalLinkIndicator', 'interWikiLinkIndicator'
- (see rhizome.processRhizmlSideEffects() )
+ (see rhizome.processZMLSideEffects() )
 -->
 <x:output method='html' indent='no' />
 

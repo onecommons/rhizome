@@ -84,9 +84,9 @@ h1:first-child {margin-top: 0;}/*starts first heading in a TD flush top*/
 
 h2:first-child {margin-top: 0;}/*starts first heading in a TD flush top*/
 
-h1 { font-size: 160%; }
+h1 { font-size: 140%; }
 
-h2 { font-size: 140%; }
+h2 { font-size: 130%; }
 
 #sidebar {       
     background-color: #EBEBB5;
@@ -167,7 +167,6 @@ table .title {
 
 .code { border-color: #CFDCED; border-style: solid; border-width: 1px; 
        line-height: 1.25em; 
-       font-size : 75%;
       }
 .codefrag {	font-family: "Courier New", Courier, monospace; }
 

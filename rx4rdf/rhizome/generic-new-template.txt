@@ -1,0 +1,20 @@
+ prefixes:
+     wiki: `http://rx4rdf.sf.net/ns/wiki#
+     a: `http://rx4rdf.sf.net/ns/archive#
+     bnode: `http://4suite.org/rdf/anonymous/
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+     rdf: `http://www.w3.org/1999/02/22-rdf-syntax-ns#
+     rdfs: `http://www.w3.org/2000/01/rdf-schema#
+     auth: `http://rx4rdf.sf.net/ns/auth#
+     base: `%(base)s
+
+ ;generic new resource template
+
+ ;(you probably want to rename the resource id to something like base:myDocType)
+ bnode:newResource: 
+     ;you probably want to say what a type of resource it is
+     ;rdf:type: bnode:aClassResource
+     
+     ;if you want to give this a human-readable name 
+     ;rdfs:label: `your resource name
+     

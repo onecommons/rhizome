@@ -6,7 +6,7 @@
     http://rx4rdf.sf.net    
 """
 
-#see docs/RacoonConfig for documentation on config file settings
+#see docs/RaccoonConfig for documentation on config file settings
 
 import rx.rhizome
 from rx import rxml
@@ -32,7 +32,7 @@ resourceQueries=[
 '/a:NamedContent[wiki:name=$_name]',  #give NamedContent priority 
 '/*[wiki:name=$_name]',  #view any other type by its wiki:name
 '/*[wiki:alias=$_name]',  #view the resource
-#name not found, see if there's an external file on the Racoon path with this name:
+#name not found, see if there's an external file on the Raccoon path with this name:
 '''wf:if(wf:file-exists($_name), "wf:assign-metadata('externalfile', wf:string-to-nodeset($_name))")''',
 "/*[wiki:name='_not_found']", #invoke the not found page 
 ]
@@ -133,7 +133,7 @@ templateAction.assign("_doctype", '$_doctype', "wiki:doctype/*")
 #thus we check for the wiki:handles-disposition property
 templateAction.assign("_disposition", 'xf:if($previous:_template/wiki:handles-disposition, wiki:item-disposition/*)', 
                     '$_disposition', "wiki:item-disposition/*")
-#Raccon may set response-header:content-type based on the extension, so we check that unless we're the template resource
+#Raccoon may set response-header:content-type based on the extension, so we check that unless we're the template resource
 #(always let the template set the content type)
 templateAction.assign('response-header:content-type', '$_contenttype', 
    'string(/*[.=$_doctype]/a:content-type)', 
@@ -154,8 +154,8 @@ rhizome.handleRequestSequence = handleRequestSequence
 
 actions = { 'http-request' : handleRequestSequence,
             #rhizome adds two command line options: --import and --export
-            'run-cmds' : [ Action(["$import", '$i'], lambda result, kw, contextNode, retVal, rhizome=rhizome: rhizome.doImport(result[0], **kw)),
-                           Action(['$export', '$e'], lambda result, kw, contextNode, retVal, rhizome=rhizome: rhizome.doExport(result[0], **kw)),
+            'run-cmds' : [ Action(["$import", '$i'], lambda result, kw, contextNode, retVal, rhizome=rhizome: rhizome.doImport(result, **kw)),
+                           Action(['$export', '$e'], lambda result, kw, contextNode, retVal, rhizome=rhizome: rhizome.doExport(result, **kw)),
                         ]
           }
 
@@ -171,7 +171,8 @@ nsMap = {'a' : 'http://rx4rdf.sf.net/ns/archive#',
          'rdfs' : 'http://www.w3.org/2000/01/rdf-schema#',
         'wiki' : "http://rx4rdf.sf.net/ns/wiki#",
          'auth' : "http://rx4rdf.sf.net/ns/auth#",
-         'base' : rhizome.BASE_MODEL_URI
+         'base' : rhizome.BASE_MODEL_URI,
+         'bnode' : "http://4suite.org/rdf/anonymous/"
          }
 rhizome.nsMap = nsMap
 
@@ -182,9 +183,9 @@ cmd_usage = '''\n\nrhizome-config.py specific:
 --import [dir or filepath] [--recurse] [--dest path] [--xupdate url] [--format format] [--disposition disposition]
 --export dir [--static]'''
 
-# we define a couple of content processors here instead of in Racoon because
+# we define a couple of content processors here instead of in Raccoon because
 # they make assumptions about the underlying schema 
-from rx import rhizml
+from rx import zml
 contentProcessors = {
     'http://rx4rdf.sf.net/ns/content#pydiff-patch-transform':
         lambda result, kw, contextNode, contents, rhizome=rhizome: rhizome.processPatch(contents, kw, result),
@@ -192,8 +193,8 @@ contentProcessors = {
     'http://www.w3.org/1999/XSL/Transform' : lambda result, kw, contextNode, contents, self=__server__:\
         self.processXslt(contents, kw['_contents'], kw, uri=self.evalXPath( 
             'concat("site:///", (/a:NamedContent[wiki:revisions/*/*[.=$__context]]/wiki:name)[1])',node=contextNode) ), 
-    'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
-        lambda result, kw, contextNode, contents, rhizome=rhizome: rhizome.processRhizml(contextNode, contents, kw),
+    'http://rx4rdf.sf.net/ns/wiki#item-format-zml' :
+        lambda result, kw, contextNode, contents, rhizome=rhizome: rhizome.processZML(contextNode, contents, kw),
     'http://rx4rdf.sf.net/ns/wiki#item-format-custom': 
         lambda result, kw, contextNode, contents, rhizome=rhizome: rhizome.customProcessor(contents, kw),
 }
@@ -206,22 +207,22 @@ contentProcessorCachePredicates = {
             'concat("site:///", (/a:NamedContent[wiki:revisions/*/*[.=$__context]]/wiki:name)[1])',
             node=contextNode)) , 
     
-    'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
+    'http://rx4rdf.sf.net/ns/wiki#item-format-zml' :
         lambda result, kw, contextNode, contents: contents #the key is just the contents
 }
 
 contentProcessorSideEffectsFuncs = {
     'http://www.w3.org/1999/XSL/Transform' : __server__.xsltSideEffectsFunc,  
-    'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
+    'http://rx4rdf.sf.net/ns/wiki#item-format-zml' :
     lambda cacheValue, sideEffects, resultNodeset, kw, contextNode, contents, \
-        rhizome=rhizome: rhizome.processRhizmlSideEffects(contextNode, kw)
+        rhizome=rhizome: rhizome.processZMLSideEffects(contextNode, kw)
     }
     
 contentProcessorSideEffectsPredicates = {
     'http://www.w3.org/1999/XSL/Transform' :  __server__.xsltSideEffectsCalc }
 
 extFunctions = {
-(RXWIKI_XPATH_EXT_NS, 'get-rdf-as-rhizml'): rhizome.getRxML,
+(RXWIKI_XPATH_EXT_NS, 'get-rdf-as-rxml'): rhizome.getRxML,
 (RXWIKI_XPATH_EXT_NS, 'get-contents'): rhizome.getContents,
 (RXWIKI_XPATH_EXT_NS, 'save-metadata'): __server__.saveRxML,
 (RXWIKI_XPATH_EXT_NS, 'generate-patch'): rhizome.generatePatch,
@@ -229,8 +230,7 @@ extFunctions = {
 (RXWIKI_XPATH_EXT_NS, 'get-nameURI'): rhizome.getNameURI,
 (RXWIKI_XPATH_EXT_NS, 'has-page'): rhizome.hasPage,
 (RXWIKI_XPATH_EXT_NS, 'secure-hash'): rhizome.getSecureHash,
-(RXWIKI_XPATH_EXT_NS, 'get-rhizml'): lambda context, contents,\
-    rhizml=rhizml, mmf=rhizome.mmf: rhizml.rhizmlString2xml(contents,mmf),
+(RXWIKI_XPATH_EXT_NS, 'get-zml'): rhizome.getZML,
 }
 
 NOT_CACHEABLE_FUNCTIONS = {
@@ -331,14 +331,20 @@ rhizome.addItemTuple('docbook2document.xsl', loc='path:docbook2document.xsl', fo
     disposition='template', doctype='document', handlesDoctype='docbook')]
 #+ rhizome.addItemTuple('todo2document.xsl', loc='path:todo2document.xsl', format='http://www.w3.org/1999/XSL/Transform', disposition='template', doctype='document', handlesDoctype='todo'),
   
-#help and sample pages
-templateList += [rhizome.addItemTuple('index',loc='path:index.txt', format='rhizml', disposition='entry', accessTokens=None),
-rhizome.addItemTuple('sidebar',loc='path:sidebar.txt', format='rhizml', accessTokens=None),
-rhizome.addItemTuple('TextFormattingRules',loc='path:TextFormattingRules.txt', format='rhizml', disposition='entry'),
-rhizome.addItemTuple('MarkupFormattingRules',loc='path:MarkupFormattingRules.txt', format='rhizml', disposition='entry'),
-rhizome.addItemTuple('RhizML',loc='path:RhizML.rz', format='rhizml', disposition='entry'),
-rhizome.addItemTuple('SandBox', format='rhizml', disposition='entry', accessTokens=None,
-	contents="Feel free to [edit|?action=edit] this page to experiment with [RhizML]...")]
+#sample pages
+templateList += [rhizome.addItemTuple('index',loc='path:index.txt', format='zml', disposition='entry', accessTokens=None),
+rhizome.addItemTuple('sidebar',loc='path:sidebar.txt', format='zml', accessTokens=None),
+rhizome.addItemTuple('SandBox', format='zml', disposition='entry', accessTokens=None,
+	contents="Feel free to [edit|?action=edit] this page to experiment with [ZML]..."),
+#help pages
+rhizome.addItemTuple('help',loc='path:help/help.zml', format='zml', disposition='entry'),
+rhizome.addItemTuple('TextFormattingRules',loc='path:help/TextFormattingRules.zml', format='zml', disposition='entry'),
+rhizome.addItemTuple('ZML',loc='path:help/ZML.zml', format='zml', disposition='entry'),
+rhizome.addItemTuple('RxML',loc='path:help/RxML.zml', format='zml', disposition='entry',doctype='document'),
+rhizome.addItemTuple('RhizomeManual',loc='path:help/RhizomeDoc.zml', disposition='entry', format='zml', title="Rhizome Manual", doctype='document'),
+rhizome.addItemTuple('RaccoonManual',loc='path:help/RaccoonDoc.zml', disposition='entry', format='zml', title="Raccoon Manual", doctype='document'),
+rhizome.addItemTuple('RaccoonConfig',loc='path:help/RaccoonConfig.txt', disposition='entry', format='text', title="Raccoon Config Settings"),
+]
 
 #add the authorization and authentification structure
 
@@ -502,7 +508,7 @@ for action in ['view', 'edit', 'new', 'creation', 'save', 'delete', 'confirm-del
                'showrevisions', 'edit-metadata', 'save-metadata', 'view-metadata', 'view-source']:
     authStructure += "\n wiki:action-%s: rdf:type: auth:Permission" % action
 
-templateList.append( ('@auth', rxml.rhizml2nt(contents=authStructure, nsMap=nsMap)) )
+templateList.append( ('@auth', rxml.zml2nt(contents=authStructure, nsMap=nsMap)) )
 
 siteVars =\
 '''
@@ -510,7 +516,7 @@ siteVars =\
   wiki:header-image: `underconstruction.gif
   wiki:header-text: `Header, site title goes here: edit the<a href="site-template?action=edit-metadata">site template</a>
 '''
-templateList.append( ('@sitevars', rxml.rhizml2nt(contents=siteVars, nsMap=nsMap)) )
+templateList.append( ('@sitevars', rxml.zml2nt(contents=siteVars, nsMap=nsMap)) )
 
 import sys, time
 currentTime = "%.3f" % time.time() 
@@ -529,7 +535,7 @@ modelVars =\
 #  wiki:initial-location: `%(STORAGE_PATH)s
 #but that might be sensitive information -- perhaps storage a hash instead?
   
-templateList.append( ('@model', rxml.rhizml2nt(contents=modelVars, nsMap=nsMap)) )
+templateList.append( ('@model', rxml.zml2nt(contents=modelVars, nsMap=nsMap)) )
    
 def name2uri(name, nsMap = nsMap):
     i = name.find(':')
@@ -593,7 +599,7 @@ itemFormats = [ ('http://rx4rdf.sf.net/ns/wiki#item-format-binary', 'Binary', 'a
                 ('http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate', 'RxUpdate'),
                 ('http://rx4rdf.sf.net/ns/wiki#item-format-python', 'Python'),
                 ('http://www.w3.org/1999/XSL/Transform', 'XSLT'),
-                ('http://rx4rdf.sf.net/ns/wiki#item-format-rhizml', 'RhizML'),
+                ('http://rx4rdf.sf.net/ns/wiki#item-format-zml', 'ZML'),
               ]
 #don't include disabled content processors:
 itemFormats = [x for x in itemFormats if x[0] not in locals().get('disabledDefaultContentProcessors', 
@@ -613,11 +619,11 @@ def __addItem__(name, rhizome=rhizome, configlocals=locals(), **kw):
 
 def __addSiteVars__(siteVars, rxml=rxml, configlocals=locals()):
     templateMap=configlocals['templateMap']
-    templateMap['@sitevars'] = rxml.rhizml2nt(contents=siteVars, nsMap=configlocals['nsMap'])
+    templateMap['@sitevars'] = rxml.zml2nt(contents=siteVars, nsMap=configlocals['nsMap'])
     configlocals['STORAGE_TEMPLATE']= "".join(templateMap.values())
 
 def __addRxML__(contents, rxml=rxml, configlocals=locals()):
-    configlocals['STORAGE_TEMPLATE'] += rxml.rhizml2nt(contents=contents, nsMap=configlocals['nsMap'])
+    configlocals['STORAGE_TEMPLATE'] += rxml.zml2nt(contents=contents, nsMap=configlocals['nsMap'])
 
 def __addTriples__(triples, configlocals=locals()):
     configlocals['STORAGE_TEMPLATE'] += triples

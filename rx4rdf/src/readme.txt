@@ -1,1 +1,1 @@
-This folder contains the RhizML sources to various xml files found in the rhizome directory.
+This folder contains the ZML sources to various XML files found in the rhizome directory.

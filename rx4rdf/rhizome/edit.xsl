@@ -4,10 +4,10 @@
 		xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"
 		xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
 		xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'
-		xmlns:wf='http://rx4rdf.sf.net/ns/racoon/xpath-ext#'
+		xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'
 		xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
 		xmlns:f = 'http://xmlns.4suite.org/ext'
-		xmlns:response-header = 'http://rx4rdf.sf.net/ns/racoon/http-response-header#'
+		xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
 		xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
 		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header auth" >
 <xsl:output method='html' indent='no' />
@@ -108,7 +108,7 @@ function OnSubmitEditForm()
             <xsl:call-template name="add-option" >
                 <xsl:with-param name="text" select="rdfs:label/text()" />
                 <xsl:with-param name="value" select="$i" />
-                <xsl:with-param name="selected" select="f:if($item, $item//a:contents/*/a:transformed-by/*/@rdf:about[.=$i], $i='http://rx4rdf.sf.net/ns/wiki#item-format-rhizml')" />
+                <xsl:with-param name="selected" select="f:if($item, $item//a:contents/*/a:transformed-by/*/@rdf:about[.=$i], $i='http://rx4rdf.sf.net/ns/wiki#item-format-zml')" />
             </xsl:call-template>
 	</xsl:for-each>
 	</select>
@@ -179,30 +179,33 @@ function OnSubmitEditForm()
     </form>
     <iframe src='' name='preview' id='previewFrame' width='100%' height='0'/>
 
-<a href="site:///RhizML">RhizML</a> Formatting Quick Reference (see <a href="site:///TextFormattingRules">TextFormattingRules</a> for more info)
+<a href="site:///ZML">ZML</a> Formatting Quick Reference (see <a href="site:///TextFormattingRules">TextFormattingRules</a> for more info)
 <pre class="code">
 ----             Horizontal ruler
-                 Blank line starts a new paragraph
+                 Blank line starts a new paragraph.
+ text            A space at the beginning of a line continues the previous line.
 [text|ann; link] Create a hyperlink. where "link" can be either an internal 
-		 page name or an external link (e.g http://).  
+		 page name or an external link (e.g http://...).  
 		 Both annotation and text may be omitted.
 *                Make a bulleted list (must be in first column). Use more (**) 
                  for deeper indentations.
 #                Make a numbered list (must be in first column). Use more (##, ###) 
                  for deeper indentations.
-:                Indent line (must be in first column). Use more (::, ::) 
+:                Indent line (must be in first column). Use more (::, :::) 
                  for deeper indentations.
 ::		 (on a line by itself) Start (or end) a block quote.
 +term=def        Defines 'term' with 'def'.  
 !, !!, !!!       Start a line with an exclamation mark (!) to make a heading. 
                  !! makes a sub-heading, !!! a sub-sub-heading, etc. (up to 6)
 __bold__         Makes text bold.
-//italic//       Makes text in italics (notice that these are single quotes ('))
+//italic//       Makes text in italics
 ^^monospace^^    Makes text in monospaced font.
-|text|more text| Makes a table. Double bars for a table heading.
+|text|more text| Makes a table. Use double bars for a table heading.
 ~~               Creates a line break without starting a new paragraph
-\                If in-line: Prints the next formatting character as is. 
-                 At end of line: Treat next line as continuation of this line.  
+\                Prints the next formatting character as is. 
+'''text'''       Plain text (no formatting). Can span across lines.       
+p'''text'''      Plain text with spacing preserved. Can span across lines.
+&lt;                (In first column) Create XML markup (see <a href="site:///ZML">ZML Markup Rules</a>).
 </pre>
 </xsl:template>
 </xsl:stylesheet>

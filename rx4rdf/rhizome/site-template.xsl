@@ -4,11 +4,11 @@
         xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"
         xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
         xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'
-        xmlns:wf='http://rx4rdf.sf.net/ns/racoon/xpath-ext#'
+        xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'
         xmlns:f = 'http://xmlns.4suite.org/ext'
-        xmlns:response-header='http://rx4rdf.sf.net/ns/racoon/http-response-header#'
-        xmlns:previous = 'http://rx4rdf.sf.net/ns/racoon/previous#'
-        xmlns:session = 'http://rx4rdf.sf.net/ns/racoon/session#'
+        xmlns:response-header='http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
+        xmlns:previous = 'http://rx4rdf.sf.net/ns/raccoon/previous#'
+        xmlns:session = 'http://rx4rdf.sf.net/ns/raccoon/session#'
         exclude-result-prefixes = "f wf a wiki rdf response-header previous session" >		
     <xsl:param name="_contents" />		
     <xsl:param name="previous:title" />		
@@ -146,6 +146,7 @@ Or <a href="site:///users/guest?action=new">signup</a>
     &#xa0;<a href="site:///search?search=%2F*%5Bwiki%3Aname%5D&amp;searchType=RxPath&amp;view=html&amp;title=All%20Pages">List</a>
     &#xa0;<a href="site:///search?search=wf%3Asort%28%2Fa%3ANamedContent%2C%27%28wiki%3Arevisions%2F*%2Frdf%3Afirst%2F*%29%5Blast%28%29%5D%2Fa%3Acreated-on%27%2C%27number%27%2C%27descending%27%29&amp;searchType=RxPath&amp;view=html&amp;title=Recently%20Changed%20Pages">Recent</a>
     &#xa0;<a href="site:///administration">Admin</a>
+    &#xa0;<a href="site:///help">Help</a>
 </div>
 <xsl:variable name='aboutparam' select="f:if($previous:about, concat('&amp;about=', f:escape-url($previous:about)), '')" />
 <xsl:variable name='path' select="f:if($previous:itemname, $previous:itemname, $_name)" />

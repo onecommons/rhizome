@@ -4,10 +4,10 @@
 		xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"
 		xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
 		xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'
-		xmlns:wf='http://rx4rdf.sf.net/ns/racoon/xpath-ext#'
+		xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'
 		xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
 		xmlns:f = 'http://xmlns.4suite.org/ext'
-		xmlns:response-header = 'http://rx4rdf.sf.net/ns/racoon/http-response-header#'
+		xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
 		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header" >		
 
 <xsl:output omit-xml-declaration='yes' indent='no' />
@@ -32,7 +32,7 @@
         Edit Metadata
          <br/>
 	<textarea NAME="metadata" ROWS="30" COLS="75" STYLE="width:100%" WRAP="off">
-	<xsl:value-of select="wf:get-rdf-as-rhizml($__resource | $revision | $transforms)" />
+	<xsl:value-of select="wf:get-rdf-as-rxml($__resource | $revision | $transforms)" />
 	</textarea>
 	<br/>
 	<input TYPE="submit" NAME="save" VALUE="Save" />
