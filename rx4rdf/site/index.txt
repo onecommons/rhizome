@@ -13,6 +13,12 @@ See also:
 [Rhizome Vision|RhizomeStatus]
 
 !!Latest News
-[[18 October 2003]
+\[15 December 2003]
+
+Version 0.1.3 of Rx4RDF released. Includes support for Python 2.3 and major
+enhancements to [Rhizome] -- including users, sessions, authentication and
+authorization. [Download] it or view the [changelog|http://sourceforge.net/project/shownotes.php?release_id=204244].
+
+\[18 October 2003]
 
 First public release of Rx4RDF. Get it [here|Download]! 

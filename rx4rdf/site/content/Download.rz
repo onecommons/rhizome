@@ -15,9 +15,9 @@ Once you've installed Rx4RDF, use this guide to quickly start playing with its v
 !!RxPath
 To run a query on an RDF or NTriples file:
 
-^^python RDFDom.py myrdf.rdf [[RxPath expression]
+^^python RDFDom.py myrdf.rdf \[RxPath expression]
 
-If [[RxPath expression] is omitted it will start in interactive mode.
+If \[RxPath expression] is omitted it will start in interactive mode.
 
 !!Racoon and Rhizome
 Run a local copy of this site:
@@ -37,12 +37,12 @@ To experiment with RxSLT, RxUpdate, or RhizML run an instance of Rhizome and cre
 !!RhizML
 Convert RhizML to XML:
 
-^^python rhizml.py [[-p] [[-d] [[-m MyMarkupMapFactory()] rhizmlsample.rz.txt 
+^^python rhizml.py \[-p] \[-d] \[-m MyMarkupMapFactory()] rhizmlsample.rz.txt 
 
 Options: 
 :-p pretty print
 :-d debug output
-:-m [[string that evaluates to an object compatible with rx.rhizml.DefaultMarkupMapFactory]
+:-m \[string that evaluates to an object compatible with rx.rhizml.DefaultMarkupMapFactory]
 
 !!RxML
 Convert a RDF or NTriples file to RxML/RhizML:
