@@ -1,4 +1,14 @@
 !Latest News
+\[14 Oct 2004]
+Version 0.4.1 of Rx4RDF and Rhizome released. 
+
+New features include: support for RDFLIb as a RDF store and as the default RDF/XML parser;
+Rhizome's export now has the option to export resources as a NTriples file (and inline external file content); 
+and the RxPath command line tool adds the ability to set namespace mappings.
+Bug fixes most notably include support for non-ASCII content.
+
+[Download] it or view the [changelog|changelog.txt]
+
 \[30 Aug 2004]
 Version 0.4.0 of Rx4RDF and Rhizome released. 
 

@@ -399,19 +399,21 @@ If no .metarx file exists import will use the defaults specified by the ^^--form
 You can use Rhizome's export command to export the content of each item in the site as a separate file.  You can use it for two different types of tasks: to export raw content and metadata (for data exchange or schema migration, etc.), or to generate static versions of the website.  
 
 The command has these options:
-p'''--export dir [--static [--noalias]] [--xpath exp | --name name] [--label label]'''
+p'''--export dir [--static [--noalias] | --astriples filepath] 
+           [--xpath exp | --name name] [--label label]'''
 where 
 ~~^^ dir^^ is the directory to export to 
-~~^^-xpath^^ RxPath expression that evaluates a nodeset of items to export
+~~^^-xpath^^ RxPath expression that evaluates to a nodeset of items to export
 ~~^^-name^^  The name of item to export (for exporting one item) (no effect if -xpath is specified)
 ~~^^-label^^ Choose revisions with this label
 ~~^^-static^^ Export as static HTML
 ~~^^-noalias^^ Don't create static copies of page aliases (use with -static only)
+~~^^-astriples filepath^^ Export the selected resources as an NTriples file. External content is inserted in the file as string literals.
 
 If the ^^-static^^ option is present, export will try to render each item as HTML. Dynamic pages (e.g. those that require query parameters) are skipped (you may see exceptions being reported to the consol). A $_static variable is introduced so stylesheets can render appropriately (for example, see site-template.xsl). Limitations: 
 * External content referenced by links are not copied
 
-If ^^-static^^ is not present each item will be exported to 2 files: one containing the raw content of item and the other a RxML document containing the metadata associated with the item. The first file will match the item's name with a file type extension added, if necessary, and the second will be the same but with '.metarx' appended.
+If the ^^-static^^ or ^^-astriples^^ options are not present each item will be exported to 2 files: one containing the raw content of item and the other a RxML document containing the metadata associated with the item. The first file will match the item's name with a file type extension added, if necessary, and the second will be the same but with '.metarx' appended.
 
 #todo:
 #!The RDF Store

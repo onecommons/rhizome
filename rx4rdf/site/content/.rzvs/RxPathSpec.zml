@@ -183,7 +183,7 @@ Second, a [Step|http://www.w3.org/TR/xpath#NT-Step] with one of the descendant a
 When evaluating a Step with a descendant or descendant-or-self axis the RxPath processor MUST enter ^^circularity-checked^^ mode with the top-most ancestor of the circularity check set to the context node of Step.  When a Step's axis is following or proceeding, at every point in the document tree that the evaluation begins descending a branch the process must enter ^^circularity-checked^^ mode with the top-most ancestor of the circularity check set to the current node. 
 
 In addition, RxPath changes how [AbbreviatedAbsoluteLocationPath|http://www.w3.org/TR/xpath#NT-AbbreviatedAbsoluteLocationPath], 
-[AbbreviatedRelativeLocationPath|http://www.w3.org/TR/xpath#NT-AbbreviatedRelativeLocationPath], and [PathExpres|http://www.w3.org/TR/xpath#NT-PathExpr] are expanded:
+[AbbreviatedRelativeLocationPath|http://www.w3.org/TR/xpath#NT-AbbreviatedRelativeLocationPath], and [PathExpr|http://www.w3.org/TR/xpath#NT-PathExpr] are expanded:
 
 If a RxPath expression contains a ^^\//^^ and the AxisSpecifier of the expression's next Step is the child axis, the two steps are combined by replacing them with a Step having an AxisSpecifier of descendant and the second Step's NodeTest and Predicates.
 
@@ -212,7 +212,7 @@ The combined effect of these rules leaves the descendant axis with a NameTest is
 Node identity (as defined in the XPath spec -- used to determine the uniqueness of nodes in a nodeset and by RxSLT's generate-id(), but not node equality) is the same as in XPath -- which implies every recursive node is different each other, even if they refer to same Subject Element.
 
 <    s2 title="Core Functions"
-RxPath processors MUST support all the [core functions|http://www.w3.org/TR/xpath#corelib] required by XPath. All functions behave the same as specified in XPath except for __id()__, which behaves the same except that that string tokens are treated as URI references and the look up function finds the Subject Element that match the URI reference.  
+RxPath processors MUST support all the [core functions|http://www.w3.org/TR/xpath#corelib] required by XPath. All functions behave the same as specified in XPath except for __id()__, which behaves the same except that the string tokens are treated as URI references and the look up function finds the Subject Element that match the URI reference.  
 
 In addition a RxPath processor MUST support the following additional functions:
 <      note: 
@@ -318,18 +318,13 @@ Should we specify anything how inferences and entailments appear in the model? F
 """ 
 <  s1 title="Commentary":
 This section contain informal comments on the why certain approaches were taken. 
-<    s2 title="deviation from XPath behavior":             
+<    s2 title="deviation from XPath semantics":             
 <      s3 title="descendant axis":     
 The constraints on the descendant axis enable it to behave like a transitive join, an intuitive behavior for a RDF query language. Perhaps more importantly, the XPath rule would require the processor to exhaustively follow every statement with an resource as an object, a potentially extremely expensive approach. Also, placing the ispredicate() constraint on descendant and ancestor axes enables it to be possible to static analyze an RxPath expression to determine if each step is referring to a subject, predicate, or object. With this it would be much more difficult efficiently implement many kinds RxPath implementations, for example, an RxPath -> SQL converter.
-<      s3 title="string value":
 <    s2 title="Special handling of RDF"
 <      s3 title="containers and collections":
-It would be very tedious to query lists without special mapping rules. For examples, here's an RxPath expression for selecting all the items in a list:      <    source: 
-/*/predicate/rdf:List\//rdf:rest/../rdf:first/* 
-compared to:
-/*/predicate/rdf:List/rdf:first/*
-This assumes the descendant axis follows RxPath's rule (or else it would look far uglier!).  Worse, there would be no way (as far I can figure) to have a single RxPath expression that selected, say, all the first or last items in the list in case where the predicate matches multiple predicates each with a list. E.g.:
-<       source: 
-`/*/predicate/rdf:List/rdf:first/*[1]
+It would be very tedious to query lists without special mapping rules. For examples, here's an RxPath expression for selecting all the items in a list:     
+^^/*/predicate/rdf:List\//rdf:rest/../rdf:first/*^^.  Compare that with ^^/*/predicate/rdf:List/rdf:first/*^^. 
+This assumes the descendant axis follows RxPath's rule (or else it would look far uglier!).  Worse, there would be no way (as far I can figure) to have a single RxPath expression that selected, say, all the first or last items in the list in case where the predicate matches multiple predicates each with a list, e.g.: ^^/*/predicate/rdf:List/rdf:first/*\[1]^^
 <    s2 title="Miscellaneous"
-Why have an "uri" attribute on a Predicate Element when this will be the same value as calling the ^^uri^^ core function with a nodeset containing the Predicate Element? Because strings can't be members of nodesets in XPath, certain expressions are hard to do without the uri attribute, such as selecting property resources; e.g. ^^/*[.=uri(/*/*)]^^ won't work, but ^^/*[.=/*/*/@uri]^^ will (or, better, ^^id(/*/*/@uri)^^).
+Why have an "uri" attribute on a Predicate Element when this will be the same value as calling the ^^uri^^ core function with a nodeset containing the Predicate Element? Because strings can't be members of nodesets in XPath, certain expressions are hard to do without the uri attribute, such as selecting property resources; e.g. ^^/*\[.=uri(/*/*)]^^ won't work, but ^^/*\[.=/*/*/@uri]^^ will (or, better, ^^id(/*/*/@uri)^^).

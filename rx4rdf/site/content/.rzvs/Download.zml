@@ -21,6 +21,11 @@ must be installed or interprocess file locking will be disabled (You do not
 need this unless you have multiple Raccoon processes simultaneously accessing 
 the same application instance).
 
+RDFLib data stores can be used if RDFLib ([http://www.rdflib.net])
+is installed. See the Raccoon manual for more info. In addition, if RDFLib is 
+installed, its RDF/XML parser will be used by default (since the 4Suite's parser doesn't  
+support the new RDF/XML syntax). 
+
 Redland RDF data stores can be used if Redland ([http://www.redland.opensource.ac.uk])
 is installed. See the Raccoon manual for more info.
 
@@ -46,6 +51,11 @@ To run a query on an RDF or NTriples file:
 ^^python <python lib dir>/site-packages/rx/RxPathDom.py myrdf.rdf \[RxPath expression]
 
 If \[RxPath expression] is omitted it will start in interactive mode.
+
+RxPath expressions can be preceeded by one or more expressions of the form ^^xmlns(prefix=namespaceuri)^^, 
+which set the namespace prefixes for subsequent RxPath expression (for duration 
+of the session if in interactive mode). If the prefix is omitted (e.g. ^^xmlns(=http://example.org/ns)^^)
+the default namespace will be set. 
 
 !!Raccoon and Rhizome
 Run a local copy of this site:

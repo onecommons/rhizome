@@ -5,6 +5,7 @@ recursive-include rdfscribbler *
 recursive-include rx/test *
 recursive-include rx/logging22 *
 include site/*
+exclude site/test-config.py
 recursive-include docs *
 global-exclude .cvsignore
 global-exclude *.bak *.bk? *.nt *.metarx *.pyc *.log *.lock

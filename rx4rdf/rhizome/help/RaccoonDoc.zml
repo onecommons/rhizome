@@ -20,13 +20,13 @@ Raccoon is known to run on Linux, Windows 2000/XP, and Cygwin and should work on
 
 Optional Packages:
 
-On Windows, the Python Win32 Extensions (http://python.org/windows/win32all) 
+On Windows, the Python Win32 Extensions ([http://python.org/windows/win32all]) 
 must be installed or interprocess file locking will be disabled (You do not 
 need this unless you have multiple Raccoon processes simultaneously accessing 
 the same application instance).
 
-Redland RDF data stores can be used if Redland (http://www.redland.opensource.ac.uk)
-is installed. See the Raccoon manual for more info.
+Redland RDF or RDFLib data stores can be used if Redland ([http://www.redland.opensource.ac.uk])
+or RDFLib ([http://rdflib.net]) are installed. For more infomation, See the section on loading and saving models below. 
 
 !Installation
 This is a standard Python source distribution. To install:
@@ -134,7 +134,7 @@ This config defines two variables: ^^actions^^ and ^^APPLICATION_MODEL^^. ^^APPL
 
 !!Requests
 
-A request consists of a dictionary whose keys are strings that can be used as Python identifiers. Its values are arbitrary but generally consist of strings, numbers, and lists of strings or unique DOM nodes (XPath nodesets). This dictionary is mapped to a set of XPath variables in an obvious manner (except that lists of strings are converted to a nodeset of Text nodes). Values of other types are mapped as XPath variables in ways specific to the type of request; for example dictionaries may be mapped to variables in a particular namespace and other values excluded from the mapping.
+A request consists of a dictionary whose keys are strings that can be used as Python identifiers. Its values can be arbitrary but generally should consist of strings, numbers, and lists of strings or unique DOM nodes (XPath nodesets). When evaluating a //match expression// or a //ContentProcessor// that relies on XPath (such as the XSLT, RxSLT, or RxUpdate content processors), this dictionary is mapped to a set of XPath variables. For simple data types that correspond to XPath data types the mapping is straightforward. Values for other types are mapped as XPath variables in ways specific to the type of request trigger; for example dictionaries may be mapped to variables in a particular namespace and other values excluded from the mapping. When mapping strings the following rules apply: first, lists of strings are converted to a nodeset of Text nodes, and, second, since XPath and the RDF model both treat strings as unicode, non-unicode strings are converted to unicode with the assumption that they are either UTF-8 encoded or 7-bit ASCII. It is the responsibility of the request processor to ensure that strings are encoded properly. However, the http request processor doesn't currently check the character encoding of the request, so application must make sure that request form data is sent as UTF-8. The easiest way to ensure this is to add "accept-charset='UTF-8'" attribute to form elements.
 
 For all requests, Raccoon will add these variables to the request metadata:
 +\__server\__=the ^^RequestProcessor^^ object that is processing this current request.
@@ -295,7 +295,7 @@ If the ^^-m^^ command line argument is present, Raccoon will attempt to load tha
 After the model is loaded, any statements in the ^^APPLICATION_MODEL^^ config variable are added to the model. ^^APPLICATION_MODEL^^ is a string of [NTriples|http://www.w3.org/TR/rdf-testcases/#ntriples] containing statements that are read-only and not saved with the model. Typically it is used alongside the writable model for structural components such as the schema.
 
 Raccoon loads the model using the function specified by the ^^initModel^^ config variable. Its signature looks like ^^def initModel(location, defaultModel)^^ where location is the value of the ^^-m^^ argument or ^^STORAGE_PATH^^ and defaultModel is a stream containing the NTriples stored in STORAGE_TEMPLATE. Note that ^^initModel^^'s value is a callable object (e.g. a function) which may need to be imported into the config file.
-The default is ^^RxPath.initFileModel^^, which can load RDF, NTriples, and Metakit files created by 4Suite but always saves the model as an (incrementally updated) NTriples file. Also available is ^^RxPath.initRedlandHashBdbModel^^ which loads and saves to Berkeley DB files created by Redland (requires [Redland|http://www.redland.opensource.ac.uk/] to be installed). Both 4Suite and Redland support several other RDF stores (including various SQL databases) and alternative ^^initModel^^ functions can be written fairly easily, however until the underlying RxPath implementation is improved there's not much benefit in using these other sources. 
+The default is ^^RxPath.initFileModel^^, which can load RDF, NTriples, and Metakit files created by 4Suite but always saves the model as a special NTriples file that acts as a transaction log, allowing the model to be incrementally updated with appends. Also available is ^^RxPath.initRedlandHashBdbModel^^, which loads and saves to Berkeley DB files created by Redland (requires [Redland|http://www.redland.opensource.ac.uk/] to be installed); and ^^RxPath.initRDFLibModel^^, which loads and saves to the specified RDF/XML file (requires [RDFLib|http://rdflib.net]). 4Suite, Redland, and RDFLib support several other RDF stores (including various SQL databases) and alternative ^^initModel^^ functions can be written fairly easily, however until the underlying RxPath implementation is improved there's not much benefit in using these other sources. 
 
 Raccoon provides a few methods for updating the models, each of which use atomic transactions and hooks for authorization. At the lowest level is ^^updateDOM^^ which takes a list of statements to add and remove. Also available is ^^processRxML^^ which parses RxML and updates the model either by adding news statements or, if a list of resources to replace is specified, by merging in the difference between the RxML and the resource list. Finally, there is the ^^xupdateRDFDom^^ method which processes an [rx4rdf:RxUpdate] document and is used by the RxUpdate content processor.
 

@@ -33,7 +33,7 @@ Advanced Content Management functionality
 * supports local file system or browser-based development 
 * can generate static websites
 * import/export of content and metadata
-* flexible backend: supports multiple RDF engines (Redland, 4Suite) with multiple datastores: file based, SQL databases, embeddable databases (Sleepycat, Metakit)
+* flexible backend: supports multiple RDF engines (Redland, 4Suite, RDFLib) with multiple datastores: file based, SQL databases, embeddable databases (Sleepycat, Metakit)
 
 !Easy authoring and Rapid Development
 XHTML or arbitrary XML can be authored in [ZML] in a manner very similar to Wiki text formatting rules.  Rhizome comes with built-in support for [Apache Forrest|http://xml.apache.org/forrest/index.html] document types and has preliminary support for [DocBook|http://www.docbook.org].  You can also easily view and edit RDF metadata for the site using [RxML].

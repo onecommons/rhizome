@@ -1,12 +1,28 @@
 Rx4RDF and Rhizome Changelog
 ============================
 
+Changes in Version 0.4.1 (Oct. 13, 2004)
+---------------------------------------
+Minor release:
+* Rhizome: fix exception when importing .metarx files
+* Rhizome: fix summary view for search 
+* Rhizome: add --astriples option to export
+* utils:   parseTriples(): properly unescape NTriple literals like '\\\r' 
+* utils:   parse/writeTriples(): support @lang and ^^datatype literals
+* RxPath:  support for xml:lang and rdf:datatype predicate attributes
+* RxPath:  add xmlns(prefix=namespaceuri) support to query command-line 
+* Raccoon: configurable server id (see rhizome/server.cfg)
+* Rhizome: use accept-charset='UTF-8' in forms and UTF-8 output encoding in XSLT 
+* RxPath:  support for RDFLib, as RxPath store and as default RDF/XML parser
+* Raccoon: wf:evaluate XPath function now adds the RxPath DOM namespaces to context
+* All:     various bug fixes throughout to better handle non-ASCII content
+
 Changes in Version 0.4 (Aug 30, 2004)
 ---------------------------------------
 Major changes and bug fixes:
 * Raccoon: added content processing-level authorization
 * Raccoon: added content digest-based authorization 
-  (used by default by the Python content processor)
+  (used by default by the now re-enabled Python content processor)
 * Raccoon: authorization hook for XPath extension functions
 * Rhizome: added RDF/XML output for search and metadata view, 
 * Rhizome: added RxML to RDF/XML page (RxMLSandbox)

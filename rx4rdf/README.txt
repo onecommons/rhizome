@@ -1,8 +1,8 @@
                             README
 
                          Rx4RDF and Rhizome
-                         Version 0.4
-                         Aug 30, 2004
+                         Version 0.4.1
+                         Oct 13, 2004
  
   Introduction
   ------------
@@ -20,19 +20,21 @@
   in several ways.
   
   What's new in this release?
-  ---------------------------  
+  ---------------------------    
+  Changes from last announced release (0.3.0):
   Rhizome gains full-text indexing, browsing and grouping by keyword, 
   summary views, better support for RDF/XML, diffing of revisions, and 
   several usability enhancements. Raccoon gets several improvements to 
-  performance, security, and error handling. RxML and ZML syntax has been 
-  made more user-friendly with simpler syntax and better documentation.
-
-    
+  performance, security, and error handling. RxML and ZML have been made
+  more user-friendly with simpler syntax and better documentation. RxPath
+  adds support for RDFLib. Better support for non-ASCII content throughout
+  all sub-systems.
+  
   For a list of all major changes see docs/changelog.txt for more details.
 
   Known (major) bugs
   ----------
-  (Also see http://rx4rdf.liminalzone.org/Status for more general information.)
+  (Also see docs/Status for more general information.)
   
   Rx4RDF
   * See comment at top of RxPathDom.py for discrepancies with the RxPath
@@ -43,7 +45,7 @@
   * The global write lock doesn't seem to work correctly on CygWin and is disabled 
   on that platform.
   * When using file-based sessions, the files aren't deleted when the session ends.
-
+  
   Rhizome
   * Dynamic pages might not behave as expected since Rhizome doesn't set headers
     such as Pragma NoCache or Expires -- if you need that you'll have set them 
@@ -51,10 +53,9 @@
   * You should not import files directly into the directory specified in the 
     ALTSAVE_DIR setting (the default is "content") -- if you do the first 
     revision of a file will overwrite the initial version. Instead import 
-    file into the directory specified by SAVE_DIR (the default is 
+    files into the directory specified by SAVE_DIR (the default is 
     "content/.rzvs").
-  * doesn't save or display pages in non-ASCII encodings properly.
-  * deleting a page doesn't delete a file or remove its contents from the index.
+  * Deleting a page doesn't delete its file or remove its contents from the index.
   * When searching, the RxML and Edit views only support queries that evaluate 
     to a resource list (as opposed to a list of statement predicates, for example).
         
@@ -81,6 +82,11 @@
   Redland RDF data stores can be used if Redland (http://www.redland.opensource.ac.uk)
   is installed. See the Raccoon manual for more info.
   
+  RDFLib data stores can be used if RDFLib (http://www.rdflib.net)
+  is installed. See the Raccoon manual for more info. In addition, if RDFLib is 
+  installed, its RDF/XML parser will be used by default (since the 4Suite's 
+  parser doesn't support the latest RDF/XML syntax). 
+
   Installation
   ------------
 
