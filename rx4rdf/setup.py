@@ -53,8 +53,8 @@ markup languages for authoring XML and RDF, and RDFScribbler, for viewing and ed
 #packaging info:	  	  
       packages = ['rx', 'rx/logging22', 'rx/test'],
 	  data_files = [
-		    ('rx',[ 'changelog.txt', 'COPYING', 'README.txt'] ),
-		   ('rx/rhizome',glob.glob('rx/rhizome/*.*') ),
-		   ('rx/rdfscribbler',glob.glob('rx/rdfscribbler/*.*') ),
+		    ('share/rx4rdf',[ 'changelog.txt', 'COPYING', 'README.txt'] ),
+		   ('share/rx4rdf/rhizome',glob.glob('rx/rhizome/*.*') ),
+		   ('share/rx4rdf/rdfscribbler',glob.glob('rx/rdfscribbler/*.*') ),
         ],
 	  )

@@ -11,3 +11,4 @@ global-include site/wikistore.nt
 global-exclude */CVS/*
 global-exclude */sessions/*
 include COPYING
+include changelog.txt
