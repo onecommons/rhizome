@@ -1,0 +1,148 @@
+body {
+	margin: 0 1% 0 1%;
+	padding: 0;
+	font-size: 14px;
+	font-family:"Trebuchet MS",arial, helvetica, sans-serif;
+}
+
+h1:first-child {margin-top: 0;}/*starts first heading in a TD flush top*/
+
+h2:first-child {margin-top: 0;}/*starts first heading in a TD flush top*/
+
+h1 { font-size: 140%; }
+
+h2 { font-size: 130%; }
+
+/* #maincontent is referenced by site-template.xsl */
+#maincontent {
+	font-size: 100%;
+}
+
+#maincontent table {
+	border-spacing: 0px; 
+	border-collapse: collapse;
+}
+
+/* entry content */
+
+/* this ids are referenced by default-theme.xsl */
+
+#mainTable {
+    background-color: white;
+	margin: 0 auto; 
+	border: 1px solid #000;
+	line-height: 1.25em; 
+
+}
+
+#mainTable td, #mainTable th {
+	padding: 0px 0px 0px 0px; /*Pads each table cell in modern browsers: top, right, bottom, left*/
+}
+
+#contentTable td, #contentTable th {
+	padding: 20px
+}
+
+#maincontent td, #maincontent th {  
+  border: 1px solid black;
+  padding: 5px
+}
+
+#contentTable {
+	border: 2px dotted #333;
+	border-spacing: 0px;
+	padding: 0px
+}
+
+.content { 
+padding: 5px 5px 5px 10px; 
+font : small Verdana, Helvetica, sans-serif;  
+font-size : 90%; 
+}
+
+#titlebar{
+    background-color: #ffcc66;
+	margin: 0 0;
+	border-bottom: 1px solid #000;
+	line-height: 1px; 
+	font-size: 120%;
+	font-weight: bold;
+}
+
+#titlerow {
+	height:10px;
+	vertical-align:top;
+}	
+
+
+#header {
+	background-color: #EBEBB5; /* #EFE */
+	color: black;	
+}
+
+#header * {
+	padding: 1px;
+}
+
+#login-box {
+    float: right;
+    font-size: 80%;
+    line-spacing: 0;
+    
+}
+
+#login-box form {
+    margin: 0 0 0 0;
+}
+
+#footer {
+	background-color: #EBEBB5;/* #294563 #333333 */
+	color: black;
+}
+
+#footer a, #header a {
+  color: black
+}
+
+
+#sidebar {       
+    background-color: #EBEBB5;
+	font-size: 12px;
+	/*/*/font-size: 85%; /* */
+}
+
+#sidebar a {
+	/*/*/padding: 3px;
+	display: block;
+	border: 2px dotted #aaa;
+	text-decoration: none;
+	line-height: 1em;
+	width: 100px; /* */
+}
+
+#sidebar a:link, #sidebar a:visited {
+	color: black;
+}
+
+#sidebar a:hover, #sidebar a:active {
+	color: black;
+	background-color: #ffcc66;
+	border: 2px solid #000;
+}
+
+#current a {
+	color: #FFFFFF !important;
+	/*/*/background-color: #999999!important;
+	border: 2px dotted #999 !important; /* */
+}
+
+#sidebar ul {
+	/*/*/padding-left: 0em;
+	list-style-type: none;
+	margin-left: 0em; /* */
+}
+
+#sidebar li {
+	/*/*/margin: 0px 0px 0px 0px; /* */
+}
+

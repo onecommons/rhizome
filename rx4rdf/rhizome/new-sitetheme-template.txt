@@ -1,0 +1,30 @@
+ prefixes:
+     wiki: `http://rx4rdf.sf.net/ns/wiki#
+     a: `http://rx4rdf.sf.net/ns/archive#
+     bnode: `bnode:
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+     rdf: `http://www.w3.org/1999/02/22-rdf-syntax-ns#
+     rdfs: `http://www.w3.org/2000/01/rdf-schema#
+     auth: `http://rx4rdf.sf.net/ns/auth#
+     base: `%(base)s
+
+ #creates a new SiteTheme 
+
+ #You specify which SiteTheme the site should use by setting the wiki:uses-theme 
+ #property on the site-template page. For example:
+ # base:site-template:
+ #   wiki:uses-theme: base:myTheme
+
+ #(you probably want to rename the resource id to something like base:myTheme)
+ bnode:newSiteTheme: 
+     a: 
+       wiki:SiteTheme
+    
+    #you must declare the following properties:
+    
+    #this points to a XSLT page that will be imported and used by the site-template.
+    #(see the comments in site-template.xsl on how to create this)
+    wiki:uses-site-template-stylesheet: myTheme.xsl
+    
+    #this points to a CSS page that the site-template will reference 
+    wiki:uses-css-stylesheet: myTheme.css
