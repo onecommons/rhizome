@@ -28,7 +28,7 @@
 
 <xsl:variable name='header-image' select="/*[wiki:name='site-template']/wiki:header-image"/>
 <xsl:if test="$header-image">
-<a href="index"><img height="45" border="0" src="site:///{/*[wiki:name='site-template']/wiki:header-image}" /></a> 
+<a href="site:///index"><img border="0" src="site:///{/*[wiki:name='site-template']/wiki:header-image}" /></a> 
 </xsl:if>
 <xsl:value-of disable-output-escaping='yes' select="/*[wiki:name='site-template']/wiki:header-text" />
 </td>
@@ -40,7 +40,7 @@
     <table width="100%" height="100%" cellpadding = "0" cellspacing="10">
     <tr>
     <td valign="top">
-    <xsl:value-of disable-output-escaping='yes' select="wf:openurl(concat('site:///sidebar?_docpath=',$_path))" />
+    <xsl:value-of disable-output-escaping='yes' select="wf:openurl('site:///sidebar')" />
     </td>
     </tr>
 

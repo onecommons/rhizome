@@ -28,8 +28,7 @@ h2 { font-size: 130%; }
 /* this ids are referenced by default-theme.xsl */
 
 #mainTable {
-    background-color: white;
-	margin: 0 auto; 
+    background-color: white; 
 	border: 1px solid #000;
 	line-height: 1.25em; 
 
@@ -40,7 +39,7 @@ h2 { font-size: 130%; }
 }
 
 #contentTable td, #contentTable th {
-	padding: 20px
+	padding: 20px 0px
 }
 
 #maincontent td, #maincontent th {  
