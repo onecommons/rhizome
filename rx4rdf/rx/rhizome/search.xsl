@@ -15,7 +15,6 @@
 <xsl:param name="searchType" />
 <xsl:param name="_base-url" />
 <xsl:param name="_url" />
-<xsl:param name="ROOT_PATH" />
 
 <xsl:variable name="searchExp">     
      <xsl:choose>
@@ -34,6 +33,8 @@
     </xsl:choose> 
 </xsl:variable>
 
+<xsl:variable name="results" select="f:evaluate($searchExp)" />     
+
 <xsl:template match="/" >
 <!-- search result header -->
      <xsl:choose>
@@ -50,7 +51,7 @@ on <xsl:value-of select="$_base-url" />
 
 <link><xsl:value-of select="$_url" /></link>
 
-<xsl:for-each select="f:evaluate($searchExp)">
+<xsl:for-each select="$results">
     <item>
        <title><xsl:value-of select="./wiki:name" /></title>
        <link>
@@ -63,16 +64,22 @@ on <xsl:value-of select="$_base-url" />
 </rss>
        </xsl:when>
        <xsl:otherwise>  
+       
 <xsl:variable name='_disposition' select="wf:assign-metadata('_disposition', /*[.='http://rx4rdf.sf.net/ns/wiki#item-disposition-entry'])" />
 <div class="title">Search Results for "<xsl:value-of select="$search" />"</div>
 <br />   
 <table>
-<xsl:for-each select="f:evaluate($searchExp)">
-<tr><td><a href="{./wiki:name/text()}?action=edit" ><img border="0" src='edit-icon.png' /></a></td>
-<td><a href="{./wiki:name/text()}" ><xsl:value-of select='./wiki:name/text()' /></a></td>
-</tr>        
+<xsl:for-each select="$results">
+    <tr><td><a href="{./wiki:name/text()}?action=edit" ><img border="0" src='edit-icon.png' /></a></td>
+    <td><a href="{./wiki:name/text()}" ><xsl:value-of select='./wiki:name/text()' /></a></td>
+    </tr>        
 </xsl:for-each>    
 </table>
+<xsl:if test='not($results)'>
+No results found.
+</xsl:if>
+
+
       </xsl:otherwise>
       </xsl:choose> 
 
