@@ -22,7 +22,7 @@ f:if($user, concat('Edit Profile of ', $user/wiki:login-name), 'Register new use
 
     x:value-of select='$title'    
     hr
-    form action="{concat('site:///users/',f:if($user, $user/wiki:login-name, 'guest'))}" method='post':
+    form action="{concat('site:///users/',f:if($user, $user/wiki:login-name, 'guest'))}" accept-charset='UTF-8' method='post':
      table:         
          x:choose
           x:when test='not($user)': 

@@ -15,7 +15,7 @@
 <xsl:param name="previous:contents" />
 <xsl:param name="previous:file" />
 <xsl:param name="previous:format" />
-<xsl:output omit-xml-declaration='yes' indent='no' />
+<xsl:output omit-xml-declaration='yes' encoding="UTF-8" indent='no' />
 
 <xsl:template match="/" >
 Error: You have attempted to view a XSLT page without specifying the content source to transform. Mostly likely you've tried to directly view a page that is designed to be used as template or document converter. Otherwise:
@@ -24,8 +24,8 @@ Error: You have attempted to view a XSLT page without specifying the content sou
 <li>Or you can enter the source content here:</li>
 </ul>
 
-<form METHOD="POST" ACTION="site:///{$_name} {f:if($previous:about,concat('?about=', $previous:about))}" ENCTYPE="multipart/form-data">	         
-	<textarea NAME="_contents" ROWS="30" COLS="75" STYLE="width:100%" WRAP="off">
+<form method="POST" action="site:///{$_name}{f:if($previous:about,concat('?about=', $previous:about))}" accept-charset='UTF-8' enctype="multipart/form-data">	         
+	<textarea name="_contents" rows="30" cols="75" style="width:100%" wrap="off">
 	<xsl:text> </xsl:text>
 	</textarea>
 	<input TYPE="hidden" name='contents' value='{$previous:contents}' />

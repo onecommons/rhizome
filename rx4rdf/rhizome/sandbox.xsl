@@ -10,12 +10,12 @@
 		xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
 		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header" >		
 
-<xsl:output method='html' indent='no' />
+<xsl:output method='html' indent='no' encoding="UTF-8" />
 <xsl:template match="/" >
 <p>This page lets you execute content in Rhizome and see the results without having to save the content. </p>
 <p>WARNING: even though the content isn't saved depending on the Source Format it may modify the system (e.g. using Python or RxUpdate).</p>
 <p>Note: Resulting content is displayed without invoking any templates, so the resulting page may be blank (e.g. with RxUpdate).</p>
-<form METHOD="POST" ACTION="site:///process-contents" ENCTYPE="multipart/form-data">	         
+<form method="POST" action="site:///process-contents" accept-charset='UTF-8' enctype="multipart/form-data">	         
     Upload File:<input TYPE='file' name='file' /> OR enter text here:<br />
 	<textarea NAME="contents" ROWS="25" COLS="75" STYLE="width:100%" WRAP="off" />
 	Source Format:

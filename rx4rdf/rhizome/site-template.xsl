@@ -28,7 +28,7 @@
     <xsl:param name="previous:_robots" />
     <xsl:param name="previous:action" />
     
-    <xsl:output method='html' indent='no' />
+    <xsl:output method='html' encoding="UTF-8" indent='no' />
 
 <xsl:template name="display-content" >
 <xsl:param name="contents" />
@@ -92,7 +92,7 @@
 <xsl:if test="not($_static)" >
          <xsl:choose>
             <xsl:when test="$session:login">
-<form action='site:///logout' method='POST' >
+<form action='site:///logout' method='POST' accept-charset='UTF-8' >
 Welcome <a href="site:///users/{$session:login}?action=edit"><xsl:value-of select="$session:login" /></a>
 <input TYPE="hidden" NAME="redirect" value="{$_url}" />
 <input type="submit" style="font-size: 100%" value="logout" name="logout"/>    
@@ -100,7 +100,7 @@ Welcome <a href="site:///users/{$session:login}?action=edit"><xsl:value-of selec
 </form>            
             </xsl:when>
             <xsl:otherwise>
-<form action='site:///login' method='POST' >
+<form action='site:///login' method='POST' accept-charset='UTF-8'>
 Name<input TYPE="text" NAME="loginname" style="font-size: 100%" SIZE="10" />
 Password<input TYPE="password" NAME="password" style="font-size: 100%" SIZE="10" />
 <input TYPE="hidden" NAME="redirect" value="{$_url}" />
@@ -183,9 +183,8 @@ Or <a href="site:///users/guest?action=new">signup</a>
 &#xa0;<a href="site:///{$path}?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-print{$aboutparam}">Print</a>
 </p>
 <p>       
-<form action='site:///search'>
-
-      Search <input TYPE="text" NAME="search" VALUE="{$previous:search}" SIZE="40" />
+<form action='site:///search' method="GET">
+      Search <input type="text" name="search" value="{$previous:search}" size="40" />
 Type<select name="searchType">    
     <option value="Simple">
 	<xsl:if test='not($previous:searchType) or $previous:searchType = "Simple"'>

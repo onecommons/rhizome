@@ -10,7 +10,7 @@
 		xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
 		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header" >		
 
-<xsl:output omit-xml-declaration='yes' indent='no' />
+<xsl:output omit-xml-declaration='yes' encoding="UTF-8" indent='no' />
 <xsl:param name="_name" />
 <xsl:param name="__resource" />
 
@@ -20,7 +20,7 @@
 <xsl:variable name='transforms' select="$revision//a:contents/*" />	
 
 <xsl:template match="/" >
-<form METHOD="POST" ACTION="site:///{$_name}" ENCTYPE="multipart/form-data">	
+<form METHOD="POST" ACTION="site:///{$_name}" accept-charset='UTF-8' ENCTYPE="multipart/form-data">	
     <input TYPE="hidden" NAME="itemname" VALUE="{$_name}" />
     <input type="hidden" name="about" value="{$__resource}"/>
     <input TYPE="hidden" NAME="action" VALUE="save-metadata" />    

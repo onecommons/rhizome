@@ -10,7 +10,7 @@
 		xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
 		xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
 		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header auth" >
-<xsl:output method='html' indent='no' />
+<xsl:output method='html' encoding="UTF-8" indent='no' />
 <xsl:param name="about" />
 <xsl:param name="_name" />
 <xsl:param name="__user" />
@@ -133,7 +133,8 @@ function OnSubmitEditForm()
 //</xsl:comment>
 </script>
 
-<form name="edit" method="POST" onSubmit="return OnSubmitEditForm();" action="site:///{f:if($item,$itemname, 'save')}" enctype="multipart/form-data">    
+<form name="edit" method="POST" accept-charset="UTF-8" onSubmit="return OnSubmitEditForm();" 
+    action="site:///{f:if($item,$itemname, 'save')}" enctype="multipart/form-data">    
 	<xsl:if test='string-length($itemname) > 0'>		
 	    <input TYPE="hidden" NAME="itemname" VALUE="{$itemname}" />
 	    <xsl:variable name='title' select="wf:assign-metadata('title', concat('Editing ', $itemname))" />

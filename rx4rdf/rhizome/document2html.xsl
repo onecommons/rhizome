@@ -17,7 +17,7 @@ $Id$
 -->
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
 <!--<xsl:output omit-xml-declaration='yes' />-->
-<xsl:output method='html' indent='no' />
+<xsl:output method='html' encoding="UTF-8" indent='no' />
   <!-- If non-blank, a PDF link for this page will not be generated -->
   <xsl:param name="nopdf"/>
   <xsl:param name="notoc"/>

@@ -10,11 +10,11 @@
 		xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
 		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header" >		
 
-<xsl:output omit-xml-declaration='yes' indent='no' />
+<xsl:output omit-xml-declaration='yes' indent='no' encoding="UTF-8" />
 <xsl:template match="/" >
 <p>Use this page to experiment with the RxML syntax. If you want to save your RxML, click <a href='site:///generic-new-template'>here</a> instead.</p>
-<form METHOD="POST" ACTION="site:///rxml2rdf" ENCTYPE="multipart/form-data">	         
-	<textarea NAME="rxmlAsZML" ROWS="20" COLS="75" STYLE="width:100%" WRAP="off">
+<form method="POST" action="site:///rxml2rdf" accept-charset='UTF-8' enctype="multipart/form-data">	         
+	<textarea name="rxmlAsZML" rows="20" COLS="75" style="width:100%" wrap="off">
 	<xsl:text>
 #a generic RxML template 
 prefixes:

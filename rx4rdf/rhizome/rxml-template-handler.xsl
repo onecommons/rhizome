@@ -10,7 +10,7 @@
 		xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
 		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header" >		
 
-<xsl:output omit-xml-declaration='yes' indent='no' />
+<xsl:output omit-xml-declaration='yes' encoding="UTF-8" indent='no' />
 <xsl:param name="_name" />
 <xsl:param name="_contents" />		
 <xsl:param name="BASE_MODEL_URI" />
@@ -19,7 +19,7 @@
 <xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />	
 
 <xsl:template match="/" >
-<form METHOD="POST" ACTION="site:///{$_name}" ENCTYPE="multipart/form-data">	
+<form method="POST" action="site:///{$_name}" accept-charset='UTF-8' enctype="multipart/form-data">	
     <input TYPE="hidden" NAME="action" VALUE="save-metadata" />    
     <input TYPE="hidden" NAME="itemname" VALUE="{$_name}" />
         Create New Resources from Template
