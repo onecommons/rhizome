@@ -1484,9 +1484,9 @@ def main():
         ]
     extFunctionMap = None
     try:
-        from rx import racoon
-        extFunctionMap = racoon.DefaultExtFunctions        
-        ns.append( (racoon.RXWIKI_XPATH_EXT_NS, 'wf') )
+        from rx import raccoon
+        extFunctionMap = raccoon.DefaultExtFunctions        
+        ns.append( (raccoon.RXWIKI_XPATH_EXT_NS, 'wf') )
     except ImportError:
         pass    
     nsMap = dict( ns )

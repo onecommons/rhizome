@@ -3,8 +3,8 @@
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
-__all__ = ["racoon", "RxPathDom", "RxPath", "DomTree", "utils", 'MRUCache',
-           "rxml", "rhizome", "rhizml", "rhizmltokenize",
+__all__ = ["raccoon", "RxPathDom", "RxPath", "DomTree", "utils", 'MRUCache',
+           "rxml", "rhizome", "zml", "x2z",
            "Server", "XUpdate", "glock", "metakitdriver"]
 try:
     import Ft

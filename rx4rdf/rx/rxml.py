@@ -57,15 +57,15 @@ def getURIFromElementName(elem, nsMap):
 
 def quoteString(string):
     '''
-    returns rhizml string that can be used as rhizml representation of a xml infoset text item
+    returns zml string that can be used as zml representation of a xml infoset text item
     '''
     if '\n' in string or '\r' in string:
         #if odd number of \ before a & or < we need to add an extra \
-        #because in rhizml \& and \< means don't escape the markup character
+        #because in zml \& and \< means don't escape the markup character
         string = re.sub(r'((?<=[^\\]\\)\\\\+|(?<=^\\)\\\\+|(?<!\\)\\)(&|<)', r'\1\\\2', string)
         return `string`.lstrip('u')
     else:
-        return '`' + string # ` strings in rhizml are raw (no escape characters)
+        return '`' + string # ` strings in zml are raw (no escape characters)
     
 def matchName(node, prefixes, local):
     if node.namespaceURI: #namespace aware node 
@@ -257,10 +257,10 @@ def addRxdom2Model(rootNode, model, nsMap = None, rdfdom = None, thisResource = 
             addResource(model, scope, resource, s, rxNSPrefix,nsMap,thisResource, len(resources) > 1)        
     return nsMap
             
-def getRXAsRhizmlFromNode(resourceNodes, nsMap=None, includeRoot = False,
-                         INDENT = '    ', NL = '\n', INITINDENT=' ', rescomment='',
+def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
+                         INDENT = '    ', NL = '\n', INITINDENT='', rescomment='',
                           fixUp=None, fixUpPredicate=None):
-    '''given a nodeset of RxPathDom nodes, return RXML serialization in Rhizml markup format'''    
+    '''given a nodeset of RxPathDom nodes, return RXML serialization in ZML markup format'''    
     def getResourceNameFromURI(resNode):
         namespaceURI = resNode.getAttributeNS(RDF_MS_BASE, 'about')
         prefixURI, rest = RxPath.splitUri(namespaceURI)
@@ -342,7 +342,7 @@ def getRXAsRhizmlFromNode(resourceNodes, nsMap=None, includeRoot = False,
                 line += indent + getResourceNameFromURI(object) + NL
                 
         return line
-    if fixUp: #if fixUp we assume we're outputing xml/html not rhizml
+    if fixUp: #if fixUp we assume we're outputing xml/html not zml
         doQuote = utils.htmlQuote
     else:
         doQuote = quoteString
@@ -362,7 +362,8 @@ def getRXAsRhizmlFromNode(resourceNodes, nsMap=None, includeRoot = False,
     
     if includeRoot:
         indent += INDENT
-        root = INITINDENT + rxPrefix + 'rx:' + NL        
+        root + '#?zml markup' + NL
+        root += INITINDENT + rxPrefix + 'rx:' + NL        
 
     if not isinstance(resourceNodes, (type([]), type(()) )):
         resourceNodes = [ resourceNodes ]
@@ -432,12 +433,12 @@ def rx2nt(path, url=None, debug=0, nsMap = None):
     utils.writeTriples(stmts, outputfile)
     return outputfile.getvalue()
 
-def rhizml2nt(stream=None, contents=None, debug=0, nsMap = None, addRootElement=True):
-    from rx import rhizml
+def zml2nt(stream=None, contents=None, debug=0, nsMap = None, addRootElement=True):
+    from rx import zml
     if stream is not None:
-        xml = rhizml.rhizml2xml(stream)
+        xml = zml.zml2xml(stream, mixed=False)
     else:
-        xml = rhizml.rhizmlString2xml(contents)#parse the rxity to rx xml
+        xml = zml.zmlString2xml(contents, mixed=False)#parse the zml to rx xml
     if addRootElement:
         xml = '<rx:rx>'+ xml+'</rx:rx>'
     return rx2nt(StringIO.StringIO(xml), debug=debug, nsMap = nsMap)
@@ -463,5 +464,5 @@ usage:
             }
         revNsMap = dict( [ (x[1], x[0]) for x in nsMap.items() if x[0] and ':' not in x[0] ])
         rdfDom = RxPath.createDOM(RxPath.FtModel(model), revNsMap)        
-        print getRXAsRhizmlFromNode(rdfDom.childNodes, nsMap)
+        print getRXAsZMLFromNode(rdfDom.childNodes, nsMap)
         

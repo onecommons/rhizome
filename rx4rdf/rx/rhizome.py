@@ -1,18 +1,18 @@
 """
     Helper classes for Rhizome
     This classes includes functionality dependent on the Rhizome schemas
-    and so aren't included in the Racoon module.
+    and so aren't included in the Raccoon module.
 
     Copyright (c) 2003 by Adam Souzis <asouzis@users.sf.net>
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
-from rx import rhizml, rxml, racoon, utils, RxPath
+from rx import zml, rxml, raccoon, utils, RxPath
 import Ft
 from Ft.Lib import Uri
 from Ft.Rdf import RDF_MS_BASE,OBJECT_TYPE_RESOURCE
 from Ft.Xml import InputSource
-import os, sys, types
+import os, sys, types, base64, fnmatch, traceback
 try:
     import cPickle
     pickle = cPickle
@@ -26,50 +26,19 @@ except ImportError:
 from rx import logging #for python 2.2 compatibility
 log = logging.getLogger("rhizome")
 
-class DocumentMarkupMap(rhizml.LowerCaseMarkupMap):
-    TT = 'code'
-    A = 'link'
-    SECTION = 'section'
-    
-    def __init__(self, docType):
-        super(DocumentMarkupMap, self).__init__()
-        self.docType = docType
-        self.wikiStructure['!'] = (self.SECTION, 'title')
-
-    def H(self, level, line):
-        return 'section'
-        
-class TodoMarkupMap(rhizml.LowerCaseMarkupMap):
-    pass #todo
-
-class SpecificationMarkupMap(DocumentMarkupMap):
-    SECTION = 's'
-    
-    def __init__(self):
-        super(SpecificationMarkupMap, self).__init__('http://rx4rdf.sf.net/ns/wiki#doctype-specification')
-        self.wikiStructure['!'] = (self.SECTION, None)
-
-    def canonizeElem(self, elem):
-        if isinstance(elem, type(()) ) and elem[0][0] == 's' and elem[0][-1:].isdigit():
-            return 's' #map section elems to s
-        else:
-            return elem
-        
-    def H(self, level, line):
-        return ('s'+`level`, (('title',rhizml.xmlquote(line)),) )
-
-class HTMLMarkupMap(rhizml.LowerCaseMarkupMap):
+class RhizomeBaseMarkupMap(zml.LowerCaseMarkupMap):
     def __init__(self, rhizome):
-        super(HTMLMarkupMap, self).__init__()
+        super(RhizomeBaseMarkupMap, self).__init__()
         self.rhizome = rhizome
         
     def mapLinkToMarkup( self, link, name, annotations, isImage, isAnchorName):
         #any link that just a name turn into a site:/// url
         if not isAnchorName and link and link[0] not in './#?' and link.find(':') == -1:
             link = 'site:///' + link        
-        tag, attribs, text = super(HTMLMarkupMap, self).mapLinkToMarkup(
+        tag, attribs, text = super(RhizomeBaseMarkupMap, self).mapLinkToMarkup(
                 link, name, annotations, isImage, isAnchorName)
-        if tag != self.A:
+
+        if tag != self.A:#todo: this means that interwiki links only work in <a> tags
             return tag, attribs, text
 
         attribDict = dict(attribs)
@@ -78,7 +47,7 @@ class HTMLMarkupMap(rhizml.LowerCaseMarkupMap):
             return tag, attribs, text
         url = url[1:-1] #strip quotes
 
-        value = rhizml.xmlquote('IgnorableMetadata')
+        value = zml.xmlquote('IgnorableMetadata')
         if url.startswith('site:'):
             if self.rhizome.undefinedPageIndicator:
                 attribDict['undefined']=value            
@@ -96,10 +65,13 @@ class HTMLMarkupMap(rhizml.LowerCaseMarkupMap):
                 scheme = url[:schemeIndex]
             replacement = self.rhizome.getInterWikiMap().get(scheme.lower())
             if replacement:
+                if name is None: #don't include the interlink scheme in the name
+                    text = url[schemeIndex+1:]
                 url = replacement + url[schemeIndex+1:]
-                attribDict['href'] = rhizml.xmlquote(url)
+                attribDict['href'] = zml.xmlquote(url)
                 if self.rhizome.interWikiLinkIndicator:
-                    attribDict['interwiki']=value
+                    if replacement[0] != '.' and not replacement.startswith('site:'):
+                        attribDict['interwiki']=value                
                 return tag, attribDict.items(), text
                 
         external = url.find('://') > -1 or url[0] == '/'
@@ -112,24 +84,75 @@ class HTMLMarkupMap(rhizml.LowerCaseMarkupMap):
                 attribDict['undefined']=value
                 
         return tag, attribDict.items(), text
+
+class DocumentMarkupMap(RhizomeBaseMarkupMap):
+    TT = 'code'
+    A = 'link'
+    SECTION = 'section'
     
-class MarkupMapFactory(rhizml.DefaultMarkupMapFactory):
-    map = {
-        'faq' : DocumentMarkupMap('http://rx4rdf.sf.net/ns/wiki#doctype-faq'),
-        'document' : DocumentMarkupMap('http://rx4rdf.sf.net/ns/wiki#doctype-document'),
-        'specification' : SpecificationMarkupMap(),
-        'todo' : TodoMarkupMap(),
-        }
+    def __init__(self, docType,rhizome):
+        super(DocumentMarkupMap, self).__init__(rhizome)
+        self.docType = docType
+        self.wikiStructure['!'] = (self.SECTION, 'title')
+
+    def H(self, level, line):
+        return 'section'
+        
+class TodoMarkupMap(RhizomeBaseMarkupMap):
+    pass #todo
+
+class SpecificationMarkupMap(DocumentMarkupMap):
+    SECTION = 's'
     
     def __init__(self, rhizome):
-        self.rhizome = rhizome
+        super(SpecificationMarkupMap, self).__init__('http://rx4rdf.sf.net/ns/wiki#doctype-specification',rhizome)
+        self.wikiStructure['!'] = (self.SECTION, None)
+
+    def canonizeElem(self, elem):
+        if isinstance(elem, type(()) ) and elem[0][0] == 's' and elem[0][-1:].isdigit():
+            return 's' #map section elems to s
+        else:
+            return elem
+        
+    def H(self, level, line):
+        return ('s'+`level`, (('title',zml.xmlquote(line)),) )
+    
+class MarkupMapFactory(zml.DefaultMarkupMapFactory):
+    def __init__(self, rhizome):
+        self.rhizome = rhizome        
+
+        faqMM = DocumentMarkupMap('http://rx4rdf.sf.net/ns/wiki#doctype-faq', rhizome)
+        documentMM = DocumentMarkupMap('http://rx4rdf.sf.net/ns/wiki#doctype-document', rhizome)
+        specificationMM = SpecificationMarkupMap(rhizome)
+        todoMM = TodoMarkupMap(rhizome)
+        
+        self.elemMap = {
+            'faq' : faqMM,
+            'faqs' : faqMM,
+            'document' : documentMM,
+            'specification' : specificationMM,
+            'todo' : todoMM,
+            }
+
+        self.mmMap = {
+            'http://rx4rdf.sf.net/ns/wiki#doctype-faq': faqMM,
+            'http://rx4rdf.sf.net/ns/wiki#doctype-document': documentMM,
+            'http://rx4rdf.sf.net/ns/wiki#doctype-specification': specificationMM,
+            }
         
     def startElement(self, elem):
-        return self.map.get(elem)
+        return self.elemMap.get(elem)
 
     def getDefault(self):        
-        return HTMLMarkupMap(self.rhizome)
-    
+        return RhizomeBaseMarkupMap(self.rhizome)
+
+    def getMarkupMap(self, uri):
+        mm = self.mmMap.get(uri)
+        if not mm:
+            return zml.DefaultMarkupMapFactory(self, uri)
+        else:
+            return mm
+        
 METADATAEXT = '.metarx'
 
 def kw2vars(**kw):
@@ -140,7 +163,7 @@ class Rhizome(object):
     'http://rx4rdf.sf.net/ns/wiki#item-format-python' : 'py',
     'http://www.w3.org/1999/XSL/Transform' : 'xsl',
     'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt' : 'rxsl',
-    'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' : 'rz',
+    'http://rx4rdf.sf.net/ns/wiki#item-format-zml' : 'zml',
     'http://rx4rdf.sf.net/ns/wiki#item-format-text': 'txt',
     'http://rx4rdf.sf.net/ns/wiki#item-format-xml':'xml',
     'http://rx4rdf.sf.net/ns/content#pydiff-patch-transform':'pkl'
@@ -149,7 +172,7 @@ class Rhizome(object):
     def __init__(self, server):
         self.server = server
         #this is just like findContentAction except we don't want to try to retrieve alt-contents' ContentLocation        
-        self.findPatchContentAction = racoon.Action(['.//a:contents/text()', 
+        self.findPatchContentAction = raccoon.Action(['.//a:contents/text()', 
         'wf:openurl(.//a:contents/a:ContentLocation)', #contents stored externally
         ], lambda result, kw, contextNode, retVal:\
             server.getStringFromXPathResult(result), requiresContext = True) #get its content
@@ -158,13 +181,13 @@ class Rhizome(object):
 
     def configHook(self, kw):
         def initConstants(varlist, default):
-            return racoon.assignVars(self, kw, varlist, default)
+            return raccoon.assignVars(self, kw, varlist, default)
         
         initConstants( ['MAX_MODEL_LITERAL'], -1)        
         self.SAVE_DIR = kw.get('SAVE_DIR', 'content/.rzvs/')
         self.ALTSAVE_DIR = kw.get('ALTSAVE_DIR', 'content/')
         self.interWikiMapURL = kw.get('interWikiMapURL', 'site:///intermap.txt')
-        initConstants( ['undefinedPageIndicator', 'externalLinkIndicator', 'interWikiLinkIndicator' ], 0)
+        initConstants( ['undefinedPageIndicator', 'externalLinkIndicator', 'interWikiLinkIndicator' ], 1)
         initConstants( ['authPredicates', 'globalRequestVars'], [])
         initConstants( ['RHIZOME_APP_ID'], '')
 
@@ -184,7 +207,7 @@ class Rhizome(object):
             log.warning("neither ADMIN_PASSWORD nor ADMIN_PASSWORD_HASH was set; using default admin password")
         #this is just like findResourceAction except we don't assign the 'not found' resource
         #used by hasPage
-        self.checkForResourceAction = racoon.Action(self.findResourceAction.queries[:-1])
+        self.checkForResourceAction = raccoon.Action(self.findResourceAction.queries[:-1])
         self.checkForResourceAction.assign("__resource", '.', post=True)
 
     def getInterWikiMap(self):        
@@ -192,7 +215,7 @@ class Rhizome(object):
             return self.interWikiMap
         interWikiMapURL = getattr(self, 'interWikiMapURL', None) #in case this is call before configuration is completed
         if interWikiMapURL:
-           self.interWikiMap = rhizml.interWikiMapParser(InputSource.DefaultFactory.fromUri(interWikiMapURL).stream)
+           self.interWikiMap = zml.interWikiMapParser(InputSource.DefaultFactory.fromUri(interWikiMapURL).stream)
            return self.interWikiMap
         return {}
 
@@ -208,7 +231,7 @@ class Rhizome(object):
         digest. '''
         if name.startswith('__') and operation in ['assign', 'remove']:
             return False
-        elif operation == 'assign' and namespace == racoon.RXIKI_SESSION_NS and name == 'login':
+        elif operation == 'assign' and namespace == raccoon.RXIKI_SESSION_NS and name == 'login':
             #for security
             #we only let session:login be set in the context where $password is present
             if not kw.has_key('password'):
@@ -318,29 +341,53 @@ class Rhizome(object):
                actionName = 'remove'
            else:
                actionName = action
-           raise racoon.NotAuthorized('You are not authorized to %s this statement: %s %s %s'
+           raise raccoon.NotAuthorized('You are not authorized to %s this statement: %s %s %s'
                     % (actionName, stmt.subject, stmt.predicate,stmt.object))
         
     ###command line handlers####
-    def doImport(self, path, recurse=False, r=False, disposition='', filenameonly=False,
-                 xupdate="path:import.xml", doctype='', format='', dest=None, **kw):
+    def doImport(self, path, recurse=False, r=False, disposition='',
+                 filenameonly=False, xupdate="path:import.xml",
+                 doctype='', format='', dest=None, folder=None, token = None,
+                 keepext = False, **kw):
           '''Import command line option
 Import the file in a directory into the site.
 If, for each file, there exists a matching file with ".metarx" appended, 
 then import will attempt to use the metadata in the metarx file.          
--i -import path Location of files to import
+-i -import path Location of file(s) to import (* and ? wildcards OK)
+
 Options:
--recurse -r whether to recursively import subdirectories 
 -dest path If dest is present content will be copied to this directory, 
      otherwise the site will reference the content at the import directory.
--filenameonly don't include the full relative path in the imported item name     
+-recurse -r whether to recursively import subdirectories 
+-filenameonly (with recurse) don't include the relative path
+             in the imported item name     
 -xupdate URL url to an RxUpdate file which is applied to each metarx file.
 Can be used for schema migration, for example.
-Default: "path:import.xml". This disgards previous revisions and points the content to the new import location.
+Default: "path:import.xml". This disgards previous revisions and
+         points the content to the new import location.
+
+The following options only apply when no metarx file is present: 
+-folder path (prepended to name and creates folder resource if necessary)
+-keepext Don't drop the file extension when naming the page.
+Each of these set the equivalent metadata property:
+-disposition (wiki:item-disposition), -doctype (wiki:doctype),
+-format (wiki:item-format), -token (auth:guarded-by)
+Their value can be either an URI or a QName.
 '''
           defaultFormat=format
           defaultDisposition=disposition
-          defaultDoctype=doctype          
+          defaultDoctype=doctype
+          if folder and folder[-1] != '/':
+              folder += '/'
+          if token:
+              accessTokens = [ token ]
+          else:
+              accessTokens = []
+              
+          if '*' in os.path.split(path)[1] or '?' in os.path.split(path)[1]:
+              path,filePattern = os.path.split(path)
+          else:
+              filePattern = ''
           rootPath = os.path.normpath(path or '.').replace(os.sep, '/')
           log.info('beginning import of ' + rootPath)
           triples = []
@@ -352,20 +399,23 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
           #todo: support storing contents directly in model (use saveContents()?)
               
           def fileFunc(path, filename):
+              if filePattern and not fnmatch.fnmatch(filename, filePattern):
+                  return
               if os.path.splitext(filename)[1]==METADATAEXT:
                   return              
+
               if dest:
                   destpath = os.path.join(dest, filename)
               else:
                   destpath = path
-              if prefixlen: #if the destination is on the Racoon path use a path: URL
-                  loc = racoon.SiteUriResolver.OsPathToPathUri(os.path.abspath(destpath)[prefixlen+1:])
+              if prefixlen: #if the destination is on the raccoon path use a path: URL
+                  loc = raccoon.SiteUriResolver.OsPathToPathUri(os.path.abspath(destpath)[prefixlen+1:])
               else: #use a file:// URL 
                   loc = Uri.OsPathToUri(os.path.abspath(destpath))
                   
               if os.path.exists(path + METADATAEXT):
                   #parse the rzml to rxml then load it into a RxPath DOM
-                  xml = rhizml.rhizml2xml(open(path + METADATAEXT))
+                  xml = zml.zml2xml(open(path + METADATAEXT))
                   rdfDom = rxml.rxml2RxPathDOM(StringIO.StringIO('<rx:rx>'+ xml+'</rx:rx>'))
                   #Ft.Xml.Lib.Print.PrettyPrint(rdfDom, asHtml=1, stream=file('rdfdom1.xml','w')) #asHtml to suppress <?xml ...>
                   
@@ -398,12 +448,12 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
 
                   #create folder resources if necessary
                   pathSegments = wikiname.split('/')
-                  rootFolder, folder = self.addFolders(pathSegments[:-1])
-                  if folder:
+                  rootFolder, parentFolder = self.addFolders(pathSegments[:-1])
+                  if parentFolder:
                       #get the resource's uri (it might have changed)
                       itemUriRef = rdfDom.evalXPath('string(/*[wiki:name])', nsMap = self.server.nsMap)
                       assert itemUriRef
-                      folder['wiki:has-child'] = itemUriRef
+                      parentFolder['wiki:has-child'] = itemUriRef
                   if rootFolder:
                       triples.append( rootFolder.toTriplesDeep() )
               else:
@@ -412,14 +462,20 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
                       filepath = path[len(rootPath)+1:]
                   else:
                       filepath = filename
-                  wikiname = filter(lambda c: c.isalnum() or c in '_-./', os.path.splitext(filepath)[0])
+                  if folder:
+                     filepath = folder + filepath
+                  if not keepext:
+                      wikiname = os.path.splitext(filepath)[0]
+                  else:
+                      wikiname = filepath
+                  wikiname = filter(lambda c: c.isalnum() or c in '_-./', wikiname)
                   if self.server.evalXPath("/*[wiki:name='%s']"% wikiname):
                       log.warning('there is already an item named ' + wikiname +', skipping import')
                       return #hack for now skip if item already exists
                   else:
                       log.info('importing ' +filepath+ ' as ' + wikiname)
                   if not defaultFormat:
-                      exts = { '.rz' : 'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml',
+                      exts = { '.zml' : 'http://rx4rdf.sf.net/ns/wiki#item-format-zml',
                       '.xsl' : 'http://www.w3.org/1999/XSL/Transform',
                       '.rxsl' : 'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt',
                       '.py' : 'http://rx4rdf.sf.net/ns/wiki#item-format-python',
@@ -443,32 +499,32 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
                   else:
                       disposition = defaultDisposition
                   if not defaultDoctype:
-                      if format == 'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml':
-                          mm = rhizml.rhizml2xml(file(path), mmf=self.mmf, getMM=True)
+                      if format == 'http://rx4rdf.sf.net/ns/wiki#item-format-zml':
+                          mm = zml.zml2xml(file(path), mmf=self.mmf, getMM=True)
                           doctype = mm.docType
                       else:
                           doctype=''
                   else:
                       doctype = defaultDoctype
-                                    
                   triples.append( self.addItem(wikiname,loc=loc,format=format,
                                     disposition=disposition, doctype=doctype,
-                                    contentLength = os.stat(path).st_size,
-                                    digest = utils.shaDigest(file(path))
+                                    contentLength = str(os.stat(path).st_size),
+                                    digest = utils.shaDigest(path),
+                                    accessTokens=accessTokens
                                     ) )
               if dest:
                   import shutil
                   try: 
                     os.makedirs(dest)
                   except OSError: pass #dir might already exist
-                  shutil.copy2(path, dest)                  
+                  shutil.copy2(path, dest)
 
           if os.path.isdir(rootPath):
                 if recurse or r:
                     recurse = 0xFFFF
                 utils.walkDir(rootPath, fileFunc, recurse = recurse)
           else:
-                fileFunc(rootPath)
+                fileFunc(rootPath, os.path.split(rootPath)[1])
           if triples:
               triples = ''.join(triples)
               model, db = utils.DeserializeFromN3File(StringIO.StringIO(triples))
@@ -502,8 +558,8 @@ Options:
 -label Name of revision label
 '''
          assert not (xpath and name), self.server.cmd_usage
-         if not xpath and name: xpath = '/*[wiki:name="%s"]' % name
-         else: xpath = xpath or ('/*[%s]' % filter) 
+         if not xpath and name: xpath = '/a:NamedContent[wiki:name="%s"]' % name
+         else: xpath = xpath or ('/a:NamedContent[%s]' % filter) 
          results = self.server.evalXPath(xpath)
          for item in results:
              name = self.server.evalXPath('string(wiki:name)', node = item)
@@ -512,8 +568,16 @@ Options:
              content = None
              log.info('attempting to export %s ' % name)
              if static:
-                 try:                     
-                     rc = { '_static' : static}
+                 try:
+                     class _dummyRequest:
+                         def __init__(self):
+                             self.headerMap = {}
+                             self.simpleCookie = {}
+
+                     rc = { '_static' : static,
+                            '_response': _dummyRequest() #we need this for the mimetype
+                            }
+                     
                      if kw.get('label'): rc['label'] = kw['label']
                      #todo: what about adding user context (default to administrator?)
                      #add these to the requestContext so invocation know its intent
@@ -526,6 +590,7 @@ Options:
                      #       (use invokeEx but move default mimetype handling out of handleRequest())
                      #       but adding an extension means fixing up links
                  except:
+                     #traceback.print_exc()
                      log.warning('%s is dynamic, can not do static export' % name)
                      self.server.requestContext.pop()
                      #note: only works with static site (ones with no required arguments)
@@ -537,7 +602,7 @@ Options:
                  content = self.server.doActions([self.findRevisionAction, self.findContentAction], kw.copy(), item)
 
                  format = self.server.evalXPath(
-'string((wiki:revisions/*/rdf:first)[last()]/wiki:Item//a:contents/a:ContentTransform/a:transformed-by/wiki:ItemFormat)',
+'string((wiki:revisions/*/rdf:first)[last()]/wiki:Item/a:contents/a:ContentTransform/a:transformed-by/wiki:ItemFormat)',
                      node = item)
                  ext = os.path.splitext(name)[1]
                  if not ext and format:                 
@@ -550,7 +615,9 @@ Options:
              dir = dir.replace(os.sep, '/')
              path = dir+'/'+ name
              try: os.makedirs(os.path.split(path)[0])
-             except os.error: pass 
+             except os.error:
+                 #traceback.print_exc()
+                 pass 
              itemfile = file(path, 'w+b')
              itemfile.write( content)
              itemfile.close()
@@ -561,13 +628,13 @@ Options:
                        (wiki:revisions/*/rdf:first)[last()]/wiki:Item//a:contents/*''',
                      node = item)
                  lastrevision.insert(0, item)
-                 metadata = rxml.getRXAsRhizmlFromNode(lastrevision)
+                 metadata = rxml.getRXAsZMLFromNode(lastrevision)
                  metadatafile = file(path + METADATAEXT, 'w+b')
                  metadatafile.write( metadata)
                  metadatafile.close()
                  
     ######content processing####
-    def processRhizmlSideEffects(self, contextNode, kw):
+    def processZMLSideEffects(self, contextNode, kw):
         #optimization: only set the doctype (which will invoke wiki2html.xsl if we need links to be transformed)
         if self.undefinedPageIndicator or self.externalLinkIndicator or self.interWikiLinkIndicator:
             #wiki2html.xsl shouldn't get invoked with the doctype isn't html
@@ -576,9 +643,9 @@ Options:
                     node = contextNode):
                 kw['_doctype'] = 'http://rx4rdf.sf.net/ns/wiki#doctype-wiki'
         
-    def processRhizml(self, contextNode, contents, kw):
-        self.processRhizmlSideEffects(contextNode, kw)
-        contents = rhizml.rhizmlString2xml(contents,self.mmf)
+    def processZML(self, contextNode, contents, kw):
+        self.processZMLSideEffects(contextNode, kw)
+        contents = zml.zmlString2xml(contents,self.mmf)
         return (contents, 'http://rx4rdf.sf.net/ns/wiki#item-format-xml') #fixes up site://links
         
     def processTemplateAction(self, resultNodeset, kw, contextNode, retVal):
@@ -611,22 +678,22 @@ Options:
     def customProcessor(self, contents, kw):
         #return getattr(self.customHandler, kw['_name'])(contents.strip(), kw)
         name = contents.strip()
-        if name=='dump':
+        if name=='dump' and not kw.get('_static'):
             return self.server.dump()
         raise 'Error: unknown customHandler! ' + name
         
     ######XPath extension functions#####        
-    def getRhizml(self, context, resultset = None):        
+    def getZML(self, context, resultset = None):        
         if resultset is None:
             resultset = context.node
-        contents = racoon.StringValue(resultset)
-        return rhizml.rhizmlString2xml(contents,self.mmf )
+        contents = raccoon.StringValue(resultset)
+        return zml.zmlString2xml(contents,self.mmf )
 
     def getRxML(self, context, resultset = None, comment = '',
                                 fixUp=None, fixUpPredicate=None):
       if resultset is None:
             resultset = [ context.node ]
-      return rxml.getRXAsRhizmlFromNode(resultset, rescomment = comment,
+      return rxml.getRXAsZMLFromNode(resultset, rescomment = comment,
                             fixUp=fixUp, fixUpPredicate=fixUpPredicate)
 
     def getSecureHash(self, context, plaintext, secureProperty=None):
@@ -649,7 +716,7 @@ Options:
         '''
         if resultset is None:
             resultset = context.node
-        url = racoon.StringValue(resultset)
+        url = raccoon.StringValue(resultset)
 
         #it'd be better to normalize the url with the (relative) doc url
         #but for now rely on the fact that our fixed up links will always
@@ -684,33 +751,6 @@ Options:
         #todo I8N (return a IRI?)
         return self.server.BASE_MODEL_URI + \
                filter(lambda c: c.isalnum() or c in '_-./', str(wikiname))
-
-    def saveMetadata(self, context, contents, user=None, about=None):
-      try:
-          xml = rhizml.rhizmlString2xml(contents)#parse the rhizml to xml
-          
-          #make sure we authorized to modified each resource specified in about
-          #authorizationNodes = eval("/*[. = $about]", vars = utils.kw2dict(about=about) )
-          #for node in authorizationNodes: 
-          #    if eval(self.authorizationQuery % 'true()',
-          #            node = node, vars=utils.kw2dict(__authAction='view')):
-          #        raise unathorized
-          
-          if isinstance(about, ( types.ListType, types.TupleType ) ):            
-              #about may be a list of text nodes, convert to a list of strings
-              about = [racoon.StringValue(x) for x in about]
-          elif about is not None:
-              about = [ about ]
-          self.server.processRxML('<rx:rx>'+ xml+'</rx:rx>', about, source=user)
-      except racoon.NotAuthorized:
-        assignFunc = context.functions.get((racoon.RXWIKI_XPATH_EXT_NS, 'assign-metadata') )
-        if assignFunc:
-            assignFunc(context, 'error', sys.exc_value.msg)
-        else:
-            raise
-      except:
-        log.exception("metadata save failed")
-        raise
     
     def generatePatch(self, context, contents, oldcontentsNode, base64decode):
         patch = ''
@@ -721,7 +761,6 @@ Options:
             if oldContents:
                 if base64decode:
                     #we want to base64 decode the old content before attempting the diff
-                    import base64
                     oldContents = base64.decodestring(oldContents)
                 patchTupleList = utils.diff(contents, oldContents) #compare  
                 if patchTupleList is not None:
@@ -931,7 +970,8 @@ Options:
         
         itembNode['rdf:type'] = Res('wiki:Item')
         itembNode['a:created-on'] = "1057919732.750"
-        itembNode['wiki:item-disposition'] = Res(kw2uri(disposition, 'wiki:item-disposition-'))
+        if disposition:
+            itembNode['wiki:item-disposition'] = Res(kw2uri(disposition, 'wiki:item-disposition-'))
 
         if rootFolder:
             return rootFolder.toTriplesDeep()

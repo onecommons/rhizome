@@ -589,7 +589,7 @@ class Res(dict):
         return cmp(self.uri, other.uri)
 
     def __hash__(self):
-        return hash(self.uri, other.uri)        
+        return hash(self.uri)        
 
     def __getitem__(self, key):
         return super(Res, self).__getitem__(self.getURI(key))
@@ -946,7 +946,7 @@ class LinkFixer(HTMLParser.HTMLParser):
         return s
     
     def reallyUnescape(self, s):
-        return HTMLParser.HTMLParser(self, s)
+        return HTMLParser.HTMLParser.unescape(self, s)
         
     # Overridable -- finish processing of start+end tag: <tag.../>
     def handle_startendtag(self, tag, attrs):

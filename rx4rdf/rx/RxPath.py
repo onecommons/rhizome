@@ -995,7 +995,7 @@ def getURIFromElement(context, nodeset=None):
         try:
             namespace = context.processorNss[prefix]
         except KeyError:
-            raise RuntimeException(RuntimeException.UNDEFINED_PREFIX,
+            raise XPath.RuntimeException(RuntimeException.UNDEFINED_PREFIX,
                                    prefix)       
         return namespace + getURIFragmentFromLocal(local)
     else:
