@@ -14,17 +14,17 @@
  #property on the site-template page. For example:
  # base:site-template:
  #   wiki:uses-theme: base:myTheme
+ #In addition, the theme XSL page needs to have an alias named "theme.xsl"
 
  #(you probably want to rename the resource id to something like base:myTheme)
  bnode:newSiteTheme: 
-     a: 
-       wiki:SiteTheme
+    a: wiki:SiteTheme
     
     #you must declare the following properties:
     
     #this points to a XSLT page that will be imported and used by the site-template.
-    #(see the comments in site-template.xsl on how to create this)
-    wiki:uses-site-template-stylesheet: myTheme.xsl
+    #(see the comments in site-template.xsl on how to create this)    
+    #wiki:uses-site-template-stylesheet: base:myTheme.xsl
     
     #this points to a CSS page that the site-template will reference 
-    wiki:uses-css-stylesheet: myTheme.css
+    #wiki:uses-css-stylesheet: base:myTheme.css
