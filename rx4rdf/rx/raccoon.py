@@ -739,7 +739,7 @@ else:
         '''
         DEFAULT_CONFIG_PATH = 'raccoon-default-config.py'
         lock = None
-        defaultDisabledDefaultContentProcessors = ['http://rx4rdf.sf.net/ns/wiki#item-format-python']
+        defaultDisabledDefaultContentProcessors = []
                     
         requestContext = utils.createThreadLocalProperty('__requestContext',
             doc='variables you want made available to anyone during this request (e.g. the session)')
@@ -825,7 +825,7 @@ else:
             def initConstants(varlist, default):
                 return assignVars(self, kw, varlist, default)
                             
-            initConstants( [ 'nsMap', 'extFunctions', 'actions', 'contentProcessors',
+            initConstants( [ 'nsMap', 'extFunctions', 'actions', 'contentProcessors', 'authorizePython',
                              'NOT_CACHEABLE_FUNCTIONS', 'contentProcessorCachePredicates',
                              'contentProcessorSideEffectsFuncs','contentProcessorSideEffectsPredicates',
                              'contentProcessorIsValueCacheablePredicates'], {} )
@@ -870,7 +870,7 @@ else:
                 styleSheetCache.isValueCacheableCalc = isStyleSheetCacheable
                 
             self.nsMap.update(DefaultNsMap)
-            
+
             self.contentProcessors.update(self.DefaultContentProcessors)
             self.contentProcessorCachePredicates.update(self.DefaultContentProcessorCachePredicates)
             self.contentProcessorSideEffectsFuncs.update(self.DefaultContentProcessorSideEffectsFuncs)
@@ -1315,8 +1315,20 @@ else:
             return contents
 
         def processPython(self, contents, kw):
+            if self.authorizePython is not None:
+                digest = utils.shaDigestString(contents)
+                if not self.authorizePython.get(digest):
+                    raise NotAuthorized(
+                     'This application is not configured to execute the python code with a SHA1 digest of '
+                     + digest)
+
+            locals = {}
+            locals['__requestor__'] = self.requestDispatcher
+            locals['__server__'] = self
+            locals['__kw__'] = kw
+
             try:            
-                contents = self.executePython(contents, kw)             
+                contents = self.executePython(contents, locals)             
             except (NameError), e:              
                 contents = "<pre>Unable to invoke script: \nerror:\n%s\nscript:\n%s</pre>" % (str(e), contents)
             if '_nextFormat' in kw: #doc
