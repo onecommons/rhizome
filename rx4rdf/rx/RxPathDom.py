@@ -13,14 +13,16 @@
     Therefore it is an error to try to remove an Object node.
     Also, it is error to remove a resource if there is an object with a reference to it
 
-    The underlying model will be modified as the DOM is modified and should
-    only be modified through the DOM for the lifetime of the DOM instance.
+    The underlying model will be modified as the DOM is modified and the moodel should
+    only be modified by the DOM for the lifetime of the DOM instance.
 
     The Document factory methods (e.g. createElementNS) create "regular" XML
     dom nodes which will be coerced into RDF Dom nodes when attached the RDF DOM via appendChild et. al.
     
     Todo:    
     * check for object references when removing a resource   
+    * you can not insert a list or container item, only append 
+    * ascendant axes are not treated specially as per the spec    
 
     Copyright (c) 2003 by Adam Souzis <asouzis@users.sf.net>
     All rights reserved, see COPYING for details.
@@ -1428,8 +1430,8 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     def rollback(self):
         self.model.rollback()
         #to remove the changes we need to rollback we just force the
-        #DOM's nodes to be regenerated from the model null out
-        #childNodes and incremement revision
+        #DOM's nodes to be regenerated from the model by null-ing out
+        #childNodes and then incrementing revision.
         
         #warning: its still possible the application may have a
         #dangling references to a node that don't know they've been

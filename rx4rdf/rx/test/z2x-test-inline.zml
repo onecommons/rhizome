@@ -1,0 +1,14 @@
+#!zml markup
+#?zml
+<foo
+<<bar;child-of-foo a=v: child-of-child-of-foo a-v: 'child-child text';child-of-foo: 'child text';
+<<b2;<<child-of-b2;<<<child-of-child-b2: "text c-of-c-b2";<<<child-of-child-b2 a=v;<<<'text child-of-child';<<child-of-b2: child-of-child-of-b2
+#!should be the same as above
+<<b2;<<child-of-b2;< <child-of-child-b2: "text c-of-c-b2"; <<child-of-child-b2 a=v;<<<'text child-of-child';<<child-of-b2: child-of-child-of-b2
+#!should be the same as above
+<<b2;
+<<<<child-of-b2
+<<<  child-of-child-b2: "text c-of-c-b2"
+<<<  child-of-child-b2 a=v
+<<   'text child-of-child'
+<<<<child-of-b2: child-of-child-of-b2

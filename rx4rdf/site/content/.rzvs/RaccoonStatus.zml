@@ -9,7 +9,8 @@ That being said, here's a "strategic" feature list:
 * Support for mod-python and plain old cgi
 ** Technically not part of Raccoon per se, but regardless, the current approach to integrating with Apache has its limitations.
 * Security
-** Allow for fine-grained authorization (i.e. when adding and removing individual statements) -- right now authorization is at the application level (in Rhizome) (Done!)
+** Allow for fine-grained authorization (i.e. when adding and removing individual statements)
+  (Done!)
 ** Integrate a sandbox for the safe execution of Python content (Zope seems like it has one, can we use that?)
 * Support multiple applications per Raccoon instance
 ** Allow the application config files to treated like any content handler, allowing it to be edited through Raccoon.

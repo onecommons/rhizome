@@ -1,10 +1,8 @@
 '''
     An implementation of RxPath.
-    Loads and saves the Dom to a RDF model.
-    
-    Todo:    
-    * you can not insert a list or container item, only append 
-    * ascendant axes are not treated specially as per the spec    
+    Loads and saves the DOM to a RDF model.
+
+    See RxPathDOM.py for more notes and todos.
 
     Copyright (c) 2003 by Adam Souzis <asouzis@users.sf.net>
     All rights reserved, see COPYING for details.

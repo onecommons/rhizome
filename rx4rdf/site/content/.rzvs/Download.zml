@@ -1,14 +1,28 @@
-Rx4RDF requires Python 2.2 or later and [4Suite 1.0a1|http://4suite.org] or later. 
+Rx4RDF requires Python 2.2 or later (2.3 recommended) and 4Suite 1.0a1 
+or later ([http://4Suite.org]).
 
-Rx4RDF is known to run on Linux and Windows NT & 2000 and should work on any platform that supports Python and 4Suite.
-
-On Windows, [Win32 Extensions for Python|http://www.python.org/windows/win32all] must be installed or interprocess file locking will be disabled (which is only needed if you have multiple Raccoon processes accessing the same model).
+Rx4RDF and Rhizome are known to run on Linux and Windows 2000/XP  
+and should work on any platform that supports Python and 4Suite.
 
 [Source (zip)|http://sourceforge.net/project/showfiles.php?group_id=85676]
 
 [Source (tar.gz)|http://sourceforge.net/project/showfiles.php?group_id=85676]
 
 If you're just interested in ZML you just need this one Python [file|http://cvs.sourceforge.net/viewcvs.py/rx4rdf/rx4rdf/rx/zml.py].
+
+Optional Packages:
+
+If Lupy is installed ([http://www.divmod.org/Home/Projects/Lupy]), Rhizome will
+perform full-text indexing of content (requires Python 2.3). 
+See the Rhizome manual for more info.
+
+On Windows, the Python Win32 Extensions ([http://python.org/windows/win32all]) 
+must be installed or interprocess file locking will be disabled (You do not 
+need this unless you have multiple Raccoon processes simultaneously accessing 
+the same application instance).
+
+Redland RDF data stores can be used if Redland ([http://www.redland.opensource.ac.uk])
+is installed. See the Raccoon manual for more info.
 
 !Install
 This is a standard Python source distribution. To install:
@@ -19,6 +33,9 @@ This installs:
 * a package named "rx" in the Python ^^site-packages^^ directory
 * shell scripts or .bat files for running Raccoon and ZML in the Python scripts directory (in the Python install directory on Windows or  or on Unix-like systems one of the standard "/usr/bin", "usr/local/bin", or "~/bin").
 * a directory named "rx4rdf" containing documentation, Rhizome pages, and other ancillary files in the Python "share" directory (in the Python install directory on Windows or on Unix-like systems one of the standard "/usr/share", "usr/local/share", or "~/share").
+
+!Upgrading
+[Upgrading] contains notes on upgrading from the previous version.
 
 !Quick Start
 Once you've installed Rx4RDF, use this guide to quickly start playing with its various components. Also, see the ^^readme.txt^^ in the install package for release notes.

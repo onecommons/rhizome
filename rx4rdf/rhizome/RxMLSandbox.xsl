@@ -14,9 +14,9 @@
 <xsl:template match="/" >
 <p>Use this page to experiment with the RxML syntax. If you want to save your RxML, click <a href='site:///generic-new-template'>here</a> instead.</p>
 <form METHOD="POST" ACTION="site:///rxml2rdf" ENCTYPE="multipart/form-data">	         
-	<textarea NAME="rxmlAsZML" ROWS="25" COLS="75" STYLE="width:100%" WRAP="off">
+	<textarea NAME="rxmlAsZML" ROWS="20" COLS="75" STYLE="width:100%" WRAP="off">
 	<xsl:text>
-;a generic RxML template 
+#a generic RxML template 
 prefixes:
  wiki: `http://rx4rdf.sf.net/ns/wiki#
  a: `http://rx4rdf.sf.net/ns/archive#
@@ -29,7 +29,12 @@ prefixes:
 	</xsl:text>
 	</textarea>
 	<br/>
-	<input TYPE="submit" NAME="convert" VALUE="Convert To RDF/XML" />&#xA0;<a href='site:///RxML'>RxML Help</a> 	
+	<input TYPE="submit" NAME="convert" VALUE="Convert To RDF/XML" />
 </form>
+<div class="code" style='font-size: smaller'>
+<p align='center'><b><a href="site:///RxML">RxML</a> Quick Reference</b></p>
+<xsl:value-of disable-output-escaping='yes' 
+  select="wf:openurl('site:///RxML?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-complete')" />
+</div>
 </xsl:template>
 </xsl:stylesheet>

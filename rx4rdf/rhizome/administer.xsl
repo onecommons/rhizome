@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <x:stylesheet xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" 
 xmlns:wf="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#" 
 xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" 
@@ -16,11 +16,11 @@ exclude-result-prefixes="f wf a wiki rdf rdfs auth" version="1.0">
         <tr>
           <td><x:value-of select='$resName' /></td>
           <td>
-             <!-- /*[.='uri'] -->
-            <a href="site:///search?search=%2F*%5B.%3D%27{f:escape-url(string(.))}%27%5D&amp;searchType=RxPath&amp;view=list">List </a>
+             <!-- /*[rdf:type='uri'] -->
+            <a href="site:///search?search=%2F*%5Brdf:type%3D%27{f:escape-url(string(.))}%27%5D&amp;searchType=RxPath&amp;view=list">List </a>
           </td>
           <td>
-            <a href="site:///search?search=%2F*%5B.%3D%27{f:escape-url(string(.))}%27%5D&amp;searchType=RxPath&amp;view=edit">Edit All </a>
+            <a href="site:///search?search=%2F*%5Brdf:type%3D%27{f:escape-url(string(.))}%27%5D&amp;searchType=RxPath&amp;view=edit">Edit All </a>
           </td>
           <x:if test='$shownew'>
           <td>
@@ -32,6 +32,7 @@ exclude-result-prefixes="f wf a wiki rdf rdfs auth" version="1.0">
   </x:template>
   
   <x:template match="/">    
+    <x:variable name='_robots' select="wf:assign-metadata('_robots', 'nofollow,noindex')" />
     <p>
     The tables below give you access that all the resources of this site. <br/>    
     To create new resources of any type, click <a href='site:///generic-new-template'>here</a>.<br/> 

@@ -12,6 +12,8 @@
 <xsl:param name="__resource" />
 
 <xsl:template match="/">
+    <xsl:variable name='_robots' select="wf:assign-metadata('_robots', 'nofollow,noindex')" />
+    
     <div class="title">All revisions for <xsl:value-of select='$_name'/></div>
     <br />
     <form name="diff" METHOD="GET" ACTION="site:///diff-revisions" ENCTYPE="multipart/form-data">
@@ -37,8 +39,13 @@
         </tr>        
     </xsl:for-each>
     </table>
-    <input TYPE="HIDDEN" name="name" value="{$_name}" />	
-    <input TYPE="SUBMIT" name="diff"  VALUE="diff" />	
+    <input TYPE="HIDDEN" name="name" value="{$_name}" />
+    Diff:	
+    <input TYPE="SUBMIT" name="diff"  VALUE="Side By Side" />	
+    &#xa0;<input TYPE="SUBMIT" name="diff"  VALUE="Context" />	    
+    &#xa0;<label for="context">Number of context lines </label><input TYPE="text" NAME="context" VALUE="5" SIZE="1" MAXLENGTH="3" />	    
+	
+
     </form>
 </xsl:template>
 </xsl:stylesheet>

@@ -30,7 +30,7 @@ For example, this annotation:  \[Shouldn't we say more here?|wiki:comment author
 
 But if you view source of the generated HTML you'll see the text is wrapped in a ^^<span>^^ element with a ^^class^^ attribute set to "wiki:comment". 
 
-A link can have any number of annotations proceeding the page name or URL, each separated by a ";". Each annotation is treated like a line of ZML [markup|ZML] with the exception that a ";" ends the markup line instead beginning a comment and __`__ strings are not allowed. Each annotation is distinct from the others (e.g. they are not joined to create a document tree).
+A link can have any number of annotations proceeding the page name or URL, each separated by a ";". Each annotation is treated like a line of ZML [markup|ZMLMarkupRules] with the exception that a ";" ends the markup line instead beginning a comment and __`__ strings are not allowed. Technically, the annotation portion is treated as a physical line of ZML [markup|ZMLMarkupRules] -- the ";" is used in ZML markup to break a line into multiple logical lines.
 
 !Anchors
 
@@ -117,7 +117,7 @@ p'''here's
      formatting 
            preserved'''
            
-If you want to turn off markup escaping so you enter HTML or XML markup directly into the document start the quote with r''' or r""". (You can combine both prefixes, e.g. pr""".)  For more info, see [Markup Formatting Rules|ZML] or edit this page for an example.
+If you want to turn off markup escaping so you enter HTML or XML markup directly into the document start the quote with r''' or r""". (You can combine both prefixes, e.g. pr""".)  For more info, see [ZML Markup Rules] or edit this page for an example.
 
 !Character escaping
 If you want to display any of these formatting characters instead of creating the formatting precede the character with a \\ e.g. here \// is displayed instead starting italics text.
@@ -155,7 +155,7 @@ gives you the following table.  Note how you can use links also inside tables.
  | we continue the line here for readability
 
 !XML/HTML Markup 
-You can create arbitrary XML markup using ZML's markup formatting rules. Any line that starts with a "<" is treated like ZML markup that gets translated directly into XML or HTML -- see the [Markup Formatting Rules|ZML] for more information.
+You can create arbitrary XML markup using ZML's markup formatting rules. Any line that starts with a "<" is treated like ZML markup that gets translated directly into XML or HTML -- see the [ZML Markup Rules] for more information.
 
 ----
 

@@ -15,6 +15,7 @@
 <xsl:param name="_name" />
 <xsl:param name="__user" />
 <xsl:param name="action" />
+<xsl:param name="BASE_MODEL_URI" />
 <!-- todo: you can used these faults to create a template -->
 <xsl:param name="nameDefault" />
 <xsl:param name="titleDefault" />
@@ -78,30 +79,48 @@
 <xsl:param name="sharingDefault" select='$sharingDefault'/>
 <xsl:param name="minorEditDefault" select='$minorEditDefault'/>
 
+<xsl:variable name='_robots' select="wf:assign-metadata('_robots', 'nofollow,noindex')" />    
+
 <script language="JavaScript">
+<xsl:comment>
 function resizeForIframe(iframeWin, iframeId)
 {	
     var width = iframeWin.document.body.scrollWidth
     var height = iframeWin.document.body.scrollHeight
-
-    document.getElementById(iframeId).style.height=height+20;//change the height of the iframe
+    
+    document.getElementById('previewFrame').style.height=height+20;//change the height of the iframe
+    if (iframeId != 'previewFrame')
+    { //a gross little hack
+      //save.xml sets the frameid variable used by the iframe-display-handler
+      //with the new save time because save and reedit needs it so that there isn't a conflict when re-saving
+      document.getElementById("startTime").value = iframeId;
+    }
 }
 
 function OnSubmitEditForm()
 {
+  var actionField = document.getElementById("action")
+  if (actionField != null)
+     actionField.parentNode.removeChild(actionField);     
+
   if(document.editFormPressed == 'Preview')
   {
-   document.edit.action ="site:///preview";
+   document.edit.action ="site:///preview?frameid=previewFrame";
    document.edit.target ="preview";
-   var actionField = document.getElementById("action")
-   if (actionField != null)
-        actionField.parentNode.removeChild(actionField);     
   }
   else
-  if(document.editFormPressed == 'Save')
+  if(document.editFormPressed == 'Save' || document.editFormPressed == 'Save (keep editing)')
   {	
+    reedit = document.editFormPressed == 'Save (keep editing)'    
     document.edit.action ="site:///<xsl:value-of select="f:if($item,$itemname,'save')"/>";
-    document.edit.target ="_self";
+    if (reedit)
+    {    
+        //goes in preview iframe
+        document.edit.target ="preview";               
+        document.edit.action += '?_itemHandlerDisposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-short-display' 
+    }
+    else
+        document.edit.target ="_self";
 
     var newEditAction = document.getElementById("startTime").cloneNode(false)
     newEditAction.name = 'action'
@@ -111,10 +130,10 @@ function OnSubmitEditForm()
   }
   return true;
 }
+//</xsl:comment>
 </script>
 
-<form name="edit" method="POST" onSubmit="return OnSubmitEditForm();" action="site:///{f:if($item,$itemname, 'save')}" enctype="multipart/form-data">
-    <!-- <input TYPE="hidden" NAME="action" VALUE="{f:if($item,'save','creation')}" />  -->
+<form name="edit" method="POST" onSubmit="return OnSubmitEditForm();" action="site:///{f:if($item,$itemname, 'save')}" enctype="multipart/form-data">    
 	<xsl:if test='string-length($itemname) > 0'>		
 	    <input TYPE="hidden" NAME="itemname" VALUE="{$itemname}" />
 	    <xsl:variable name='title' select="wf:assign-metadata('title', concat('Editing ', $itemname))" />
@@ -227,7 +246,7 @@ function OnSubmitEditForm()
     <br/>
     <xsl:variable name='keywords'>
          <xsl:for-each select='$namedContent/wiki:about'>          
-           <xsl:value-of select='f:if(namespace-uri-from-uri(.)="http://rx4rdf.sf.net/ns/kw#",local-name-from-uri(.), name-from-uri(.))'/>
+           <xsl:value-of select='f:if(namespace-uri-from-uri(.)=concat($BASE_MODEL_URI,"kw#"),local-name-from-uri(.), name-from-uri(.))'/>
            <xsl:text> </xsl:text>
          </xsl:for-each>
     </xsl:variable>    
@@ -235,6 +254,7 @@ function OnSubmitEditForm()
     <br/>
 	<input TYPE="SUBMIT" name="preview" onClick="document.editFormPressed=this.value" VALUE="Preview" />	
     &#xa0;<input TYPE="SUBMIT" name="save" onClick="document.editFormPressed=this.value" VALUE="Save" />      
+    &#xa0;<input TYPE="SUBMIT" name="save" onClick="document.editFormPressed=this.value" VALUE="Save (keep editing)" />      
     </form>
     <iframe src='' name='preview' id='previewFrame' width='100%' height='0'/>
 
@@ -243,9 +263,9 @@ function OnSubmitEditForm()
 ----             Horizontal ruler
                  Blank line starts a new paragraph.
  text            A space at the beginning of a line continues the previous line.
-[text|ann; link] Create a hyperlink. where "link" can be either an internal 
-                 page name or an external link (e.g http://...).  
-                 Both annotation and text may be omitted.
+[text|ann; link] Create a hyperlink where "link" can be either an internal 
+                 page name or an external URL (e.g http://...) and "ann"  
+                 is an annotation. Any of these parts may be omitted.
 *                Make a bulleted list (must be in first column). Use more (**) 
                  for deeper indentations.
 1.               Make a numbered list (must be in first column). Use more (11.)
@@ -264,7 +284,7 @@ __bold__         Makes text bold.
 \                Prints the next formatting character as is. 
 '''text'''       Plain text (no formatting). Can span across lines.       
 p'''text'''      Plain text with spacing preserved. Can span across lines.
-&lt;                (In first column) Create XML markup (see <a href="site:///ZML">ZML Markup Rules</a>).
+&lt;                (In first column) Create XML markup (see <a href="site:///ZMLMarkupRules">ZML Markup Rules</a>).
 </pre>
 </xsl:template>
 </xsl:stylesheet>

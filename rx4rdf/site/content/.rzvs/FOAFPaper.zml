@@ -1,2 +1,87 @@
-(lp1
-.
+<document:
+< header:
+<  title: `Rhizome Position Paper
+<  subtitle: `1st Workshop on Friend of a Friend, Social Networking, and the Semantic Web
+<  authors:
+<    person name = 'Adam Souzis' email="asouzis@users.sf.net"
+< body:
+!Introduction
+
+There are several technical challenges to building decentralized Semantic Web-based social networks, especially if the goal is a network that enables the kind of widely accessible, autonomous, and uncoordinated activity that was crucial to the phenomenal success of the World Wide Web. An obvious example of a social network with these characteristics is the one formed today by diverse individuals independently publishing FOAF content on their HTTP servers.
+
+Rhizome\[[#7]] is an experimental, open-source application stack for developing Semantic Web applications with unique capabilities to address many of the technical challenges that arise from a network with the above characteristics. After a brief description of the Rhizome architecture, this position paper will discuss how Rhizome addresses the following challenges:
+ 
+* Managing ambiguity and inconsistency. The network we describe here is intrinsically organic and ad-hoc, with little coordination between nodes. Yet Semantic Web technologies expect a certain level of precision and consistency to be put to meaningful use. How can we reconcile this?
+* Accessibility. Compared to authoring HTML or even building XML-based web services, Semantic Web languages such as RDF and OWL are harder to understand and require specialized skills. How can we make the barriers to entry for consuming, authoring, and publishing Semantic Web content low enough for it to become ubiquitous? 
+* Querying disparate locations of RDF content. There are both social and technical reasons why the current state of the art for searching -- i.e.  centralized search engines that crawls the web looking for FOAF content -- is limited, including operational costs, centralized control, and maintaining consistency.
+
+!Architectural Overview
+
+[Rhizome architecture|rhizomearch.png]
+
+Rhizome is an application stack for building (primarily Web-based) applications. Starting from the bottom of the stack (see above figure):
+
+* __RxPath__ is a RDF data access engine that provides a deterministic mapping between the RDF abstract syntax to the XPath data model, enabling us to access external RDF data stores as a (virtual) XML DOM (Document Object Model) and to query them using a language syntactically identical to XPath 1.0\[[#2]]. Building on this are languages for transforming and updating the RDF data store that are syntactically identical to XSLT\[[#1]] and XUpdate\[[#5]] (dubbed RxSLT and RxUpdate respectively). Other XML technologies that rely on XPath can be easily adopted, such as using Schematron to validate an RDF model. Some other salient features to consider:
+** RxPath was designed to work efficiently with peer-to-peer lookup primitives, in particular the Kademlia routing algorithm\[[#6]]. This is much easier to do with a path-based (as opposed to tuple-based) query language.
+** RxPath treats a RDF context not as a one-to-one mapping with a subgraph of a RDF model, but as a collection of subgraphs composed via union and difference operators. This enables contexts to be used to simultaneously and efficiently model many different concepts, such as transactions, provenance, and application partitioning.
+
+* __Raccoon__ is a application server that uses RxPath to translate arbitrary requests (currently HTTP, XML-RPC, and command line arguments) to actions that act on a RDF store. An application for Raccoon consists of a set of RxPath rules and (optional) structural RDF statements. Responses are generated when a request matches a rule that trigger actions, e.g. invoking an RxSLT stylesheet. Actions can update the application's RDF store, in particular by "shredding" content, that is, extracting RDF statements from it. For example: shredding an RDF/XML document would consist of parsing the RDF; for an HTML document with a GRDDL\[[#4]] link, invoking the referenced XSLT script; for an MP3 file, extracting the metadata out of the embedded ID3 tag.
+
+* __Rhizome__ is a content management and delivery application built on Raccoon that exposes the entire site -- content, structure, and metadata -- as editable RDF. Rhizome uses a content management ontology that can express the relationship between content URLs and their representations across time and request contexts. Rhizome adopts the Wiki design principles\[[#3]] (open, incremental, organic, etc.) and applies them to Semantic Web content through its support for contexts and shredding and by introducing the following simple and concise languages:
+** __ZML__ is a Wiki-like text formatting language that can be syntactically transformed into arbitrary XML, enabling you to author XML documents with (nearly) the same ease as a Wiki entry.
+** __RxML__ is an alternative XML serialization for RDF that is designed for easy authoring in ZML, allowing novices to read and edit RDF metadata.
+
+!Conclusion
+
+The Rhizome architecture addresses the technical challenges listed above in the following ways:
+* Providing a data integration layer that is amenable to P2P lookup primitives enables decentralized querying. Note that it is not required that all the nodes in the network implement the Rhizome architecture to participate in querying. The combination of shredding, contexts, and the content ontology can enable Rhizome nodes to effectively cache external RDF content, so one could imagine a much smaller P2P network that acts as a distributed web service for querying.
+* Rhizome provides different technologies to make RDF more accessible for both application developers and end-users. 
+** For developers, the RxPath model allows RDF to be treated as XML documents that can manipulated using their familiar XML tool set, such as XSLT.
+** For end-users, ZML and RxML enable users without knowledge of XML or RDF to use simple and concise plain text-based languages to read and write markup and RDF. 
+:Note that each of these two sets of technologies can be used independently from each other and from the rest of the Rhizome architecture.
+* Rhizome helps manage ambiguity and inconsistency primarily in three ways:
+** Its content ontology can unambiguously describe the ambiguity of external resources.
+** Its context model is rich enough to enable contexts to model transaction history, thus providing enough information for each application to choose the appropriate level of consistency. 
+** By shredding an external resource within a context, then using the content ontology to describe exactly how and when that context was extracted from the external resource, these management techniques can be applied to RDF statements expressed in external resources, such as remote FOAF documents. 
+
+<   section 
+<    title: `References
+<    r"""<bl>            
+            <bi name="1" 
+                href="http://www.w3.org/TR/xslt" 
+                title="XSL Transformations (XSLT) Version 1.0"
+                authors="James Clark"
+                date="16 November 1999"/>
+            <bi name="2" 
+                href="http://www.w3.org/TR/xpath" 
+                title="XML Path Language (XPath) Version 1.0"
+                authors="James Clark, Steve DeRose"
+                date="16 November 1999"/>
+            <bi name="3" 
+                href="http://c2.com/cgi/wiki?WikiDesignPrinciples" 
+                title="Wiki Design Principles"
+                authors="Ward Cunningham"
+                />                
+            <bi name="4" 
+                href="http://www.w3.org/TR/grddl" 
+                title="Gleaning Resource Descriptions from Dialects of Languages (GRDDL)"
+                authors="Dominique Hazael-Massieux, Dan Connolly "
+                date="13 April 2004"/>                
+            <bi name="5" 
+                href="http://www.xmldb.org/xupdate/xupdate-wd.html" 
+                title="XUpdate - XML Update Language"
+                authors="Andreas Laux, Lars Martin"
+                date="14 September 2000"/>
+            <bi name="6"
+                href="http://www.scs.cs.nyu.edu/~petar/kpos_iptps.pdf"
+                title="Kademlia: A peer-to-peer information system based on the xor metric" 
+                authors="P. Maymounkov and D. Mazieres"
+                date="March 2002"/>
+            <bi name="7"
+                href="http://rx4rdf.sourceforge.net"
+                title="http://rx4rdf.sourceforge.net" 
+                authors="Adam Souzis"
+            />                                
+         </bl>
+"""   
+

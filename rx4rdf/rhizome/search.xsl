@@ -80,7 +80,7 @@ function resizeForIframe(iframeWin, iframeId)
      ( 
      <xsl:for-each select='wiki:about'>
        <a href='site:///keywords/{local-name-from-uri(.)}?about={f:escape-url(.)}' >
-       <xsl:value-of select='f:if(namespace-uri-from-uri(.)="http://rx4rdf.sf.net/ns/kw#",local-name-from-uri(.), name-from-uri(.))'/>
+       <xsl:value-of select='f:if(namespace-uri-from-uri(.)=concat($BASE_MODEL_URI,"kw#"),local-name-from-uri(.), name-from-uri(.))'/>
        </a>&#xa0;
      </xsl:for-each>
      )
@@ -234,7 +234,7 @@ No results found.
     <td><a href="site:///{$relUrl}&amp;action=edit" title='edit'><img border="0" alt='edit' src='site:///edit-icon.png' /></a></td>
     <td><a href="site:///{$relUrl}" ><xsl:value-of select='$resName' /></a></td>    
     <xsl:if test='$long-table'>
-    <td><xsl:value-of select='f:pytime-to-exslt( (./wiki:revisions/*/rdf:first/*)[last()]/a:created-on)' /></td>
+    <td><xsl:value-of select='wf:format-pytime( (./wiki:revisions/*/rdf:first/*)[last()]/a:created-on, "%a, %d %b %Y %H:%M")' /></td>
     <td>
         <xsl:choose>
          <xsl:when test="(./wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by/*[wiki:login-name = 'guest']
@@ -288,8 +288,8 @@ No results found.
 No results found.
 </xsl:if>
 <br/>
-<!-- site-template.xsl uses $rsslink -->
-<a href='{wf:assign-metadata("rsslink", concat($_base-url,"search?view=rss&amp;search=", f:escape-url($search)) )}' type="application/rss+xml">
+<!-- site-template.xsl uses $_rsslink -->
+<a href='{wf:assign-metadata("_rsslink", concat($_base-url,"search?view=rss&amp;search=", f:escape-url($search)) )}' type="application/rss+xml">
   <img border='0' src='site:///rss.png' alt='RSS .91 of this search'/></a>
       </xsl:otherwise>
       </xsl:choose> 

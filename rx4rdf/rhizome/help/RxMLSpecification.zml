@@ -1,13 +1,13 @@
 <document:
 < header:
-<  title: `RxML
+<  title: `RxML 1.0
 <  authors:
 <    person name = 'Adam Souzis' email="asouzis@users.sf.net"
 <    abstract:
-An informal but comprehensive description of [RxML], an alternative XML serialization for [RDF] that is designed for easy and simple authoring, particularly in conjunction with [ZML].
+An informal but comprehensive description of [RxML], an alternative XML serialization for [rx4rdf:RDF] that is designed for easy and simple authoring, particularly in conjunction with [ZML].
 < body:
 !Introduction
-[RxML] is an alternative XML serialization for [RDF] that is designed for easy and simple authoring, particularly in conjunction with [ZML].
+[RxML] is an alternative XML serialization for [rx4rdf:RDF] that is designed for easy and simple authoring, particularly in conjunction with [ZML]. This document is intended as an informal but comprehensive description of RxML. [ZML] is alternative syntax for XML, enabling us to specify RxML in terms of XML, even though RxML is designed to be expressed as ZML.
 
 The structure of a RxML docment is simple: each child of the root ^^rx^^ element represent a resource.  Each child element of the resource element specifies a name-value pair that applies to the resource.  Together the resource and name-value pair form a RDF statement.
 
@@ -74,11 +74,11 @@ Technical note: if the RxML document is encoded in XML and it contains ^^rx:pref
 
 !^^rx:resource^^
 
-Sometimes it is not convenient to map an URL to an element name.  In that case, you can use ^^rx:resource^^, which has an ^^id^^ attribute whose value is the URI reference of the resource. For example, in the example above the ^^<mysite:page1.html>^^ element could haven been replaced with: ^^<resource id="http://example.org/mysite/page1.html">^^. If the ^^id^^ attribute is missing or has an empty value, the resource is treated as a [blank node|http://www.w3.org/TR/2003/WD-rdf-concepts/#section-blank-nodes]. 
+Sometimes it is not convenient to map an URL to an element name.  In that case, you can use ^^rx:resource^^, which has an ^^id^^ attribute whose value is the URI reference of the resource. For example, in the example above the ^^<mysite:page1.html>^^ element could haven been replaced with: ^^<resource id="http://example.org/mysite/page1.html">^^. If the ^^id^^ attribute is missing or has an empty value, the resource is treated as a [blank node|http://www.w3.org/TR/2003/WD-rdf-concepts/#section-blank-nodes]. Note that in ZML expanded form of a QName can be written directly as a URI wrapped in "{}", so this form is not needed when expressing RxML in ZML; for example, the above example can be replaced with ^^{http://example.org/mysite/page1.html}^^.
 
 !Literal elements
 
-If the child of a property element is an element named "rx:xml" the value of the property is the XML contained in that ^^rx:xml^^ element (and, in RDF terms, is treated an XML literal). If the child of a property element is an element named "rx:l" the value of the property is the literal text contained in that ^^rx:l^^ element. A ^^rx:l^^ element can only contain text, but may have two option attributes: the ^^xml:lang^^ attribute whose value declares the language of the literal, and ^^rdf:datatype^^ whose value is a [datatype|http://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-datatyped-literals] URI reference that declares the datatype of the literal.
+If the child of a property element is an element named "rx:xml" the value of the property is the XML contained in that ^^rx:xml^^ element (and, in RDF terms, is treated as an XML literal). If the child of a property element is an element named "rx:l" the value of the property is the literal text contained in that ^^rx:l^^ element. A ^^rx:l^^ element can only contain text, but may have two optional attributes: the ^^xml:lang^^ attribute whose value declares the language of the literal, and ^^rdf:datatype^^ whose value is a [datatype|http://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-datatyped-literals] URI reference that declares the datatype of the literal.
 
 !Lists 
 
@@ -146,43 +146,38 @@ rx:
      a: wiki:Item
 </source>'''
 
-
-!^^rx:query^^
-
-Finally, RxML provides an element that allows a set of properties to be applied to several resources at once: the ^^rx:query^^ element. The element can appear as a child of the root ^^rx^^ element and behaves like a ^^rx:resource^^ element, except that instead of an ^^id^^ attribute, it must have a ^^select^^ attribute whose value is an [RxPath|rx4rdf:RxPath] expression that must return a nodeset of zero or more resource elements. The property children of the ^^rx:query^^ are applied to each resource referenced by the selected nodeset. It is an error if a ^^rx:stmtID^^ appears on a property element that is a child of a rx:query element (because that property element is actually creating multiple RDF statements, one for each resource). 
-
-A RxML processor that does not support RxPath is not required to support the ^^rx:query^^ element.
-
 !Advanced example. 
 Below is an example written in [ZML] that demonstrates all the features of RxML.
 
 '''\<source>
 rx:
  prefixes:
-     arch: `http://rx4rdf.sf.net/ns/archive#
      wiki: `http://rx4rdf.sf.net/ns/wiki#
      bnode: `bnode:
+     #note: not necessary since default-ns defaults to this
      default-ns: `http://rx4rdf.sf.net/ns/rxml#
-     rdf: `http://www.w3.org/1999/02/22-rdf-syntax-ns#
 
- bnode:blankNode1: ;a comment
-     a: a:NamedContent
-     arch:last-modified: `1062022787.468
-     wiki:name stmtID='http://rx4rdf.sf.net/ns/archive#': `RxML
-     wiki:revisions listType='rdf:Bag': 
-         bnode:x87d0723b-fad6-488a-abcb-04b1d9323368_195
-         l xml:lang=en: `some text
+ bnode:blankNode1: 
+     a: wiki:NamedContent
+     wiki:last-modified:
+       #by placing a literal value inside a "l" element
+       #you can declare a datatype or xml:lang for it
+       l rdf:datatype="http://www.w3.org/2001/XMLSchema#integer": 
+         "1062022787"
+     
+     #stmtID is equivalent to "rdf:ID"
+     wiki:name stmtID='http://rx4rdf.sf.net/ns/archive#': `foo
+     
+     #properties with multiple values are treated as lists
+     #the list and listType attributes are optional
+     wiki:revisions listType='rdf:Bag' list="bnode:list57":          
+         {http://example.org/mysite/page1.html}
+         l xml:lang=en: `some text in english
+         #the property value is the markup inside the "xml" 
          xml:
            html:
              body:
                r"some <b>xml</b> content"
-         resource id='http://asdfasdf'
- 
- ; child properties are applied to each node in
- ; the nodeset returned by the xpath expression
- query select='\*': 
-     prop1:dsa:
-      bnode:blankNode1
 \</source>
 '''
 

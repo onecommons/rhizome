@@ -10,36 +10,36 @@
         xmlns:response-header="http://rx4rdf.sf.net/ns/raccoon/http-response-header#"   
         exclude-result-prefixes = "f a wiki rdf previous wf response-header error" 
         >
-    <xsl:param name="previous:action" />
-    <xsl:param name="previous:itemname" />
     <xsl:param name="error:userMsg" />
     <xsl:param name="error:name" />
     <xsl:param name="error:message" />
     <xsl:param name="error:details" />
-    <xsl:param name="previous:about" />
-    <xsl:param name="previous:redirect" />
     <xsl:param name="_previousContext" />
     
 <xsl:template match="/">  
+    <xsl:variable name='_robots' select="wf:assign-metadata('_robots', 'nofollow,noindex')" />
     <!-- use the same item template as the page that contained the error; 
       if $_disposition has not have been set yet, get the wiki:item-disposition 
-      Hack: if the disposition is handler than use entry instead
+      Hack: if the disposition is handler than use $_itemHandlerDisposition or entry instead
     -->
     <xsl:variable name='dispStep1' select="f:if(wf:has-metadata('_disposition'), 
         wf:get-metadata('_disposition'), $_previousContext/wiki:item-disposition/*)" />       
     <xsl:variable name='_disposition' select="wf:assign-metadata('_disposition', 
         f:if($dispStep1 = 'http://rx4rdf.sf.net/ns/wiki#item-disposition-handler', 
-        /*[.='http://rx4rdf.sf.net/ns/wiki#item-disposition-entry'], $dispStep1))" />       
+        /*[.=wf:get-metadata('previous:_itemHandlerDisposition', 
+             'http://rx4rdf.sf.net/ns/wiki#item-disposition-entry')], $dispStep1))" />       
 
     <div class='message'>
     <xsl:choose>    
     <xsl:when test='$error:userMsg'>        
-    <!--hmm, why did the replace stop working? -->
+    <!--todo: hmm, why did the replace stop working? -->
     <b><pre>Error: <xsl:value-of disable-output-escaping='yes' 
         select="f:replace('\n','&lt;br />', f:escape-xml($error:userMsg))"/>
     </pre></b>
     </xsl:when>
     <xsl:otherwise>    
+    <!-- set 500 internal server error -->
+    <xsl:variable name='status500' select="wf:assign-metadata('response-header:status', 500)" />
     <p>
     Unexpected Error 
     <br/>

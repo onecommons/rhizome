@@ -24,7 +24,8 @@
     <xsl:param name="previous:itemname" />
     <xsl:param name="previous:search" />				
     <xsl:param name="previous:searchType" />				
-    <xsl:param name='previous:rsslink'/>
+    <xsl:param name='previous:_rsslink'/>
+    <xsl:param name="previous:_robots" />
     <xsl:param name="previous:action" />
     
     <xsl:output method='html' indent='no' />
@@ -72,8 +73,11 @@
 <xsl:if test="wf:file-exists('favicon.ico')"> <!-- performance hack (assumes favicon.ico is external) -->
   <link rel="icon" href="site:///favicon.ico" />
 </xsl:if>
-<xsl:if test="$previous:rsslink"> 
-  <link rel="alternate" type="application/rss+xml" title="RSS" href="{$previous:rsslink}" />
+<xsl:if test="$previous:_rsslink"> 
+  <link rel="alternate" type="application/rss+xml" title="RSS" href="{$previous:_rsslink}" />
+</xsl:if>
+<xsl:if test="$previous:_robots"> 
+  <meta name="robots" content="{$previous:_robots}" />
 </xsl:if>
 </head>
 <body id="bd">
@@ -163,7 +167,7 @@ Or <a href="site:///users/guest?action=new">signup</a>
 <p>
 <div style='float: right'>
     <a href="site:///edit">New</a>
-    &#xa0;<a href="site:///search?search=%2F*%5Bwiki%3Aname%5D&amp;searchType=RxPath&amp;view=list&amp;title=All%20Pages">List</a>
+    &#xa0;<a href="site:///keyword-browser">Browse</a>
     &#xa0;<a href="site:///search?search=wf%3Asort%28%2Fa%3ANamedContent%2C%27%28wiki%3Arevisions%2F*%2Frdf%3Afirst%2F*%29%5Blast%28%29%5D%2Fa%3Acreated-on%27%2C%27number%27%2C%27descending%27%29&amp;searchType=RxPath&amp;view=list&amp;title=Recently%20Changed%20Pages">Recent</a>
     &#xa0;<a href="site:///administration">Admin</a>
     &#xa0;<a href="site:///help">Help</a>
@@ -175,6 +179,7 @@ Or <a href="site:///users/guest?action=new">signup</a>
 &#xa0;<a href="site:///{$path}?action=showrevisions">Revisions</a>
 &#xa0;<a href="site:///{$path}?action=view-metadata{$aboutparam}">Metadata</a>
 &#xa0;<a href="site:///{$path}?action=confirm-delete{$aboutparam}">Delete</a>
+&#xa0;<a href="site:///{$path}?action=view-source{$aboutparam}">Source</a>
 &#xa0;<a href="site:///{$path}?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-print{$aboutparam}">Print</a>
 </p>
 <p>       

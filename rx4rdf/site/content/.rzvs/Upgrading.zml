@@ -1,0 +1,32 @@
+!Upgrading to Rhizome version 0.4
+
+Migrating an existing instance of Rhizome to the latest version involves exporting 
+and re-importing the site as described in the [Rhizome manual|RhizomeDoc]. 
+If you have non-page resources you want to keep, you need to manually re-add them.
+The easiest way to do that is search for them using the "Edit" view, save the resulting 
+RxML to a file and re-add them using either the [generic-new-template] page or by 
+including it in your application's config script using the ^^\__addRxML\__^^ directive.
+Alternatively, you can copy the statements from the old ^^wikistore.nt^^ or the transaction log 
+and include them using the ^^\__addTriples\__^^ directive in your config file. 
+
+The following list details changes between 0.4 and 0.3 that may require changes to existing 
+
+*RxML now uses "bnode:" instead of "http://4suite.org/anonymous" as the URI prefix 
+ to represent anonymous (blank) nodes. Any existing RxML files should be updated to reflect this.
+*The ZML syntax has changed: "#" is now the comment character instead of ";" and numbered lists are now created using "1." instead of "#". 
+ You can upgrade existing ZML (and RxML) files using the -u (or --upgrade) option of the ZML command line tool. 
+ It will make a copy of the specified file with the latest ZML syntax. (The file spec can contain wild cards.)
+*The default PATH created by Rhizome has changed: Instead of putting the current directory that the 
+ Rhizome instance was launched from on the path, it uses the ALT_SAVE directory (by default "content").
+ Thus any files that relied on being on the PATH (e.g. external static files) 
+ should be moved to the ALT_SAVE directory.
+*The "index" and "sidebar" pages now reference "index.zml" and "sidebar.zml" respectively, instead of "index.txt" and "sidebar.txt".
+ If you placed your own version of those files on the PATH, you will need to rename them.
+* Rhizome now uses the [FOAF|http://www.foaf-project.org] schema for representing users. To migrate existing users requires a few resources to be changed to the FOAF equivalent:
+ ~~wiki:User => foaf:Person
+ ~~wiki:fullname => foaf:name
+ ~~wiki:email => foaf:mbox (and turn the email literal into a <mailto:> URI)
+ ~~This script does this:
+ ~~^^sed 's/rx4rdf.sf.net\/ns\/wiki#User/xmlns.com\/foaf\/0.1\/Person/g' wikistore.nt^^ 
+ ~~^^sed 's/rx4rdf.sf.net\/ns\/wiki#fullname/xmlns.com\/foaf\/0.1\/name/g' wikistore.nt^^ 
+ ~~^^sed 's/rx4rdf.sf.net\/ns\/wiki#email> "\(.*\)"/xmlns.com\/foaf\/0.1\/mbox> <mailto:\1>/g' wikistore.nt^^ 

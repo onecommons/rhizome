@@ -1,0 +1,71 @@
+<div>
+RxML enables you to list the properties that an URL has, in a manner that conforms with <a href='http://rx4rdf.liminlzone.org/RDF'>RDF</a>. 
+Complete documentation is <a href="site:///RxMLSpecification">here</a>.
+
+This example illustrates its basic pattern:
+<pre>
+{http://example.org/mysite/page1.html}
+   {http://purl.org/dc/elements/1.1/creator}: {mailto:alice@example.org}
+   {http://purl.org/dc/elements/1.1/title}: "The first Page"
+</pre>
+
+<ul>
+<li>This example describes the "creator" and "title" properties for "http://example.org/mysite/page1.html".</li>
+<li>URLs must appear inside { and }, literal values in quotes. See <a href='site:///ZMLMarkupRules'>ZML markup rules</a> for more info.</li>
+<li>In RDF, property names are always URLs, even though they don't point to anything. </li>
+<li>Property values can be either an URL or a literal value.
+</li>
+</ul>
+You can abbreviate URLs by declaring prefixes. Here's an expanded version of the above example, include the use of prefixes:
+<pre>
+prefixes: 
+    dc: "http://purl.org/dc/elements/1.1/"
+    mysite: "http://example.org/mysite/"
+
+mysite:page1.html
+  a: {http://purl.org/dc/dcmitype/Text}
+  dc:creator: {bnode:alice}
+  dc:title: "The first Page"
+
+{bnode:alice}
+  {http://xmlns.com/foaf/0.1/mbox}: {mailto:example.org}
+</pre>
+
+This example also illustrates:
+<ul>
+<li>the <tt>a</tt> element, which declares what type of resource the URL is (<tt>a</tt> is a synonym for <tt>rdf:type</tt>).</li>
+<li>Internal Resources:  URLs that start with "bnode:" represent internal, "anonymous" resources.</li>
+</ul>
+
+Finally, an advanced example, showing all the possible elements and attributes of RxML:
+<pre>
+ #this is a comment
+ prefixes:
+     wiki: `http://rx4rdf.sf.net/ns/wiki#
+     bnode: `bnode:
+     #note: not necessary since default-ns defaults to this
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+
+ bnode:blankNode1: 
+     a: wiki:NamedContent
+     wiki:last-modified:
+       #by placing a literal value inside a "l" element
+       #you can declare a datatype or xml:lang for it
+       l rdf:datatype="http://www.w3.org/2001/XMLSchema#integer": 
+         "1062022787"
+     
+     #stmtID is equivalent to "rdf:ID"
+     wiki:name stmtID='http://rx4rdf.sf.net/ns/archive#': `foo
+     
+     #properties with multiple values are treated as lists
+     #the list and listType attributes are optional
+     wiki:revisions listType='rdf:Bag' list="bnode:list57":          
+         {http://example.org/mysite/page1.html}
+         l xml:lang=en: `some text in english
+         #the property value is the markup inside the "xml" 
+         xml:
+           html:
+             body:
+               r"some &lt;b>xml&lt;/b> content"
+</pre>
+</div>

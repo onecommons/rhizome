@@ -21,7 +21,7 @@
   #e.g. if the folder is a child of another folder you must include parent path
   #in the name. Also the parent folder must be linked to this folder using the 
   #wiki:has-child property (again, this happens automatically when you create a page)
-  wiki:name `full\path
+  wiki:name `full/path
   
   #these are created automatically when you create a page in this folder
   #wiki:has-child: base:aPage

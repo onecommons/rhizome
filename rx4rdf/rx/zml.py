@@ -416,10 +416,10 @@ def tokenize_loop(readline, tokeneater, useFreestr = True, counter = None):
                     if initial == NEWSTMTCHAR:
                         spos = pos
                         countIndention = False
-                        while pos < max and (line[pos].isspace() or line[pos] == '<'):
-                            pos += 1                            
+                        while pos < max and (line[pos].isspace() or line[pos] == '<'):                            
                             if line[pos] == '<': #only measure the whitespace if it has a '<'
                                 countIndention = True
+                            pos += 1                            
                         if countIndention:
                             icolumn = column + (pos - spos)
                         else:

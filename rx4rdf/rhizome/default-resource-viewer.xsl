@@ -13,10 +13,12 @@
 <xsl:output omit-xml-declaration='yes' indent='no' />
 <xsl:param name="__resource" />
 <xsl:param name="_name" />
+<xsl:param name="BASE_MODEL_URI" />
 
 <xsl:template match="/" >
 <!-- this page is always html, not the content's mimetype -->
 <xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />
+<xsl:variable name='_robots' select="wf:assign-metadata('_robots', 'nofollow,noindex')" />
 
 <!-- note: the same template is used in search.xsl for the rxml output -->
 <a href="site:///{$_name}?action=edit-metadata&amp;about={f:escape-url($__resource)}">Edit Metadata</a>
@@ -27,7 +29,7 @@
  Keywords:&#xa0; 
  <xsl:for-each select='$__resource/wiki:about'>
    <a href='site:///keywords/{local-name-from-uri(.)}?about={f:escape-url(.)}' >
-   <xsl:value-of select='f:if(namespace-uri-from-uri(.)="http://rx4rdf.sf.net/ns/kw#",local-name-from-uri(.), name-from-uri(.))'/>
+   <xsl:value-of select='f:if(namespace-uri-from-uri(.)=concat($BASE_MODEL_URI,"kw#"),local-name-from-uri(.), name-from-uri(.))'/>
    </a>&#xa0;
  </xsl:for-each>
  <hr />
@@ -40,5 +42,6 @@
                
     <xsl:value-of disable-output-escaping='yes' select="wf:get-rdf-as-rxml($__resource, '', $fixup, $fixupPredicate)" />
 </pre>
+
 </xsl:template>
 </xsl:stylesheet>

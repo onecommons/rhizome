@@ -21,13 +21,14 @@ x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
                string($__resource), "")'''
     x:param name=maxResources select='1'
     x:param name='summary'
+    x:param name="BASE_MODEL_URI"
     
     x:template name='resource-row'
        x:variable name=othertopics select='./wiki:about[not(.=$topicList)]' 
        
        tr: 
         td: 
-          a href='site:///.?about={.}'
+          a href='site:///{wiki:name}?about={.}'
            # choose the best name for the resource using this order: title, non-anonymous name, auto-summary, rdfs:label, name-from-uri
            x:variable name=pagename select='''f:if( (./wiki:revisions/*/rdf:first/*)[last()]/wiki:title, 
                 (./wiki:revisions/*/rdf:first/*)[last()]/wiki:title,
@@ -40,11 +41,26 @@ x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
            ' ('
            x:for-each select='$othertopics'
             a href="site:///keyword-browser?disjunction=[wiki:about='{f:escape-url(.)}']&topics={f:escape-url(.)}&summary={$summary}" 
-             x:value-of select='f:if(namespace-uri-from-uri(.)="http://rx4rdf.sf.net/ns/kw#",local-name-from-uri(.), name-from-uri(.))'
+             x:value-of select='f:if(namespace-uri-from-uri(.)=concat($BASE_MODEL_URI,"kw#"),local-name-from-uri(.), name-from-uri(.))'
              ' '              
            ')'
+
+    x:template name=make-resource-table
+      x:param name='resources'                
+      x:choose:
+        x:when test='$summary'           
+          x:call-template name=add-summary-javascript    
+          br
+          div id='fixeddiv':
+            x:for-each select='$resources'            
+             x:call-template name='make-summary'            
+        x:otherwise             
+         table 
+          x:for-each select='$resources'
+            x:call-template name='resource-row'
             
     x:template match='/'
+        x:variable name='_robots' select="wf:assign-metadata('_robots', 'nofollow,noindex')"               
         x:variable name=topicList select="wf:split($topics, '\\')"
         
         x:if test='$topicList'
@@ -53,7 +69,7 @@ x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
           x:for-each select='$topicList'                
             a href="site:///keyword-browser?disjunction=[wiki:about='{f:escape-url(.)}']&topics={f:escape-url(.)}&summary={$summary}" 
               i: 
-                x:value-of select='f:if(namespace-uri-from-uri(.)="http://rx4rdf.sf.net/ns/kw#",local-name-from-uri(.), name-from-uri(.))'
+                x:value-of select='f:if(namespace-uri-from-uri(.)=concat($BASE_MODEL_URI,"kw#"),local-name-from-uri(.), name-from-uri(.))'
             x:text: '\&#xa0;'                
             
         #find all the resources that have each of these topics
@@ -72,7 +88,7 @@ x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
                 td: 
                  a href='''site:///keyword-browser?disjunction={f:escape-url($disjunction)}[wiki:about='{
                         f:escape-url(current() )}']&topics={f:escape-url(f:join($topicList | current(), '\\'))}&summary={$summary}'''
-                  x:value-of select='f:if(namespace-uri-from-uri(.)="http://rx4rdf.sf.net/ns/kw#",local-name-from-uri(.), name-from-uri(.))'                          
+                  x:value-of select='f:if(namespace-uri-from-uri(.)=concat($BASE_MODEL_URI,"kw#"),local-name-from-uri(.), name-from-uri(.))'                          
                  ' (' 
                  x:value-of select='$count'
                  ')'
@@ -100,18 +116,18 @@ x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
            `All resources with these keywords (
            x:value-of select='count($resWithTopics)'
            ` )
-          x:choose:
-            x:when test='$summary'           
-              x:call-template name=add-summary-javascript    
-              br
-              div id='fixeddiv':
-                x:for-each select='$resWithTopics'            
-                 x:call-template name='make-summary'            
-            x:otherwise             
-             table 
-              x:for-each select='$resWithTopics'
-                x:call-template name='resource-row'
+          x:call-template name=make-resource-table
+            x:with-param name='resources' select='$resWithTopics'
 
+        x:if test='not($topics)'
+          x:variable name='nokeywords' select='/a:NamedContent[not(wiki:about)]'
+          h4:
+           `All pages with no keywords (
+           x:value-of select='count($nokeywords)'
+           ` )
+          x:call-template name=make-resource-table
+            x:with-param name='resources' select='$nokeywords'
+                
         x:choose:
           x:when test='$summary'                     
            hr

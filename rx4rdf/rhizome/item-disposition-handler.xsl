@@ -14,6 +14,7 @@
     <xsl:param name="previous:error" />
     <xsl:param name="previous:about" />
     <xsl:param name="previous:redirect" />
+    <xsl:param name="previous:_itemHandlerDisposition" />
     <xsl:param name="_contents" />		
 <xsl:template match="/">  
     <div class='message'>
@@ -22,7 +23,9 @@
     Error <b><xsl:value-of select='$previous:error'/></b> 
     </xsl:when>
     <xsl:when test='$previous:redirect'>
-    <xsl:variable name='_disposition' select="wf:assign-metadata('_disposition', /*[.='http://rx4rdf.sf.net/ns/wiki#item-disposition-complete'])" />       
+    <!-- allow handler page to redirect to another page-->
+    <xsl:variable name='_dispositionDisposition' 
+      select="wf:assign-metadata('_dispositionDisposition', /*[.='http://rx4rdf.sf.net/ns/wiki#item-disposition-complete'])" />       
     <xsl:variable name="dummy2" select="wf:assign-metadata('response-header:status', 302)"/>
     <xsl:variable name="dummy3" select="wf:assign-metadata('response-header:Location', $previous:redirect)"/>You should be redirected shortly...    
     </xsl:when>
@@ -40,5 +43,11 @@
     </xsl:otherwise>
     </xsl:choose>    
     </div>
+
+    <!-- hack! add a parameter so we can override this item handler disposition (which is normally entry) -->
+    <xsl:if test="$previous:_itemHandlerDisposition" >
+      <xsl:variable name='_dispositionDisposition' 
+         select="wf:assign-metadata('_dispositionDisposition', /*[.=$previous:_itemHandlerDisposition])" />       
+    </xsl:if>     
 </xsl:template>
 </xsl:stylesheet>

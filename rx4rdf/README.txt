@@ -1,8 +1,8 @@
                             README
 
                          Rx4RDF and Rhizome
-                         Version 0.3.1
-                         Aug XX, 2004
+                         Version 0.4
+                         Aug 30, 2004
  
   Introduction
   ------------
@@ -21,9 +21,14 @@
   
   What's new in this release?
   ---------------------------  
-  TODO XXX 
-  
-  For a listing of all the major changes see changelog.txt for more details.
+  Rhizome gains full-text indexing, browsing and grouping by keyword, 
+  summary views, better support for RDF/XML, diffing of revisions, and 
+  several usability enhancements. Raccoon gets several improvements to 
+  performance, security, and error handling. RxML and ZML syntax has been 
+  made more user-friendly with simpler syntax and better documentation.
+
+    
+  For a list of all major changes see docs/changelog.txt for more details.
 
   Known (major) bugs
   ----------
@@ -48,15 +53,18 @@
     revision of a file will overwrite the initial version. Instead import 
     file into the directory specified by SAVE_DIR (the default is 
     "content/.rzvs").
-  * doesn't handle unicode pages properly  
-      
+  * doesn't save or display pages in non-ASCII encodings properly.
+  * deleting a page doesn't delete a file or remove its contents from the index.
+  * When searching, the RxML and Edit views only support queries that evaluate 
+    to a resource list (as opposed to a list of statement predicates, for example).
+        
   Requirements
   ------------
     
   Rx4RDF requires Python 2.2 or later (2.3 recommended) and 4Suite 1.0a1 
   or later (http://4Suite.org).
    
-  Rx4RDF and Rhizome are known to run on Linux and Windows 2000  
+  Rx4RDF and Rhizome are known to run on Linux and Windows 2000/XP  
   and should work on any platform that supports Python and 4Suite.
   
   Optional Packages:
@@ -82,11 +90,13 @@
   2. Run python <unzip dir>/setup.py install     
   
   docs/Download contains a quick start guide.
+  
+  docs/Upgrading contains notes on upgrading from the previous version.
 
   Documentation
   -------------
   
-  The /docs directory is contains a static export of the Rx4RDF site.
+  The /docs directory contains a static export of the Rx4RDF site.
   Alternatively, you can visit http://rx4rdf.sf.net for the latest content 
   or run the local copy of the site found in the /site directory:
   

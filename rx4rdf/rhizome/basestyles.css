@@ -136,7 +136,8 @@ h2 { font-size: 130%; }
 }
 
 /* for diff-revisions */  
-   #difflib_chg_to_top th, #difflib_chg_to_top td
+   table.diff {font-family:Courier; border:medium;}
+   #difflib_chg_to0__top th, #difflib_chg_to0__top td
      { border: 0; border-spacing: 0px; padding: 0; font-size: smaller; }  
   .diff_header {background-color:#e0e0e0}
   td.diff_header {text-align:right; border:0}

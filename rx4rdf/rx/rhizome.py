@@ -167,7 +167,7 @@ class Rhizome(object):
     'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt' : 'rxsl',
     'http://rx4rdf.sf.net/ns/wiki#item-format-zml' : 'zml',
     'http://rx4rdf.sf.net/ns/wiki#item-format-text': 'txt',
-    'http://rx4rdf.sf.net/ns/wiki#item-format-xml':'xml',
+    'http://rx4rdf.sf.net/ns/wiki#item-format-xml':'xml',    
     'http://rx4rdf.sf.net/ns/content#pydiff-patch-transform':'pkl'
     }
 
@@ -193,8 +193,12 @@ class Rhizome(object):
         
         initConstants( ['MAX_MODEL_LITERAL'], -1)        
         self.SAVE_DIR = os.path.abspath( kw.get('SAVE_DIR', 'content/.rzvs') )
-        self.ALTSAVE_DIR = os.path.abspath( kw.get('ALTSAVE_DIR', 'content') )
-
+        altsaveSetting = kw.get('ALTSAVE_DIR', 'content')
+        if altsaveSetting:
+            self.ALTSAVE_DIR = os.path.abspath( altsaveSetting )
+        else:
+            self.ALTSAVE_DIR = ''
+            
         if not kw.has_key('PATH'):
             #set the path to be ALT_SAVE_DIR followed by the directory
             #that rhizome-config.py lives in (i.e. probably 'rhizome')
@@ -205,8 +209,10 @@ class Rhizome(object):
                 self.server.PATH = self.ALTSAVE_DIR + os.pathsep + self.server.PATH
         log.debug('path is %s' % self.server.PATH)
         if self.MAX_MODEL_LITERAL > -1:
-            assert [prefix for prefix in self.server.PATH
-                if self.ALTSAVE_DIR.startswith(os.path.abspath(prefix)) ], 'ALT_SAVE_DIR must be on the PATH'
+            if self.ALTSAVE_DIR:
+                assert [prefix for prefix in self.server.PATH
+                 if self.ALTSAVE_DIR.startswith(os.path.abspath(prefix)) ],\
+                    'ALT_SAVE_DIR must be on the PATH'
                 
             #SAVE_DIR should be a sub-dir of one of the PATH
             #directories so that 'path:' URLs to files there include
@@ -559,6 +565,7 @@ Their value can be either an URI or a QName.
                       '.xsl' : 'http://www.w3.org/1999/XSL/Transform',
                       '.rxsl' : 'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt',
                       '.py' : 'http://rx4rdf.sf.net/ns/wiki#item-format-python',
+                      '.html':'http://rx4rdf.sf.net/ns/wiki#item-format-xml',
                       }
                       ext = os.path.splitext(path)[1]
                       format = exts.get(ext)
@@ -897,7 +904,8 @@ Options:
     def saveContents(self, context, wikiname, format, contents, revisionCount,
                      indexURI=None, title='', previousContentURI='',
                      previousRevisionDigest=''):
-        filename = wikiname
+        #only keep file system friendly characters
+        filename = filter(lambda c: c.isalnum() or c in '_-./', str(wikiname))
         if filename.find('.') == -1 and self.exts.get(format):
             filename += '.' + self.exts[format]
         
@@ -1150,15 +1158,20 @@ Options:
             parent = folder
         return rootFolder, folder
 
-    def addItemTuple(self, name, **kw):
-        return (name, self.addItem(name, **kw))
+    def _addItemTuple(self, name, keywords=None,
+                        accessTokens=['base:save-only-token'], **kw):
+        keywordlist=['built-in']
+        if keywords:
+           keywordlist.extend(keywords)
+        return (name, self.addItem(name, keywords=keywordlist,
+                                   accessTokens=accessTokens, **kw))
 
     def addItem(self, name, loc=None, contents=None, disposition = 'complete', 
                 format='binary', doctype='', handlesDoctype='', handlesDisposition='',
                 title=None, label='http://rx4rdf.sf.net/ns/wiki#label-released',
                 handlesAction=None, actionType='http://rx4rdf.sf.net/ns/archive#NamedContent',
                 baseURI=None, owner='http://rx4rdf.sf.net/site/users/admin',
-                accessTokens=None, authorizationGroup='',
+                accessTokens=None, authorizationGroup='', keywords=None,
                 contentLength = None, digest = None):
         '''
         Convenience function for adding an item the model. Returns a string of triples.
@@ -1246,7 +1259,10 @@ Options:
         itembNode['a:created-on'] = "1057919732.750"
         if disposition:
             itembNode['wiki:item-disposition'] = Res(kw2uri(disposition, 'wiki:item-disposition-'))
-        
+
+        if keywords:
+            nameUriRef['wiki:about'] = [Res(kw2uri(x,'wiki:')) for x in keywords]
+            
         if rootFolder:
             return rootFolder.toTriplesDeep()
         else:

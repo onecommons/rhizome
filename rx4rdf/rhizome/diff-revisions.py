@@ -12,24 +12,30 @@ def makeDiff(fromlines, tolines,label1, label2, context, fullpage):
     from rx.htmldiff import HtmlDiff
             
     if fromlines != tolines:
-        htmlDiff = HtmlDiff()        
+        HtmlDiff._default_prefix = 0
+        htmlDiff = HtmlDiff(wrapcolumn=60)                
         if fullpage:
             return htmlDiff.make_file(fromlines,tolines, label1, label2, 
                             context=context,numlines=context)
         else:
             return htmlDiff.make_table(fromlines,tolines, label1, label2, 
-                    context=context,numlines=context) + htmlDiff.legend
+                    context=context,numlines=context) + htmlDiff._legend
     else:
         return "<b>%s and %s are identical</b>" % (label1, label2)
 
 def run(__kw__, __server__, getContents, makeDiff):                   
   revisions = __kw__.get('rev')
-  context = __kw__.get('context', 5)
+  if  __kw__.get('diff') == 'Context':
+     context = int(__kw__.get('context', 5))
+  else:
+     context = 0
   __kw__['_nextFormat'] = 'http://rx4rdf.sf.net/ns/wiki#item-format-xml' 
   #todo: error if item format is binary 
   if not isinstance(revisions, (type([]), type(()))) or len(revisions) != 2:
      print "<b>Error: you must select two revisions to diff.</b>"     
   else:
+    revisions = [int(i) for i in revisions]
+    revisions.sort()
     if revisions[0] == revisions[1]:        
        return "<b>%s and %s are identical</b>" % (label1, label2)
     fromlines = getContents(revisions[0], __kw__, __server__)
@@ -43,4 +49,5 @@ def run(__kw__, __server__, getContents, makeDiff):
     print makeDiff(fromlines, tolines, label1, label2,context, 
         __kw__.get('_disposition') == 'http://rx4rdf.sf.net/ns/wiki#item-disposition-complete')    
 
+#this script isn't a real module so we must pass the variables defined here to run()
 run(__kw__, __server__, getContents, makeDiff)

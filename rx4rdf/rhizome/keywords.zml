@@ -10,7 +10,8 @@ x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
     xmlns:auth="http://rx4rdf.sf.net/ns/auth#",
     exclude-result-prefixes = "f wf a wiki rdf rdfs auth"
     ) 
-
+    x:param name="BASE_MODEL_URI"
+    
     x:template match='/'
         h3:
           `All Keywords
@@ -19,7 +20,7 @@ x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
                tr: 
                 td: 
                  a href='''site:///keywords/{local-name-from-uri(.)}?about={f:escape-url(.)}'''
-                  x:value-of select='f:if(namespace-uri-from-uri(.)="http://rx4rdf.sf.net/ns/kw#",local-name-from-uri(.), name-from-uri(.))'                          
+                  x:value-of select='f:if(namespace-uri-from-uri(.)=concat($BASE_MODEL_URI,"kw#"),local-name-from-uri(.), name-from-uri(.))'                          
                  ' (' 
                  x:value-of select='count(/*[wiki:about=current()])'
                  ')'

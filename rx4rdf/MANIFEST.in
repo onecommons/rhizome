@@ -12,4 +12,3 @@ global-exclude */CVS/*
 global-exclude */sessions/*
 global-exclude */contentindex/*
 include COPYING
-include changelog.txt

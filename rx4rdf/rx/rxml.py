@@ -293,7 +293,8 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
             if fixUp:
                 namespaceURI = fixUp % utils.kw2dict(uri=namespaceURI,
                     encodeduri=urllib.quote(namespaceURI), res=namespaceURI)
-            retVal = rxPrefix + 'resource id="' + namespaceURI + '"'
+            #retVal = rxPrefix + 'resource id="' + namespaceURI + '"'
+            retVal = '{' + namespaceURI + '}'
         return retVal
 
     def outputPredicate(predNode, indent):

@@ -24,7 +24,7 @@
     <input TYPE="hidden" NAME="itemname" VALUE="{$_name}" />
         Create New Resources from Template
          <br/>
-	<textarea NAME="metadata" ROWS="30" COLS="75" STYLE="width:100%" WRAP="off">
+	<textarea NAME="metadata" ROWS="20" COLS="75" STYLE="width:100%" WRAP="off">
 	<xsl:if test="$_contents">
 	<xsl:value-of select="f:replace('%(base)s',$BASE_MODEL_URI,$_contents)" />
 	</xsl:if>
@@ -33,5 +33,10 @@
 	<input TYPE="submit" NAME="save" VALUE="Save" />
 	
 </form>
+<div class="code" style='font-size: smaller'>
+<p align='center'><b><a href="site:///RxML">RxML</a> Quick Reference</b></p>
+<xsl:value-of disable-output-escaping='yes' 
+  select="wf:openurl('site:///RxML?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-complete')" />
+</div>
 </xsl:template>
 </xsl:stylesheet>

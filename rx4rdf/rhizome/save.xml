@@ -1,7 +1,8 @@
 <xu:modifications version="1.0" xmlns:xu="http://www.xmldb.org/xupdate"
-		    xmlns:a="http://rx4rdf.sf.net/ns/archive#" xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" 
-		    xmlns:kw = "http://rx4rdf.sf.net/ns/kw#"
-		    xmlns:f = 'http://xmlns.4suite.org/ext' xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'		    
+		    xmlns:a="http://rx4rdf.sf.net/ns/archive#" 
+		    xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" 
+		    xmlns:f = 'http://xmlns.4suite.org/ext' 
+		    xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'		    
 		    xmlns:request-header = 'http://rx4rdf.sf.net/ns/raccoon/http-request-header#'
 			xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
 			xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
@@ -136,39 +137,42 @@
        </xu:append>
     </xu:if>
 
-    <xu:define-template name='addKeywords'>
-    <xu:if test='$keywordsLeft'>
-       <!-- if the keyword doesn't have a prefix put it in the 'kw' namespace  
-         we url escape the keyword in case the specified name has invalid characters
-       -->            
-       <xu:variable name='kw' select="uri(f:if(contains($keywordsLeft[1],':') , 
-          $keywordsLeft[1], concat('kw:', f:escape-url($keywordsLeft[1])) ))" />
-
+    <xu:define-template name='addKeyword'>
+       <xu:variable name='kwUri' select="wf:evaluate('uri($kw)')" /> 
        <xu:append select='$resource'>  
-         <wiki:about rdf:resource='{$kw}' />         
+         <wiki:about rdf:resource='{$kwUri}' />         
        </xu:append>      
        
-       <xu:if test='not(/wiki:Keyword[.=$kw])'>
+       <xu:if test='not(/wiki:Keyword[.=$kwUri])'>
            <!-- not found, add a keyword resource -->
            <xu:append select='/'>
-             <wiki:Keyword rdf:about='{$kw}'>
-                <wiki:name>keywords/<xu:value-of select="f:escape-url(f:if(contains($keywordsLeft[1],':'), 
-                            substring-after($keywordsLeft[1], ':'), $keywordsLeft[1]))"/></wiki:name>
+             <wiki:Keyword rdf:about='{$kwUri}'>
+                <wiki:name>keywords/<xu:value-of select="$kw"/></wiki:name>
              </wiki:Keyword>
            </xu:append>
        </xu:if>
-       
-      <xu:variable name='keywordsLeft' select='$keywordsLeft[position()!=1]' />
-      <xu:call-template name='addKeywords'/>
-    </xu:if>
     </xu:define-template>
     
     <xu:if test='wf:get-metadata("keywords")'>
-        <xu:remove select='$resource/wiki:about'/>
-        <xu:variable name='keywordsLeft' select='wf:split($keywords)' />
-        <xu:call-template name='addKeywords'/>
-    </xu:if>
-    
+         <xu:remove select='$resource/wiki:about'/>
+        
+         <xu:for-each select='wf:split(wf:get-metadata("keywords"))'>
+           <xu:if test='string($current)'>
+             <!-- in case the user used commas -->
+             <xu:for-each select='wf:split($current, ",")'>
+                <xu:if test='string($current)'>
+                    <!-- if the keyword doesn't have a prefix put it in the 'kw' namespace  
+                    we url escape the keyword in case the specified name has invalid characters
+                    -->            
+                   <xu:variable name='kw' select="f:if(contains($current,':') , 
+                        $current, concat('kw:', f:escape-url($current)) )" />
+                   <xu:call-template name='addKeyword'/>
+                </xu:if> 
+             </xu:for-each>      
+           </xu:if>
+         </xu:for-each>
+    </xu:if>    
+           
     <xu:variable name="formatTransformURI" select="wf:generate-bnode()"/>                
     
     <!-- don't bother saving the last revision if this was just a minor edit
@@ -338,7 +342,6 @@
         </wiki:Item>
        </rdf:first>
     </xu:append>
-                    
-    <xu:if test="wf:assign-metadata('revision-added', $itemURI)" /> <!-- do nothing - just for the side-effect -->
-    <xu:if test="wf:assign-metadata('_update-trigger', 'revision-added')" /> <!-- do nothing - just for the side-effect -->            
+    
+    <xu:variable name='frameid' select="wf:assign-metadata('frameid', $current-time)" /> <!-- used by the iframe-display-handler -->                            
 </xu:modifications>

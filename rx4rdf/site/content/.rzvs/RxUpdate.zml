@@ -2,6 +2,7 @@ RxUpdate is a language for updating an RDF model. It is syntactically and semant
 
 The XUpdate specification was never completed and so RxUpdate adds several enhancements to XUpdate, including support for the following elements: 
 * ^^if 
+* ^^for-each
 * ^^copy-of^^ (along with an enhanced ^^value-of^^)
 * ^^message 
 * ^^include

@@ -7,11 +7,13 @@
 		xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'
 		xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
 		xmlns:f = 'http://xmlns.4suite.org/ext'
+		xmlns:response-header='http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
 		exclude-result-prefixes = "f wf a wiki rdf" >
 <xsl:import href="edit.xsl" />
 <xsl:param name="_name" />
 
 <xsl:template match="/">
+    <xsl:variable name='status404' select="wf:assign-metadata('response-header:status', 404)" />
 	<div>"<xsl:value-of select='$_name'/>" Not Found - Create New Item?</div>
 	<xsl:call-template name="edit-main" >
 		<xsl:with-param name="itemname" select="$_name" />

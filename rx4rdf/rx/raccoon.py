@@ -1315,7 +1315,7 @@ else:
 
             for k, v in kw.items():
                 #initialize the templates variable map copying the core request kws
-                #and copy the rest (the application specific kws) to _prevkw
+                #and copy the r est (the application specific kws) to _prevkw
                 #this way the template processing doesn't mix with the orginal request
                 #but are made available in the 'previous' namespace (think of them as template parameters)
                 if k in globalVars:
@@ -1872,11 +1872,17 @@ else:
                     
             return self.default_not_found(kw)
 
-        def default_not_found(self, kw):
-            '''if the _not_found page is not defined, we assume we're just viewing an arbitrary rdf model -- so just print its rdfdom xml representation'''
-            kw['_response'].headerMap["content-type"]="text/xml"
+        def default_not_found(self, kw):            
+            kw['_response'].headerMap["content-type"]="text/html"
             kw['_response'].headerMap['status'] = 404 #not found
-            return self.dump() 
+            return '''<html><head><title>Error 404</title>
+<meta name="robots" content="noindex" />
+</head><body>
+<h2>HTTP Error 404</h2>
+<p><strong>404 Not Found</strong></p>
+<p>The Web server cannot find the file or script you asked for. Please check the URL to ensure that the path is correct.</p>
+<p>Please contact the server's administrator if this problem persists.</p>
+</body></html>'''
 
         def dump(self):
             '''returns a xml representation of the rdf model'''

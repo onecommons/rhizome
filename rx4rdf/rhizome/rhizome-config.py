@@ -1,7 +1,7 @@
 """
     Config file for Rhizome
 
-    Copyright (c) 2003 by Adam Souzis <asouzis@users.sf.net>
+    Copyright (c) 2003-4 by Adam Souzis <asouzis@users.sf.net>
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
@@ -17,7 +17,7 @@ if not hasattr(__server__, 'rhizome') or not __server__.rhizome: #make executing
 else:
     rhizome = __server__.rhizome
 
-RHIZOME_APP_ID = "Rhizome 0.3.1" #don't change this unless you have a good reason
+RHIZOME_APP_ID = "Rhizome 0.4.0" #don't change this unless you have a good reason
 
 rhizome.BASE_MODEL_URI = locals().get('BASE_MODEL_URI', __server__.BASE_MODEL_URI)
 MAX_MODEL_LITERAL = 0 #will save all content to disk
@@ -62,6 +62,8 @@ rhizome.authorizationQuery = locals().get('unAuthorizedExpr', '''not($__user/aut
  
 #now find a resource that will be used to display the resource
 contentHandlerQueries= [
+#if the resource is set to the Unauthorized resource select the unauthorized page
+"f:if(self::auth:Unauthorized, /a:NamedContent[wiki:name='_not_authorized'])",
 #don't do anything with external files:
 'f:if(self::text(), $STOP)', 
 #if the request has an action associated with it:
@@ -69,8 +71,6 @@ contentHandlerQueries= [
 "/*[wiki:handles-action=$__authAction][wiki:action-for-type='http://rx4rdf.sf.net/ns/wiki#Any']", #get the default handler
 #if the resource is content
 'self::a:NamedContent',
-#if the resource is set to the Unauthorized resource select the unauthorized page
-"f:if(self::auth:Unauthorized, /*[wiki:name='_not_authorized'])",
 #default if nothing matches for any real resource (i.e. an resource element)
 "/*[wiki:name='default-resource-viewer']"
 ]
@@ -145,13 +145,17 @@ rhizome.processContentAction = Action(encodingQueries, __server__.processContent
 
 templateAction = Action(templateQueries, rhizome.processTemplateAction)
 
-#setup these variables to give content a chance to dynamically set them
+#set up these variables to give content a chance to dynamically set them
 templateAction.assign("_doctype", '$_doctype', "wiki:doctype/*")
+
 #a bit hackish, but we want to preserve the initial _disposition until we encounter 
 #the disposition template itself and then use its disposition
 #thus we check for the wiki:handles-disposition property
-templateAction.assign("_disposition", 'f:if($previous:_template/wiki:handles-disposition, wiki:item-disposition/*)', 
-                    '$_disposition', "wiki:item-disposition/*")
+#even more hackish: added $_dispositionDisposition to allow a disposition to dynamically set its dispostion
+templateAction.assign("_disposition", 'f:if($previous:_template/wiki:handles-disposition, $_dispositionDisposition)',
+                    'f:if($previous:_template/wiki:handles-disposition, wiki:item-disposition/*)', 
+                    '$_disposition', 
+                    "wiki:item-disposition/*")
 #Raccoon may set response-header:content-type based on the extension, so we check that unless we're the template resource
 #(always let the template set the content type)
 templateAction.assign('response-header:content-type', '$_contenttype', 'f:if($action="view-source", "text/plain")', #todo: hack
@@ -171,12 +175,14 @@ handleRequestSequence = [ findResourceAction, #first map the request to a resour
 
 rhizome.handleRequestSequence = handleRequestSequence
 
-errorAction = Action( [ 'f:evaluate($previous:_errorhandler)', #by assigning an XPath expression to this variable a script can set its own custom error handler 
+errorAction = Action( [ 
+    #by assigning a XPath expression to this variable a script can set its own custom error handler 
+    'f:evaluate($previous:_errorhandler)', 
     '''f:if($error:name='KeyError' and $error:message="'_contents'", /*[wiki:name='xslt-error-handler'])''',                
     "/*[wiki:name='default-error-handler']",
 ])
 errorAction.assign("__resource", '.', post=True)               
-#map errors messages that should be shown to the user:
+#map errors messages that are "expected" and should be shown to the user:
 from rx import XUpdate
 errorAction.assign('error:userMsg', 
     "f:if($error:name='NotAuthorized', $error:message)",
@@ -194,7 +200,7 @@ actions = { 'http-request' : handleRequestSequence,
           }
 
 #if any of the parameters listed here exist they will preserved during template processing (see rhizome.processTemplateAction)
-globalRequestVars = [ '__user', '_static', '_disposition' ]
+globalRequestVars = [ '__user', '_static', '_disposition']
 
 ##############################################################################
 ## other config settings
@@ -207,7 +213,7 @@ nsMap = {'a' : 'http://rx4rdf.sf.net/ns/archive#',
          'auth' : "http://rx4rdf.sf.net/ns/auth#",
          'base' : rhizome.BASE_MODEL_URI,
          'bnode' : "bnode:",
-         'kw' : "http://rx4rdf.sf.net/ns/kw#",
+         'kw' : rhizome.BASE_MODEL_URI + 'kw#',
          'foaf' : "http://xmlns.com/foaf/0.1/",
          }
 rhizome.nsMap = nsMap
@@ -316,106 +322,114 @@ authPredicates=['http://www.w3.org/1999/02/22-rdf-syntax-ns#first',
 ## Define the template for a Rhizome site
 ##############################################################################
 
-templateList = [rhizome.addItemTuple('_not_found',loc='path:_not_found.xsl', format='rxslt', disposition='entry'),
- rhizome.addItemTuple('edit',loc='path:edit.xsl', format='rxslt', disposition='entry', handlesAction=['edit', 'new']),
- rhizome.addItemTuple('save',loc='path:save.xml', format='rxupdate', disposition='handler', handlesAction=['save', 'creation']),
- rhizome.addItemTuple('confirm-delete',loc='path:confirm-delete.xsl', format='rxslt', disposition='entry', 
+templateList = [rhizome._addItemTuple('_not_found',loc='path:_not_found.xsl', format='rxslt', disposition='entry'),
+ rhizome._addItemTuple('edit',loc='path:edit.xsl', format='rxslt', disposition='entry', handlesAction=['edit', 'new']),
+ rhizome._addItemTuple('save',loc='path:save.xml', format='rxupdate', disposition='handler', handlesAction=['save', 'creation']),
+ rhizome._addItemTuple('confirm-delete',loc='path:confirm-delete.xsl', format='rxslt', disposition='entry', 
                         handlesAction=['confirm-delete'], actionType='http://rx4rdf.sf.net/ns/wiki#Any'),
- rhizome.addItemTuple('delete', loc='path:delete.xml', format='rxupdate', disposition='handler', 
+ rhizome._addItemTuple('delete', loc='path:delete.xml', format='rxupdate', disposition='handler', 
                         handlesAction=['delete'], actionType='http://rx4rdf.sf.net/ns/wiki#Any'),
- rhizome.addItemTuple('basestyles.css',format='text', loc='path:basestyles.css'),
- rhizome.addItemTuple('edit-icon.png',format='binary',loc='path:edit.png'),
- #rhizome.addItemTuple('list',loc='path:list-pages.xsl', format='rxslt', disposition='entry'),
- rhizome.addItemTuple('showrevisions',loc='path:showrevisions.xsl', format='rxslt', disposition='entry',handlesAction=['showrevisions']),
- rhizome.addItemTuple('item-disposition-handler-template',loc='path:item-disposition-handler.xsl', format='rxslt', 
+ rhizome._addItemTuple('basestyles.css',format='text', loc='path:basestyles.css'),
+ rhizome._addItemTuple('edit-icon.png',format='binary',loc='path:edit.png'),
+ #rhizome._addItemTuple('list',loc='path:list-pages.xsl', format='rxslt', disposition='entry'),
+ rhizome._addItemTuple('showrevisions',loc='path:showrevisions.xsl', format='rxslt', disposition='entry',handlesAction=['showrevisions']),
+ rhizome._addItemTuple('item-disposition-handler-template',loc='path:item-disposition-handler.xsl', format='rxslt', 
                         disposition='entry', handlesDisposition='handler'),
- rhizome.addItemTuple('save-metadata',loc='path:save-metadata.xml', format='rxupdate', 
+ rhizome._addItemTuple('save-metadata',loc='path:save-metadata.xml', format='rxupdate', 
       disposition='handler', handlesAction=['save-metadata'], actionType='http://rx4rdf.sf.net/ns/wiki#Any'),
- rhizome.addItemTuple('edit-metadata',loc='path:edit-metadata.xsl', format='rxslt', disposition='entry', 
+ rhizome._addItemTuple('edit-metadata',loc='path:edit-metadata.xsl', format='rxslt', disposition='entry', 
             handlesAction=['edit-metadata', 'edit'], actionType='http://rx4rdf.sf.net/ns/wiki#Any'),
- rhizome.addItemTuple('_not_authorized',contents="<div class='message'>Error. You are not authorized to perform this operation on this page.</div>",
+ rhizome._addItemTuple('_not_authorized',contents="<div class='message'>Error. You are not authorized to perform this operation on this page.</div>",
                   format='xml', disposition='entry'),
-rhizome.addItemTuple('search', format='rxslt', disposition='entry', loc='path:search.xsl'),
-rhizome.addItemTuple('login', format='zml', disposition='complete', loc='path:login.zml'),
-rhizome.addItemTuple('logout', format='rxslt', disposition='complete', loc='path:logout.xsl'),
-rhizome.addItemTuple('signup', format='zml', disposition='entry', loc='path:signup.zml',
+rhizome._addItemTuple('search', format='rxslt', disposition='entry', loc='path:search.xsl'),
+rhizome._addItemTuple('login', format='zml', disposition='complete', loc='path:login.zml'),
+rhizome._addItemTuple('logout', format='rxslt', disposition='complete', loc='path:logout.xsl'),
+rhizome._addItemTuple('signup', format='zml', disposition='entry', loc='path:signup.zml',
                       handlesAction=['edit', 'new'], actionType='http://xmlns.com/foaf/0.1/Person'),
-rhizome.addItemTuple('save-user', format='rxupdate', disposition='handler', loc='path:signup-handler.xml',
+rhizome._addItemTuple('save-user', format='rxupdate', disposition='handler', loc='path:signup-handler.xml',
                       handlesAction=['save', 'creation'], actionType='http://xmlns.com/foaf/0.1/Person'),
-rhizome.addItemTuple('default-resource-viewer',format='rxslt', disposition='entry', loc='path:default-resource-viewer.xsl',
+rhizome._addItemTuple('default-resource-viewer',format='rxslt', disposition='entry', loc='path:default-resource-viewer.xsl',
                     handlesAction=['view-metadata'], actionType='http://rx4rdf.sf.net/ns/wiki#Any'),
-rhizome.addItemTuple('preview', loc='path:preview.xsl', disposition='short-display', format='rxslt'),
-rhizome.addItemTuple('wiki2html.xsl', loc='path:wiki2html.xsl', format='http://www.w3.org/1999/XSL/Transform', handlesDoctype='wiki'),
-rhizome.addItemTuple('intermap.txt',format='text', loc='path:intermap.txt'),
-rhizome.addItemTuple('dir', format='rxslt', disposition='entry', loc='path:dir.xsl',
+rhizome._addItemTuple('preview', loc='path:preview.xsl', disposition='short-display', format='rxslt'),
+rhizome._addItemTuple('wiki2html.xsl', loc='path:wiki2html.xsl', format='http://www.w3.org/1999/XSL/Transform', handlesDoctype='wiki'),
+rhizome._addItemTuple('intermap.txt',format='text', loc='path:intermap.txt'),
+rhizome._addItemTuple('dir', format='rxslt', disposition='entry', loc='path:dir.xsl',
                       handlesAction=['view'], actionType='http://rx4rdf.sf.net/ns/wiki#Folder'),
-rhizome.addItemTuple('rxml-template-handler',loc='path:rxml-template-handler.xsl', format='rxslt', 
+rhizome._addItemTuple('rxml-template-handler',loc='path:rxml-template-handler.xsl', format='rxslt', 
                         disposition='entry', handlesDisposition='rxml-template'),               
-rhizome.addItemTuple('generic-new-template', loc='path:generic-new-template.txt', handlesAction=['new'], actionType='wiki:Any',
+rhizome._addItemTuple('generic-new-template', loc='path:generic-new-template.txt', handlesAction=['new'], actionType='wiki:Any',
             disposition='rxml-template', format='text', title='Create New Resource'), 
-rhizome.addItemTuple('rxml2rdf',loc='path:rxml2rdf.py', format='python', disposition='complete'),
-rhizome.addItemTuple('default-error-handler', loc='path:default-error-handler.xsl', disposition='entry', doctype='xhtml', format='rxslt'), 
-rhizome.addItemTuple('xslt-error-handler', loc='path:xslt-error-handler.xsl', disposition='entry', doctype='xhtml', format='rxslt'), 
-rhizome.addItemTuple('short-display-handler',loc='path:short-display-handler.xsl', format='rxslt', 
+rhizome._addItemTuple('rxml2rdf',loc='path:rxml2rdf.py', format='python', disposition='complete'),
+rhizome._addItemTuple('default-error-handler', loc='path:default-error-handler.xsl', disposition='entry', doctype='xhtml', format='rxslt'), 
+rhizome._addItemTuple('xslt-error-handler', loc='path:xslt-error-handler.xsl', disposition='entry', doctype='xhtml', format='rxslt'), 
+rhizome._addItemTuple('short-display-handler',loc='path:short-display-handler.xsl', format='rxslt', 
                         disposition='complete', handlesDisposition='short-display'),               
-rhizome.addItemTuple('keyword-browser', loc='path:KeywordBrowser.zml', disposition='entry', format='zml', 
+rhizome._addItemTuple('keyword-browser', loc='path:KeywordBrowser.zml', disposition='entry', format='zml', 
     title="Keyword Browser", handlesAction=['view'], actionType='http://rx4rdf.sf.net/ns/wiki#Keyword'),                         
-rhizome.addItemTuple('keywords', loc='path:keywords.zml', disposition='entry', format='zml', 
+rhizome._addItemTuple('keywords', loc='path:keywords.zml', disposition='entry', format='zml', 
     title="Show All Keywords"),                         
-rhizome.addItemTuple('diff-revisions',loc='path:diff-revisions.py', format='python', disposition='entry'),
+rhizome._addItemTuple('diff-revisions',loc='path:diff-revisions.py', format='python', disposition='entry'),
 
 #administration pages
-rhizome.addItemTuple('administration', loc='path:administer.xsl', disposition='entry', format='rxslt', title="Administration"), 
-rhizome.addItemTuple('new-role-template', loc='path:new-role-template.txt', handlesAction=['new'], actionType='auth:Role',
+rhizome._addItemTuple('administration', loc='path:administer.xsl', disposition='entry', format='rxslt', title="Administration"), 
+rhizome._addItemTuple('new-role-template', loc='path:new-role-template.txt', handlesAction=['new'], actionType='auth:Role',
             disposition='rxml-template', format='text', title='Create New Role'), 
-rhizome.addItemTuple('new-accesstoken-template', loc='path:new-accesstoken-template.txt', handlesAction=['new'], actionType='auth:AccessToken',
+rhizome._addItemTuple('new-accesstoken-template', loc='path:new-accesstoken-template.txt', handlesAction=['new'], actionType='auth:AccessToken',
             disposition='rxml-template', format='text', title='Create New Access Token'), 
-rhizome.addItemTuple('new-folder-template', loc='path:new-folder-template.txt', handlesAction=['new'], actionType='wiki:Folder',
+rhizome._addItemTuple('new-folder-template', loc='path:new-folder-template.txt', handlesAction=['new'], actionType='wiki:Folder',
             disposition='rxml-template', format='text', title='Create New Folder'), 
-rhizome.addItemTuple('new-label-template', loc='path:new-label-template.txt', handlesAction=['new'], actionType='wiki:Label',
+rhizome._addItemTuple('new-label-template', loc='path:new-label-template.txt', handlesAction=['new'], actionType='wiki:Label',
             disposition='rxml-template', format='text', title='Create New Label'), 
-rhizome.addItemTuple('new-disposition-template', loc='path:new-disposition-template.txt', handlesAction=['new'], actionType='wiki:ItemDisposition',
+rhizome._addItemTuple('new-disposition-template', loc='path:new-disposition-template.txt', handlesAction=['new'], actionType='wiki:ItemDisposition',
             disposition='rxml-template', format='text', title='Create New Disposition'), 
-rhizome.addItemTuple('new-doctype-template', loc='path:new-doctype-template.txt', handlesAction=['new'], actionType='wiki:DocType',
+rhizome._addItemTuple('new-doctype-template', loc='path:new-doctype-template.txt', handlesAction=['new'], actionType='wiki:DocType',
             disposition='rxml-template', format='text', title='Create New DocType'), 
-rhizome.addItemTuple('new-keyword-template', loc='path:new-keyword-template.txt', handlesAction=['new'], actionType='wiki:Keyword',
+rhizome._addItemTuple('new-keyword-template', loc='path:new-keyword-template.txt', handlesAction=['new'], actionType='wiki:Keyword',
             disposition='rxml-template', format='text', title='Create New Keyword'), 
-rhizome.addItemTuple('Sandbox',loc='path:sandbox.xsl', format='rxslt', disposition='entry'),               	
-rhizome.addItemTuple('process-contents',loc='path:process-contents.xsl', format='rxslt', 
+rhizome._addItemTuple('Sandbox',loc='path:sandbox.xsl', format='rxslt', disposition='entry'),               	
+rhizome._addItemTuple('process-contents',loc='path:process-contents.xsl', format='rxslt', 
                         disposition='complete'),               	
 ]
 
 #forrest templates, essentially recreates forrest/src/resources/conf/sitemap.xmap 
-templateList += [rhizome.addItemTuple('faq2document.xsl', loc='path:faq2document.xsl', 
+templateList += [rhizome._addItemTuple('faq2document.xsl', loc='path:faq2document.xsl', 
     format='http://www.w3.org/1999/XSL/Transform', disposition='template', doctype='document', handlesDoctype='faq'),
-rhizome.addItemTuple('document2html.xsl', loc='path:document2html.xsl', 
+rhizome._addItemTuple('document2html.xsl', loc='path:document2html.xsl', 
     format='http://www.w3.org/1999/XSL/Transform', disposition='entry', handlesDoctype='document'),
-rhizome.addItemTuple('site-template',loc='path:site-template.xsl', 
+rhizome._addItemTuple('site-template',loc='path:site-template.xsl', 
     disposition='template', format='rxslt',handlesDisposition='entry'),
-rhizome.addItemTuple('print-template',loc='path:print-template.xsl', 
+rhizome._addItemTuple('print-template',loc='path:print-template.xsl', 
     disposition='template', format='rxslt',handlesDisposition='print'),    
-rhizome.addItemTuple('spec2html.xsl', loc='path:spec2html.xsl', format='http://www.w3.org/1999/XSL/Transform', 
+rhizome._addItemTuple('spec2html.xsl', loc='path:spec2html.xsl', format='http://www.w3.org/1999/XSL/Transform', 
     disposition='complete', handlesDoctype='specification'),
-rhizome.addItemTuple('docbook2document.xsl', loc='path:docbook2document.xsl', format='http://www.w3.org/1999/XSL/Transform', 
+rhizome._addItemTuple('docbook2document.xsl', loc='path:docbook2document.xsl', format='http://www.w3.org/1999/XSL/Transform', 
     disposition='template', doctype='document', handlesDoctype='docbook')]
-#+ rhizome.addItemTuple('todo2document.xsl', loc='path:todo2document.xsl', format='http://www.w3.org/1999/XSL/Transform', disposition='template', doctype='document', handlesDoctype='todo'),
+#+ rhizome._addItemTuple('todo2document.xsl', loc='path:todo2document.xsl', format='http://www.w3.org/1999/XSL/Transform', disposition='template', doctype='document', handlesDoctype='todo'),
   
 #sample pages
-templateList += [rhizome.addItemTuple('index',loc='path:index.zml', format='zml', disposition='entry', accessTokens=None),
-rhizome.addItemTuple('sidebar',loc='path:sidebar.zml', format='zml', accessTokens=None),
-rhizome.addItemTuple('ZMLSandbox', format='zml', disposition='entry', accessTokens=None,
+templateList += [rhizome._addItemTuple('index',loc='path:index.zml', format='zml', 
+                disposition='entry', accessTokens=None, keywords=None),
+rhizome._addItemTuple('sidebar',loc='path:sidebar.zml', format='zml', accessTokens=None, keywords=None),
+rhizome._addItemTuple('ZMLSandbox', format='zml', disposition='entry', accessTokens=None, keywords=None,
 	contents="Feel free to [edit|?action=edit] this page to experiment with [ZML]..."),
-rhizome.addItemTuple('RxMLSandbox',loc='path:RxMLSandbox.xsl', format='rxslt', 
+rhizome._addItemTuple('RxMLSandbox',loc='path:RxMLSandbox.xsl', format='rxslt', keywords=None,
                         disposition='entry', title="RxML Sandbox"),               	
 
 #help pages
-rhizome.addItemTuple('help',loc='path:help/help.zml', format='zml', disposition='entry'),
-rhizome.addItemTuple('TextFormattingRules',loc='path:help/TextFormattingRules.zml', format='zml', disposition='entry'),
-rhizome.addItemTuple('ZML',loc='path:help/ZML.zml', format='zml', disposition='entry'),
-rhizome.addItemTuple('RxML',loc='path:help/RxML.zml', format='zml', disposition='entry',doctype='document'),
-rhizome.addItemTuple('RhizomeManual',loc='path:help/RhizomeDoc.zml', disposition='entry', format='zml', title="Rhizome Manual", doctype='document'),
-rhizome.addItemTuple('RaccoonManual',loc='path:help/RaccoonDoc.zml', disposition='entry', format='zml', title="Raccoon Manual", doctype='document'),
-rhizome.addItemTuple('RaccoonConfig',loc='path:help/RaccoonConfig.txt', disposition='entry', format='text', title="Raccoon Config Settings"),
+rhizome._addItemTuple('help',loc='path:help/help.zml', format='zml', disposition='entry', keywords=['help']),
+rhizome._addItemTuple('ZML',loc='path:help/ZML.zml', format='zml', disposition='entry', keywords=['help']),
+rhizome._addItemTuple('TextFormattingRules',loc='path:help/TextFormattingRules.zml', format='zml', disposition='entry',keywords=['help']),
+rhizome._addItemTuple('ZMLMarkupRules',loc='path:help/ZMLMarkupRules.zml', format='zml', disposition='entry',keywords=['help']),
+rhizome._addItemTuple('RxML',loc='path:help/RxML.html', format='xml', disposition='entry',doctype='document',keywords=['help'],
+                       title='RxML Quick Reference'),
+rhizome._addItemTuple('RxMLSpecification',loc='path:help/RxMLSpecification.zml', format='zml', disposition='entry',
+                       title='RxML 1.0 Specification', doctype='document',keywords=['help']),
+rhizome._addItemTuple('RhizomeManual',loc='path:help/RhizomeDoc.zml', disposition='entry', format='zml', 
+     keywords=['help'], title="Rhizome Manual", doctype='document'),
+rhizome._addItemTuple('RaccoonManual',loc='path:help/RaccoonDoc.zml', disposition='entry', 
+     format='zml', title="Raccoon Manual", doctype='document',keywords=['help']),
+rhizome._addItemTuple('RaccoonConfig',loc='path:help/RaccoonConfig.txt', disposition='entry', 
+     format='text', title="Raccoon Config Settings", keywords=['help']),
 ]
 
 #add the authorization and authentification structure
@@ -437,7 +451,7 @@ if not adminShaPassword:
     adminShaPassword = sha.sha( locals().get('ADMIN_PASSWORD','admin')+ secureHashSeed ).hexdigest()    
 
 authorizationDigests = { 
-    '8Ksx33gR0EZQC4TU1TpNw+8jBo4=' : 1, #for diff-revisions.py
+    'My4pn2M3AXwU9vro1UIoBnELsS0=' : 1, #for diff-revisions.py
     'pXao2iheSFZspAFb0v/GtDbSGGM=' : 1, #for rxml2rdf.py
 }
 
@@ -487,19 +501,19 @@ authStructure =\
   rdfs:comment: `the superuser role is a special case that always has permission to do anything
   rdf:type: auth:Role
   rdfs:label: `Super User
-  
-  #if you want to release labels it is convenient to set this next property:
-  #wiki:default-edit-label: wiki:label-released
-  
-  # even though the super-user role doesn't need these tokens for authentication 
-  # we add it here so it shows up in the Sharing dropdown on the edit page
-  auth:has-rights-to: base:write-structure-token 
     
- # add access token to protect structural pages from modification
- # (assign (auth:has-rights-to) to adminstrator users or roles to give access )
+  # even though the super-user role doesn't need these tokens for authentication 
+  # we add these here so they shows up in the Sharing dropdown on the edit page
+  auth:has-rights-to: base:write-structure-token 
+  auth:has-rights-to: base:save-only-token
+  #if you want to release labels it is convenient to set this next property:
+  #wiki:default-edit-label: wiki:label-released  
+    
+ #access token to protect structural resources from modification
+ #(assign (auth:has-rights-to) to adminstrator users or roles to give access)
  base:write-structure-token:
   rdf:type: auth:AccessToken
-  rdfs:label: `Administrator Write/Public Read
+  rdfs:label: `Admin Write/Public Read
   auth:has-permission: wiki:action-delete     
   auth:has-permission: wiki:action-save
   auth:has-permission: wiki:action-save-metadata
@@ -507,6 +521,17 @@ authStructure =\
   auth:has-permission: auth:permission-remove-statement   
   auth:priority: 100
 
+ base:save-only-token:
+  rdf:type: auth:AccessToken
+  rdfs:label: `Admin Write/Public Read & Save-Only
+  auth:has-permission: wiki:action-delete     
+  auth:has-permission: auth:permission-add-statement
+  auth:has-permission: auth:permission-remove-statement   
+  auth:priority: 100
+  rdfs:comment:  """this token let's resources be modified through the edit/save UI
+ but prevents users from modifying the metadata directly or deleting the resource
+ (useful for resources you want to let users to edit in a controlled fashion)"""
+  
  #users or roles with this access-token can set pages as released 
  #(and delete pages).
  #note that if you create more labels with the wiki:is-released property
@@ -658,7 +683,8 @@ def addStructure(type, structure, extraProps=[], name2uri=name2uri):
         n3 += '''<%s> <http://www.w3.org/2000/01/rdf-schema#label> "%s" .\n''' % (name, label)
         for i in range(2, len(props)):
             #assume object is a literal
-            n3 += '''<%s> <%s> "%s" .\n''' % (name, name2uri(extraProps[i-2]), props[i])        
+            if props[i]:
+                n3 += '''<%s> <%s> "%s" .\n''' % (name, name2uri(extraProps[i-2]), props[i])        
     return n3
 
 #give readable names and descriptions to user-visible classes
@@ -675,7 +701,7 @@ itemDispositions = [ ('http://rx4rdf.sf.net/ns/wiki#item-disposition-complete', 
                 ('http://rx4rdf.sf.net/ns/wiki#item-disposition-handler', 'Handler'),            
                 ('http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template', 'RxML Template'),            
                 ('http://rx4rdf.sf.net/ns/wiki#item-disposition-print', 'Printable'),
-                ('http://rx4rdf.sf.net/ns/wiki#item-disposition-short-display', 'Short'),
+                ('http://rx4rdf.sf.net/ns/wiki#item-disposition-short-display', 'Summary'),
               ]
 
 docTypes = [ ('http://rx4rdf.sf.net/ns/wiki#doctype-faq', 'FAQ', 'text/xml'),
@@ -695,6 +721,24 @@ templateList.append( ('@doctypes', addStructure('http://rx4rdf.sf.net/ns/wiki#Do
 templateList.append( ('@labels', addStructure('http://rx4rdf.sf.net/ns/wiki#Label', labels)+
     '''<http://rx4rdf.sf.net/ns/wiki#label-draft> <http://rx4rdf.sf.net/ns/wiki#is-draft> "" .\n'''
 '''<http://rx4rdf.sf.net/ns/wiki#label-released> <http://rx4rdf.sf.net/ns/wiki#is-released> "" .\n''') )
+
+templateList.append( ('@keywords', rxml.zml2nt(nsMap=nsMap, contents='''
+ wiki:structure:
+  rdf:type: wiki:Keyword  
+  rdfs:label: `structure
+  wiki:name: `keywords/structure
+
+ wiki:built-in:
+  rdf:type: wiki:Keyword  
+  rdfs:label: `built-in
+  wiki:name: `keywords/built-in
+
+ wiki:help:
+  rdf:type: wiki:Keyword  
+  rdfs:label: `help
+  wiki:name: `keywords/help
+''')) )
+
 
 templateMap = dict(templateList) #create a map so derived sites can replace pages: for example, see site-config.py
 STORAGE_TEMPLATE = "".join(templateMap.values()) #create a NTriples string
@@ -722,22 +766,20 @@ def __addItem__(name, rhizome=rhizome, configlocals=locals(), **kw):
     configlocals['STORAGE_TEMPLATE']= "".join(templateMap.values())
 
 def __addRxML__(contents='', replace=None, rxml=rxml, configlocals=locals()):
+    templateMap=configlocals['templateMap']
+    if contents:
+        contents = rxml.zml2nt(contents=contents, nsMap=configlocals['nsMap'])
     if replace is None:
-        configlocals['STORAGE_TEMPLATE'] += rxml.zml2nt(contents=contents, nsMap=configlocals['nsMap'])
-    else:
-        templateMap=configlocals['templateMap']
-        if contents:
-            contents = rxml.zml2nt(contents=contents, nsMap=configlocals['nsMap'])
-        templateMap[replace] = contents
-        configlocals['STORAGE_TEMPLATE']= "".join(templateMap.values())
+        replace = str(id(contents))            
+    templateMap[replace] = contents
+    configlocals['STORAGE_TEMPLATE']= "".join(templateMap.values())
     
 def __addTriples__(triples='', replace=None, configlocals=locals()):
+    templateMap=configlocals['templateMap']
     if replace is None:
-        configlocals['STORAGE_TEMPLATE'] += triples
-    else:
-        templateMap=configlocals['templateMap']
-        templateMap[replace] = triples
-        configlocals['STORAGE_TEMPLATE']= "".join(templateMap.values())
+        replace = str(id(triples))
+    templateMap[replace] = triples
+    configlocals['STORAGE_TEMPLATE']= "".join(templateMap.values())
 
 #this is deprecated 
 def __addSiteVars__(siteVars, rxml=rxml, configlocals=locals()):

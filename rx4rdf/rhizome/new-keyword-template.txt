@@ -6,7 +6,7 @@
      rdf: `http://www.w3.org/1999/02/22-rdf-syntax-ns#
      rdfs: `http://www.w3.org/2000/01/rdf-schema#     
      auth: `http://rx4rdf.sf.net/ns/auth#
-     kw:   "http://rx4rdf.sf.net/ns/kw#"
+     kw:   `%(base)skw#
      base: `%(base)s
      
  #create a new keyword resource
@@ -22,5 +22,5 @@
   #rdfs:label: `keywordname
   #rdfs:comment: `describe the keyword if you'd like
 
-  #the wiki:name should be prefixed with "keywords\" and match the name used by rdfs:label 
-  #wiki:name `keywords\keywordname
+  #the wiki:name should be prefixed with "keywords/" and match the name used by rdfs:label 
+  #wiki:name `keywords/keywordname
