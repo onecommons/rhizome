@@ -1,8 +1,8 @@
                             README
 
                          RxRDF and Rhizome
-                         Version 0.1.1
-                         Oct. 10, 2003
+                         Version 0.1.2
+                         Oct. 20, 2003
  
   Introduction
   ------------

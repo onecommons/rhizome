@@ -6,4 +6,5 @@ include site/*
 recursive-include docs *
 global-exclude *.bak *.bk? *.nt *.metarx *.pyc
 global-include site/wikistore.nt
+global-exclude */CVS/*
 include COPYING
