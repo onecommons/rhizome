@@ -425,7 +425,7 @@ class RDFDomTestCase(unittest.TestCase):
         '''
 
         result = applyXslt(self.rdfDom, xslStylesheet)
-        print result
+        #open('testXslt1.xml', 'wb').write(result)
         #d = difflib.Differ()
         #print list(d.compare(result,outputXml)) #list of characters, not lines!
         self.failUnless( result == file('testXslt1.xml').read(),'xml output does not match')

@@ -46,7 +46,27 @@ class RaccoonTestCase(unittest.TestCase):
         result = root.runActions('http-request', utils.kw2dict(_name='jj'))
         #print type(result), result
         self.failUnless( '<html><body>not found!</body></html>' == result)
-                
+
+    def testContentProcessing(self):
+        root = raccoon.RequestProcessor(a='testContentProcessor.py')        
+
+        result = root.runActions('http-request', utils.kw2dict(_name='authorized'))
+        self.failUnless( result == 'authorized code executed\n')
+
+        try:
+            result = root.runActions('http-request', utils.kw2dict(_name='unauthorized'))
+        except raccoon.NotAuthorized:
+            pass
+        else:
+            self.failUnless(False) #NotAuthorized should have been raised            
+
+        try:
+            result = root.runActions('http-request', utils.kw2dict(_name='dynamic unauthorized'))
+        except raccoon.NotAuthorized:
+            pass
+        else:
+            self.failUnless(False) #NotAuthorized should have been raised            
+        
     def testXPathSecurity(self):
         '''
         test that we can't access insecure 4Suite extension functions
@@ -64,6 +84,12 @@ class RaccoonTestCase(unittest.TestCase):
             pass
         else:
             self.fail("should have thrown exception")
+
+    def testXPathExtFuncs(self):
+        root = raccoon.RequestProcessor(a='testAuthAction.py')
+        
+        self.failUnless( root.evalXPath("""/* = wf:map(/*, ".")""") )
+        self.failUnless( root.evalXPath("""count(/*) = count(wf:map(/*, "."))""") )
 
 if __name__ == '__main__':
     import sys    

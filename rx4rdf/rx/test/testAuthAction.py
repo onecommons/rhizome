@@ -13,7 +13,7 @@ findTokens = '''(./%(filterTokens)s  | ./rdf:type/*/%(filterTokens)s)''' % local
 authorizationQuery = '''not($__user/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser') and
   wf:max(%(findTokens)s/auth:priority, 0) > wf:max(%(findTokens)s[.=$__user/auth:has-rights-to/* or .=$__user/auth:has-role/*/auth:has-rights-to/*]/auth:priority,0)''' % locals()
 
-resourceAuthorizationAction = Action( ['''xf:if(%s, /auth:Unauthorized)''' % authorizationQuery] )
+resourceAuthorizationAction = Action( ['''f:if(%s, /auth:Unauthorized)''' % authorizationQuery] )
 
 #default to 'view' if not specified
 resourceAuthorizationAction.assign("__authAction", 'concat("http://rx4rdf.sf.net/ns/wiki#action-",$action)', "'http://rx4rdf.sf.net/ns/wiki#action-view'") 
@@ -53,7 +53,7 @@ authStructure =\
  auth:permission-add-statement
   rdf:type: auth:Permission
 
- ;define two built-in users and their corresponding roles
+ #define two built-in users and their corresponding roles
  rx:resource id='%(base)susers/guest':
   rdf:type: wiki:User
   wiki:login-name: `guest
@@ -65,8 +65,8 @@ authStructure =\
   wiki:login-name: `admin
   wiki:name: `users/admin
   auth:has-role: auth:role-superuser
-  ;note: we set the password in the application model below so its not hardcoded into the datastore
-  ;and can be set in the config file
+  #note: we set the password in the application model below so its not hardcoded into the datastore
+  #and can be set in the config file
 
  wiki:role-guest:
   rdf:type: auth:Role
@@ -76,8 +76,8 @@ authStructure =\
   rdf:type: auth:Role
   rdfs:label: `Super User
 
- ; add access token to protect structural pages from modification
- ; (assign (auth:has-rights-to) to adminstrator users or roles to give access )
+ # add access token to protect structural pages from modification
+ # (assign (auth:has-rights-to) to adminstrator users or roles to give access )
  base:write-structure-token:
   rdf:type: auth:AccessToken
   rdfs:label: `Administrator Write/Public Read
@@ -88,7 +88,7 @@ authStructure =\
   auth:has-permission: auth:permission-remove-statement   
   auth:priority: 10
   
- ; some class level access tokens to globally prevent dangerous actions
+ # some class level access tokens to globally prevent dangerous actions
  a:ContentTransform:
   auth:guarded-by: base:execute-python-token
   auth:guarded-by: base:execute-rxupdate-token
@@ -128,8 +128,8 @@ authStructure =\
    auth:has-permission: auth:permission-remove-statement
    auth:priority: 10
  
- ; if we supported owl we could have owl:Thing as the subject instead 
- ; and we wouldn't need a seperate check in the authorizationQuery
+ # if we supported owl we could have owl:Thing as the subject instead 
+ # and we wouldn't need a seperate check in the authorizationQuery
  base:common-access-checks:
   auth:guarded-by: base:all-resources-guard
   
@@ -141,7 +141,7 @@ authStructure =\
    auth:with-property:  auth:guarded-by
    auth:priority: 10
 
- ; test stuff
+ # test stuff
  base:test-resource1:
    auth:guarded-by: base:test-token1
 
