@@ -55,7 +55,7 @@ g_errorMessages = {
     XUpdateException.STYLESHEET_REQUESTED_TERMINATION: '%s',
     XUpdateException.NO_NAME : 'missing required name attribute',
     XUpdateException.UNDEFINED_TEMPLATE : 'template %s undefined',
-    XUpdateException.NO_NAME : 'missing required href attribute',
+    XUpdateException.NO_HREF : 'missing required href attribute',
     }
 
 class StringWriter(NullWriter.NullWriter):
