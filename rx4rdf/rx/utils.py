@@ -16,7 +16,7 @@ from binascii import unhexlify, b2a_base64
 from Ft.Rdf import Util, Model, Statement, OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, OBJECT_TYPE_UNKNOWN
 from Ft.Rdf.Drivers import Memory
 
-from Ft.Lib import Uuid
+from Ft.Lib import Uuid, Uri
 import Ft.Rdf
 #note: because we change these values here other modules need to import utils
 #before importing any Ft.Rdf modules
@@ -492,7 +492,8 @@ def deserializeRDF(modelPath, driver=Memory, dbName='', scope='', modelName='def
         try:
             #if rdflib is installed, use its RDF/XML parser because it doesn't suck            
             import rdflib.TripleStore
-            ts = rdflib.TripleStore.TripleStore(modelPath)
+            ts = rdflib.TripleStore.TripleStore()
+            ts.parse(Uri.OsPathToUri(modelPath))
             from Ft.Rdf.Drivers import Memory    
             db = Memory.CreateDb('', 'default')
             import Ft.Rdf.Model
@@ -504,11 +505,20 @@ def deserializeRDF(modelPath, driver=Memory, dbName='', scope='', modelName='def
             #print 'parsing', modelPath, 'with rdflib'
             model.add( list(RxPath.rdflib2Statements(ts.triples( (None, None, None)))) )
         except ImportError:
-            model, db = Util.DeserializeFromUri(modelPath, driver, dbName, False, scope) 
+            model, db = Util.DeserializeFromUri(Uri.OsPathToUri(modelPath),
+                                               driver, dbName, False, scope) 
     else: #todo: add support for rxml
         raise 'unknown file type reading RDF: %s, only .rdf, .nt and .mk supported' % os.path.splitext(modelPath)[1]
     return model, db
 
+def convertToNTriples(path):
+    import StringIO
+    model, db = deserializeRDF(path)
+    moreTriples = StringIO.StringIO()                  
+    stmts = model.statements()
+    writeTriples(stmts, moreTriples)
+    return moreTriples.getvalue() 
+                   
 def writeTriples(stmts, stream):
     subject = 0
     predicate = 1
@@ -519,39 +529,39 @@ def writeTriples(stmts, stream):
         stmts = Model.Model(None)._unmapStatements(stmts)
     for stmt in stmts:       
        if stmt[0] is Comment:
-           stream.write("#" + stmt[1] + "\n")
+           stream.write("#" + stmt[1].encode('utf8') + "\n")
            continue
 
        if stmt[0] is Removed:
            stream.write("#!remove\n")
            stmt = stmt[1]
        if stmt[subject].startswith(BNODE_BASE):
-            stream.write('_:' + stmt[subject][BNODE_BASE_LEN:]) 
+            stream.write('_:' + stmt[subject][BNODE_BASE_LEN:].encode('utf8') ) 
        else:
-            stream.write("<" + stmt[subject] + ">")
+            stream.write("<" + stmt[subject].encode('utf8') + ">")
        if stmt[predicate].startswith(BNODE_BASE):
-            stream.write( '_:' + stmt[predicate][BNODE_BASE_LEN:]) 
+            stream.write( '_:' + stmt[predicate][BNODE_BASE_LEN:].encode('utf8') ) 
        else:            
-           stream.write(" <" + stmt[predicate] + ">")
+           stream.write(" <" + stmt[predicate].encode('utf8') + ">")
        if stmt[objectType] == OBJECT_TYPE_RESOURCE:
             if stmt[object].startswith(BNODE_BASE):
-                stream.write(' _:' + stmt[object][BNODE_BASE_LEN:] + ".\n") 
+                stream.write(' _:' + stmt[object][BNODE_BASE_LEN:].encode('utf8')  + ".\n") 
             else:
-                stream.write(" <" + stmt[object] + "> .\n")
+                stream.write(" <" + stmt[object].encode('utf8')  + "> .\n")
        else:           
            #escaped = repr(stmt[object])
            #if escaped[0] = 'u': 
            #    escaped = escaped[2:-1] #repr uses ' instead of " for string (and so doesn't escape ")
            #else:
            #    escaped = escaped[1:-1]
-           escaped = stmt[object].replace('\\', r'\\').replace('\"', r'\"').replace('\n', r'\n').replace('\r', r'\r').replace('\t', r'\t')           
+           escaped = stmt[object].replace('\\', r'\\').replace('\"', r'\"').replace('\n', r'\n').replace('\r', r'\r').replace('\t', r'\t').encode('utf8')
            if stmt[objectType] in [OBJECT_TYPE_LITERAL, OBJECT_TYPE_UNKNOWN]:
-               stream.write(' "' + escaped.encode('utf8') + '" .\n')
+               stream.write(' "' + escaped + '" .\n')
            elif stmt[objectType].find(':') == -1: #must be a lang code
-               stream.write(' "' + escaped.encode('utf8') + '"@' + stmt[objectType])
+               stream.write(' "' + escaped + '"@' + stmt[objectType].encode('utf8'))
                stream.write(" .\n")
            else: #objectType must be a URI
-               stream.write('"' + escaped.encode('utf8') + '"^^' + stmt[objectType])
+               stream.write(' "' + escaped + '"^^' + stmt[objectType].encode('utf8'))
                stream.write(" .\n")
 
 def sanitizeFilePath(filepath): #as in "sanity"
