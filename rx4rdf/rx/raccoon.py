@@ -1372,7 +1372,7 @@ else:
                 #no resources specified -- just add all the statements            
                 newStatements, removedNodes = RxPath.addDOM(self.rdfDom, rxmlDom,
                                                             authorizeHook)
-            else:            
+            else:
                 newStatements, removedNodes = RxPath.mergeDOM(self.rdfDom, rxmlDom,
                                                 resources, authorizeHook)
             return self.updateDom(newStatements, removedNodes, source, authorizeTuple[0])
@@ -1383,7 +1383,7 @@ else:
           '''        
           try:
               import zml
-              xml = zml.zmlString2xml(contents)#parse the rhizml to xml
+              xml = zml.zmlString2xml(contents, mixed=False)#parse the rhizml to xml
                         
               if isinstance(about, ( types.ListType, types.TupleType ) ):            
                   #about may be a list of text nodes, convert to a list of strings

@@ -520,7 +520,7 @@ templateList.append( ('@sitevars', rxml.zml2nt(contents=siteVars, nsMap=nsMap)) 
 
 import sys, time
 currentTime = "%.3f" % time.time() 
-platform = 'python ' + sys.version
+platform = 'python ' + sys.version.replace('\n','').replace('\r','')
 
 modelVars =\
 '''

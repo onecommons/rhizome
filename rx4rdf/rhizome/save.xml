@@ -124,10 +124,11 @@
     <!-- don't bother saving the last revision if this was just a minor edit
     todo: this doesn't delete the actual contents if stored in an external file
 
-    we disallow minor edit logic if the previous revision was edited by a different user 
+    we disallow minor edit logic if the previous revision was edited by a different user or we're the guest user
     (instead we add a minor-edit property to mark the revision as minor)
     -->
     <xu:variable name='replaceRevision' select="wf:get-metadata('minor_edit') and 
+       not($__user/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-guest') and 
        (not($resource/wiki:revisions/*) or ($resource/wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by = $__user)" /> 
         
     <xu:if test='$replaceRevision'>    

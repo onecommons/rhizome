@@ -968,6 +968,8 @@ class LinkFixer(HTMLParser.HTMLParser):
         self.endtag_text = match.string[match.start():match.end()]
         tag = match.group(1)        
         self.handle_endtag(tag.lower())
+        if sys.version_info[:2] > (2,2):
+            self.clear_cdata_mode() #this line is in the 2.3 version of HTMLParser.parse_endtag
         return j
         
     # Overridable -- handle end tag

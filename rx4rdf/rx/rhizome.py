@@ -74,7 +74,7 @@ class RhizomeBaseMarkupMap(zml.LowerCaseMarkupMap):
                         attribDict['interwiki']=value                
                 return tag, attribDict.items(), text
                 
-        external = url.find('://') > -1 or url[0] == '/'
+        external = (url.find(':') > -1 or url[0] == '/') and not url.startswith('site:')
 
         if external:
             if self.rhizome.externalLinkIndicator:
@@ -761,19 +761,23 @@ Options:
             if oldContents:
                 if base64decode:
                     #we want to base64 decode the old content before attempting the diff
-                    oldContents = base64.decodestring(oldContents)
+                    oldContents = base64.decodestring(oldContents)                
                 patchTupleList = utils.diff(contents, oldContents) #compare  
                 if patchTupleList is not None:
                     patch = pickle.dumps(patchTupleList)                    
                     
         if patch:            
             #save patch to disk:
-            filepath = self.server.evalXPath("string(.//a:contents/a:ContentLocation)", node=oldcontentsNode)            
+            filepath = self.server.evalXPath("string(.//a:contents/a:ContentLocation)", node=oldcontentsNode)
             #replace the revision's file with the patch (and if the revision doesn't have a file don't save to disk)
             if not filepath or not filepath.startswith('path:'): 
                 filepath = None
-            else:
-                filepath = filepath[len('path:'):]
+            else:                
+                filepath = filepath[len('path:'):]            
+                if not filepath.startswith(self.SAVE_DIR):
+                    #when we import content or for the initial rhizome files
+                    #the initial version won't be in the .rzvs dir
+                    filepath = self.SAVE_DIR + os.path.split(filepath)[1] + '.1'
             return self._saveContents(filepath, patch)
         else:
             return patch

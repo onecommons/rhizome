@@ -14,7 +14,7 @@ from __future__ import generators
 
 from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, Util, BNODE_BASE, BNODE_BASE_LEN,RDF_MS_BASE
 from Ft.Xml.XPath.Conversions import StringValue, NumberValue
-from Ft.Xml import XPath, InputSource, SplitQName
+from Ft.Xml import XPath, InputSource, SplitQName, EMPTY_NAMESPACE
 from Ft.Rdf.Statement import Statement
 from rx import utils
 from rx.utils import generateBnode, removeDupsFromSortedList
@@ -806,7 +806,7 @@ def mergeDOM(sourceDom, updateDOM, resources, authorize=None):
                     newNodes.extend(resNode.childNodes)
                 else:
                     #new resource: add the subject node
-                    newNodes.extend(resNode)
+                    newNodes.append(resNode)
         else:
             assert resNode in resourcesToDiff #resource in the list will have been added above
                        
@@ -1016,6 +1016,40 @@ BuiltInExtFunctions = {
 ##########################################################################
 ## "patches" to Ft.XPath
 ##########################################################################
+
+#4suite 1.0a3 disables this function but we really need it 
+#as a "compromise" we only execute this function if getElementById is there
+#(though if its not they should look for xml:id)
+from Ft.Xml.Xslt import XsltFunctions, XsltContext
+def Id(context, object):
+    """Function: <node-set> id(<object>)"""
+    id_list = []
+    if type(object) != type([]):
+        st = StringValue(object)
+        id_list = st.split()
+    else:
+        for n in object:
+            id_list.append(StringValue(n))
+
+    doc = context.node.rootNode
+    getElementById = getattr(doc, 'getElementById', None)
+    if not getElementById:
+       #this is from 4suite 1.0a3's version of id():
+       import warnings
+       warnings.warn("id() function not supported")
+       #We do not (cannot, really) support the id() function
+       return []
+           
+    nodeset = []
+    for id in id_list:
+       element = getElementById(id)
+       if element:
+           nodeset.append(element)
+    return nodeset
+
+XPath.CoreFunctions.CoreFunctions[(EMPTY_NAMESPACE, 'id')] = Id
+XPath.Context.Context.functions[(EMPTY_NAMESPACE, 'id')] = Id
+XsltContext.XsltContext.functions[(EMPTY_NAMESPACE, 'id')] = Id
 
 #fix bug in Ft.Rdf.Statement:
 def cmpStatements(self,other):
