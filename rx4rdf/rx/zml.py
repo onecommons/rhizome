@@ -771,6 +771,11 @@ def zmlString2xml(strText, markupMapFactory=None, **kw):
 def splitURI(uri):
     for i in xrange(len(uri)-1,-1,-1):
         if not (uri[i].isalnum() or uri[i] in '.-_'):
+            #the first character can't begin with a number or . or _            
+            while not uri[i+1].isalpha() and uri[i+1] != '_':
+                i += 1
+                if i+1 == len(uri):
+                    return uri, '' #can't split                    
             return uri[:i+1], uri[i+1:]
     return uri, ''
 
@@ -1350,16 +1355,24 @@ class ParseState:
                     st.namespaceStack.pop()
                     elementInfo[1] -= 1
             #handler.whitespace('\t')
-        elif type == NEWLINE or (type == OP and token == NEWSTMTCHAR):
+        elif type == NEWLINE or type == ENDMARKER or (
+                    type == OP and token == NEWSTMTCHAR):
             if st.in_attribs: #never encountered the :
                 st.startElement()            
             st.in_elemchild = 0
-            if st.lineElems: #don't set wantIndent if the line just had a string or comment 
-                st.wantIndent = 1
-                #remember the # of elements on this line so we can pop the right number
-                st.elementStack[-1][1] = st.lineElems
-                
-            handler.whitespace(token)
+
+            if type == ENDMARKER:
+                while st.wikiStack: st.popWikiStack()
+                while st.elementStack:
+                    handler.endElement( st.elementStack.pop()[0] )
+                while st.namespaceStack:
+                    st.namespaceStack.pop()
+            else:
+                if st.lineElems: #don't set wantIndent if the line just had a string or comment 
+                    st.wantIndent = 1
+                    #remember the # of elements on this line so we can pop the right number
+                    st.elementStack[-1][1] = st.lineElems                
+                handler.whitespace(token)
         elif type == COMMENT:
             if st.in_attribs:
                 #in attribs but never encountered the :
@@ -1383,12 +1396,6 @@ class ParseState:
                 else:
                     value = ''
                 handler.pi(name, value)                
-        elif type == ENDMARKER:
-            while st.wikiStack: st.popWikiStack()
-            while st.elementStack:
-                handler.endElement( st.elementStack.pop()[0] )
-            while st.namespaceStack:
-                st.namespaceStack.pop()
         elif type == ERRORTOKEN and not token.isspace(): #not sure why this happens
             raise ZMLParseError("unexpected token: " + repr(token))
 
@@ -1618,6 +1625,22 @@ class XML2ZML(HTMLParser.HTMLParser):
         if sys.version_info[:2] > (2,2):
             self.clear_cdata_mode() #this line is in the 2.3 version of HTMLParser.parse_endtag        
         return j
+
+    in_cdata_section = False
+    def updatepos(self, i, j):
+        #htmlparser doesn't support CDATA sections hence this terrible hack
+        #which rely on the fact that this will be called right after
+        #parse_declaration (which calls unknown_decl)
+        if self.in_cdata_section:
+            self.handle_data(self.rawdata[i:j])
+            self.in_cdata_section = False
+        return HTMLParser.HTMLParser.updatepos(self, i, j)
+        
+    def unknown_decl(self, data):
+        if data.startswith('CDATA['):
+            self.in_cdata_section = True
+        else:
+            return HTMLParser.HTMLParser.unknown_decl(self, data)
 
 def xml2zml(input, out, NL = os.linesep):
     zml = XML2ZML(out, nl=NL)
