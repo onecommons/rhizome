@@ -211,11 +211,12 @@ class Rhizome(object):
         else:
             result = getattr(SanitizeHTML, name)
         setattr(self, name, result)
-            
-        
+                    
     def configHook(self, kw):
         def initConstants(varlist, default):
             return raccoon.assignVars(self, kw, varlist, default)
+
+        self.server.APPLICATION_MODEL += RxPath.RDFSSchema.schemaTriples
         
         initConstants( ['MAX_MODEL_LITERAL'], -1)        
         self.SAVE_DIR = os.path.abspath( kw.get('SAVE_DIR', 'content/.rzvs') )
@@ -262,7 +263,6 @@ class Rhizome(object):
                 
         self.interWikiMapURL = kw.get('interWikiMapURL', 'site:///intermap.txt')
         initConstants( ['undefinedPageIndicator', 'externalLinkIndicator', 'interWikiLinkIndicator', 'useIndex' ], 1)
-        initConstants( ['authPredicates'], [])
         initConstants( ['RHIZOME_APP_ID'], '')
 
         self.passwordHashProperty = kw.get('passwordHashProperty',
@@ -414,13 +414,12 @@ class Rhizome(object):
         nodeset = [ node ]
         authresources = [ node ]
         while nodeset:                
-            nodeset = rdfDom.evalXPath('/*/*[* = $nodeset]', nsMap = self.server.nsMap,
+            nodeset = rdfDom.evalXPath('/*/auth:requires-authorization-for[* = $nodeset]', nsMap = self.server.nsMap,
                                        extFunctionMap = self.server.extFunctions,
-                                       vars = kw2vars(nodeset = nodeset) )
+                                       vars = kw2vars(nodeset = nodeset) )            
             nodeset = [p.parentNode for p in nodeset
-                        if p.stmt.predicate in self.authPredicates 
-                         and (not membershipList or p in membershipList) 
-                         and p.parentNode not in authresources] #avoid circularity
+                        if (not membershipList or p in membershipList) 
+                            and p.parentNode not in authresources] #avoid circularity
             authresources.extend(nodeset)
         return authresources
         
