@@ -4,7 +4,7 @@ import sys, glob, os, os.path, tempfile
 from distutils.core import setup
 #import py2exe
 
-version_string = "0.4.2b"
+version_string = "0.4.3"
 
 PACKAGE_NAME = 'rx4rdf'
 
@@ -58,8 +58,8 @@ def createScript(scriptFile, sourceFile):
 
 data_files = [
 		   ('share/rx4rdf',[ 'COPYING', 'README.txt'] ),
-		   ('share/rx4rdf/rdfscribbler',glob.glob('rdfscribbler/*') ),
-		   ('share/rx4rdf/docs',glob.glob('docs/*') ),
+		   #('share/rx4rdf/rdfscribbler',glob.glob('rdfscribbler/*') ),
+		   ('share/rx4rdf/blank',glob.glob('blank/*') ),
         ]
 
 #setup doesn't handle directory trees well, e.g. just using glob on each subtree doesn't work
@@ -70,6 +70,7 @@ def _addFiles(data_files, dirname, names):
 
 os.path.walk('site', _addFiles, data_files)
 os.path.walk('rhizome', _addFiles, data_files)
+os.path.walk('doc', _addFiles, data_files)
 
 setup(name=PACKAGE_NAME,
 #metadata:
