@@ -21,13 +21,12 @@ __addItem__('FOAFPaper',loc='path:.rzvs/FOAFPaper.zml', format='zml',
             title="Rhizome Position Paper", accessTokens=['base:save-only-token'],
             disposition='entry', doctype='document')
 
-for filename in ['archive-schema.rdf', 'xupdate-wd.html', 'changelog.txt']:
-    if filename == 'xupdate-wd.html':
-        format = 'xml'
-    else:
-        format = 'text'
-    __addItem__(filename,loc='path:.rzvs/'+filename, format=format, 
-           accessTokens=['base:save-only-token'], disposition='complete')
+__addItem__('archive-schema.rdf',loc='path:archive-schema.rdf', format='text', 
+       accessTokens=['base:save-only-token'], disposition='complete')
+__addItem__('changelog.txt',loc='path:.rzvs/changelog.txt', format='text', 
+       accessTokens=['base:save-only-token'], disposition='complete')
+__addItem__('xupdate-wd.html',loc='path:.rzvs/xupdate-wd.html', format='xml', 
+       accessTokens=['base:save-only-token'], disposition='complete')
 
 __addRxML__(replace = '@sitevars', contents = '''
  base:site-template:
