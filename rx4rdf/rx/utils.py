@@ -75,7 +75,7 @@ def bisect_left(a, x, cmp=cmp, lo=0, hi=None):
         else: hi = mid
     return lo
 
-def createThreadLocalProperty(name, fget=True, fset=True, fdel=True, doc=None, initAttr=False, initValue=None):
+def createThreadLocalProperty(name, fget=True, fset=True, fdel=True, doc=None, **kw):
     '''
     usage:
       class foo(object):
@@ -83,12 +83,19 @@ def createThreadLocalProperty(name, fget=True, fset=True, fdel=True, doc=None, i
 
     A KeyError will be thrown when attempting to get an attribute that has not been set in the current thread.
     For example, if an attribute is set in __init__() and then retrieved in another thread.
-    To avoid this, set initAttr to True, which will set the attribute value to initValue by default.
-    
+    To avoid this, pass an initValue argument, whose value will be used to initialize the attribute.
+        
     Deleting an attribute will delete it for all threads.
     '''
     import thread
-    
+    if kw.has_key('initValue'):
+        initAttr = True
+        initValue =  kw['initValue']
+        assert len(kw) == 1
+    else:
+        initAttr = False
+        assert len(kw) == 0
+        
     def getThreadLocalAttr(self):    
         attr = getattr(self, name, None)
         if attr is None:
@@ -1217,7 +1224,7 @@ class BlackListHTMLSanitizer(LinkFixer):
     * Using CSS to change the look of page elements outside the user's page real estate
     * Embedding (potentially dangerous or unacceptable) external images
     However, external stylesheets are banned because they may can contain
-    Javascript (in the form of a javascript: URLs or IE's "behavior" and Mozilla's "-moz-binding" rules)
+    Javascript (in the form of a javascript: URLs or IE's "behavior" and "expression()" and Mozilla's "-moz-binding" rules)
     '''
     __super = LinkFixer #set this (_BlackListHTMLSanitizer__super) let us chain to another LinkFixer using inheritance        
     
@@ -1227,14 +1234,14 @@ class BlackListHTMLSanitizer(LinkFixer):
                            'param', 'embed','applet']
     blacklistedAttributes = dict( [(re.compile(name), re.compile(value)) for name, value in 
            {'src|href|link|lowsrc|url|usemap|background|action': '(javascript|vbscript|data):.*',
-            'rel':r'.*stylesheet.*', #ban links to avoid external stylesheets (which may contain javascript urls)
-            'style': r'.*(javascript|vbscript|data|behavior|-moz-binding):.*', 
+            'rel':r'.*stylesheet.*', #ban stylesheet links to avoid external stylesheets (which may contain javascript urls)
+            'style': r'.*((javascript|vbscript|data|behavior|-moz-binding)\s*:|expression\s*\().*', 
             'http-equiv|on.*': '.*', #disallow these attributes
             }.items()] )
     #scan for content that appears either as text or in a comment
     blacklistedContent = {
         #avoid url() with javascript, data, etc.; behavior or -moz-binding rules and don't let external stylesheets be imported
-        re.compile('style'): re.compile(r'(javascript|vbscript|data|behavior|-moz-binding):|@import')
+        re.compile('style'): re.compile(r'(javascript|vbscript|data|behavior|-moz-binding):|@import|expression\s*\(')
         } 
 
     def onStrip(self, tag, name, value):
