@@ -8,7 +8,7 @@
     <x:variable name="title" select="wf:assign-metadata('title',  f:if($user, concat('Edit Profile of ', $user/wiki:login-name), 'Register new user'))"/>
     <x:value-of select="$title"/>
     <hr/>
-    <form action="{concat('site:///users/',$__resource/wiki:login-name)}" method="post">
+    <form action="{concat('site:///users/',f:if($user, $user/wiki:login-name, 'guest'))}" method="post">
       <table>
         <x:choose>
           <x:when test="not($user)">
@@ -49,6 +49,7 @@
         </tr>
         <tr>
           <td>
+            <input TYPE="hidden" NAME="action" VALUE="{f:if($user,'save','creation')}" />
             <button type="submit" name="action" value="{f:if($user,'save','creation')}">Signup</button>
           </td>
         </tr>
