@@ -342,15 +342,17 @@ class Processor:
                 context.processorNss = Domlette.GetAllNs(node)
 
                 result = _select.evaluate(context)
-                if type(result) is type([]):
-                    # a node-set
-                    for node in result:
-                        CopyNode(processor, node)
-                else:
+                #4suite bug CopyNode and processor undefined
+                #instead let's convert everything to string like XSLT
+                #if type(result) is type([]):
+                #    # a node-set
+                #    for node in result:
+                #        CopyNode(processor, node) 
+                #else:
                     # a string, number or boolean
-                    if type(result) is not type(u''):
-                        result = Conversions.StringValue(result)
-                    self.writers[-1].text(result)
+                if type(result) is not type(u''):
+                    result = Conversions.StringValue(result)
+                self.writers[-1].text(result)
                 context.processorNss = oldNss
             elif node.localName == 'text':
                 for child in node.childNodes:

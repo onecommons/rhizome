@@ -190,7 +190,15 @@ def addRxdom2Model(rootNode, model, nsMap = None, rdfdom = None, thisResource = 
     #revNsMap = dict(map(lambda x: (x[1], x[0]), nsMap.items()) )#reverse namespace map
     #rxNSPrefix = revNsMap[RX_NS]
     rxNSPrefix = [x[0] for x in nsMap.items() if x[1] == RX_NS]
-    
+    if not rxNSPrefix: #if RX_NS is missing from the nsMap add the 'rx' prefix if not already specified
+        if not nsMap.get('rx'):
+            nsMap['rx'] = RX_NS
+            rxNSPrefix = ['rx']
+    if not nsMap.get('rdf'):
+        nsMap['rdf'] = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
+    if not nsMap.get('rdfs'):
+        nsMap['rdfs'] = 'http://www.w3.org/2000/01/rdf-schema#'
+
     for s in rootNode.childNodes:
         if s.nodeType != s.ELEMENT_NODE:
             continue
@@ -320,11 +328,13 @@ def getRXAsRhizmlFromNode(resourceNodes, nsMap=None, includeRoot = False,
 
     return root + prefixes + line
 
-def rx2model(path, debug=0):    
+def rx2model(path, url=None, debug=0, nsMap = None):    
     from Ft.Lib import Uri
     from Ft.Xml import Domlette
-    
-    if isinstance(path, ( type(''), type(u'') )):
+
+    if url:
+        isrc = InputSource.DefaultFactory.fromUri(url)    
+    elif isinstance(path, ( type(''), type(u'') )):
         isrc = InputSource.DefaultFactory.fromUri(Uri.OsPathToUri(path))    
     else:
         isrc = InputSource.DefaultFactory.fromStream(path)    
@@ -335,25 +345,36 @@ def rx2model(path, debug=0):
     import Ft.Rdf.Model
     outputModel = Ft.Rdf.Model.Model(db)
     
-    addRxdom2Model(doc, outputModel, thisResource='wikiwiki:')
+    addRxdom2Model(doc, outputModel, nsMap = nsMap, thisResource='wikiwiki:')
     return outputModel, db
 
-def rx2statements(path, debug=0):
+def rx2statements(path, url=None, debug=0, nsMap = None):
     '''
     given a rxml file return a list of tuples like (subject, predicate, object, statement id, scope, objectType)
     '''
-    model, db = rx2model(path, debug)
+    model, db = rx2model(path, url, debug, nsMap)
     stmts = db._statements['default'] #get statements directly, avoid copying list
     return stmts
     
-def rx2nt(path, debug=0):
+def rx2nt(path, url=None, debug=0, nsMap = None):
     '''
     given a rxml file return a string of N-triples
+    path is either a stream-like object or a string that is file path
     '''
-    stmts = rx2statements(path, debug)
+    stmts = rx2statements(path, url, debug,nsMap)
     outputfile = StringIO.StringIO()
     utils.writeTriples(stmts, outputfile)
     return outputfile.getvalue()
+
+def rhizml2nt(stream=None, contents=None, debug=0, nsMap = None, addRootElement=True):
+    import rhizml
+    if stream is not None:
+        xml = rhizml.rhizml2xml(stream)
+    else:
+        xml = rhizml.rhizmlString2xml(contents)#parse the rxity to rx xml
+    if addRootElement:
+        xml = '<rx:rx>'+ xml+'</rx:rx>'
+    return rx2nt(StringIO.StringIO(xml), debug=debug, nsMap = nsMap)
             
 if __name__ == '__main__':                     
     if len(sys.argv) < 2:

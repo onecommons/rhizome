@@ -23,7 +23,7 @@ from utils import generateBnode
 from Ft.Xml import XPath
 import types
 from rx import logging #for python 2.2 compatibility
-log = logging.getLogger("rhizome")
+log = logging.getLogger("RDFDom")
 
 #from Ft.Rdf import RDF_MS_BASE -- for some reason we need this to be unicode for the xslt engine:
 RDF_MS_BASE=u'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
@@ -827,7 +827,7 @@ def applyXUpdate(rdfdom, xup = None, vars = None, extFunctionMap = None, uri='fi
 
 def evalXPath(rdfDom, xpath, nsMap = None, vars=None, extFunctionMap = None, node = None):
     node = node or rdfDom
-    #print node
+    #print node    
     log.debug(xpath)
     if extFunctionMap:
         extFunctionMap.update(BuiltInExtFunctions)
@@ -850,7 +850,8 @@ def main():
             #compExpr = XPath.Compile(query)
             #res = XPath.Evaluate(compExpr, rdfDom, context)
         except:
-            log.exception("Unexpected error")            
+            print "Unexpected error:", sys.exc_info()[0]
+            traceback.print_exc(file=sys.stdout)    
         else:
             print repr(res)
             if res:
@@ -865,7 +866,7 @@ def main():
         import utils
         model, db = utils.deserializeRDF( sys.argv[1] )
     else:
-        model, db = Util.DeserializeFromUri("./archive-template.rdf")
+        model, db = Util.DeserializeFromUri("./test/rdfdomtest1.rdf")
     ns =[ ('http://rx4rdf.sf.net/ns/archive#', u'a'),
           ('http://rx4rdf.sf.net/ns/wiki#', u'wiki'),
            ('http://www.w3.org/2002/07/owl#', u'owl'),
