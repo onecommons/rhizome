@@ -8,7 +8,8 @@
 			xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
 			xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >
 
-    <xu:if test='number($startTime) &lt; /*[wiki:name=$itemname]/a:last-modified/text()'>
+    <xu:if test='$itemname and not(wf:get-metadata("__noConflictDetection")) and 
+                number($startTime) &lt; /*[wiki:name=$itemname]/a:last-modified'>
         <xu:message text="Conflict: Item has been modified after you started editing this item!" terminate="yes" />
     </xu:if>
 
@@ -131,7 +132,7 @@
 
     <!-- set access control: remove previous, add selected, if any -->
     <xu:remove select='$resource/auth:guarded-by'/>
-    <xu:if test="$authtoken"> 
+    <xu:if test="wf:get-metadata('authtoken')"> 
        <xu:append select='$resource'>    
          <auth:guarded-by rdf:resource='{$authtoken}'/>
        </xu:append>
@@ -208,21 +209,23 @@
           &lt;br/>You can view this revision using this URL:
           &lt;a href='site:///{$itemname}?revision={$revnumber}'>{$itemname}?revision={$revnumber}&lt;/a>." />
    </xu:if>            
-        
+
+    <!-- select the raw content of the latest revision by getting the last (deepest) resource with a 'a:contents' predicate 
+         save this (and its digest) now because we might remove it below
+    -->         
+    <xu:variable name = 'lastContents' select="( ($resource/wiki:revisions/*/rdf:first/*)[last()]//a:contents)[last()]" />
+    <xu:variable name = 'lastContentsDigest' select="$lastContents/*/a:sha1-digest" />
+    
     <xu:if test='$replaceRevision'>        
         <!-- for simplicity's sake we implement this by just removing the last revision 
         before we add the new revision 
         We must do this before any possible patching because we may need to re-generate the last patch
-        -->        
-        <!-- save a reference to the last contents before we delete this revision so that we can pass it to save-contents -->
-        <xu:variable name = 'lastContents' select="( ($resource/wiki:revisions/*/rdf:first/*)[last()]//a:contents)[last()]" />
+        -->                
+        <xu:remove select='id($lastContents/*)'/>
         <xu:remove select='($resource/wiki:revisions/*/rdf:first)[last()]'/>
     </xu:if>
         
-    <xu:if test='not($replaceRevision)'>
-         <!-- select the raw content of the latest revision by getting the last (deepest) resource with a 'a:contents' predicate -->         
-        <xu:variable name = 'lastContents' select="( ($resource/wiki:revisions/*/rdf:first/*)[last()]//a:contents)[last()]" />
-    
+    <xu:if test='not($replaceRevision)'>    
         <!-- 
         remove previous revision's wiki:alt-contents
         otherwise, retrieving a previous revision would get the latest content sitting in wiki:alt-contents        
@@ -306,7 +309,7 @@
                    <a:contents>
                      <xu:copy-of select="wf:save-contents($itemname, $format, $contents,
                                     count($resource/wiki:revisions/*/rdf:first)+1, $resource, 
-                                    $title, string($lastContents), string($lastContents/*/a:sha1-digest))"/> 
+                                    $title, string($lastContents), string($lastContentsDigest))"/> 
                    </a:contents>
                </a:ContentTransform>
            </a:contents>
@@ -325,7 +328,7 @@
                 <!-- the user didn't specify a name or title, so select the first line of text so we have something to show  -->
                 <wiki:auto-summary><xu:value-of select="substring($contents, 1, 80)"/></wiki:auto-summary>
             </xu:if>
-            <xu:if test='$change_comment'>
+            <xu:if test="wf:get-metadata('change_comment')">
                 <rdfs:comment><xu:value-of select="$change_comment"/></rdfs:comment>
             </xu:if>
             <xu:if test='wf:get-metadata("label")'>
