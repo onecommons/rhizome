@@ -273,7 +273,23 @@ if not globals().has_key('hotReload'):
 # Create request and response instances (the same will be used all the time)
 if not _threading and _threadPool==1:
     # If we don't use threading, we don't care about concurrency issues among different requests
-    class _emptyClass: pass
+    class _emptyClass:
+        #rhizome changes:
+        def __repr__(self):
+            return repr(self.__dict__)
+
+        def __getstate__(self):
+            dictcopy = dict(self.__dict__)
+            if 'wfile' in dictcopy:
+                del dictcopy['wfile']
+            return dictcopy
+        
+        def __setstate__(self,dict):
+            '''maintains compatibility with old pickled requests'''
+            if 'browserQuery' not in dict:
+                dict['browserQuery'] = ''
+            self.__dict__.update(dict)
+            
     request=_emptyClass()
     response=_emptyClass()
 else:
@@ -699,12 +715,15 @@ if not globals().has_key('hotReload'):
         if request.isXmlRpc:
             request.paramMap = dict( zip( [str(x) for x in range(len(request.paramTuple))], request.paramTuple))
                         
-        #assume we only handle requests inside our home path:                
-        name = request.path[len(root.ROOT_PATH)-1:] #skip ROOT_PATH's initial '/' 
-        
-        request.browserBase = request.base + root.ROOT_PATH 
-        request.browserPath = request.browserUrl[len(request.browserBase):] #the operative part of the url (browserUrl = browserBase + browserPath)
-
+        #assume we only handle requests inside our home path:        
+        name = request.path[len(root.ROOT_PATH)-1:] #skip ROOT_PATH's initial '/'        
+        request.browserBase = request.base + root.ROOT_PATH         
+        #the operative part of the url (browserUrl = browserBase + browserPath + '?' + browserQuery)
+        path = request.browserUrl[len(request.browserBase):]
+        if path.find('?') > -1:
+            request.browserPath, request.browserQuery = path.split('?', 1)
+        else:
+            request.browserPath, request.browserQuery = path, ''
         #use virtual domain name in place of index
         #note: they still share the same set of page and also www.foo.com/bar == bar.foo.com/
         if not name or name == _indexName:            
@@ -750,7 +769,7 @@ if not globals().has_key('hotReload'):
     def _generateSessionId():
         s=''
         for i in range(50):
-            s+=whrandom.choice(string.letters+string.digits)
+            s+=random.choice(string.letters+string.digits)
         s+='%s'%time.time()
         return sha.sha(s).hexdigest()
 
@@ -973,7 +992,7 @@ if not globals().has_key('hotReload'):
 
     __all__ = ["CherryHTTPRequestHandler"]
 
-    import BaseHTTPServer, mimetypes, Cookie, whrandom, os.path, cPickle
+    import BaseHTTPServer, mimetypes, Cookie, random, os.path, cPickle
 
 
     class CherryHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -1269,7 +1288,7 @@ def ramOrFileOrCookieSaveSessionData(sessionId, sessionData):
             except:
                 _SITE_KEY_ = ''
                 for i in range(30):
-                    _SITE_KEY_ += whrandom.choice(string.letters)
+                    _SITE_KEY_ += random.choice(string.letters)
         # Update expiration time
         sessionMap = sessionData[0]
         _sessionData = (sessionMap, time.time()+_sessionTimeout*60)
