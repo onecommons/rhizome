@@ -30,7 +30,10 @@ log = logging.getLogger("racoon")
 #xpath variable namespaces:
 RXIKI_HTTP_REQUEST_HEADER_NS = 'http://rx4rdf.sf.net/ns/racoon/http-request-header#'
 RXIKI_HTTP_RESPONSE_HEADER_NS = 'http://rx4rdf.sf.net/ns/racoon/http-response-header#'
-RXIKI_COOKIES_NS = 'http://rx4rdf.sf.net/ns/racoon/cookie#'
+RXIKI_REQUEST_COOKIES_NS = 'http://rx4rdf.sf.net/ns/racoon/request-cookie#'
+RXIKI_RESPONSE_COOKIES_NS = 'http://rx4rdf.sf.net/ns/racoon/response-cookie#'
+RXIKI_SESSION_NS = 'http://rx4rdf.sf.net/ns/racoon/session#'
+RXIKI_PREV_NS = 'http://rx4rdf.sf.net/ns/racoon/previous#'
 #XPath extension functions:
 RXWIKI_XPATH_EXT_NS = 'http://rx4rdf.sf.net/ns/racoon/xpath-ext#'
 
@@ -166,8 +169,12 @@ def _onMetaData(kw, context, name, func):
         retVal = func(local, kw['_request'].headerMap)
     elif namespace == RXIKI_HTTP_RESPONSE_HEADER_NS:
         retVal = func(local, kw['_response'].headerMap)     
-    elif namespace == RXIKI_COOKIES_NS:
-        retVal = func(local, kw['_request'].cookieMap)
+    elif namespace == RXIKI_REQUEST_COOKIES_NS: #assigning values will be automatically converted to a Morsel
+        retVal = func(local, kw['_request'].simpleCookie)
+    elif namespace == RXIKI_RESPONSE_COOKIES_NS: #assigning values will be automatically converted to a Morsel
+        retVal = func(local, kw['_response'].simpleCookie)        
+    elif namespace == RXIKI_SESSION_NS:
+        retVal = func(local, kw['_session'])        
     else:
         raise 'unusable namespace: ', namespace 
     return retVal
@@ -188,10 +195,14 @@ DefaultExtFunctions = {
 
 DefaultNsMap = { 'owl': 'http://www.w3.org/2002/07/owl#',
            'rdf' : 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+            'rdfs' : 'http://www.w3.org/2000/01/rdf-schema#',
            'wf' : RXWIKI_XPATH_EXT_NS,
            'request-header' : RXIKI_HTTP_REQUEST_HEADER_NS,
            'response-header' : RXIKI_HTTP_RESPONSE_HEADER_NS,
-           'cookie' : RXIKI_COOKIES_NS,
+           'request-cookie' : RXIKI_REQUEST_COOKIES_NS,
+           'response-cookie' : RXIKI_RESPONSE_COOKIES_NS,                 
+           'session' : RXIKI_SESSION_NS,
+            'prev' : RXIKI_PREV_NS,
            'xf' : 'http://xmlns.4suite.org/ext'
         }
 
@@ -209,7 +220,7 @@ DefaultContentProcessors = {
 ##Helper Classes
 ############################################################
 
-class Requestor:
+class Requestor(object):
     '''
     Requestor is a helper class that allows python code to invoke a Racoon request as if it was function call
     Usage:
@@ -220,10 +231,11 @@ class Requestor:
         self.server = server
         self.triggerName = triggerName
 
-    def invoke(self, name, **kw):
-        return self.invokeEx(name, kw)[0]
+    #the trailing __ so you can have requests named 'invoke' without conflicting    
+    def invoke__(self, name, **kw):
+        return self.invokeEx__(name, kw)[0]
         
-    def invokeEx(self, name, kw):
+    def invokeEx__(self, name, kw):
         #print 'invoke', kw
         kw['_name']=name
         result = self.server.runActions(self.triggerName, kw) 
@@ -232,8 +244,10 @@ class Requestor:
         else:
             raise AttributeError, name
     
-    def __getattr__(self, name):        
-        return lambda **k: self.invoke(name, **k)
+    def __getattr__(self, name):
+        if name in ['__hash__','__nonzero__', '__cmp__', '__del__']: #undefined but reserved attribute names
+            raise AttributeError("'Requestor' object has no attribute '%s'" %name)
+        return lambda **k: self.invoke__(name, **k)
         #else:raise AttributeError, name #we can't do this yet since we may need the parameters to figure out what to invoke (like a multimethod)
 
 class SiteUriResolver(Uri.SchemeRegistryResolver):
@@ -327,14 +341,14 @@ class SiteUriResolver(Uri.SchemeRegistryResolver):
                         
         try:
             #print 'to resolve!', name, ' ', uri
-            contents = self.server.requestDispatcher.invoke(name, **paramMap)
+            contents = self.server.requestDispatcher.invoke__(name, **paramMap)
             #print 'resolved', name, ': ', contents
             return StringIO.StringIO( contents )
         except AttributeError: #not found
             raise UriException(UriException.RESOURCE_ERROR, uri, 'Not Found')
 
 class Action(object):    
-    def __init__(self, queries, action = None, matchFirst = True, forEachNode = False, requiresContext = False):
+    def __init__(self, queries, action = None, matchFirst = True, forEachNode = False, depthFirst = True, requiresContext = False):
         '''Queries is a list of RxPath expressions associated with this action
 Action must be a function with this signature:    
 def action(resultNodeset, kw, contextNode, retVal) where:
@@ -353,8 +367,23 @@ otherwise the action will be called once and whole nodeset will passed as the re
         self.action = action
         self.matchFirst = matchFirst 
         self.forEachNode = forEachNode
-        self.requiresContext = requiresContext 
+        self.requiresContext = requiresContext
+        self.depthFirst = depthFirst
+        self.preVars = {}
+        self.postVars = {}
         # self.requiresRetVal = requiresRetVal not yet implemented
+
+    def assign(self, varName, *exps, **kw):
+        '''
+        Add a variable and expression list.
+        Before the Action is run the each expression evaluated, the first one that returns a non-empty value is assigned to the variable.
+        Otherwise, the result of last expression is assigned (so you can choose between '', [], and 0).
+        '''
+        assert len(exps), 'Action.assign requires at least one expression'
+        if kw.get('post', False):
+            self.postVars[varName] = exps
+        else:
+            self.preVars[varName] = exps
 
 ############################################################
 ##Racoon main class
@@ -395,6 +424,7 @@ class Root(object):
                 break
             i += 1
         argsForConfig = argv[i+1:]
+        self.cmd_usage = DEFAULT_cmd_usage
         self.loadConfig(configpath, argsForConfig)
         self.loadModel()
         self.requestDispatcher = Requestor(self)
@@ -454,11 +484,13 @@ class Root(object):
                 setattr(self, name, value)
                         
         initConstants( [ 'nsMap', 'extFunctions', 'contentProcessors', 'actions'], {} )
-        initConstants( [ 'STORAGE_PATH', 'STORAGE_TEMPLATE_PATH', 'STORAGE_TEMPLATE', 'APPLICATION_MODEL', 'ROOT_PATH' ], '')
+        initConstants( [ 'STORAGE_PATH', 'STORAGE_TEMPLATE_PATH', 'STORAGE_TEMPLATE', 'APPLICATION_MODEL'], '')
+        initConstants( ['ROOT_PATH'], '/')
+        assert self.ROOT_PATH[0] == '/', "ROOT_PATH must start with a '/'"
         initConstants( ['BASE_MODEL_URI'], self.BASE_MODEL_URI)
         self.PATH = kw.get('PATH', self.PATH)
         self.SECURE_FILE_ACCESS= kw.get('SECURE_FILE_ACCESS', True)        
-        self.cmd_usage = DEFAULT_cmd_usage + kw.get('cmd_usage', '[config-specific options]')    
+        self.cmd_usage = DEFAULT_cmd_usage + kw.get('cmd_usage', '')    
         self.nsMap.update(DefaultNsMap)
         self.contentProcessors.update(DefaultContentProcessors)
         self.extFunctions.update(DefaultExtFunctions)
@@ -529,7 +561,9 @@ class Root(object):
         sequence = self.actions.get(triggerName)
         if sequence:
             return self.doActions(sequence, kw)
-            
+
+    COMPLEX_REQUESTVARS = ['__requestor__', '__server__','_request', '_response','_session', '_prevkw', '__argv__']
+    
     def mapToXPathVars(self, kw):
         '''map request kws to xpath vars (include http request headers)'''
         extFuncs = self.extFunctions.copy()
@@ -541,19 +575,29 @@ class Root(object):
         })
         #add most kws to vars (skip references to non-simple types):
         vars = dict( [( (None, x[0]), x[1] ) for x in kw.items()\
-                      if x[0] not in ['__requestor__', '__server__','_request', '_response','__argv__']] )       
+                      if x[0] not in self.COMPLEX_REQUESTVARS] )       
         #magic constants:
         vars[(None, 'STOP')] = 0
-        vars[(None, 'ROOT_PATH')] = self.ROOT_PATH
+        vars[(None, 'ROOT_PATH')] = self.ROOT_PATH        
         vars[(None, 'BASE_MODEL_URI')] = self.BASE_MODEL_URI        
         #http request and response vars:
         request = kw.get('_request', None)
         if request:
+            vars[(None, '_url')] = request.browserUrl
+            vars[(None, '_base-url')] = request.browserBase            
+            vars[(None, '_path')] = request.browserPath 
             vars.update( dict(map(lambda x: ((RXIKI_HTTP_REQUEST_HEADER_NS, x[0]), x[1]), request.headerMap.items()) ) )
-            vars.update( dict(map(lambda x: ((RXIKI_COOKIES_NS, x[0]), x[1]), request.cookieMap.items()) ) )
+            vars.update( dict(map(lambda x: ((RXIKI_REQUEST_COOKIES_NS, x[0]), x[1].value), request.simpleCookie.items()) ) )
         response = kw.get('_response', None)
         if response:
-            vars.update( dict(map(lambda x: ((RXIKI_HTTP_RESPONSE_HEADER_NS, x[0]), x[1]), response.headerMap.items()) ) )      
+            vars.update( dict(map(lambda x: ((RXIKI_HTTP_RESPONSE_HEADER_NS, x[0]), x[1]), response.headerMap.items()) ) )
+            vars.update( dict(map(lambda x: ((RXIKI_RESPONSE_COOKIES_NS, x[0]), x[1].value), request.simpleCookie.items()) ) )
+        session = kw.get('_session', None)
+        if session:
+            vars.update( dict(map(lambda x: ((RXIKI_SESSION_NS, x[0]), x[1]), session.items()) ) )
+        prevkw = kw.get('_prevkw', None)
+        if prevkw:
+            vars.update( dict(map(lambda x: ((RXIKI_PREV_NS, x[0]), x[1]), prevkw.items()) ) )
         #print 'vars', vars
         return vars, extFuncs
 
@@ -566,7 +610,7 @@ class Root(object):
             return evalXPath(self.rdfDom, xpath, nsMap = self.nsMap, vars=vars, extFunctionMap = extFunctionMap , node = node)
         except (RuntimeException), e:
             if e.errorCode == RuntimeException.UNDEFINED_VARIABLE:
-                log.info("%s", e.message) #this is ok
+                log.debug(e.message) #undefined variables are ok
             else:
                 raise
 
@@ -582,6 +626,20 @@ class Root(object):
                 return None
         else: #assume its some sort of node
             return StringValue(result)
+
+    def __assign(self, actionvars, kw, contextNode):
+        for name, exps in actionvars.items():
+            vars, extFunMap = self.mapToXPathVars(kw)
+            for exp in exps:
+                #print exp
+                result = self.evalXPath(exp, vars=vars, extFunctionMap = extFunMap, node = contextNode)
+                if result:
+                    if name == '_resource' and isinstance(result, type([])):
+                        result = result[0]
+                    kw[name] = result
+                    break
+            if not result:
+                kw[name] = result
             
     def doActions(self, sequence, kw = None, contextNode = None, retVal = None):
         if kw is None: kw = {}
@@ -592,11 +650,15 @@ class Root(object):
                 contextNode = contextNode[0]
             if action.requiresContext:
                 if not contextNode: #if the next action requires a contextnode and there isn't one, end the sequence
-                    return retVal 
+                    return retVal
+
+            self.__assign(action.preVars, kw, contextNode)
+                                
             for xpath in action.queries:
+                #print 'contextNode', contextNode
                 kw['_context'] = [ contextNode ]  #_context so access to the rdf database is available to xsl, xupdate, etc. processing
-                #todo add _root variable also?
-                vars, extFunMap = self.mapToXPathVars(kw)        
+                #todo add _root variable also? 
+                vars, extFunMap = self.mapToXPathVars(kw)
                 result = self.evalXPath(xpath, vars=vars, extFunctionMap = extFunMap, node = contextNode)
                 if type(result) in [types.IntType,types.FloatType]:#for $STOP
                     break
@@ -610,15 +672,40 @@ class Root(object):
                         if not isinstance(result, type([])):
                             result = [ result ]
                         if action.forEachNode:
-                            result.reverse()#we probably want the reverse of document order (e.g. the deepest first)
+                            if action.depthFirst:
+                                result.reverse()#we probably want the reverse of document order (e.g. the deepest first)
                             for node in result:
                                 retVal = action.action(node, kw, contextNode, retVal)
                         else:
                             retVal = action.action(result, kw, contextNode, retVal)
                     if action.matchFirst:
                         break
+            self.__assign(action.postVars, kw, contextNode)
         return retVal
-    
+
+    def callActions(self, actions, globalVars, resultNodeset, kw, contextNode, retVal):
+        '''
+        process another set of actions using the current context as input,
+        but without modified the current context.
+        Particularly useful for template processing.
+        '''
+        prevkw = kw.get('_prevkw', {}).copy() #merge previous prevkw, overriding vars as necessary
+        templatekw = {}
+        for k, v in kw.items():
+            #initialize the templates variable map copying the core request kws
+            #and copy the rest (the application specific kws) to _prevkw
+            #this way the template processing doesn't mix with the orginal request
+            #but are made available in the 'previous' namespace (think of them as template parameters)
+            if k in self.COMPLEX_REQUESTVARS + globalVars:
+                templatekw[k] = v
+            else:
+                prevkw[k] = v
+        templatekw['_prevkw'] = prevkw    
+        templatekw['_contents'] = retVal            
+        templatekw['_prevnode'] = [ contextNode ] #nodeset containing current resource
+
+        return self.doActions(actions, templatekw, resultNodeset) #the resultNodeset is the contextNode so skip the find resource step
+            
 ###########################################
 ## content processing 
 ###########################################
@@ -684,6 +771,7 @@ class Root(object):
         sys_stdout = sys.stdout
         sys.stdout = output
         try:        
+            #exec '%s' % `cmds` in globals(), kw
             exec cmds.strip()+'\n' in globals(), kw
             contents = output.getvalue()
         except:
@@ -813,8 +901,8 @@ class Root(object):
 ##command line handling
 #################################################
     
-DEFAULT_cmd_usage = 'python [racoon.py -l [log.config] -r -d [debug.pkl] -x -s server.cfg -p path -m store.nt] -a config.py'
-cmd_usage = '''
+DEFAULT_cmd_usage = 'python [racoon.py -l [log.config] -r -d [debug.pkl] -x -s server.cfg -p path -m store.nt] -a config.py [config specific options]'
+cmd_usage = '''\nusage:
 -h this help message
 -s server.cfg specify an alternative server.cfg
 -l [log.config] specify a config file for logging
@@ -823,7 +911,8 @@ cmd_usage = '''
 -x exit after executing config specific cmd arguments
 -p specify the path (overrides RHIZPATH env. variable)
 -m [store.nt] load the RDF model (.rdf, .nt, .mk supported)
-   (if file is type NTriple it will override STORAGE_PATH otherwise it is used as the template)
+   (if file is type NTriple it will override STORAGE_PATH
+   otherwise it is used as the template)
 -a [config.py] run the application specified
 '''
 
@@ -854,12 +943,18 @@ if __name__ == '__main__':
         else:
             import logging.config as log_config          
         log_config.fileConfig(logConfig) #todo document loggers: rhizome, server, racoon, rdfdom
+        #any logger already created and not explicitly specified in the log config file is disabled
+        #this seems like a bad design -- certainly took me a while to why understand things weren't getting logged
+        #so re-enable the loggers
+        for logger in logging.Logger.manager.loggerDict.itervalues():
+            logger.disabled = 0        
     else: #set defaults        
-        logger.BASIC_FORMAT = "%(asctime)s %(levelname)s %(name)s:%(message)s" 
-        logger.basicConfig()
+        logging.BASIC_FORMAT = "%(asctime)s %(levelname)s %(name)s:%(message)s" 
+        logging.basicConfig()
         
     if '-h' in mainArgs or '--help' in mainArgs:
-        print DEFAULT_cmd_usage,'[config specific options]'
+        #print DEFAULT_cmd_usage,'[config specific options]'
+        print root.cmd_usage
         print cmd_usage
     elif '-d' in mainArgs: 
         try:
