@@ -17,7 +17,8 @@
 <xsl:param name="_base-url" />
 <xsl:param name="_url" />
 <xsl:param name="_name" />
-<xsl:output indent='yes'/>
+<xsl:param name="BASE_MODEL_URI" />
+<xsl:output indent='yes' encoding="UTF-8" />
 <xsl:variable name="searchExp">     
      <xsl:choose>
         <xsl:when test="$searchType='Simple'">                     
@@ -164,7 +165,7 @@ No results found.
 <xsl:if test='not($results)'>
 No results found.
 </xsl:if>
-<form METHOD="POST" ACTION="site:///save-metadata" ENCTYPE="multipart/form-data">	
+<form method="POST" action="site:///save-metadata" accept-charset='UTF-8' enctype="multipart/form-data">	
     <input TYPE="hidden" NAME="itemname" VALUE="save-metadata" />
     <input TYPE="hidden" NAME="action" VALUE="save-metadata" />    
     <xsl:for-each select="$results">
