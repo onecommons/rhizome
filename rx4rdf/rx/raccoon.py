@@ -51,6 +51,12 @@ else:
     _defexception = utils.DynaExceptionFactory(__name__)
 
     _defexception('CmdArgError')
+
+    class DoNotHandleException(Exception):
+        '''
+        RequestProcessor.doActions() will not invoke error handler actions on
+        exceptions derived from this class.
+        '''
     
     #xpath variable namespaces:
     RXIKI_HTTP_REQUEST_HEADER_NS = 'http://rx4rdf.sf.net/ns/raccoon/http-request-header#'
@@ -840,14 +846,14 @@ else:
                 #and in this case we don't want them in the key since we add the stylesheet's params instead
                 value = field.evaluate(context) #may raise RuntimeException.UNDEFINED_VARIABLE
                 expanded = _splitKey(field._key, context)
-                if type(value) is type([]):
+                if isinstance(value, list):
                     value = tuple(value)
                     DomDependent = True
                 elif isinstance(value, _Node):
                     DomDependent = True                
                 key.append( (expanded, value) )
             elif isinstance(field, XPath.ParsedExpr.FunctionCall):
-                DomDependent = True #todo: we could check if its a 'static' function that isn't domdendent
+                DomDependent = True #todo: we could check if its a 'static' function that doesn't access the dom
                 expandedKey = _splitKey(field._key, context)
                 if expandedKey in notCacheableXPathFunctions:
                     keyfunc = notCacheableXPathFunctions[expandedKey]
@@ -974,6 +980,8 @@ else:
             #except XPath.RuntimeException: if e.code = XPath.RuntimeException.UNDEFINED_VARIABLE:
             except:
                 raise MRUCache.NotCacheable
+            if isinstance(value, list):
+                value = tuple(value)                
             return (varRef, value)
         else:
             raise MRUCache.NotCacheable
@@ -1440,6 +1448,8 @@ else:
                 else:
                     self.inErrorHandler += 1
                 try:
+                    if isinstance(sys.exc_info()[1], DoNotHandleException):
+                        raise
                     errorSequence = self.actions.get('on-error')
                     if errorSequence and sequence is not errorSequence:
                         import traceback as traceback_module
@@ -1887,7 +1897,8 @@ else:
                   about = [StringValue(x) for x in about]
               elif about is not None:
                   about = [ about ]
-              self.processRxML('<rx:rx>'+ xml+'</rx:rx>', about, source=user)
+              xml ='<rx:rx>'+ xml+'</rx:rx>'
+              self.processRxML(xml, about, source=user)
           except NotAuthorized:
             raise
           except:
@@ -2289,7 +2300,7 @@ else:
                         raise ValueError
                 except (IndexError, ValueError):
                     debugFileName = 'debug-wiki.pkl'
-                requests = pickle.load(file(debugFileName, 'rb'))        
+                requests = pickle.load(file(debugFileName, 'rb'))
                 for request in requests:
                     root.handleRequest(request[0], **request[1])
             elif '-x' not in mainArgs: #if -x (execute cmdline and exit) we're done
