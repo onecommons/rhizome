@@ -41,7 +41,7 @@ class ZMLParseError(NestedException):
         self.state = state #line, col #, etc.
         if state:
             self.msg = 'ZML syntax error at line %d, column %d: %s\nline: "%s"' % (
-                state.currentStartPos[0], state.currentStartPos[1], self.msg, state.currentLine.trim())
+                state.currentStartPos[0], state.currentStartPos[1], self.msg, state.currentLine.strip())
             self.args = ( self.msg, ) #'cuz that's the way Exception stores its message
         
 ######################################################
@@ -97,6 +97,9 @@ N_TOKENS += 1
 IGNORE = N_TOKENS
 tok_name[IGNORE] = 'IGNORE'
 N_TOKENS += 1
+URIREF = N_TOKENS
+tok_name[URIREF] = 'URIREF'
+N_TOKENS += 1
 
 def group(*choices): return '(' + '|'.join(choices) + ')'
 def any(*choices): return apply(group, choices) + '*'
@@ -108,6 +111,7 @@ Comment = r';[^\r\n]*' #replace # with ;
 StrLine = r'`[^\r\n]*'
 Ignore = Whitespace + any(r'\\\r?\n' + Whitespace) + maybe(Comment) + maybe(StrLine)
 Name = r'[a-zA-Z_][\w:.-]*' #added _:.-
+URIRef =  r"\{[a-zA-Z_][\w:.-\]\[;/?@&=+$,!~*'()%#]*\}"
 Hexnumber = r'0[xX][\da-fA-F]*[lL]?'
 Octnumber = r'0[0-7]*[lL]?'
 Decnumber = r'[1-9]\d*[lL]?'
@@ -139,7 +143,7 @@ Operator = group(r"\*\*=?", r">>=?", r"<<=?", r"<>", r"!=",
                  r"[+\-*/%&|^=<>]=?",
                  r"~")
 
-Bracket = '[][(){}]'
+Bracket = '[][()]' #remove {}
 Special = group(r'\r?\n', r'[:#,]') #removed `. replace ; with #
 Funny = group(Operator, Bracket, Special)
 
@@ -152,7 +156,7 @@ ContStr = group(r"[pP]?[rR]?'[^\n'\\]*(?:\\.[^\n'\\]*)*" +
                 r'[pP]?[rR]?"[^\n"\\]*(?:\\.[^\n"\\]*)*' +
                 group('"', r'\\\r?\n'))
 PseudoExtras = group(r'\\\r?\n', Comment, Triple, StrLine)
-PseudoToken = Whitespace + group(PseudoExtras, Funny, ContStr, Name, Number) 
+PseudoToken = Whitespace + group(PseudoExtras, Funny, ContStr, Name, URIRef, Number) #added URIRef
 
 tokenprog, pseudoprog, single3prog, double3prog = map(
     re.compile, (Token, PseudoToken, Single3, Double3))
@@ -384,12 +388,13 @@ def tokenize_loop(readline, tokeneater, useFreestr = True, counter = None):
                         tokeneater(OP, token[-1], epos, epos, line)
                     else:
                         tokeneater(NAME, token, spos, epos, line)
-                    
+                elif initial == '{':                 # URIRef
+                    tokeneater(URIREF, token, spos, epos, line)                    
                 elif initial == '\\':                      # continued stmt
                     continued = 1
-                else:
-                    if initial in '([{': parenlev = parenlev + 1
-                    elif initial in ')]}': parenlev = parenlev - 1
+                else: 
+                    if initial in '[(': parenlev = parenlev + 1 #removed { and }
+                    elif initial in ')]': parenlev = parenlev - 1
                     tokeneater(OP, token, spos, epos, line)
             else:
                 tokeneater(ERRORTOKEN, line[pos],
@@ -443,7 +448,7 @@ class OutputHandler(Handler):
         
     def endElement(self, element):
         if self.element:
-            assert element == self.element
+            assert element == self.element, '%s != %s' % (element, self.element)
             self.output.write(u' />') #empty element
             self.element = None            
         else:
@@ -550,6 +555,8 @@ class MarkupMap(object):
         if name is None:
             if link.startswith('site:///'):
                 name = link[len('site:///'):]
+            elif link.startswith('#'): #anchor link
+                name = link[1:] 
             else:
                 name = link
         #print link, not annotations or [a.name for a in annotations]
@@ -562,7 +569,7 @@ class MarkupMap(object):
                 attribs = [('name', xmlquote(link)) ]
             else:
                 attribs = [ ('href', xmlquote(link)) ]
-            if annotations:
+            if annotations and annotations[0].name != 'wiki:xlink-replace':
                 attribs += [ ('rel', xmlquote(annotations[0].name)) ]
             return self.A, attribs, name
 
@@ -634,27 +641,6 @@ def interWikiMapParser(interwikimap):
             prefix, url = line.split()
             interWikiMap[prefix.lower()] = url
     return interWikiMap
-
-def normalizeAttribs(attribs, handler=None):
-    '''
-    returns list of (name, value) tuples (use list to preserve order)
-    '''
-    cleanAttribs = []
-    i = 0
-    while i+1 <= len(attribs):
-        if i+1 == len(attribs) or attribs[i+1] != '=': #last item or next item != '=' : assume attribute minimalization
-            cleanAttribs.append( (attribs[i], '"' + attribs[i] + '"') )
-            i+=1
-        else:
-            val = attribs[i+2]
-            if val[0] not in '\'"':
-                val = '"'+val+'"'
-            cleanAttribs.append( (attribs[i], val) )
-            i+=3
-    if handler is not None:
-        for name, value in cleanAttribs:
-            handler.attrib(name, value)
-    return cleanAttribs
 
 def stripQuotes(strQuoted, checkEscapeXML=True):    
     if strQuoted[0] == '`':
@@ -732,6 +718,12 @@ def zmlString2xml(strText, markupMapFactory=None, **kw):
     contents = zml2xml(fd, mmf=markupMapFactory, **kw)   
     return contents
 
+def splitURI(uri):
+    for i in xrange(len(uri)-1,-1,-1):
+        if not (uri[i].isalnum() or uri[i] in '.-_'):
+            return uri[:i+1], uri[i+1:]
+    return uri, ''
+
 def _group(*choices): return '(' + '|'.join(choices) + ')'
 defexp =  r'\='
 tableexp= r'\|' 
@@ -743,9 +735,6 @@ linkexp = r'\[.*?\]'#any [.*] except when a [ is behind the leading
 #todo linkexp doesn't handle ] in annotation strings or IP6 hostnames in URIs
 #match any of the above unless proceeded by an odd number of \
 inlineprog = re.compile(r'(((?<!\\)(\\\\)+)|[^\\]|^)'+_group(defexp,tableexp,bold,monospace,italics,linkexp,brexp))
-
-def inlineTokenMap(st):
-    return { '/' : st.mm.I, '_' : st.mm.B, '^' : st.mm.TT}
 
 def parseLinkType(string, annotationList = None):
     '''
@@ -783,216 +772,305 @@ def parseLinkType(string, annotationList = None):
     handler = TypeParseHandler(annotationList)
     zmlString2xml(string, handler=handler, mixed=False)
     return annotationList
- 
-def _handleInlineWiki(st, handler, string, wantTokenMap=None, userTextHandler=None):
-    inlineTokens = inlineTokenMap(st)
-    if wantTokenMap is None:
-        wantTokenMap = inlineTokens
-    if userTextHandler is None:
-        userTextHandler = lambda s: handler.text(s)
-    textHandler = lambda s: userTextHandler(re.sub(r'\\(.)',r'\1', xmlescape(s)) ) #xmlescape then strip out \ (but not \\) 
-    pos = 0
-    while 1:
-        match = inlineprog.search(string[pos:]) #we can't do search(string, pos) because of ^ in our regular expression
-        if match:
-            start, end = match.span(4) #0
-            start += pos
-            end += pos
-            token = string[start]
-            elem = wantTokenMap.get(token)
-            if elem:                
-                textHandler(string[pos:start])
-                if token == '=':
-                    del wantTokenMap['='] #only do this once per line
-                elif token == '|':
-                    if len(string) > start+1 and string[start+1] == '|': #|| = header                    
-                        cell = st.mm.TH
-                        end += 1 #skip second |
+
+class ParseState:
+    def __init__(st):    
+        st.in_attribs = 0
+        st.in_wikicont = 0 #not implemented
+        st.in_elemchild = 0
+        st.wantIndent = 0
+        st.lineElems = 0 #just 0 or 1 right now
+        st.in_freeform = 0 #are we in wikimarkup?
+        st.nlcount = 0 #how many blank lines following wikimarkup
+        st.toClose = 0 #how many inline elements need to be closed at the end of the wikimarkup line
+        st.attribs = []
+        st.currentLine = ''
+        st.currentStartPos = (0, 0)
+        st.nextGeneratedPrefixCounter = 0    
+        st.elementStack = []
+        #the stack of elements created by wiki markup that has yet to be closed
+        #should maintain this order: nestable block elements (e.g. section, blockquote)*, block elements (e.g. p, ol/li, table/tr)+, inline elements*
+        st.wikiStack = []    
+        st.wikiStructureStack = {}
+
+    def inlineTokenMap(st):
+        return { '/' : st.mm.I, '_' : st.mm.B, '^' : st.mm.TT}
+     
+    def _handleInlineWiki(st, handler, string, wantTokenMap=None, userTextHandler=None):
+        inlineTokens = st.inlineTokenMap()
+        if wantTokenMap is None:
+            wantTokenMap = inlineTokens
+        if userTextHandler is None:
+            userTextHandler = lambda s: handler.text(s)
+        textHandler = lambda s: userTextHandler(re.sub(r'\\(.)',r'\1', xmlescape(s)) ) #xmlescape then strip out \ (but not \\) 
+        pos = 0
+        while 1:
+            match = inlineprog.search(string[pos:]) #we can't do search(string, pos) because of ^ in our regular expression
+            if match:
+                start, end = match.span(4) #0
+                start += pos
+                end += pos
+                token = string[start]
+                elem = wantTokenMap.get(token)
+                if elem:                
+                    textHandler(string[pos:start])
+                    if token == '=':
+                        del wantTokenMap['='] #only do this once per line
+                    elif token == '|':
+                        if len(string) > start+1 and string[start+1] == '|': #|| = header                    
+                            cell = st.mm.TH
+                            end += 1 #skip second |
+                        else:
+                            cell = st.mm.TD
+                        wantTokenMap['|'] = cell #user may have switched from || to | or from || to | (not sure if this is valid html though)
+
+                    if token in inlineTokens.keys(): 
+                        if st.wikiStack.count(elem): #if the elem is open 
+                            while st.wikiStack[-1] != elem: #close it
+                                wikiElem = st.popWikiStack()
+                                if wikiElem in inlineTokens.values(): #these elements need st.toClose to be decremented
+                                    st.toClose -= 1
+                            st.popWikiStack()
+                            st.toClose -= 1
+                        else: #open the elem
+                            st.pushWikiStack(elem)
+                            st.toClose += 1 #update this so we pop the right amount below
                     else:
-                        cell = st.mm.TD
-                    wantTokenMap['|'] = cell #user may have switched from || to | or from || to | (not sure if this is valid html though)
+                        st.popWikiStack() #pop the DT or last TD or TH
+                        st.pushWikiStack(elem) #push the DD or TD or TH
+                    pos = end
+                elif token == '~': #<BR>
+                    textHandler(string[pos:start])
+                    st.pushWikiStack(st.mm.BR)
+                    st.popWikiStack()
+                    pos = end
+                elif token == '[': #its a link
+                    #print 'link ', string[start:end]
+                    if string[start+1] == ']':  #handle special case of [] -- just print it 
+                        textHandler( string[pos:start+1] )
+                        pos = start+1 
+                        continue
+                    
+                    textHandler( string[pos:start] )
+                    pos = end
+                    linkToken = string[start+1:end-1] #strip [ and ] 
 
-                if token in inlineTokens.keys(): 
-                    if st.wikiStack.count(elem): #if the elem is open 
-                        while st.wikiStack[-1] != elem: #close it
-                            wikiElem = st.popWikiStack()
-                            if wikiElem in inlineTokens.values(): #these elements need st.toClose to be decremented
-                                st.toClose -= 1
-                        st.popWikiStack()
-                        st.toClose -= 1
-                    else: #open the elem
-                        st.pushWikiStack(elem)
-                        st.toClose += 1 #update this so we pop the right amount below
-                else:
-                    st.popWikiStack() #pop the DT or last TD or TH
-                    st.pushWikiStack(elem) #push the DD or TD or TH
-                pos = end
-            elif token == '~': #<BR>
-                textHandler(string[pos:start])
-                st.pushWikiStack(st.mm.BR)
-                st.popWikiStack()
-                pos = end
-            elif token == '[': #its a link
-                #print 'link ', string[start:end]
-                if string[start+1] == ']':  #handle special case of [] -- just print it 
-                    textHandler( string[pos:start+1] )
-                    pos = start+1 
-                    continue
-                
-                textHandler( string[pos:start] )
-                pos = end
-                linkToken = string[start+1:end-1] #strip [ and ] 
+                    nameAndLink = linkToken.split('|', 1)
+                    if len(nameAndLink) == 1:
+                        name = None
+                    else:
+                        name = nameAndLink[0].strip()                    
+                        namechunks = [] #parse any wiki markup in the name
+                        st._handleInlineWiki(handler, name, None, lambda s: namechunks.append(s))
+                        name = ''.join(namechunks)                    
+                    linkinfo = nameAndLink[-1].strip() #the right side of the |
+                    
+                    words = linkinfo.split()
 
-                nameAndLink = linkToken.split('|', 1)
-                if len(nameAndLink) == 1:
-                    name = None
-                else:
-                    name = nameAndLink[0].strip()                    
-                    namechunks = [] #parse any wiki markup in the name
-                    _handleInlineWiki(st, handler, name, None, lambda s: namechunks.append(s))
-                    name = ''.join(namechunks)                    
-                linkinfo = nameAndLink[-1].strip()
-                
-                words = linkinfo.split()
-                if len(words) > 1:
                     #print 'word ', words
                     if words[-1][-1] == ';': #last character is the annotation delineator, so there's no link
                         #todo: actually, a valid URL could end in a ';' but that is an extremely rare case we don't support
                         link = None
                         type = ' '.join(words)
-                    elif words[-2][-1] == ';':
+                    elif len(words) > 1 and words[-2][-1] == ';': #annotation preceeding link
                         link = words[-1]
                         type = ' '.join(words[:-1])
-                    else: #must be a link like [this is also a link] handled below
-                        if name is not None:
-                            raise ZMLParseError(st, 'link names or URLs can not have spaces')
+                    else: 
+                        if len(words) > 1:
+                            #must be a link like [this is also a link]
+                            if name is not None:                                
+                                raise ZMLParseError(st, 'link URL can not contain spaces: ' + ''.join(words))
+                            if [word for word in words if not word.isalnum()]:
+                                #error: one of the words has punctuation, etc.
+                                raise ZMLParseError(st, 'invalid link: ' + linkToken)
+                            link = ''
+                            #[this is also a link] creates a hyperlink to an internal WikiPage called 'ThisIsAlsoALink'.
+                            for word in words:
+                                link += word[0].upper() + word[1:] #can't use capitalize(), it makes other characters lower
+                            name = ' '.join(words)
+                        else:
+                            link = words[0]
                         type = None
+                        
                     if type:
                         type = parseLinkType(type) #type is a list of Annotations
+                                                            
+                    if link:                                                          
+                        isInlineIMG = link[link.rfind('.'):].lower() in st.mm.INLINE_IMG_EXTS
+                        isFootNote = link[0] == '#'
+                        isAnchor = link[0] == '&'
+                        if isAnchor:
+                            link = link[1:] #strip &
+                        element, attribs, text = st.mm.mapLinkToMarkup(link, name, type, isInlineIMG, isAnchor)
+                    else: #no link, just a type
+                        assert(type)
+                        element, attribs, text = st.mm.mapAnnotationsToMarkup(type, name)
+                    
+                    handler.startElement(element)
+                    for name, value in attribs:
+                        handler.attrib(name, value)
+                    if text:
+                        handler.text( text )
+                    handler.endElement(element)
                 else:
-                    type = None
-                                                        
-                #support: [this is also a link] creates a hyperlink to an internal WikiPage called 'ThisIsAlsoALink'.
-                if name is None and len(words) > 1 and [word for word in words if word.isalnum()]: #if no punctuation etc.
-                    link = ''
-                    for word in words:
-                        link += word[0].upper() + word[1:] #capitalize() makes other characters lower
-                    name = ' '.join(words)
-                else:
-                    if type is None: #if the type has already been set, so has the link (which might be None)
-                        link = words[0]
-
-                if link:                                                          
-                    isInlineIMG = link[link.rfind('.'):].lower() in st.mm.INLINE_IMG_EXTS
-                    isFootNote = link[0] == '#'
-                    isAnchor = link[0] == '&'
-                    if isAnchor:
-                        link = link[1:] #strip &
-                    element, attribs, text = st.mm.mapLinkToMarkup(link, name, type, isInlineIMG, isAnchor)
-                else: #no link, just a type
-                    assert(type)
-                    element, attribs, text = st.mm.mapAnnotationsToMarkup(type, name)
-                
-                handler.startElement(element)
-                for name, value in attribs:
-                    handler.attrib(name, value)
-                if text:
-                    handler.text( text )
-                handler.endElement(element)
+                    textHandler( string[pos:start+1] )                
+                    pos = start+1 #skip one of the brackets                
+                    continue
             else:
-                textHandler( string[pos:start+1] )                
-                pos = start+1 #skip one of the brackets                
-                continue
-        else:
-            break            
-    textHandler( string[pos:] )    
+                break            
+        textHandler( string[pos:] )    
+
+    def normalizeAttribs(st, attribs):
+        '''
+        returns list of (name, value) tuples (use list to preserve order)
+        '''
+        cleanAttribs = []
+        i = 0
+        while i+1 <= len(attribs):
+            if i+1 == len(attribs) or attribs[i+1] != '=': #last item or next item != '=' : assume attribute minimalization
+                cleanAttribs.append( (attribs[i], '"' + attribs[i] + '"') )
+                i+=1
+            else:
+                val = attribs[i+2]
+                if val[0] not in '\'"':
+                    val = '"'+val+'"'
+                cleanAttribs.append( (attribs[i], val) )
+                i+=3    
+
+        #add namespace to map
+        for name, value in cleanAttribs:
+            if name.startswith('xmlns:'):
+                #note: we don't care about the default namespace                
+                st.namespaceStack[-1][name[len('xmlns:'):] ] = value[1:-1]
+            elif name.startswith('xml:base'):
+                pass#st.docbase.append( value ) #todo
+
+        return cleanAttribs
     
-def handleInlineWiki(st, handler, string, wantTokenMap ):
-    #if markup appears on the line following a wiki line (that ends in ::) this markup will be a child of the wiki element
-    #nope too complicated!!!
-    if 0:#string[-2:] == '::': 
-        return _handleInlineWiki(st, handler, string[:-2], wantTokenMap)
-        st.in_wikicont = 1
-    else:
-        return _handleInlineWiki(st, handler, string, wantTokenMap)
-        st.in_wikicont = 0
+    def handleInlineWiki(st, handler, string, wantTokenMap ):
+        #if markup appears on the line following a wiki line (that ends in ::) this markup will be a child of the wiki element
+        #nope too complicated!!!
+        if 0:#string[-2:] == '::': 
+            return st._handleInlineWiki(handler, string[:-2], wantTokenMap)
+            st.in_wikicont = 1
+        else:
+            return st._handleInlineWiki(handler, string, wantTokenMap)
+            st.in_wikicont = 0
+
+    def uriToQName(st, token):
+        uri = token[1:-1] #strip {}
+        if not uri:
+            raise ZMLParseError('syntax error: empty URI element')
+        if not uri[-1].isalnum() and uri[-1] not in '.-':
+            if not st.URIAdjust: 
+                if uri[-1] != '_': #trailing _ is ok in this case
+                    raise ZMLParseError('invalid URI as element name: %s' % repr(uri))
+            else:                                    
+                uri += '_' #add another _ to assure we can split the URI into a qname
+        prefix, local = '',''
+        inScope = {} #find the namespaces in scope
+
+        for i in range(len(st.namespaceStack)-1,-1,-1): #reverse order            
+            namespaceDict = st.namespaceStack[i] 
+            for prefixCandidate, namespace in namespaceDict.items():                        
+                if prefixCandidate not in inScope:
+                    #hasn't been overridden
+                    if uri.startswith(namespace):
+                        local = uri[len(namespace):]
+                        if local and (local[0].isalnum() or local[0] == '_'):
+                            prefix = prefixCandidate
+                            break
+                inScope[prefixCandidate] = namespace
+                
+        if not prefix:                 
+            while 1:
+                #make sure the generated prefix doesn't override 
+                #an in-scope user declared prefix
+                st.nextGeneratedPrefixCounter += 1
+                prefix = 'ns' + str(st.nextGeneratedPrefixCounter)
+                if prefix not in inScope:
+                    break
             
-def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
-               rootElement = None, getMM=False, mixed=True):
-    """
-    given a string of zml, return a string of xml
-    """
-    #debug = 1
-    if mmf is None:
-        mmf=DefaultMarkupMapFactory()
+            namespaceURI, local = splitURI(uri)                    
+            assert prefix and namespaceURI and local
+            st.namespaceStack[-1][prefix] = namespaceURI
+
+            newNS = ('xmlns:'+ prefix, "'"+namespaceURI+"'")
+        else:
+            newNS = None
+        assert local
+        return prefix + ':' + local, newNS
         
-    def addWikiElem(wikiElem):
+    def startElement(st):
+        st.in_attribs = 0
+        cleanAttribs = st.normalizeAttribs(st.attribs)
+        name = st.elementStack[-1]
+
+        if name[0] == '{': #its a URIRef
+             name, newNS = st.uriToQName(name)
+             if newNS:
+                 cleanAttribs.append( newNS )
+             st.elementStack[-1] = name
+             
+        st.handler.startElement( name )
+                
+        for name, value in cleanAttribs:
+            if name[0] == '{':
+                name, newNS = st.uriToQName(name)
+                if newNS:
+                    st.handler.attrib(name, value)
+            if value and value[0] == '{':
+                #note: this code results in a URIRef as an attribute value being converted to a qname
+                value, newNS = st.uriToQName(value)
+                if newNS:
+                    st.handler.attrib(name, value)            
+            st.handler.attrib(name, value)
+        st.attribs = []            
+
+    def addWikiElem(st, wikiElem):
         if isinstance(wikiElem, type( () )):
             attribs = wikiElem[1]
             elem = wikiElem[0]
         else:
             attribs = []
             elem = wikiElem
-        handler.startElement(elem)
+        st.handler.startElement(elem)
         for name, value in attribs:
-            handler.attrib(name, value)
+            st.handler.attrib(name, value)
             
-    def pushWikiStack(wikiElem):
-        addWikiElem(wikiElem)
+    def pushWikiStack(st,wikiElem):
+        st.addWikiElem(wikiElem)
         st.wikiStack.append(wikiElem)
         
-    def popWikiStack(untilElem = None):        
+    def popWikiStack(st, untilElem = None):        
         while st.wikiStack:
             wikiElem = st.wikiStack.pop()
             if isinstance(wikiElem, type( () )):
-                handler.endElement(wikiElem[0])
+                st.handler.endElement(wikiElem[0])
             else:
-                handler.endElement(wikiElem)
-            if wikiStructureStack.get(st.mm.canonizeElem(wikiElem)):
-                wikiStructureStack[st.mm.canonizeElem(wikiElem)]-= 1
+                st.handler.endElement(wikiElem)
+            if st.wikiStructureStack.get(st.mm.canonizeElem(wikiElem)):
+                st.wikiStructureStack[st.mm.canonizeElem(wikiElem)]-= 1
             if not untilElem or untilElem == wikiElem:
                 return wikiElem
         raise IndexError('pop from empty list')
-
-    class state: pass  
-    st = state()    
-    st.in_attribs = 0
-    st.in_wikicont = 0 #not implemented
-    st.in_elemchild = 0
-    st.wantIndent = 0
-    st.lineElems = 0 #just 0 or 1 right now
-    st.in_freeform = 0 #are we in wikimarkup?
-    st.nlcount = 0 #how many blank lines following wikimarkup
-    st.toClose = 0 #how many inline elements need to be closed at the end of the wikimarkup line
-    st.attribs = []
-    st.pushWikiStack = pushWikiStack
-    st.popWikiStack = popWikiStack
-    #the stack of elements created by wiki markup that has yet to be closed
-    #should maintain this order: nestable block elements (e.g. section, blockquote)*, block elements (e.g. p, ol/li, table/tr)+, inline elements*
-    st.wikiStack = []
-    st.mm = mmf.getDefault()
-    st.currentLine = ''
-    st.currentStartPos = (0, 0)
-    
-    elementStack = []
-    wikiStructureStack = {}
-    output = StringIO.StringIO()
-    outputHandler = handler or OutputHandler(output)
-    handler = InterfaceDelegator( [ outputHandler, MarkupMapFactoryHandler(st, mmf) ] )
-
-    def stringToText(token):
+            
+    def stringToText(st, token):
         preformatted = token[0] in 'Pp' or (token[0] in 'rR' and token[1] in 'pP')
         string = stripQuotes(token)
         if preformatted:
-            addWikiElem(st.mm.PRE)            
-        handler.text(string)
+            st.addWikiElem(st.mm.PRE)            
+        st.handler.text(string)
         if preformatted:
             if isinstance(st.mm.PRE, type( () )):
-                handler.endElement(st.mm.PRE[0])
+                st.handler.endElement(st.mm.PRE[0])
             else:
-                handler.endElement(st.mm.PRE)
+                st.handler.endElement(st.mm.PRE)
              
-    def handleWikiML(string):
+    def handleWikiML(st, string):
+        handler = st.handler
+        wikiStructureStack = st.wikiStructureStack
+        
         lead = string[0]
         if lead == '`': #treat just like STRLINE token
             handler.text( stripQuotes(string) ) 
@@ -1011,21 +1089,21 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
         if st.wikiStack and st.wikiStack[-1] != newStructureElem: 
             while st.wikiStack and st.mm.canonizeElem(st.wikiStack[-1]) not in \
                   [st.mm.SECTION, st.mm.BLOCKQUOTE, st.mm.P, newStructureElem]:
-               popWikiStack()
+               st.popWikiStack()
 
         if newStructureElem == st.mm.BLOCKQUOTE: #note: too difficult to allow blockquotes to nest
             inBlockQuote = wikiStructureStack.get(st.mm.BLOCKQUOTE, 0)
             if inBlockQuote: #close block quote
                 while wikiStructureStack.get(st.mm.BLOCKQUOTE, 0):
-                    popWikiStack() #will decrement wikiStructureStack
+                    st.popWikiStack() #will decrement wikiStructureStack
             else: #open block quote
-                pushWikiStack(st.mm.BLOCKQUOTE)
+                st.pushWikiStack(st.mm.BLOCKQUOTE)
                 wikiStructureStack[st.mm.BLOCKQUOTE] = 1
             return
             
         if string.startswith('----'):
-            pushWikiStack(st.mm.HR)
-            popWikiStack() #empty element pop the HR
+            st.pushWikiStack(st.mm.HR)
+            st.popWikiStack() #empty element pop the HR
             return
 
         pos = 0                                
@@ -1044,7 +1122,7 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
                 #    hlevel = 1
                 helem = st.mm.H(hlevel, string[pos:]) 
                 if not parent: #wasn't in wikiStructure so its not structural (like <section>), just a line element (like <H1>)
-                    pushWikiStack(helem)
+                    st.pushWikiStack(helem)
                     st.toClose += 1
                     done = True
                 else:
@@ -1058,24 +1136,24 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
                 #close or deepen the outline structure till it matches the level
                 closeSameLevel = parent in [st.mm.SECTION] #when we encounter a nestable element close and restart the same level
                 while level-closeSameLevel < wikiStructureStack.get(parent, 0):
-                    popWikiStack() #will decrement wikiStructureStack                
+                    st.popWikiStack() #will decrement wikiStructureStack                
                 currlevel = wikiStructureStack.get(parent, 0)
                 while level > currlevel:
-                    pushWikiStack(structureElem)
+                    st.pushWikiStack(structureElem)
                     currlevel += 1
                 wikiStructureStack[parent] = level
                 if lineElem:
-                    pushWikiStack(lineElem)
+                    st.pushWikiStack(lineElem)
                     st.toClose += 1
         else:
             #if no structural element is specfied and the wikistack is empty (eg. we're starting out)
             #or only contains elements that require block elem children, start a P
             if not st.wikiStack or st.mm.canonizeElem(st.wikiStack[-1]) in [st.mm.SECTION, st.mm.BLOCKQUOTE]:
-               pushWikiStack(st.mm.P) 
+               st.pushWikiStack(st.mm.P) 
             if lead == '\\' and string[1] in '*#:-!+| ': #handle escape 
                 pos += 1
 
-        wantTokenMap = inlineTokenMap(st)
+        wantTokenMap = st.inlineTokenMap()
         if lead == '+':
             wantTokenMap['='] = st.mm.DD
         elif lead == '|':
@@ -1084,21 +1162,23 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
             else:
                 cell = st.mm.TD
             wantTokenMap['|'] = cell
-            pushWikiStack(cell)
+            st.pushWikiStack(cell)
             st.toClose += 1
-        handleInlineWiki( st, handler, string[pos:], wantTokenMap) 
+        st.handleInlineWiki( handler, string[pos:], wantTokenMap) 
         if st.in_wikicont:
             return
         while st.toClose: #close the line elements: e.g. LI, H1, DD, TR
-            popWikiStack()
+            st.popWikiStack()
             st.toClose -= 1
         
-    def tokenHandler(type, token, (srow, scol), (erow, ecol), line, indents=None):        
-        if debug:                
+    def tokenHandler(st, type, token, (srow, scol), (erow, ecol), line, indents=None):        
+        if st.debug:                
             print >>sys.stderr, "STATE: A %d, Ch %d nI %d Fr %d NL %d" % (st.in_attribs, st.in_elemchild, st.wantIndent, st.in_freeform, st.nlcount)
             print >>sys.stderr, "TOKEN: %d,%d-%d,%d:\t%s\t%s" % (srow, scol, erow, ecol, tok_name[type], repr(token))
         st.currentLine = line
         st.currentStartPos = (srow, scol)
+        handler = st.handler
+        
         if type == WHITESPACE:
             if not st.in_attribs and not st.in_elemchild:
                 handler.whitespace(token.replace('<', ' '))
@@ -1108,12 +1188,12 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
             
             while st.nlcount:
                 #this can never happen now:
-                #if  st.nlcount > 1 and elementStack:
+                #if  st.nlcount > 1 and st.elementStack:
                 #    #each extra blank line __between__ wiki paragraphs closes one markup element
-                #    handler.endElement( elementStack.pop() )
+                #    handler.endElement( st.elementStack.pop() )
                 #    indents.pop()
                 st.nlcount -= 1            
-            handleWikiML(token) #handle wikiml 
+            st.handleWikiML(token) #handle wikiml 
             return
         elif st.in_freeform:
             if type == NL:
@@ -1121,7 +1201,7 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
                     return #skip blank lines after a wiki line ending in \
                 #NL == a blank line - close the P:
                 while st.wikiStack:
-                    popWikiStack()                
+                    st.popWikiStack()                
                 handler.whitespace(token)
                 st.nlcount = 1 #used to be += 1 but we disabled this "feature"
                 if not line[:scol] or line[:scol].strip('<'):#if the 'whitespace' is all '<'s continue
@@ -1129,7 +1209,7 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
             elif type in [STRLINE, STRING]:
                 #encounting a string with no indention immediately after a FREESTR:
                 #just write out the string at the same markup level
-                stringToText(token)
+                st.stringToText(token)
                 st.nlcount = 0
                 return
             elif type == NEWLINE:
@@ -1140,7 +1220,7 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
                 st.nlcount = 0
 
         if not st.in_wikicont: 
-            while st.wikiStack: popWikiStack()
+            while st.wikiStack: st.popWikiStack()
             assert st.toClose == 0
 
         if type == NL: #skip blank lines
@@ -1155,42 +1235,39 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
                 #if we don't see an indent and we just encountered an element
                 #(e.g. elem:) then pop that elem from the stack
                 while st.lineElems: #support multiple elements per line e.g. elem1: elem2: 'OK!'
-                    handler.endElement( elementStack.pop() )
+                    handler.endElement( st.elementStack.pop() )
+                    st.namespaceStack.pop()
                     st.lineElems -= 1
             st.wantIndent = 0
         
-        if type == NAME:
+        if type == NAME or type == URIREF:                    
+            name = token                
             if st.in_attribs:
-                st.attribs.append(token)
+                st.attribs.append(name)
             #elif st.in_elemchild:
             #    handler.text(token)              
             else:
-                elementStack.append(token)
+                st.elementStack.append(name)
+                st.namespaceStack.append( {} )
                 st.in_attribs = 1
                 st.lineElems += 1                
         elif type == STRLINE: #`a string
             if st.in_attribs:
                 #in attribs but never encountered the :
-                st.in_attribs = 0
-                handler.startElement( elementStack[-1])
-                normalizeAttribs(st.attribs,handler)
-                st.attribs = []
-            stringToText(token)
+                st.startElement()
+            st.stringToText(token)
         elif type == STRING:            
             if not st.in_attribs:
-                stringToText(token)                
+                st.stringToText(token)                
             else:        
                 string = stripQuotes(token)
                 st.attribs.append(xmlquote(string))
         elif type == OP:
             if token == ':':
-                st.in_attribs = 0
+                st.startElement()
                 st.in_elemchild = 1
                 #assert len(st.attribs) % 2 == 0 #is even
                 #attribDict = dict([ ( attribs[i], attribs[i+1]) for i in range( 0, len(attribs), 2)]) #no dict, we want to preserve order
-                handler.startElement( elementStack[-1])
-                normalizeAttribs(st.attribs, handler)
-                st.attribs = []
             else:
                 if token not in '=(),':
                     raise ZMLParseError('invalid token: ' + repr(token))
@@ -1206,20 +1283,14 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
                 raise ZMLParseError('encountered a number in an illegal location: ' + token)
         elif type == DEDENT:
             if st.in_attribs: #never encountered the :
-                st.in_attribs = 0
-                handler.startElement( elementStack[-1])
-                normalizeAttribs(st.attribs, handler)
-                st.attribs = []            
-            if elementStack: #this will be empty when the top level elements are indented and then we dedent
-                handler.endElement( elementStack.pop() )
+                st.startElement()
+            if st.elementStack: #this will be empty when the top level elements are indented and then we dedent
+                handler.endElement( st.elementStack.pop() )
+                st.namespaceStack.pop()
             #handler.whitespace('\t')
         elif type == NEWLINE:
             if st.in_attribs: #never encountered the :
-                st.in_attribs = 0
-                handler.startElement( elementStack[-1])
-                normalizeAttribs(st.attribs,handler)
-                st.attribs = []
-            
+                st.startElement()            
             st.in_elemchild = 0
             if st.lineElems: #don't set wantIndent if the line just had a string or comment 
                 st.wantIndent = 1
@@ -1228,10 +1299,7 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
         elif type == COMMENT:
             if st.in_attribs:
                 #in attribs but never encountered the :
-                st.in_attribs = 0
-                handler.startElement( elementStack[-1])
-                normalizeAttribs(st.attribs,handler)
-                st.attribs = []
+                st.startElement()
             handler.comment( token[1:] )
         elif type == PI:
             split = token.split(None, 1)
@@ -1253,25 +1321,45 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
                 handler.pi(name, value)                
         elif type == ENDMARKER:
             while st.wikiStack: popWikiStack()
-            while elementStack:
-                handler.endElement( elementStack.pop() )
+            while st.elementStack:
+                handler.endElement( st.elementStack.pop() )
+            while st.namespaceStack:
+                st.namespaceStack.pop()
         elif type == ERRORTOKEN and not token.isspace(): #not sure why this happens
             raise ZMLParseError("unexpected token: " + repr(token))
 
+def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
+               rootElement = None, getMM=False, mixed=True, nsMap = None, URIAdjust = False):
+    """
+    given a string of zml, return a string of xml
+    """
+    mmf = mmf or DefaultMarkupMapFactory()
+    nsMap = nsMap or {}
+    
+    st = ParseState()    
+    st.mm = mmf.getDefault()
+    st.namespaceStack = [ nsMap ]
+    st.URIAdjust = URIAdjust
+    st.debug = debug
+
+    output = StringIO.StringIO()
+    outputHandler = handler or OutputHandler(output)
+    st.handler = InterfaceDelegator( [ outputHandler, MarkupMapFactoryHandler(st, mmf) ] )
+
     try:                    
-        tokenize(fd.readline, tokeneater=tokenHandler, useFreestr=mixed, counter=st)
+        tokenize(fd.readline, tokeneater = st.tokenHandler, useFreestr=mixed, counter=st)
     except ZMLParseError, e:
         e.setState(st)
         raise 
     except Exception, e:
         #unexpected error
-        import traceback        
+        import traceback, sys        
         zpe = ZMLParseError("Unhandled error:\n"
-            +''.join(format_exception_only( type(e), e) ))
+            +''.join(traceback.format_exception( sys.exc_type, sys.exc_value, sys.exc_traceback, 100) ))
         zpe.setState(st)
         raise zpe
 
-    handler.endDocument()
+    st.handler.endDocument()
 
     if getMM:
         return st.mm
@@ -1471,9 +1559,11 @@ ZML to XML options:
             pass
         return value
     
-    def switch(opt):
-        switch = opt in sys.argv
-        return switch
+    def switch(*args):
+        for opt in args:
+            if opt in sys.argv:
+                return True
+        return False
 
     toZml = switch('-z')
     if toZml:
@@ -1484,8 +1574,8 @@ ZML to XML options:
         xml2zml(text, sys.stdout)
         sys.exit(0)
         
-    debug = switch('-d')
-    prettyprint = switch('-p')
+    debug = switch('-d', '--debug')
+    prettyprint = switch('-p', '--pretty')
     rootElement = opt('-r', 'zml')
     markupOnly = switch('-m')
     try:            
