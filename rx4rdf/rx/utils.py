@@ -384,21 +384,23 @@ def walkDir(path, fileFunc, *funcArgs, **kw):
         return dirFunc(path, lambda *args, **kw: _walkDir(path, recurse, args, kw), *funcArgs, **kw)
 
 #see w3.org/TR/rdf-testcases/#ntriples 
-#todo: assumes utf8 encoding and not string escapes for unicode
+#todo: assumes utf8 encoding and not string escapes for unicode 
 Removed = object()
 Comment = object()
-def parseTriples(lines, bNodeToURI = None):
+def parseTriples(lines, bNodeToURI = lambda x: x, charencoding='utf8'):
     remove = False
     for line in lines:
-        line = line.strip().decode('utf8')
+        line = line.strip()
         if not line: #trailing whitespace
             break;
+        if not isinstance(line, unicode):
+           line = line.decode(charencoding)            
         if line.startswith('#!remove'): #this extension to NTriples allows us to incrementally update a model using NTriples
             remove = True
             continue
         elif line[0] == '#': #comment
             remove = False
-            continue
+            continue        
         subject, predicate, object = line.split(None,2)
         if subject.startswith('_:'):
             subject = subject[2:] #bNode
@@ -418,27 +420,40 @@ def parseTriples(lines, bNodeToURI = None):
             object = object[1:object.find('>')]
             objectType = OBJECT_TYPE_RESOURCE
         elif object.startswith('_:'):
-            object = object[2:object.find('.')].strip()
+            object = object[2:object.rfind('.')].strip()
             object = bNodeToURI(object)
             objectType = OBJECT_TYPE_RESOURCE
         else:                        
             quote = object[0] #add support for using either ' or " (spec says just ")
-            object = object[1:object.rfind(quote)] #todo: also handle the optional ^^datatype or @lang after the "
-            if object.find('\\') != -1:
-                object = object.replace('\\' + quote, quote).replace(r'\n', '\n').\
-                         replace(r'\r', '\r').replace(r'\t', '\t').replace(r'\\', '\\')
-            objectType = OBJECT_TYPE_LITERAL
+            endquote = object.rfind(quote)
+            literal = object[1:endquote]
+            if literal.find('\\') != -1:
+                #use split and join to replace even pairs of // with /
+                #without have the resulting single / accidently escape the next character
+                unescaped = literal.split(r'\\') 
+                escaped = [x.replace('\\' + quote, quote).replace(r'\n', '\n').
+                             replace(r'\r', '\r').replace(r'\t', '\t') for x in unescaped]
+                literal = '\\'.join(escaped) 
+            if object[endquote+1]=='@':
+                lang = object[endquote+2:object.rfind('.')].strip()
+                objectType = lang
+            elif object[endquote+1]=='^':                
+                objectType = object[endquote+3:object.rfind('.')].strip()
+            else:    
+                objectType = OBJECT_TYPE_LITERAL
+            object = literal
         #print "parsed: ", subject, predicate, object
         if remove:
             remove = False
             yield (Removed, (subject, predicate, object, objectType))
         else:
-            if objectType != OBJECT_TYPE_RESOURCE or object: #ignore <> as objects
+            if objectType != OBJECT_TYPE_RESOURCE or object:
+                #hack to handle malformed NTriples doc -- skip statements that have <> as the object
                 yield (subject, predicate, object, objectType)
 
 def DeserializeFromN3File(n3filepath, driver=Memory, dbName='', create=0, scope='',
                         modelName='default', model=None):
-    #rename this function to ...NTFile
+    #todo: rename this function to ...NTFile
     if not model:
         if create:
             db = driver.CreateDb(dbName, modelName)
@@ -474,7 +489,22 @@ def deserializeRDF(modelPath, driver=Memory, dbName='', scope='', modelName='def
     elif modelPath[-3:] == '.nt':
         model, db = DeserializeFromN3File(modelPath,driver, dbName, False, scope, modelName)
     elif modelPath[-4:] == '.rdf':
-        model, db = Util.DeserializeFromUri(modelPath, driver, dbName, False, scope) 
+        try:
+            #if rdflib is installed, use its RDF/XML parser because it doesn't suck            
+            import rdflib.TripleStore
+            ts = rdflib.TripleStore.TripleStore(modelPath)
+            from Ft.Rdf.Drivers import Memory    
+            db = Memory.CreateDb('', 'default')
+            import Ft.Rdf.Model
+            model = Ft.Rdf.Model.Model(db)
+            import RxPath
+            if not RxPath.useRDFLibParser:
+                raise ImportError()
+
+            #print 'parsing', modelPath, 'with rdflib'
+            model.add( list(RxPath.rdflib2Statements(ts.triples( (None, None, None)))) )
+        except ImportError:
+            model, db = Util.DeserializeFromUri(modelPath, driver, dbName, False, scope) 
     else: #todo: add support for rxml
         raise 'unknown file type reading RDF: %s, only .rdf, .nt and .mk supported' % os.path.splitext(modelPath)[1]
     return model, db
@@ -484,7 +514,10 @@ def writeTriples(stmts, stream):
     predicate = 1
     object = 2
     objectType = 5
-    for stmt in stmts:
+    if stmts and isinstance(stmts, (type([]), type(()) )) and isinstance(
+                    stmts[0], Statement.Statement):
+        stmts = Model.Model(None)._unmapStatements(stmts)
+    for stmt in stmts:       
        if stmt[0] is Comment:
            stream.write("#" + stmt[1] + "\n")
            continue
@@ -511,13 +544,15 @@ def writeTriples(stmts, stream):
            #    escaped = escaped[2:-1] #repr uses ' instead of " for string (and so doesn't escape ")
            #else:
            #    escaped = escaped[1:-1]
-           escaped = stmt[object].replace('\\', r'\\').replace('\"', r'\"').replace('\n', r'\n').replace('\r', r'\r').replace('\t', r'\t')
-
+           escaped = stmt[object].replace('\\', r'\\').replace('\"', r'\"').replace('\n', r'\n').replace('\r', r'\r').replace('\t', r'\t')           
            if stmt[objectType] in [OBJECT_TYPE_LITERAL, OBJECT_TYPE_UNKNOWN]:
                stream.write(' "' + escaped.encode('utf8') + '" .\n')
-	       #else:
-           #    stream.write('"' + escaped.encode('utf8') + '"^^' + stmt[objectType])
-	       #    stream.write(" .\n")
+           elif stmt[objectType].find(':') == -1: #must be a lang code
+               stream.write(' "' + escaped.encode('utf8') + '"@' + stmt[objectType])
+               stream.write(" .\n")
+           else: #objectType must be a URI
+               stream.write('"' + escaped.encode('utf8') + '"^^' + stmt[objectType])
+               stream.write(" .\n")
 
 def sanitizeFilePath(filepath): #as in "sanity"
     if sys.platform != 'win32':
@@ -646,9 +681,11 @@ class Res(dict):
            'rdf' : 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
             'rdfs' : 'http://www.w3.org/2000/01/rdf-schema#' }
 
-    def __init__(self, uri, nsMap = None):
+    def __init__(self, uri=None, nsMap = None):
         if nsMap is not None:
             self.nsMap = nsMap
+        if uri is None:
+            uri = '_:'+ generateBnode()[BNODE_BASE_LEN:]
         self.uri = self.getURI(uri)
 
     def __eq__(self, other):
@@ -689,6 +726,47 @@ class Res(dict):
             return self.nsMap[prefix] + local 
         else:#otherwise assume its a uri
             return key
+    
+    def toStatementsDeep(self):
+        stmts = []
+        curlist = [ self ]
+        done = [ self ]
+        while curlist:
+            #print [x.uri for x in reslist], [x.uri for x in done]
+            res = curlist.pop()
+            stmts2, reslist = res.toStatements(done)
+            done.extend(reslist)
+            curlist.extend(reslist)
+            stmts.extend(stmts2) 
+        return stmts
+        
+    def toStatements(self, doneList = None):
+        stmts = []
+        reslist = []
+        if self.uri.startswith('_:'):
+            s = BNODE_BASE+self.uri[2:]
+        else:
+            s = self.uri
+        for p, v in self.items():
+            if p.startswith('_:'):
+                p = BNODE_BASE + p[2:] #but note that in RDF, its technically illegal for the predicate to be a bnode 
+            if not isinstance(v, (type(()), type([])) ):
+                v = (v,)
+            for o in v:                                    
+                if isinstance(o, Res):                    
+                    if o.uri.startswith('_:'):
+                        oUri = BNODE_BASE+o.uri[2:]
+                    else:
+                        oUri = o.uri
+                    stmts.append(Statement.Statement(s, p, oUri, objectType=OBJECT_TYPE_RESOURCE))
+                    if doneList is not None and o not in doneList:
+                        reslist.append(o)
+                else: #todo: datatype, lang                    
+                    stmts.append(Statement.Statement(s, p, o, objectType=OBJECT_TYPE_LITERAL))
+        if doneList is None:
+            return stmts
+        else:
+            return stmts, reslist
 
     def toTriplesDeep(self):
         t = ''
@@ -702,7 +780,7 @@ class Res(dict):
             curlist.extend(reslist)
             t += t2
         return t
-        
+
     def toTriples(self, doneList = None):
         triples = ''
         reslist = []
@@ -837,25 +915,6 @@ class DynaExceptionFactory(object):
             #import traceback; print traceback.print_stack(file=sys.stderr)
             setattr(self.module, classname, dynaexception)
         return dynaexception
-
-def toXPathDataType(value, ownerDocument):
-    #todo: handle XML-RPC classes DateTime and Binary
-    #todo: handle dictionaries that have keys as strings by using
-    # the dictionary name as the namespace (optional param)
-    if isinstance(value, ( types.ListType, types.TupleType ) ):
-        newvalue = []
-        for item in value:
-            if getattr(item, 'nodeType', None):
-                newvalue.append(item)
-            else:
-                newvalue.append( ownerDocument.createTextNode( unicode(item) ))
-        return newvalue
-    else:
-        import Ft.Xml.XPath
-        assert isinstance(value, (type(''), Ft.Xml.XPath.boolean.BooleanType,
-                                 type(True), type(u''), type(1), type(1.0), type(None)) )\
-               or getattr(value, 'nodeType', None), 'not a valid XPath datatype %s: ' % type(value)
-        return value
 
 try:
     from Ft.Xml import XPath, Xslt
