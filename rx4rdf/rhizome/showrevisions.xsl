@@ -6,10 +6,14 @@
         xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
         xmlns:f='http://xmlns.4suite.org/ext'
         xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'
+        xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
         exclude-result-prefixes = "a wiki rdf rdfs f wf" 
         >
 <xsl:param name="_name" />
 <xsl:param name="__resource" />
+
+<!-- this page is always html, not the content's mimetype -->
+<xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />	
 
 <xsl:template match="/">
     <xsl:variable name='_robots' select="wf:assign-metadata('_robots', 'nofollow,noindex')" />
