@@ -1,10 +1,166 @@
  document:
   header:
-   title: `The document
-   authors:
-     person name = 'Adam Souzis' email="stevenn@apache.org"
-     abstract:
-A nonsense document using all possible elements in the current \<code>document-v11.dtd\</code>.
+   title: `Rhizome Manual
   body:
-!Section 1
-!!Section 2
+!Overview
+Rhizome is a simple content management and delivery system that is similar to a [Wiki|http://c2.com/cgi/wiki] except that you can author arbitrary XML content and RDF metadata, including the structure of the website. This allows both the content and structure to be easily repurposed and complex web applications rapidly developed. 
+
+The key conceptual difference is this: a Wiki is a website whose pages correspond to WikiNames, which are local to the website. Rhizome has a notion similar to WikiNames but they are universal, unique, abstract entities that don't necessarily correspond to a web page -- they can be a name for anything.  How they are displayed depends on the context, using the [Racoon] engine.
+
+The long-term [vision|RhizomeStatus] is that each Rhizome site will intertwine together, forming an emergent fuzzy taxonomy over a peer-to-peer network.
+
+!Features
+
+Wiki ease
+
+* All the functionality of a Wiki: public and automatic creation of pages and links using simple text formatting rules
+* But the same [formatting rules|RhizML] can used to author arbitrary HTML, XML and RDF 
+* And you can create and edit not just content but also the metadata, site structure and appearance, even application behavior
+* Including dynamic pages: supports XSLT, [RxSLT], Python, [RxUpdate]
+* Thus enabling dynamic, rule and context based presentation of content
+
+Advanced Content Management functionality
+
+* pages can consist of any content: xml, html, binary, etc.
+* content, metadata and site structure is a stored as RDF: enabling it be repurposable, human editable, application agnostic, etc.
+* flexible authorization and security model 
+* staging/release workflow
+* native versioning of content and metadata, conflict detection
+* support for external resources that can be modified without cooperation
+* can generate static websites
+* import/export of content and metadata
+* flexible backend: supports multiple RDF engines (Redland, 4Suite) with multiple datastores: file based, SQL databases, embeddable databases (Sleepycat, Metakit)
+    note: 
+Its tedious to write documentation! Check back soon for more content.
+
+
+!Requirements
+Rhizome requires Python 2.2 or later and [4Suite 1.0a1|http://4suite.org]. 
+
+Rhizome is known to run on Linux, Windows NT & 2000, and Cygwin and should work on any platform that supports Python and 4Suite.
+
+On Windows, [Win32 Extensions|http://www.python.org/windows/win32all] must be installed or locking will be disabled.
+
+!Installation
+This is a standard Python source distribution. To install:
+# Unzip
+# Run ^^python <unzip dir>/setup.py install^^
+
+!Running
+Rhizome is an application that runs on [Racoon], a simple application server.  Rhizome just consists of a Racoon config file and a bunch of web pages. To run Rhizome, run Racoon specifying your Rhizome config file using the -a option, e.g.: 
+
+^^python racoon.py -a rhizome/rhizome-config.py^^
+
+This will launch Racoon's built-in http server, which runs on port 8000 by default. You can change this by editing ^^server.cfg^^ (see below in Configuration). 
+
+That's it! You now have a new instance of Rhizome running. By default, the site will be stored in the current directory in file called "wikistore.nt" and content will be stored in a subdirectory called "content".  Most of the Rhizome's behaviour is defined in its pages so you can start customizing your Rhizome instance by editing its pages and metadata from within Rhizome.
+
+However, there are few additional things you might want to configure first if you deploying a live website. First, you should create your own config file to seperate your config settings from the stock Rhizome config settings.  For example, the Rx4RDF distribution contains a copy of the rx4rdf.sf.net website;  here's the first couple of lines of its config file (^^site-config.py^^):
+
+p'''BASE_MODEL_URI='http://rx4rdf.sf.net/site/'
+__include__('../rhizome/rhizome-config.py')'''
+
+The first line sets the base URI that will be used for all RDF resources created. Note that this does not have to correspond to any resolvable URL.
+The second includes the Rhizome config file.
+
+!!Running with Apache
+Although Racoon comes with a built-in web server, it can be configured run behind an Apache web server. There are several different ways to do this. The Racoon HTTP server is derived from the CherryPy server and a how-to on running with Apache can be found on its website [here|http://www.cherrypy.org/static/html/howto/node3.html].
+
+For example, this script kicks off Rhizome when being invoked from a Apache fastcgi script:
+p'''#!/bin/tcsh
+python2.2 /lib/python2.2/site-packages/rx/racoon.py 
+  -s /home/rhizome/site/RootServer.cfg -l 
+  -a /home/rhizome/site/site-config.py >& /dev/null &'''
+
+!Configuration
+There are two config files Racoon depends on: the application config file and its built-in http server's config file. 
+
+The application config specified using '-a' command line argument. If that is missing, Racoon tries to load a file called 'racoon-default-config.py' in the current directory.  For the application config file settings, see [RacoonConfig] for complete documentation. The Rhizome config file found at ^^rhizome/rhizome-config.py^^ is also commented.
+
+The http server config specified using '-s' command line argument. If that is missing, Racoon tries to load a file called 'server.cfg' in the current directory.  The Racoon HTTP server is derived from the CherryPy server and documentation on its configuration settings can be found on its website [here|http://www.cherrypy.org/static/html/tut/node17.html#SECTION0017200000000000000000]. In addition, Racoon adds a few settings, they are documented on the sample ^^server.cfg^^ found in the ^^rhizome^^ directory.
+
+!Rhizome Customization
+
+Here are some files useful for the basic customization of Rhizome: 
++[rhizome/basestyles.css|basestyles.css?action=edit]= Most formatting rules are found here.
++[rhizome/sidebar.txt|sidebar?action=edit]= This Rhizml document is displayed as the navbar on the left hand column by the site-template.
++[rhizome/site-template.xsl|site-template?action=edit]= The XSL stylesheet that controls Rhizome's layout.
+
+There are three ways you could modify these files:
+* Just edit them in Rhizome (e.g. click on the links above)
+* Place a modified copy of the file in a directory that the appears in the Racoon PATH before the 'rhizome' directory. By default, Rhizome set the PATH with the current working directory before the ^^rhizome^^ directory. (See [RacoonConfig] for more on the PATH setting). 
+* Modify the files directly.
+
+!Command Line Arguements
+
+p'''racoon.py [racoon options] -a config.py [app. config specific options]'''
+
+Racoon options:
+p'''
+-h prints help message
+-s [server.cfg] specify an alternative server.cfg
+-l [log.config] specify a config file for logging
+-r record requests (ctrl-c to stop recording) 
+-d [debug.pkl]: debug mode (replay the requests saved in debug.pkl)
+-x exit after executing config specific cmd arguments
+-p specify the path (overrides RHIZPATH env. variable)
+-m [store.nt] load the RDF model
+   (default model supports .rdf, .nt, .mk)
+-a [config.py] run the application specified
+'''
+
+Rhizome-specific option (must come after -a):
+p'''--import [path] [--recurse] [--dest path] 
+        [--xupdate url] [--format format] 
+        [--doctype doctype] [--disposition disposition]
+-export dir [--static] [--xpath exp | --name name] 
+             [--label label]'''
+
+!Importing content and schema migration
+
+The import command adds content to the site by adding all the files that match the given path (with wildcards).
+
+The command has these options:
+p'''--import path [--recurse] [--dest path] 
+        [--xupdate url] [--format format] 
+        [--doctype doctype] [--disposition disposition]'''
+where
+~~^^path^^ Location of files to import (wildcards ok) 
+~~^^-recurse^^ if present, recursively import subdirectories
+~~^^-dest dir^^ If dest is present files will be copied to this directory, otherwise the site will directly reference the imported files.
+~~^^-xupdate URL^^ URL to an RxUpdate file which is applied to each metarx file.
+~~^^--format format^^ default format 
+~~^^--disposition disposition^^ default item disposition
+~~^^--doctype doctype^^ default doctype
+
+If, for each file, there exists a matching file with ".metarx" appended, then import will attempt to add the metadata in the metarx file.  First it load the metadata file and then update it using the RxUpdate file specified by the ^^--xupdate^^ option.  If it isn't present it will run the default, "path:import.xml". This RxUpdate script disgards previous revisions and points the content to the new import location. You'll find a couple of other import scripts in the rhizome directory: one changes the base URI for the RDF resources, and another add authentification to the items. By writing your own import scripts and exporting and reimporting your site, you can migrate your site to your latest schema.
+
+If no .metarx file exists import will use the defaults specified by the ^^--format^^, ^^--disposition^^ and ^^--doctype^^ options, if present, or attempt a guess at the metadata based on the contents and file extension of the file.
+
+!Exporting and static websites  
+
+You can use Rhizome's export command exports the content of each item in the site as a seperate file.  You can use it for two different types of tasks: to export raw content and metadata (for data exchange or schema migration, etc.), or to generate static versions of the website.  
+
+The command has these options:
+p'''--export dir [--static] [--xpath exp | --name name] [--label label]'''
+where 
+~~^^ dir^^ is the directory to export to. 
+~~^^-xpath^^ RxPath expression that evaluates to a nodeset of items to export
+~~^^-name^^  The name of item to export (for exporting one item) (no effect if -xpath is specified)
+~~^^-label^^ Choose revisions with this label
+~~^^-static^^ Export as static HTML
+
+If the ^^-static^^ option is present, export will try to render each item as HTML. Dynamic pages (e.g. those that require query parameters) are skipped (you may see exceptions being reported to the consol). A $_static variable is introduced so stylesheets can render appropriately (for example, see site-template.xsl). Limitations: 
+* links are not fixed up so all links should be relative
+* External content referenced by links are not copied
+
+If ^^-static^^ is not present each item will be exported to 2 files: one containing the raw content of item and the other a RxML document containing the metadata associated with the item. The first file will match the item's name with a file type extension added, if necessary, and the second will be the same but with '.metarx' appended.
+
+!Debugging Racoon
+Racoon provides a simple debugging facility that is useful for debugging or creating test scripts: launch it with the -r option and it will record all the incoming requests until you hit control-c; that will trigger it to write them to a file named debug.pkl.
+
+Once you have one of these files, you can launch Racoon using the -d option, which causes Racoon to replay the requests stored in that file instead of launching its http server.
+
+;todo:
+;!The RDF Store
+;+External Resources= Two kinds of external files are supported: One, a revision can point to a external file instead of a location. (Useful for editing content in external progam.) Two, any file on the Racoon path can be retrieved if it isn't found in the RDF store. (Useful for links to images.)

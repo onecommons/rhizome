@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, glob
+import sys, glob, os.path
 from distutils.core import setup
 #import py2exe
 
@@ -34,6 +34,20 @@ if sys.version_info < (2, 3):
             del kwargs["download_url"]
         _setup(**kwargs)	
 
+
+data_files = [
+		    ('share/rx4rdf',[ 'changelog.txt', 'COPYING', 'README.txt'] ),
+		   ('share/rx4rdf/rhizome',glob.glob('rhizome/*') ),
+		   ('share/rx4rdf/rdfscribbler',glob.glob('rdfscribbler/*') ),
+		   ('share/rx4rdf/docs',glob.glob('docs/*') ),
+        ]
+
+def _addFiles(data_files, dirname, names):     
+    data_files.append( ( os.path.join('share/rx4rdf', dirname), 
+       [os.path.join(dirname, name) for name in names if os.path.isfile(os.path.join(dirname, name))]) 
+       )
+os.path.walk('site', _addFiles, data_files)
+
 setup(name=PACKAGE_NAME,
 #metadata:
 	  version=version_string,
@@ -52,9 +66,5 @@ Rhizome, a wiki-like content management and delivery system with wiki-like
 markup languages for authoring XML and RDF, and RDFScribbler, for viewing and editing RDF models.""",	  
 #packaging info:	  	  
       packages = ['rx', 'rx/logging22', 'rx/test'],
-	  data_files = [
-		    ('share/rx4rdf',[ 'changelog.txt', 'COPYING', 'README.txt'] ),
-		   ('share/rx4rdf/rhizome',glob.glob('rx/rhizome/*.*') ),
-		   ('share/rx4rdf/rdfscribbler',glob.glob('rx/rdfscribbler/*.*') ),
-        ],
+	  data_files = data_files
 	  )

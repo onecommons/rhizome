@@ -10,7 +10,7 @@ Or
 
 A request is just a dictionary of name/value properties that are mapped to XPath variables. These variables are used in the XPath context when RxPath rules are evaluated. The result of the rule processing is treated as the response. Currently Racoon supports the following request types:
 +HTTP request= the URL name, query parameters or form variables, HTTP headers and cookies are mapped.
-+XML-RPC= the request name and parameters are mapped to RxPath variables (parameters are named '0', '1', '2', etc.)
++XML-RPC= the request name and parameters are mapped to RxPath variables (parameters are named '1', '2', '3', etc.)
 +Command Line= command parameters are mapped; arguments that start with '-' treated as the variable name
 
 Racoon comes with several built-in actions for processing content and manipulating the underlying RDF model:
@@ -25,9 +25,13 @@ Racoon can be run as a standalone HTTP server or it can be used with Apache/mod-
 
 !More Info:
 
-[Racoon Installation|http://localhost:8000/Download]
+[Racoon Quick Start|Download]
 
-[RacoonConfig] This sample configuration file documents Racoon's config format and options.
+[Racoon Manual|RhizomeDoc]
+
+[Racoon Config] This sample configuration file documents Racoon's config format and options.
+
+[Racoon invocation] Walks through a example Racoon invocation step-by-step
 
 [Racoon Status]
 

@@ -25,11 +25,16 @@ The \<code><fixme>\</code> element is used for stuff which still needs work. Min
 
      anchor id=section
      section:
-       title:
+       title: 
 Using sections
+
+
 You can use sections to put some structure in your document.
-       section:
-          title: `Section 2.1
+       section id=foo:
+          title: 
+Section 2.1
+
+
 This is a subsection with the section
        anchor id=figure
      section:

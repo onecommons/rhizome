@@ -1,7 +1,7 @@
 Rx4RDF and Rhizome Changelog
 ============================
 
-Changes in Version 0.2 (Feb. 25, 2004)
+Changes in Version 0.2 (Feb. 29, 2004)
 ---------------------------------------
 Major changes and bug fixes:
 * Rx4RDF: The RxPath engine has been completely rewritten. 
@@ -14,17 +14,21 @@ Changes include:
 ** support for 4Suite (default) and Redland (experimental) RDF models
 ** commit/rollback support
 ** the default memory model now incrementally commits changes to disk 
-instead of re-saving the whole model.
-* RxUpdate: added new xupdate:replace element/instruction
-* RxUpdate: added new xupdate:copy-of element/instruction
+   instead of re-saving the whole model.
+* RxUpdate: added new xupdate:replace and xupdate:copy-of element/instructions
+* RxUpdate: implemented xupdate:variable element/instruction
 * Racoon: added cacheing of RxPath expression parsing, stylesheet parsing, 
-RxPath evaluation, and Racoon Actions. See /RacoonCaches for config options.
-* Racoon: partial support for virtual servers
-* Rhizome: minor edit checkbox temporarily hidden to avoid diffing problems between revisions
+  RxPath evaluation, and Racoon Actions. 
+  (See docs/RacoonCaches for config options.
+* Racoon: partial support for virtual host names. 
+  (See rx/rhizome/server.cfg for config options.)
 * utils: added iterators and visitors for compiled XPath expressions
 * utils: utility classes for generating exception classes and patching 3rd-party classes
+* Rhizome: rewrote saving content logic, including allowing external 
+           content to be safely changed by external applications
 * Rhizome: added config-specific functions to ease extending Rhizome
 * Rhizome: improved static export (including added $_static var for dynamic content)
+* Rhizome: added support for revision labels and draft/release workflow
 
 Changes in Version 0.1.3 (Dec. 15, 2003)
 ---------------------------------------

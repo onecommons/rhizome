@@ -2,7 +2,7 @@
 
                          Rx4RDF and Rhizome
                          Version 0.2.0
-                         Feb 25, 2004
+                         Feb 29, 2004
  
   Introduction
   ------------
@@ -20,7 +20,7 @@
   
   What's new in this release?
   ---------------------------  
-  RxPath has been completely reimplemented.  The first implementation was a 
+  RxPath has been completely reimplemented. The first implementation was a 
   proof-of-concept, this one is intended for production use. 
   Enhancements include: signficant performance boost, retrieves statements 
   from the underlying model on demand, incrementally updates the underlying model, 
@@ -63,7 +63,8 @@
     
   Rx4RDF requires Python 2.2 or later and 4Suite 1.0a1 (4Suite.org).
    
-  Rx4RDF and Rhizome are known to run on Linux, Windows 2000 and Cygwin.  
+  Rx4RDF and Rhizome are known to run on Linux, Windows 2000 and Cygwin 
+  and should work on any platform that supports Python and 4Suite.
   
   On Windows, the Python Win32 Extensions (python.org/windows/win32all) 
   must be installed or locking will be disabled.
@@ -82,11 +83,9 @@
   -------------
   
   The /docs directory is contains a static export of the Rx4RDF site.
-  Alternatively, you can visit http://rx4rdf.sf.net or run the local copy of the site 
-  in the /site directory:
+  Alternatively, you can visit http://rx4rdf.sf.net for the latest content 
+  or run the local copy of the site found in the /site directory:
   
-  cd <unzip>
-  python setup.py install
   cd <unzip dir>/site
   python ../rx/racoon.py -a site-config.py
   browse to http://localhost:8000 (edit server.cfg to change the port).

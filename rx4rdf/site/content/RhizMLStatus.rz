@@ -2,12 +2,8 @@
 
 * Feature Todo:
 ** support for inter:wiki links
-** support for inline variables and RxPath queries e.g. '[[{$var}]'
+** support for inline variables and RxPath queries e.g. '\[{$var}]'
 ** better support for inline metadata and/or markup?
-** possibly add formatting syntax for:
-*** <br> (e.g. '\\' but that's taken)
-*** blockquotes
-*** <pre>
 ** CamelCase support?
 
 Any suggestions?

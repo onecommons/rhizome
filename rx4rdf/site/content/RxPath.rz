@@ -40,11 +40,11 @@ RxPath defines resource elements (subject and object) as having a string value e
 
 +Example 6=Find all objects of the resource with URI reference "http://example.com/example#foo":
 
-^^/*[[.="http://example.com/example#foo"]/*/*
+^^/*\[.="http://example.com/example#foo"]/*/*
 
 +Example 7=Find all the statements with a ^^dc:title^^ predicate and an object which a literal equal to "A marvelous thing"
 
-^^/*/dc:title[[.="A marvelous thing"] 
+^^/*/dc:title\[.="A marvelous thing"] 
 
 Here the string value of the predicate element follows the XPath rule, thus matching the object value (its child)
 
@@ -52,24 +52,24 @@ Two more similar examples:
 
 +Example 8=All resources with a property rdfs:label with value "my label":
 
-^^/*[[rdfs:label='my label']
+^^/*\[rdfs:label='my label']
 
 +Example 9=Find all the statements with that have the resource "http://example.com/example#bar": as its object:
 
-^^/*/*[[.='http://example.com/example#bar']
+^^/*/*\[.='http://example.com/example#bar']
 
 RxPath expressions can follow transitive properties by using the descendant axis: 
 
 +Example 10=Find all the decendant files of a folder named "foldername":
 
-^^/fs:Folder[[fs:file-name="foldername"]\//fs:has-child/fs:File
+^^/fs:Folder\[fs:file-name="foldername"]\//fs:has-child/fs:File
 
 Inverse transitive queries can be done the same way: 
 
 +Example 11=Find all the ancestor folder(s) of the file named "filename":
 
-^^/fs:Folder[[.\//fs:has-child/fs:File[[fs:file-name="filename"]]
+^^/fs:Folder\[.\//fs:has-child/fs:File\[fs:file-name="filename"]]
 
 +Example 12=A more complicated expression that does the same thing but returns a nodeset ordered by the ancestor relation.
 
-^^(\//fs:has-child/fs:File[[fs:file-name="filename"])[[last()]/ancestor::fs:has-child/parent::fs:Folder
+^^(\//fs:has-child/fs:File\[fs:file-name="filename"])\[last()]/ancestor::fs:has-child/parent::fs:Folder

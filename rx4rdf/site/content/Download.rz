@@ -29,7 +29,7 @@ Run a local copy of this site:
 To start a fresh Rhizome site, just run Rhizome from the directory where you want the site to live:
 
 #^^cd <directory of the new site>
-#^^python /<rx4rdf root>/rx/racoon.py -a /<rx4rdf root>/rx/rhizome/rhizome-config.py
+#^^python /<rx4rdf root>/rx/racoon.py -a /<rx4rdf root>/rhizome/rhizome-config.py
 
 !!RxSLT, RxUpdate, RhizML
 To experiment with RxSLT, RxUpdate, or RhizML run an instance of Rhizome and create or edit pages with this format.  Or see RDFDom.py or rhizml.py for programmatic interfaces.

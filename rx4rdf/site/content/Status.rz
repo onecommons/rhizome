@@ -1,12 +1,12 @@
 Overall, Rx4RDF is at the alpha stage -- fairly stable, mostly feature complete, but not well-tested.  
 
-The [RxPath] implementation is a reference implementation, not intended for serious production use -- in particular, it's slowww and not very scalable.  
+The [RxPath] implementation has been rewritten from scratch and its performance and robustness is now respectable for relatively small models (at least, I hope so). But the plan (and currently not must more than a plan) is for RxPath expressions to be translated to an underlying RDF query language such as Squish or directly to SQL.
 
 [Rhizome] is fairly full-featured compared to your generic wiki but just getting started in terms of completing the [Rhizome Vision|RhizomeStatus].
 
-For more details on particular sub-projects (including todo lists) see one of these pages:
+For more details on particular sub-projects (including todo lists) see:
 
-*[Rx4RDFStatus]
+;*[Rx4RDFStatus]
 *[RacoonStatus]
 *[RhizomeStatus]
 *[RhizMLStatus]

@@ -144,7 +144,7 @@ A RxML processor that does not support RxPath is not required to support the ^^r
 !Advanced example. 
 Below is an example written in [RhizML] that demonstrates all the features of RxML.
 
-r'''<source>
+'''\<source>
 rx:
  prefixes:
      a: `http://rx4rdf.sf.net/ns/archive#
@@ -166,11 +166,13 @@ rx:
          resource id='http://asdfasdf'
      rdf:type: 
          a:NamedContent
-         
- query select='\*': ; child properties are applied to each node in the nodeset returned by the xpath expression
+ 
+ ; child properties are applied to each node in
+ ; the nodeset returned by the xpath expression
+ query select='\*': 
      prop1:dsa:
       bNode:blankNode1
-</source>
+\</source>
 '''
 
 !Comparison between RxML and [RDF/XML|http://www.w3.org/TR/rdf-syntax-grammar/]

@@ -86,7 +86,7 @@ Inverse transitive queries can be done the same way:
      s2 title="Conventions and Terminology":
 Through out this document anytime a [QName|http://www.w3.org/TR/REC-xml-names#NT-QName] appears with the prefix "rdf" it can be assumed that the namespace URI for the QName is "http://www.w3.org/1999/02/22-rdf-syntax-ns#".  
 
-Mentions of XPath always refer to [XPath] 1.0. 
+Mentions of XPath always refer to [XPath|#XPath] 1.0. 
 
 The uses of "SHOULD", "MAY", and "MUST" are defined in accordance with [RFC 2119|http://www.ietf.org/rfc/rfc2119.txt] - "Key words for use in RFCs to Indicate Requirement Levels".
 
@@ -99,7 +99,7 @@ The following requirement drove the design described here:
 # SHOULD be conform closely to ones expectations of how a XPath expressions behave and also follow an intuitive picture of navigating an RDF model visualized as a graph.
 
    s1 title="Data Model":
-This section describes how to map a given an RDF Model to a representation as an abstract XML document as defined by the [XPath] Data Model. 
+This section describes how to map a given an RDF Model to a representation as an abstract XML document as defined by the [XPath Data Model|http://www.w3.org/TR/xpath#data-model]. 
 Construct an XML document from a RDF model:
 
      s2 title="Subject Element"
