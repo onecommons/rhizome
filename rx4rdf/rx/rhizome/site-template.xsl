@@ -23,7 +23,7 @@
     
 <xsl:template match="/">
 <!-- this page is always html, not the content's mimetype -->
-<xsl:variable name='prev-content-type' select="response-header:content-type" />
+<xsl:variable name='prev-content-type' select="$response-header:content-type" />
 <xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />
 <xsl:variable name='title' select="f:if($previous:title, $previous:title, f:if($_prevnode/wiki:title, $_prevnode/wiki:title, $_name) )" />
 <!-- html template based on http://www.projectseven.com/tutorials/css_t/example.htm 
@@ -99,7 +99,7 @@ Or <a href="users-guest?action=new">signup</a>
 
     <!-- Main Content -->
     <tr>
-    <td valign="top" id="maincontent">
+    <td valign="top" id="maincontent">        
          <xsl:choose>
              <!-- if the content is xml or html insert it as is
               because we don't yet always set the content-type, we'll assume any transformation other than text creates xml or html
