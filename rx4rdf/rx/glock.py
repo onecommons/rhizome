@@ -183,6 +183,27 @@ class GlobalLock:
                 raise GlobalLockError('Unlock of file "%s" failed\n' %
                                                             self.name)
 
+class LockGetter:
+    '''
+    Helper class enabling the "resource acquisition is initialization" pattern.
+    The constructor acquires the resource (the lock) and the destructor releases it
+    (e.g. when garage collected).
+    Because of the subtlies of the behavior of destructors it is recommended to call
+    release() instead of using the del statement to explictly release the lock.
+    '''
+    def __init__(self, globalLock):
+        self.globalLock = globalLock
+        self.globalLock.acquire()
+        
+    def __del__(self):
+        #print '__del__ called' ##
+        if self.globalLock:
+            self.globalLock.release()
+        
+    def release(self):
+        self.globalLock.release()
+        self.globalLock = None
+
 if lockingDisabled:
     class DummyLock:
         def __init__(self, fpath, lockInitially=False): pass

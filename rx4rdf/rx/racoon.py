@@ -367,7 +367,7 @@ class Root(object):
     '''
 
     DEFAULT_CONFIG_PATH = 'wiki-default-config.py'
-    lockName = None
+    lock = None
     
     def __init__(self,argv):
         configpath = self.DEFAULT_CONFIG_PATH
@@ -467,8 +467,8 @@ class Root(object):
         Call release() on the returned lock object to release it
         (Though this is not absolutely required since it will try to be released when garbage collected.)
         '''
-        assert self.lockName
-        return glock.GlobalLock(self.lockName, True)
+        assert self.lock
+        return glock.LockGetter(self.lock)
             
     def loadModel(self):
         source = self.source
@@ -487,8 +487,10 @@ class Root(object):
             else:
                 self.STORAGE_PATH = os.path.splitext(self.source)[0] + '.nt'
                                     
-        if not self.lockName:
-            self.lockName = self.STORAGE_PATH + '.lock'
+        if not self.lock:
+            lockName = self.STORAGE_PATH + '.lock'
+            self.lock = glock.GlobalLock(lockName)
+            
         lock = self.getLock()
         
         model, memorydb = utils.deserializeRDF(source)        
