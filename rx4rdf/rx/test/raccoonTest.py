@@ -6,17 +6,17 @@
     http://rx4rdf.sf.net    
 """
 
-from rx import racoon, utils, logging
+from rx import raccoon, utils, logging
 import unittest
 
-class RacoonTestCase(unittest.TestCase):
+class RaccoonTestCase(unittest.TestCase):
     def setUp(self):
         logging.BASIC_FORMAT = "%(asctime)s %(levelname)s %(name)s:%(message)s"
         logging.root.setLevel(logging.INFO)
         logging.basicConfig()
 
     def testAuth(self):
-        root = racoon.Root(a='testAuthAction.py')
+        root = raccoon.RequestProcessor(a='testAuthAction.py')
         unauthorized = root.rdfDom.findSubject( 'http://rx4rdf.sf.net/ns/auth#Unauthorized' )
         #the guest user has no rights
         user = root.rdfDom.findSubject( root.BASE_MODEL_URI+'users/guest' )
@@ -33,13 +33,13 @@ class RacoonTestCase(unittest.TestCase):
         self.failUnless( start == result)
 
     def testMinimalApp(self):
-        root = racoon.Root(a='testMinimalApp.py')
+        root = raccoon.RequestProcessor(a='testMinimalApp.py')
         result = root.runActions('http-request', utils.kw2dict(_name='foo'))
         #print type(result), result
         response = "<html><body>page content.</body></html>"
         self.failUnless(response == result)
         
-        result = racoon.InputSource.DefaultFactory.fromUri('site:///foo').read()    
+        result = raccoon.InputSource.DefaultFactory.fromUri('site:///foo').read()    
         #print type(result), repr(result), result
         self.failUnless(response == result)
         
@@ -50,12 +50,12 @@ class RacoonTestCase(unittest.TestCase):
     def testXPathSecurity(self):
         '''
         test that we can't access insecure 4Suite extension functions
-        after importing racoon
+        after importing raccoon
         '''
         from rx import RxPath
         from Ft.Xml import XPath
         node = None
-        context = XPath.Context.Context(node, processorNss = racoon.DefaultNsMap)
+        context = XPath.Context.Context(node, processorNss = raccoon.DefaultNsMap)
         from Ft.Xml.XPath import BuiltInExtFunctions
         #print BuiltInExtFunctions.ExtFunctions[(XPath.FT_EXT_NAMESPACE, 'env-var')]
         try:
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     #os.chdir(os.path.basename(sys.modules[__name__ ].__file__))
     try:
         test=sys.argv[sys.argv.index("-r")+1]
-        tc = RacoonTestCase(test)
+        tc = RaccoonTestCase(test)
         tc.setUp()
         getattr(tc, test)() #run test
     except (IndexError, ValueError):

@@ -16,12 +16,12 @@ class glockTestCase(unittest.TestCase):
         pass
 
     def test1(self):
-        #like rx.racoon.getLock()
+        #like rx.raccoon.getLock()
         lock = glock.GlobalLock(self.lockName, True)
         lock.release()
 
     def test2(self):
-        #like rx.racoon.getLock()
+        #like rx.raccoon.getLock()
         globalLock = glock.GlobalLock(self.lockName)
         lock = glock.LockGetter(globalLock)
         lock2 = glock.LockGetter(globalLock)

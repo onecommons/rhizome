@@ -1,4 +1,4 @@
-#racoon config file used by racoonTest.py
+#raccoon config file used by raccoonTest.py
 startAction = Action(['$start'])
 
 filterTokens = '''auth:guarded-by/auth:AccessToken[auth:has-permission=$__authAction]
@@ -158,5 +158,5 @@ for action in ['view', 'edit', 'new', 'creation', 'save', 'delete', 'confirm-del
     authStructure += "\n wiki:action-%s: rdf:type: auth:Permission" % action
 
 from rx import rxml
-STORAGE_TEMPLATE = rxml.rhizml2nt(contents=authStructure, nsMap=nsMap) 
+STORAGE_TEMPLATE = rxml.zml2nt(contents=authStructure, nsMap=nsMap) 
 STORAGE_PATH = 'dummmy'
