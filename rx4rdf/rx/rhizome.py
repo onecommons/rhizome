@@ -10,7 +10,7 @@
 from rx import zml, rxml, raccoon, utils, RxPath
 import Ft
 from Ft.Lib import Uri
-from Ft.Rdf import RDF_MS_BASE,OBJECT_TYPE_RESOURCE
+from Ft.Rdf import RDF_MS_BASE,OBJECT_TYPE_RESOURCE,RDF_SCHEMA_BASE
 from Ft.Xml import InputSource
 import os, os.path, sys, types, base64, fnmatch, traceback, re
 try:
@@ -38,7 +38,7 @@ class RhizomeBaseMarkupMap(zml.LowerCaseMarkupMap):
         tag, attribs, text = super(RhizomeBaseMarkupMap, self).mapLinkToMarkup(
                 link, name, annotations, isImage, isAnchorName)
 
-        if self.rhizome.uninitialized or tag != self.A:
+        if tag != self.A:
             #todo: this means that interwiki links only work in <a> tags
             return tag, attribs, text
 
@@ -155,8 +155,8 @@ class MarkupMapFactory(zml.DefaultMarkupMapFactory):
         else:
             return mm
 
-class SanitizeHTML(utils.BlackListHTMLSanitizer, raccoon.RequestProcessor.SiteLinkFixer):
-    _BlackListHTMLSanitizer__super = raccoon.RequestProcessor.SiteLinkFixer
+class SanitizeHTML(utils.BlackListHTMLSanitizer, raccoon.ContentProcessors.SiteLinkFixer):
+    _BlackListHTMLSanitizer__super = raccoon.ContentProcessors.SiteLinkFixer
 
     addRelNofollow = True
     
@@ -199,14 +199,114 @@ class SanitizeHTML(utils.BlackListHTMLSanitizer, raccoon.RequestProcessor.SiteLi
         else:
             log.warning('Stripping dangerous ??: %s, %s, %s' % tag, name, value)    
 
-
 class TruncateHTML(utils.HTMLTruncator, SanitizeHTML):
     _HTMLTruncator__super = SanitizeHTML
     
     def onStrip(self, tag, name, value):
         #DoNotHandleException cause we don't the action error handler to catch this
         raise raccoon.DoNotHandleException('Contains HTML that can not be safely embedded in another HTML page')
+
+class RhizomeXMLContentProcessor(raccoon.ContentProcessors.XMLContentProcessor):
+    '''
+    Replaces the xml/html content processor with one that sanitizes
+    the markup if the user doesn't have the proper access token
+    '''    
+    blacklistedElements = SanitizeHTML.blacklistedElements
+    blacklistedContent = SanitizeHTML.blacklistedContent 
+    blacklistedAttributes = SanitizeHTML.blacklistedAttributes
+
+    def __init__(self,sanitizeToken=None, nospamToken=None):
+        super(RhizomeXMLContentProcessor, self).__init__()
+        self.sanitizeToken=sanitizeToken
+        self.nospamToken=nospamToken
+                 
+    def linkFixerFactory(self, sanitize, addNoFollow, args, kwargs):
+        fixer = SanitizeHTML(*args, **kwargs)        
+        fixer.addRelNofollow = addNoFollow
+        fixer.blacklistedElements = sanitize and self.blacklistedElements or []
+        fixer.blacklistedContent = sanitize and self.blacklistedContent or {}
+        fixer.blacklistedAttributeNames = sanitize and self.blacklistedAttributes or {}
+        return fixer
+
+    def truncateHTMLFactory(self, maxwords, maxlines, args, kwargs):
+        fixer = TruncateHTML(*args, **kwargs)        
+                                    
+        fixer.blacklistedElements = self.blacklistedElements
+        fixer.blacklistedContent = self.blacklistedContent
+        fixer.blacklistedAttributeNames = self.blacklistedAttributes
+        if maxwords:
+            fixer.maxWordCount = int(maxwords)
+        if maxlines:
+            fixer.maxLineCount = int(maxlines)
+        return fixer
+        
+    def processContents(self, result, kw, contextNode, contents):
+        #if the content was not created by an user with a 
+        #trusted author token we need to strip out any dangerous HTML.
+        #Because html maybe generated dynamically we need to check this while spitting out the HTML.
+        maxwords = kw.get('maxwords') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxwords'))
+        maxlines = kw.get('maxlines') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxlines'))
+        if maxwords or maxlines:
+            #we always santize the HTML when rendering HTML for a summary
+            linkFixerFactory = lambda *args, **kwargs: self.truncateHTMLFactory(maxwords, maxlines, args, kwargs)
+        else:
+            sanitize = nofollow = True
+            #get the accessTokens granted to the author of the content            
+            result = kw['__server__'].evalXPath('''$__context/wiki:created-by/*/auth:has-role/*[.='http://rx4rdf.sf.net/ns/auth#role-superuser']
+            | $__context/wiki:created-by/*/auth:has-rights-to/* | $__context/wiki:created-by/*/auth:has-role/*/auth:has-rights-to/*''',
+                                           node=contextNode)
+            for token in result:                
+                if token.uri == 'http://rx4rdf.sf.net/ns/auth#role-superuser':
+                    #super users can do anything
+                    sanitize = nofollow = False
+                    break
+                elif token.uri == self.sanitizeToken:
+                    santize = False
+                elif token.uri == self.nospamToken:
+                    nofollow = False
+
+            if sanitize or nofollow:
+                linkFixerFactory = lambda *args, **kwargs: self.linkFixerFactory(sanitize, nofollow, args, kwargs)
+            else: #permission to generate any kind of html/xml -- so use the default                        
+                linkFixerFactory = None
+
+        return self.processMarkup(contents,kw['__server__'].appBase,
+                                  linkFixerFactory=linkFixerFactory)
+
+    def processMarkupCachePredicate(self, result, kw, contextNode, contents):
+        return (contents, contextNode, id(contextNode.ownerDocument),
+                contextNode.ownerDocument.revision,
+                kw.get('maxwords') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxwords')),
+                kw.get('maxlines') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxlines'))
+                )
+
+class PatchContentProcessor(raccoon.ContentProcessors.ContentProcessor):
+    uri = 'http://rx4rdf.sf.net/ns/content#pydiff-patch-transform'
+
+    def __init__(self, rhizome):
+        super(PatchContentProcessor, self).__init__()
+        self.rhizome = rhizome
+        
+    def processContents(self,result, kw, contextNode, contents):
+        return self.rhizome.processPatch(contents, kw, result)
+
+def authorizeDynamicContent(self, contents, formatType, kw, dynamicFormat, accessToken=None):
+    '''see rhizome-config.py for usage'''
+    if dynamic:
+        assert accessToken
+        if not kw['__server__'].evalXPath(
+'''$__account/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser' or
+/*[.='%s'][.=$__account/auth:has-rights-to/* or .=$__account/auth:has-role/*/auth:has-rights-to/*]'''
+            % accesstoken, kw2vars(__account=kw.get('__account',[]))):
+           raise raccoon.NotAuthorized(
+'You are not authorized to create dynamic content with this format: %s' 
+                % (formatType))            
     
+    if self.__class__.authorize:
+        return self.__class__.authorize(self, contents, formatType, kw, dynamicFormat)
+    elif kw.get('__server__') and kw['__server__'].authorizeContentProcessorsDefault:
+        return kw['__server__'].authorizeContentProcessorsDefault(contents, formatType, kw, dynamicFormat)
+
 METADATAEXT = '.metarx'
 
 def kw2vars(**kw):
@@ -237,24 +337,15 @@ class Rhizome(object):
         #this is just like findContentAction except we don't want to try to retrieve alt-contents' ContentLocation        
         self.findPatchContentAction = raccoon.Action(['.//a:contents/text()', 
         'wf:openurl(.//a:contents/a:ContentLocation)', #contents stored externally
-        ], lambda result, kw, contextNode, retVal:\
-            server.getStringFromXPathResult(result), requiresContext = True) #get its content
-        self.mmf = MarkupMapFactory(self)
+        ], lambda result, kw, contextNode, retVal:
+            isinstance(result, str) and result or raccoon.StringValue(result),
+                                    requiresContext = True) #get its content
         self.interWikiMap = None
-      
-    def _configSanitizer(self, kw, name, function):
-        setting = kw.get(name)
-        if setting is not None:
-            isdict = isinstance(setting, dict)
-            if isdict:
-                setting = setting.items()
-            result = map(function, setting)
-            if isdict:
-                result = dict(result)
-        else:
-            result = getattr(SanitizeHTML, name)
-        setattr(self, name, result)
-                    
+        self.zmlContentProcessor = raccoon.ContentProcessors.ZMLContentProcessor()
+        self.zmlContentProcessor.getInterWikiMap = self.getInterWikiMap
+        self.mmf = MarkupMapFactory(self.zmlContentProcessor)
+        self.zmlContentProcessor.markupMapFactory = self.mmf
+                          
     def configHook(self, kw):
         self.log = logging.getLogger("rhizome." + self.server.appName)
         
@@ -310,7 +401,7 @@ class Rhizome(object):
                   'SAVE_DIR must be a distinct sub-directory of a directory on the PATH'
                 
         self.interWikiMapURL = kw.get('interWikiMapURL', 'site:///intermap.txt')
-        initConstants( ['undefinedPageIndicator', 'externalLinkIndicator', 'interWikiLinkIndicator', 'useIndex' ], 1)
+        initConstants( ['useIndex'], 1)
         initConstants( ['RHIZOME_APP_ID'], '')
 
         self.passwordHashProperty = kw.get('passwordHashProperty',
@@ -336,12 +427,19 @@ class Rhizome(object):
         self.indexDir = kw.get('INDEX_DIR', os.path.join(self.server.baseDir, 'contentindex'))
         self.indexableFormats = kw.get('indexableFormats', self.defaultIndexableFormats)
 
-        for args in [ ('blacklistedContent', lambda x,y: (re.compile(x), re.compile(y)) ),
-          ('blacklistedElements',lambda x: x),
-          ('blacklistedAttributes', lambda x,y: (re.compile(x), re.compile(y)) )
-            ]:
-            self._configSanitizer(kw, *args)
-
+        xmlContentProcessor = self.server.contentProcessors['http://rx4rdf.sf.net/ns/wiki#item-format-xml']
+        xmlContentProcessor.blacklistedElements = kw.get('blacklistedElements',
+                                                SanitizeHTML.blacklistedElements)        
+        for name in [ 'blacklistedContent', 'blacklistedAttributes']:
+            setting = kw.get(name)
+            if setting is not None:
+                value = dict([(re.compile(x), re.compile(y))
+                               for x, y in setting.items()])
+                setattr(xmlContentProcessor, name, result)
+                
+        zmlContentProcessor = self.server.contentProcessors['http://rx4rdf.sf.net/ns/wiki#item-format-zml']
+        raccoon.assignVars(zmlContentProcessor, kw, ['undefinedPageIndicator',
+                        'externalLinkIndicator', 'interWikiLinkIndicator'], 1)        
         self.uninitialized = False
         
     def getInterWikiMap(self):
@@ -401,7 +499,7 @@ class Rhizome(object):
         #for additions we need to find all the possible authorizing
         #resources in the new nodes because the new statements may
         #create new linkages to authorzing resources
-        forAllResource = self.server.rdfDom.findSubject(self.server.BASE_MODEL_URI + 'common-access-checks')
+        forAllResource = self.server.rdfDom.findSubject(RDF_SCHEMA_BASE+'Resource')
         newPredicates = reduce(self._addPredicates, additions, [])
         #print >>sys.stderr, 'new preds', newPredicates
         for node in newPredicates:
@@ -442,7 +540,7 @@ class Rhizome(object):
                 node.stmt.subject, node.stmt.predicate,node.stmt.object)
 
     def authorizeRemovals(self, additions, removals, reordered, user):
-        forAllResource = self.server.rdfDom.findSubject(self.server.BASE_MODEL_URI + 'common-access-checks')
+        forAllResource = self.server.rdfDom.findSubject(RDF_SCHEMA_BASE+'Resource')
         for node in reduce(self._addPredicates, removals, []):
             assert getattr(node, 'stmt') #assert it's a predicate node
             authorizingResources = self.getAuthorizingResources( node.parentNode )
@@ -491,23 +589,6 @@ class Rhizome(object):
                     % (actionName, subject, predicate,object))
         #return the nodes of the resources that user isn't authorized to perform this action on 
         return result
-
-    def authorizeDynamicContent(self, accesstoken, calldefault, contents, formatType, kw, dynamicFormat):
-        if dynamicFormat:
-            if not self.server.evalXPath(
-    '''$__account/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser' or
-    /*[.='%s'][.=$__account/auth:has-rights-to/* or .=$__account/auth:has-role/*/auth:has-rights-to/*]'''
-                % accesstoken, kw2vars(__account=kw.get('__account',[]))):
-               raise raccoon.NotAuthorized(
-    'You are not authorized to create dynamic content with this format: %s' 
-                    % (formatType))
-            elif not calldefault:
-                #success so return now if we don't want try the default
-                return         
-        #try the default authorization, if any
-        return self.server.authorizeContentProcessing(
-                self.server.DefaultAuthorizeContentProcessors,
-                contents, formatType, kw, dynamicFormat)
 
     def authorizeXPathFuncs(self, server, funcs, kw):
         #we don't authorization for accessing individual XPath extension functions yet,
@@ -888,91 +969,7 @@ Options:
              utils.writeTriples(stmts,stream)
              stream.close()
                  
-    ######content processing####
-    def processXSLT(self, result, kw, contextNode, contents):
-        '''
-        Invoke the transformation on the _contents metadata 
-        '''
-        return self.server.processXslt(contents, kw['_contents'], kw,
-                uri=kw.get('_contentsURI') or self.server.evalXPath( 
-    'concat("site:///", (/a:NamedContent[wiki:revisions/*/*[.=$__context]]/wiki:name)[1])',
-                        node=contextNode) )
-                
-    def linkFixerFactory(self, sanitize, addNoFollow, args, kwargs):
-        fixer = SanitizeHTML(*args, **kwargs)        
-        fixer.addRelNofollow = addNoFollow
-        fixer.blacklistedElements = sanitize and self.blacklistedElements or []
-        fixer.blacklistedContent = sanitize and self.blacklistedContent or {}
-        fixer.blacklistedAttributeNames = sanitize and self.blacklistedAttributes or {}
-        return fixer
-
-    def truncateHTMLFactory(self, maxwords, maxlines, args, kwargs):
-        fixer = TruncateHTML(*args, **kwargs)        
-                                    
-        fixer.blacklistedElements = self.blacklistedElements
-        fixer.blacklistedContent = self.blacklistedContent
-        fixer.blacklistedAttributeNames = self.blacklistedAttributes
-        if maxwords:
-            fixer.maxWordCount = int(maxwords)
-        if maxlines:
-            fixer.maxLineCount = int(maxlines)
-        return fixer
-        
-    def processMarkup(self, result, kw, contextNode, contents,
-                      sanitizeToken=None, nospamToken=None):
-        #if the content was not created by an user with a 
-        #trusted author token we need to strip out any dangerous HTML.
-        #Because html maybe generated dynamically we need to check this while spitting out the HTML.
-        maxwords = kw.get('maxwords') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxwords'))
-        maxlines = kw.get('maxlines') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxlines'))
-        if maxwords or maxlines:
-            #we always santize the HTML when rendering HTML for a summary
-            linkFixerFactory = lambda *args, **kwargs: self.truncateHTMLFactory(maxwords, maxlines, args, kwargs)
-        else:
-            sanitize = nofollow = True
-            #get the accessTokens granted to the author of the content            
-            result = self.server.evalXPath('''$__context/wiki:created-by/*/auth:has-role/*[.='http://rx4rdf.sf.net/ns/auth#role-superuser']
-            | $__context/wiki:created-by/*/auth:has-rights-to/* | $__context/wiki:created-by/*/auth:has-role/*/auth:has-rights-to/*''',
-                                           node=contextNode)
-            for token in result:                
-                if token.uri == 'http://rx4rdf.sf.net/ns/auth#role-superuser':
-                    #super users can do anything
-                    sanitize = nofollow = False
-                    break
-                elif token.uri == sanitizeToken:
-                    santize = False
-                elif token.uri == nospamToken:
-                    nofollow = False
-
-            if sanitize or nofollow:
-                linkFixerFactory = lambda *args, **kwargs: self.linkFixerFactory(sanitize, nofollow, args, kwargs)
-            else: #permission to generate any kind of html/xml -- so use the default                        
-                linkFixerFactory = None
-
-        return self.server.processMarkup(contents,linkFixerFactory=linkFixerFactory)
-
-    def processMarkupCachePredicate(self, result, kw, contextNode, contents):
-        return (contents, contextNode, id(contextNode.ownerDocument),
-                contextNode.ownerDocument.revision,
-                kw.get('maxwords') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxwords')),
-                kw.get('maxlines') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxlines'))
-                )
-    
-    def processZMLSideEffects(self, contextNode, kw):
-        #optimization: only set the doctype (which will invoke wiki2html.xsl if we need links to be transformed)
-        if self.undefinedPageIndicator or self.externalLinkIndicator or self.interWikiLinkIndicator:
-            #wiki2html.xsl shouldn't get invoked with the doctype isn't html
-            if not kw.get('_doctype') and self.server.evalXPath(
-                "not(wiki:doctype) or wiki:doctype = 'http://rx4rdf.sf.net/ns/wiki#doctype-xhtml'",
-                    node = contextNode):
-                kw['_doctype'] = 'http://rx4rdf.sf.net/ns/wiki#doctype-wiki'
-        
-    def processZML(self, contextNode, contents, kw):
-        self.processZMLSideEffects(contextNode, kw)
-        contents = zml.zmlString2xml(contents,self.mmf)
-        #todo: optimize: don't fix up links if doctype is set since we're gonna do that again anyway
-        return (contents, 'http://rx4rdf.sf.net/ns/wiki#item-format-xml') #fixes up site://links
-        
+    ######content processing####    
     def processTemplateAction(self, resultNodeset, kw, contextNode, retVal):
         #the resultNodeset is the template resource
         #so skip the first few steps that find the page resource
