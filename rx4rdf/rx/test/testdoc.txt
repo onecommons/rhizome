@@ -1,0 +1,39 @@
+ document:
+  header:
+   title: `The document
+   authors:
+     person name = 'Adam Souzis' email="stevenn@apache.org"
+     abstract:
+A nonsense document using all possible elements in the current <code>document-v11.dtd</code>.
+  body:
+This is a simple paragraph. Most documents contain a fair amount of paragraphs. 
+
+A blank line starts a new paragraph.
+* Here is a simple list item (<code>&lt;li&gt;</code>).
+* Have you seen the use of the <code>&lt;code&gt;</code> element in the previous item?
+*We have elements for hyperlinking: 
+;;link:to another document
+;;anchor:to an anchor
+;;fork: equivalent to <code>&lt;a ...target="_top"&gt;</code>
+;;jump: equivalent to <code>&lt;a ...target="_blank"&gt;</code>
+
+paragraph-level elements (note: make sure to indent past the body element above).
+     fixme author="SN":
+The <code>&lt;fixme&gt;</code> element is used for stuff which still needs work. Mind the <code>author</code> attribute!
+     note: `The note element is used to draw attention to something
+     warning: `Sleep deprivation can be the result of being involved in an open source project.
+     anchor id=section
+     section:
+       title:
+Using sections
+You can use sections to put some structure in your document.
+       section:
+          title: `Section 2.1
+This is a subsection with the section
+       anchor id=figure
+     section:
+       title: `Using figures
+a figure
+       figure src=edit-icon.png alt='the fine forrest logo'
+  footer: ; align with body: above
+      legal: `(c) Apache Forrest

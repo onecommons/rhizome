@@ -1,0 +1,19 @@
+* bul1
+*** bul3
+##  num2 test : colon
+##  num2 test | pipe 
+** bul2 test [] empty link
+### num3
+**** bul4
+**** bul4
+|| th || th 
+| td | td |
+another table:
+| td | td 
+| td | td
+;term:defintion
+;term: def w/ : colon
+:indention
+__dont__ //worry//
+__//error__// adafdaf
+aaafafsafsaf

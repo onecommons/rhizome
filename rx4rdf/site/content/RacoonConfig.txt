@@ -1,0 +1,86 @@
+#Sample Racoon configuration file
+#The config file is just a python script, but knowledge of python is not needed for simple configurations
+
+#################################################
+## basic configuration variables 
+#################################################
+
+#PATH is a platform-specific string listing the directories that will be searched when resolving 'path:' URLs
+PATH = '.;..'
+
+#ROOT_PATH specifies base of URL that this runs on 
+ROOT_PATH = "cgi-bin/rhizome"
+
+#the __include__ function includes another Racoon configuration file
+__include__('../rx/rhizome/rhizome-config.py')
+
+#STORAGE_PATH the location of the RDF model
+STORAGE_PATH = 'mywebsite.nt'
+
+#SECURE_FILE_ACCESS limits 'file:' URLs access only the directories reachable through the PATH  
+#default is True
+SECURE_FILE_ACCESS = True
+
+#nsMap is dictionary of namespace prefixes that may appear in RxPath expressions
+nsMap = { 'dc' : 'http://purl.org/dc/elements/1.1/#',
+          'myNs' : 'http://www.example.com/#'
+        }         
+
+#################################################
+## advanced configuration variables 
+## these variables are only necessary when developing a new Racoon application
+#################################################
+
+#STORAGE_TEMPLATE_PATH location of the RDF model to be used when creating a new model
+#(i.e. when the file specified by STORAGE_PATH is not found)
+STORAGE_TEMPLATE_PATH='website-template.nt'
+
+#STORAGE_TEMPLATE is a string containing a NTriples that is used when 
+#the file specified by STORAGE_TEMPLATE_PATH is not found
+STORAGE_TEMPLATE='''
+_:itemdispositionhandlertemplate <http://rx4rdf.sf.net/ns/wiki#name> "item-disposition-handler-template" .
+_:itemdispositionhandlertemplate <http://rx4rdf.sf.net/ns/wiki#revisions> _:itemdispositionhandlertemplate1List .
+_:itemdispositionhandlertemplate <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+'''
+
+##APPLICATION_MODEL is a string containing a NTriples that are added to the RDF model
+#but are read-only and not saved to disc. Use for structural components such as the schema.
+APPLICATION_MODEL='''<http://rx4rdf.sf.net/ns/wiki#item-format-rhizml'> <http://www.w3.org/2000/01/rdf-schema#label> "RhizML" .'''
+
+#cmd_usage is string used to display the command-line usage help
+cmd_usage = '''--import [dir] [--recurse] [--format format] [--disposition disposition]
+            --export dir [--static]'''
+
+#actions is a dictionary that is the heart of an application running on Racoon 
+# the key is the name of the trigger and the value is list of Actions that are invoked in that order
+# Raccon currenlty uses two triggers:
+#'handle-request' is invoked by racoon.Root.handleRequest (for http requests) and by the 'site:' URL resolver
+#'run-cmds' is invoked on start-up to handle command line arguements
+# see Action class for more info
+
+actions = { 'handle-request' : [Action(['.//myNs:contents/myNs:ContentTransform/myNs:transformed-by/*',], __server__.processContents, matchFirst = False, forEachNode = True)]
+            'run-cmds' : [ Action(["$import", '$i'], lambda result, kw, contextNode, retVal, rhizome=rhizome: rhizome.doImport(result[0], **kw)),
+                           Action(['$export', '$e'], lambda result, kw, contextNode, retVal, rhizome=rhizome: rhizome.doExport(result[0], **kw)),
+                        ]
+          }
+
+#contentProcessors is a dictionary used by racoon.processContents to specify
+#content processors in addition to the built-in ones (RxXLST, RxUpdate, Python, base64)
+contentProcessors = {     
+    'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
+        lambda self, contents, kw, result, context, rhizml=rhizml, mmf=rx.rhizome.MarkupMapFactory(): rhizml.rhizmlString2xml(contents,mmf)
+}
+
+#extFunctions is a dictionary of RxPath extension functions to be made available RxPath, RxSLT, RxUpdate, etc.
+extFunctions = {
+('http://example.com/extfuncs', 'reverse'): lambda context, nodeset: nodeset.reverse() or nodeset
+}
+
+#######################################
+## available read-only variables 
+#######################################
+__server__ #racoon.Root reference
+__argv__   #list of arguments intended for this configuration file
+__configpath__ #stack of configuration file paths, __configpath__[-1] is always the current file
+               #__configpath__[-2], if it exists, would be the config file currently including this one, and so on.
+

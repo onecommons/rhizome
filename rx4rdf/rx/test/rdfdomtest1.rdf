@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE rdf:RDF [
+     <!ENTITY rdf  "http://www.w3.org/1999/02/22-rdf-syntax-ns#" >
+     <!ENTITY rdfs "http://www.w3.org/2000/01/rdf-schema#" >
+     <!ENTITY xsd  "http://www.w3.org/2001/XMLSchema#" >
+     <!ENTITY owl  "http://www.w3.org/2002/07/owl#" >
+     <!ENTITY archive "http://rx4rdf.sf.net/ns/archive#">
+   ]>
+
+<rdf:RDF
+  xmlns="&archive;"
+  xmlns:arc="&archive;"
+  xmlns:owl ="&owl;"
+  xmlns:tns="http://rx4rdf.sf.net/ns/archive/archive-example.rdf#"
+  xml:base="http://rx4rdf.sf.net/ns/archive/archive-example.rdf"
+  xmlns:rdf ="&rdf;"
+  xmlns:rdfs="&rdfs;"  
+>
+
+<owl:Ontology rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/" >
+  <owl:versionInfo>v0.1 April 20, 2003</owl:versionInfo>
+  <imports rdf:resource="http://rx4rdf.sf.net/ns/archive"/>  
+  <dc:title>archive instance</dc:title>
+  <dc:creator>Adam Souzis</dc:creator>
+  <dc:subject></dc:subject>
+  <dc:description></dc:description>
+  <dc:date>2003-04-10</dc:date>
+  <dc:language>en</dc:language>
+  <dc:identifier>http://rx4rdf.sf.net/ns/archive</dc:identifier>
+</owl:Ontology>
+
+
+</rdf:RDF>

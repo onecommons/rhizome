@@ -1,0 +1,9 @@
+#python setup.py sdist --force-manifest --formats=gztar,zip
+recursive-include rx/rhizome *
+recursive-include rx/rdfscribbler *
+recursive-include rx/test *
+include site/*
+recursive-include docs *
+global-exclude *.bak *.bk? *.nt *.metarx *.pyc
+global-include site/wikistore.nt
+include COPYING

@@ -1,0 +1,13 @@
+* Add users and authentication, enhance authorization
+* Introduce RDF shredder, a language for specifying how to extracting RDF out of a given XML schema
+* Improved linking support:
+** store link references in RDF store
+** more kinds of WikeNames (other than NamedContent)
+** Wiki-like display (for undefined links, etc.)
+** link fixup of site: URLs in markup
+* Add support for composite content representations
+* Polish UI, esp.: 
+** fix search 
+** add delete confirmation page
+** add title display
+* rewrite and release archiver tool

@@ -1,0 +1,14 @@
+<wikiwiki:> <http://myontology/instancepredicate1> "safadf" .
+<wikiwiki:> <http://myontology/instancepredicate2> <http://myontology/instance2res45> .
+<wikiwiki:> <http://myontology/instancepredicate3> <http://> .
+<http://myontology/instance2another-resource> <http://myontology/instancepredicate2> "adfaf" .
+<http://myontology/instance2another-resource> <http://myontology/instancepredicate2> <http://4suite.org/rdf/anonymous/badaf0a7b-8d0d-43b1-8bd2-4bce4b272d50_1> .
+<http://4suite.org/rdf/anonymous/badaf0a7b-8d0d-43b1-8bd2-4bce4b272d50_1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> "1" .
+<http://4suite.org/rdf/anonymous/badaf0a7b-8d0d-43b1-8bd2-4bce4b272d50_1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
+<http://4suite.org/rdf/anonymous/badaf0a7b-8d0d-43b1-8bd2-4bce4b272d50_1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://4suite.org/rdf/anonymous/7550e5f9-5860-4d56-ad0e-7b154c37cfe1#1> .
+<http://4suite.org/rdf/anonymous/7550e5f9-5860-4d56-ad0e-7b154c37cfe1#1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> <http://myontology/instance2res45> .
+<http://4suite.org/rdf/anonymous/7550e5f9-5860-4d56-ad0e-7b154c37cfe1#1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
+<http://4suite.org/rdf/anonymous/7550e5f9-5860-4d56-ad0e-7b154c37cfe1#1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+<http://myresources/foo> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://myontologymyclass> .
+<http://4suite.org/rdf/anonymous/4d10355b-e123-499a-b7fc-89ad1db6c6f5_1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://myontologymyclass> .
+

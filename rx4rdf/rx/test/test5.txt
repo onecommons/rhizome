@@ -1,0 +1,20 @@
+ prefixes:
+   rx: `http:rxwiki.sf.net
+   rx:meta-default-ns: `http:rxwiki.sf.net
+   rx:body-default-ns: `http:w3.org/xhtml/1.0   
+   rdf: `http://
+   rdfs:
+   owl:   
+   dc:
+ this-resource:
+     predicate1: `safadf
+     predicate2: 
+     	url1:res:
+     		url2:res2:
+     predicate3 res='http://':
+ myns:another-resource:
+     predicate2: `adfaf
+ resource id="http://adsfasdf": 
+ myontology:myclass id="http":
+ myontology:myclass id: ; 'id' designates this a resource, bNodeID is generated for the id
+ rx:res-query select='\*': ; child properties are applied to each node in the nodeset returned by the xpath expression

@@ -1,0 +1,3 @@
+RxSLT is a language for transforming RDF to XML. It is syntactically identical to [XSLT 1.0|http://www.w3.org/TR/xslt]. An RxSLT processor behaves as if it were an XSLT processor that evaluated XPath expressions and XSLT patterns as RxPath expressions and operated on a RDF model.
+
+The formal definition of RxSLT can be found at [RxPathSpec].

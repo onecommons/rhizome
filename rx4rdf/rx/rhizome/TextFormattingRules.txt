@@ -1,0 +1,120 @@
+!Writing text
+
+There's only one rule you need to know about the [RhizML] text formatting rules: don't start a line with space or a tab!  Indented lines create markup and follow the [Markup Formatting Rules]. Otherwise, just write normal text, and then use an empty line to mark a paragraph.
+It's just like writing an email.
+
+You can always [Edit|?action=edit] this page (use the link at the bottom of this page) to see how the different formatting on this page is used.
+
+!Hyperlinks
+
+You can create links to internal or external web pages by putting the name in brackets. External links must be a complete URL, while internal pages just need to be the name of page. For example, to point at the java.sun.com home page, use [[http://java.sun.com], which becomes [http://java.sun.com/] or [[Java home page|http://java.sun.com], which becomes [Java home page|http://java.sun.com], while this page can be linked to like this: [[text formatting rules]: [text formatting rules].
+
+To add a new page you just create a link to it from somewhere else. After all, there isn't much point in having a page if you can't access it! You'll then see a small question mark after the page name when you return to that page. Then click on it and you have created a new page!
+
+If you want to use brackets in regular text start with two instead one, like this: [[[[sic], to avoid creating a link.
+
+!Adding pictures
+
+If you create a link to an image it will be automatically inlined. For example, this is an inlined PNG image: [http://www.ecyrd.com/~jalkanen/test.png]. If you specify link text ([[this one here|http://example.com/example.png]) it becomes
+the ALT text for those who either can't or don't want to view images. 
+If you don't want the image to be inlined, used this link annotation:
+[[wiki:xlink-replace: http://www.ecyrd.com/~jalkanen/test.png]:
+
+[not inlined|wiki:xlink-replace: http://www.ecyrd.com/~jalkanen/test.png] (Link annotation is an advanced feature that is not documented yet -- sorry.)
+
+!Footnotes
+
+These are a special kind of hyperlink.  By using nothing but a number inside
+a hyperlink you create a reference to a footnote, like this [[1], which 
+creates a footnote[1].  To make the actual footnote, you just put a [[#1]
+where you want that footnote to point at.  Look below to find the footnote.
+
+You can also make a named footnote, just as if you were doing a normal hyperlink.  For example, this refers to the same footnote[Footnote number 1|1] as the footnote above, but this refers to another footnote[2].
+
+!Bulleted lists
+Use an asterisk (*) in the first column to make bulleted lists. Use more asterisks for deeper indentation. For example:
+ r'''<pre class='code'>
+* One
+* Two
+* Three
+** Three.One</pre>'''
+
+creates
+* One
+* Two
+* Three
+** Three.One
+
+!Numbered lists
+Just like with bulleted lists, but use a hash (#) instead of the asterisk. Like this:
+ r'''<pre class='code'>
+# One
+# Two
+# Three
+## Three.One
+</pre>'''
+
+creates
+# One
+# Two
+# Three
+## Three.One
+
+If you want to write the list item on multiple lines, add a '\\' at the end of the line. If this sounds complicated, edit this page for an example, below.
+
+* This is a single-line item.
+* This is actually a multi-line item.\
+ We continue the second sentence on a line on a line of its own.\
+ We might as well do a third line while we're at it...\
+ Notice, however, as all these sentences get put inside a single item!
+* The third line is again a single-line item for your convinience.
+
+!Indentation and Definition lists
+
+A simple way to make definition lists is to use the ';:' -construct:
+
+;__Construct__:''Something you use to do something with''
+
+: Starting with a ':' causes text to be indented like this (useful because remember, you can't start lines with spaces or tabs!).
+:: Multiple colons create greater indentation, like the '::' used here.
+
+!Text effects
+
+You may use __bold__ text or //italic// text, by placing two underscores (\__) (for bold) or two slashes (\//) (for italics) before and after the text. You can create ^^monospaced^^ text using \^^.
+
+!Headings 
+
+Start a line with an exclamation mark (!) to make a heading. 
+!!Sub-headings
+
+\!! makes a sub-heading, !!! a sub-sub-heading, etc. (up to 6 !s).
+                 
+!Preformatted text
+
+If you want to add a block of unformatted text that doesn't follow any of these rules, for now you must create markup text -- see [Markup Formatting Rules] or edit this page for an example.
+
+!Tables
+
+You can do simple tables by using using pipe signs ('|').  Use double pipe
+signs to start the heading of a table, and single pipe signs to then
+write the rows of the table.  End with a line that is not a table.
+
+For example:
+
+ r'''<pre class='code'>
+|| Heading 1 || Heading 2
+| ''Gobble'' | Bar
+| [Cocoon home|http://cocoon.apache.org/]     | [SandBox]
+</pre>'''
+
+gives you the following table.  Note how you can use links also inside tables.
+
+|| Heading 1 || Heading 2
+| ''Gobble'' | Bar
+| [Cocoon home|http://cocoon.apache.org/]     | [SandBox]
+
+----
+
+[#1] Here's the footnote I mentioned.
+
+[The other footnote|#2] The other footnote.  Note how it's name is different?

@@ -1,0 +1,26 @@
+<xu:modifications version="1.0" xmlns:xu="http://www.xmldb.org/xupdate"
+    xmlns:a="http://rx4rdf.sf.net/ns/archive#" xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"
+    xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >
+<!--
+Use this import "script" to replace the base URI of content 
+-->    
+    <xu:if test='(/*/wiki:revisions/*//a:contents)[last()][a:ContentTransform]'>         
+    	<xu:message text="order wrong!?" terminate="yes" />
+    </xu:if>
+    <xu:remove select='/*/wiki:revisions/*[not(position()=last())]'/>    
+    <xu:update select='(/*/wiki:revisions/*//a:contents)[last()]'>
+    <rdf:Description>
+    <xu:attribute name="rdf:about"><xu:value-of select="$loc"/></xu:attribute>
+    </rdf:Description>            
+    </xu:update>
+    <xu:append select='/'>
+        <a:ContentLocation>
+    	<xu:attribute name="rdf:about"><xu:value-of select="$loc"/></xu:attribute>
+	</a:ContentLocation>
+    </xu:append>
+    <!-- rename NameContent's URI ref -->
+    <xu:update select='/*[wiki:name]/@rdf:about' >
+    	<xu:message text="adding attribute {$resource-uri}" />
+    	<xu:value-of select="$resource-uri"/>
+    </xu:update>    
+</xu:modifications>

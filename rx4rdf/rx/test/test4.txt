@@ -1,0 +1,46 @@
+rxml
+*elements:
+
+:prefixes
+:meta-default-ns
+:this-resource
+:resource id
+:res-query select
+
+* elements that appear in mixed content:
+:id-before 
+:id-after
+:id 
+
+* global attributes:
+:rx:id designates an element as a resource (name is rdf:type)
+these can appear in predicate elements:
+:rx:res equivalent to rdf:resource (no children after that)
+:rx:list equivalent to rdf:parsetype=collection (but literals can be children)
+:rx:xml equivalent to rdf:parsetype=literal (not supported)
+:rx:stmt equivalent to rdf:ID (on a predicate)
+
+<b>example:</b>
+
+ '''
+ prefixes:
+   rx: `http:rxwiki.sf.net
+   rx:meta-default-ns: `http:rxwiki.sf.net
+   rx:body-default-ns: `http:w3.org/xhtml/1.0   
+   rdf: `http://
+   rdfs:
+   owl:   
+   dc:
+ this-resource:
+     predicate1: `safadf
+     predicate2: 
+     	url1:res:
+     		url2:res2:
+     predicate3 res='http://':
+ myns:another-resource:
+     predicate2: `adfaf
+ resource id="http://adsfasdf": 
+ myontology:myclass id="http":
+ myontology:myclass id: ; 'id' designates this a resource, bNodeID is generated for the id
+ rx:res-query select='\*': ; child properties are applied to each node in the nodeset returned by the xpath expression
+'''

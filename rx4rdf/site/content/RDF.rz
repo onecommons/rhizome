@@ -1,0 +1,19 @@
+!!!RDF for Beginners and Skeptics
+
+RDF (Resource Description Framework) is a World Wide Web Consortium ([W3C|http://www.w3.org]) standard for describing metadata (primarily) in XML.
+
+Take a casual first glance at RDF -- whether at some [sample|http://www.ilrt.bristol.ac.uk/discovery/rdf/resources/rss.rdf] RDF files or at its family of formal [specifications|http://www.w3.org/RDF/] -- and it sure looks complicated. But you can safely boil it down to this:
+* RDF is simply a standard way to associate properties with URLs (what RDF calls resources)
+* A property is simply a name-value pair where the value can either be a string of text, another name or a list (of names and strings). In RDF all names are also URLs (resources) -- this way they are guaranteed to be unique (the magic property of URLs). 
+* The official XML "serialization" of RDF is just one way to describe the above -- there exists other more simpler ways to do the same -- both [in XML|RxML] and [not in XML|http://www.w3.org/TR/rdf-testcases/#ntriples]. 
+* That's it! You can bundle together collections of names, call it an 'ontology' and describe the meaning of those names using formal logic (that's what the ["Semantic Web"|http://www.w3.org/2001/sw] is about) but that's entirely up to you. All RDF gives you in this regard is standard meanings to a few names (e.g. RDF:type).
+* OK, that's not exactly it. I left out a few things that you can safely ignore:
+** RDF lets you (optionally) describe what language a string is in and what datatype it represents (e.g. a number or XML)
+** RDF lets you distinguish between resources that are private ("blank nodes" -- because you don't need to name them) -- and resources that are public (regular URLs)
+** RDF has a few reserved properties to enable you to name a specific declaration (assertion) that a particular resource has a particular property. This is called "reification".
+
+!!!Why RDF?
+
+* What XML did for content, RDF does for structure -- by providing a standard way to describe resources the entire website, including its metadata, relationships between pages, etc. becomes repurposable, human editable, application agnostic, etc.
+* RDF unshackles you from the physical location of files and documents. Because resources (which can be anything) are given universal names, statements about those resources (e.g. annotations, categorization, etc.) can be made anywhere not just in the local XML file or web page containing the resource. 
+* RDF can provide a level of indirection between the application and data, as its general graph structure can represent all kinds of data, such as relational (SQL) or hierarchical (directories, XML).  Compared to XML data integration strategies, RDF's notion of unique resources and availability of languages for describing the logical relations between data structures (such as [OWL|http://www.w3.org/TR/owl-ref/]) make it easy to build abstractions over arbitrary representations of data.

@@ -1,0 +1,16 @@
+*The biggest usability problem is that minor syntax errors result in an ugly exception error page instead of a clear error message
+
+* Feature Todo:
+** support for inter:wiki links
+** support for inline variables and RxPath queries e.g. '[[{$var}]'
+** better support for inline metadata and/or markup?
+** possibly add formatting syntax for:
+*** <br> (e.g. '\\' but that's taken)
+*** blockquotes
+*** <pre>
+** CamelCase support?
+
+Any suggestions?
+
+* Development Todo:
+** XML to RhizML utility (currently only RhizML to XML)

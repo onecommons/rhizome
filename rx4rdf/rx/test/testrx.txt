@@ -1,0 +1,28 @@
+ rx:
+	 rx:prefixes:
+	   rx: `http://rx4rdf.sf.net/namespaces/rxml
+	   rx:meta-default-ns: `http://myontology/instance
+	   myns: `http://myontology/instance2
+	   rx:body-default-ns: `http:w3.org/xhtml/1.0   
+	   myontology: `http://myontology
+	   bnode: `http://4suite.org/rdf/anonymous/
+	   rdf: `http://rdf
+	   rdfs: `http://rdfs
+	   owl:  `http://owl
+	   dc: `http://dc
+	   myns: `urn:y
+	 rx:resource id="http://4suite.org/rdf/anonymous/badaf0a7b-8d0d-43b1-8bd2-4bce4b272d50_1": ;(this item)
+	     predicate1: `safadf
+	     predicate2 
+	     	myns:res45     		
+	     predicate3 rx:res='http://':    
+	 myns:another-resource:
+	     predicate2: `adfaf
+	     predicate2 rx:list: 
+	        '1'
+	        myns:res45:     
+	 rx:resource id="http://adsfasdf": 
+	 myontology:myclass rx:id="http://myresources/foo":
+	 myontology:myclass rx:id: ; 'id' designates this a resource, bNodeID is generated for the id
+	 rx:res-query select='\*': ; child properties are applied to each node in the nodeset returned by the xpath expression
+

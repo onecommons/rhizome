@@ -1,0 +1,38 @@
+__[Racoon]__ is a simple application server that uses an [RDF] model for its data store, roughly analogous to RDF as [Apache Cocoon|http://cocoon.apache.org/] is to XML.
+
+An application built for Racoon specifies a series of [RxPath] expressions that serve as rules to map an abstract request to an application-specified action. These rules are chained together application-specific way, but typically would follow basic steps such as:
+# specify rules that map the request to a RDF resource
+# specify rules that match the RDF resource to an action
+Or
+# specify rules that map the request to a RDF resource
+# specify rules that map the RDF resource to some content
+# specify rules that apply an action to the content given the RDF resource
+
+A request is just a dictionary of name/value properties that are mapped to XPath variables. These variables are used in the XPath context when RxPath rules are evaluated. The result of the rule processing is treated as the response. Currently Racoon supports the following request types:
+;HTTP request: the URL name, query parameters or form variables, HTTP headers and cookies are mapped.
+;XML-RPC: the request name and parameters are mapped to RxPath variables
+;Command Line: command parameters are mapped; arguments that start with '-' treated as the variable name
+
+Racoon comes with several built-in actions for processing content and manipulating the underlying RDF model:
+;[RxSLT]: treats the content as a [RxSLT] stylesheet with the underlying RDF model as the source
+;[RxUpdate]: treats the content as a [RxUpdate] document that modifies the underlying RDF model
+;[Python|http://www.python.org/]: treats the content as a [Python|http://www.python.org/] script to be executed
+;[XSLT]: treats the content as a [XSLT] stylesheet with application-specified content as source
+;[RxML]: treats the content as a [RxML] document that updates the underlying RDF model
+;Base64: assumes the content is base64 encoded and decodes it
+
+Racoon can be run as a standalone HTTP server or it can be used with Apache/mod-python or plain CGI. It can also be used as a library -- the calling application can just send it generic requests.
+
+!More Info:
+
+[Racoon Installation|http://localhost:8000/Download]
+
+[RacoonConfig] This sample configuration file documents Racoon's config format and options.
+
+[Racoon Status]
+
+!Racoon Applications:
+
+[RDFScribbler]
+
+[Rhizome]

@@ -1,0 +1,17 @@
+<rx xmlns='http://rx4rdf.sf.net/ns/rxml#' 
+xmlns:a='http://rx4rdf.sf.net/ns/archive#' wiki='http://rx4rdf.sf.net/ns/wiki#' 
+bNode='http://4suite.org/rdf/anonymous/' rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >
+
+	<bNode:blankNode1><!--a comment-->
+		<a:last-modified>1062022787.468</a:last-modified>
+		<wiki:name>RxML</wiki:name>
+		<wiki:revisions list="http://4suite.org/rdf/anonymous/x467ce421-1a30-4a2f-9208-0a4b01cd0da1_23">
+			<bNode:x87d0723b-fad6-488a-abcb-04b1d9323368_195 />
+		</wiki:revisions>
+		<rdf:type><a:NamedContent /></rdf:type>
+	</bNode:blankNode1>
+	
+	<res-query select="\*">
+		<!-- child properties are applied to each node in the nodeset returned by the xpath expression-->
+	</res-query>
+</rx>

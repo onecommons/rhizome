@@ -1,0 +1,27 @@
+!Summary 
+Rhizome is a simple content management and delivery system that is similar to a [Wiki|http://c2.com/cgi/wiki] except that you can author arbitrary XML and RDF metadata and the structure of the website is stored as RDF. This allows both the content and structure to be easily repurposed and complex web application rapidly developed. 
+
+The key conceptual difference is this: a Wiki is a website whose pages correspond to WikiNames, which are local to the website. Rhizome has a notion similar to WikiNames but they are universal unique abstract entities that don't necessarily correspond to a webpage -- they can be a name for anything.  How they are displayed depends on the context, using the [Racoon] engine.
+
+The long-term [vision|RhizomeStatus] is that each Rhizome site will intertwine together, forming an emergent fuzzy taxonomy over a peer-to-peer network.
+
+!Easy authoring and Rapid Development
+XHTML or arbitrary XML can be authored in [RhizML] in manner very similar to Wiki text formatting rules.  Rhizome comes with built-in support for [Apache Forrest|http://xml.apache.org/forrest/index.html] document types and has preliminary support for [DocBook|http://www.docbook.org].  You can also easily view and edit RDF metadata for the site using [RxML].
+
+Almost all of Rhizome's functionality can be found its dynamic pages, which are written in [RxSLT], XSLT, [RxUpdate] and a few Python pages.  These can be edited like any other page, making it easy to add and change functionality without restarting server.  You can use RxUpdate to migrate the underlying schema at run-time.  Rhizome supports fine-grained authorization and versioning of both metadata and content, so you have some guard rails too.
+
+!Documentation and Configuration
+See the [Rhizome Manual|RhizomeDoc] for general documentation.
+The core behavior of Rhizome is defined in ^^rx/rhizome/rhizome-config.py^^ -- the comments there should be useful to read. 
+
+Files useful for basic customization of Rhizome: 
+;^^rx/rhizome/basestyles.css^^: Most formatting rules are found here.
+;^^rx/rhizome/sitebar.txt^^: This Rhizml document is displayed as the navbar on the left hand column by the site-template.
+;^^rx/rhizome/site-template.xsl^^: This is creates Rhizome's page layout
+
+!Other Features
+;Static website generation: ^^--export --static^^ command-line generates a static set of pages.
+;External Resources: Two kinds of external files are supported: One, a revision can point to a external file instead of a location. (Useful for editing content in external progam.) Two, any file on the Racoon path can be retrieved if it isn't found in the RDF store. (Useful for links to images.)
+
+!Status
+This is the first alpha release of Rhizome.  See [RhizomeStatus] for more details.

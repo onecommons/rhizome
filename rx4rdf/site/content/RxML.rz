@@ -1,0 +1,255 @@
+ document:
+  header:
+   title: `RxML
+   authors:
+     person name = 'Adam Souzis' email="asouzis@users.sf.net"
+     abstract:
+An informal but comprehensive description of [RxML], an alternative XML serialization for [RDF] that is designed for easy and simple authoring, particularly in conjunction with [RhizML].
+  body:
+!Introduction
+[RxML] is an alternative XML serialization for [RDF] that is designed for easy and simple authoring, particularly in conjunction with [RhizML].
+
+The structure of a RxML docment is simple: each child of the root ^^rx^^ element represent a resource.  Each child element of the resource element specifies a name-value pair that applies to the resource.  Together the resource and name-value pair form a RDF statement.
+
+Any element name that is not part of RXML namespace (conventially represented as 'rx') is converted to a URI reference as specified by [RxPath|RxPathSpec] -- basically, the local name is appended to the namespace URI.  These URI references are treated as the RDF URI reference for the element.  In RDF, both resources and property names are given URI references (actually, a property name //is// a resource).
+
+Here's a simple example:
+
+'''\<source>
+<rx xmlns:rx='http://rx4rdf.sf.net/ns/rxml#' 
+xmlns:mysite='http://example.org/mysite/'
+xmlns:dc="http://purl.org/dc/elements/1.1/" >
+  <mysite:page1.html>
+        <dc:author>me</dc:author>
+        <dc:title>The first page</dc:title>
+        <dc:relatedTo><mysite:lastPage.html/></dc:relatedTo>
+  </mysite:page1>
+  
+  <mysite:lastPage.html>
+        <dc:author>me</dc:author>
+        <dc:title>The last page</dc:title>
+        <dc:relatedTo><mysite:page1.html/></dc:relatedTo>
+  </mysite:lastPage.html>  
+</rx>
+\</source>'''
+The value of a property can be either literal text or a resource, represented by a resource element -- notice that the value of the 'relatedTo' property in the example above). If the property element has no children, it assumed its value is an empty literal. The value of a properties can also be a list of literals or resources -- see the section on lists below. 
+
+!^^rx:prefixes^^
+You can use the ^^rx:prefixes^^ element to declare prefixes instead of using namespace declarations:
+
+'''\<source>
+<rx>
+ <prefixes>
+     <mysite>http://example.org/mysite/</mysite>
+     <dc>http://purl.org/dc/elements/1.1/</dc>
+     <default-ns>http://rx4rdf.sf.net/ns/rxml#</default-ns>
+ </prefixes>
+ ....
+</rx>
+\</source>'''
+The ^^default-ns^^ child element is equivalent to the "xmlns" attribute for declaring the "default" namespace for non-prefixed element names.
+
+This is convenient for writing RxML in [RhizML].  Here is the first example again, written in RhizML and using ^^rx:prefixes^^:
+
+'''\<source>
+rx:
+ prefixes:
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+     mysite: `http://example.org/mysite/
+     dc: `http://purl.org/dc/elements/1.1/
+     
+ mysite:page1.html:
+     dc:author: `me
+     dc:title:  `The first Page
+     dc:relatedTo:
+       mysite:lastPage.html
+       
+ mysite:lastPage.html:
+     dc:author: `me
+     dc:title:  `The last Page
+     dc:relatedTo:
+       mysite:page1.html       
+\</source>'''
+Technical note: if the RxML document is encoded in XML and it contains ^^rx:prefixes^^ element it must include, in the root element, namespace declarations corresponding exactly to all the prefixes declared in the ^^rx:prefixes^^ element. This is to ensure that namespace-aware XML processors can handle the RxML document properly.
+
+!^^rx:resource^^
+
+Sometimes it is not convenient to map an URL to an element name.  In that case, you can use ^^rx:resource^^, which has an ^^id^^ attribute whose value is the URI reference of the resource. For example, in the example above the ^^<mysite:page1.html>^^ element could haven been replaced with: ^^<resource id="http://example.org/mysite/page1.html">^^. If the ^^id^^ attribute is missing or has an empty value, the resource is treated as a [blank node|http://www.w3.org/TR/2003/WD-rdf-concepts/#section-blank-nodes]. 
+
+!Literal elements
+
+If the child of a property element is an element named "rx:xml" the value of the property is the XML contained in that ^^rx:xml^^ element (and, in RDF terms, is treated an XML literal). If the child of a property element is an element named "rx:l" the value of the property is the literal text contained in that ^^rx:l^^ element. A ^^rx:l^^ element can only contain text, but may have two option attributes: the ^^xml:lang^^ attribute whose value declares the language of the literal, and ^^rdf:datatype^^ whose value is a [datatype|http://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-datatyped-literals] URI reference that declares the datatype of the literal.
+
+!Lists 
+
+In addition to literal and resource names, value of a property can also be a list of resources and/or literals. In this case, the property element will have multiple children elements or may have a ^^list^^ attribute. The value of the list is a URI reference naming the list or maybe an empty string (in which case the list resource is treated as a [blank node|http://www.w3.org/TR/2003/WD-rdf-concepts/#section-blank-nodes]). In addition to naming the list, the ^^list^^ attribute can be used to indicate a property with one or zero child elements actually has value that is a list with one or zero items.  A property element may also have a ^^listType^^ attribute whose value is one of ^^rdf:List^^ (the default), ^^rdf:Seq^^, ^^rdf:Bag^^, or ^^rdf:Alt^^, which indicates the type of list (and also indicates the existence of a list in the case of one or no children). If an item in a list is a literal it must indicated using a ^^rx:l^^ or ^^rx:xml^^ element -- raw text is not valid in lists.
+
+Note that property that has a list of values is not that same as multiple identical properties each with a value. For example, this snippet:
+
+r'''<source>
+myresource:
+  author: `john
+  author: `betty
+</source>'''
+results in different statement than this:
+
+r'''<source>
+myresource:
+  authors:
+    rx:l: `john
+    rx:l: `betty
+</source>'''
+
+!Blank nodes. 
+
+[Blank nodes|http://www.w3.org/TR/2003/WD-rdf-concepts/#section-blank-nodes] are designated by a resource whose URI reference that begins with "^^http://rx4rdf.sf.net/anonymous#^^". The portion of the URI after this serves as the identifier for the node. Conventionally, the "bNode" prefix is associated with the ^^http://rx4rdf.sf.net/anonymous#^^ URI. Also, a ^^rx:resource^^ element without an ^^id^^ attribute (or an ^^id^^ with an empty value) is treated as a blank node.
+
+Below is example of a typical usage of blank nodes:
+
+r'''<source>
+rx:
+ prefixes:
+     a: `http://rx4rdf.sf.net/ns/archive#
+     wiki: `http://rx4rdf.sf.net/ns/wiki#
+     bNode: `http://4suite.org/rdf/anonymous/
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+
+ resource id='mailto:omaas@example.com':
+    name: `Oedipa Maas 
+    address:
+ 	bNode:address1
+
+ bNode:address1:
+   street: `123 1st street
+   city: `San Narcisco
+   state: `CA
+   postalcode: `94110
+   country: `USA
+</source>'''
+   
+!Statement Identifiers 
+
+An individual statement (a declaration of a property value pair for a particular resource) can be turned into a resource itself by giving it an identifier (in RDF, this is called [reification|http://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-reifying]). This is done when the ^^rx:stmtID^^ attribute appears on a property element. The value of ^^rx:stmtID^^ is a URI reference. Reification is useful when you want to attach metadata about the statement itself, for example, to say this asserted by whom or asserted on this data, etc. 
+
+!Resource types and classes.  
+
+RxML provides no special way to indicate the class of a resource -- so typically the class is declared with a property of ^^rdf:type^^ whose value is the class resource.
+
+!^^rx:query^^
+
+Finally, RxML provides an element that allows a set of properties to be applied to several resources at once: the ^^rx:query^^ element. The element can appear as a child of the root ^^rx^^ element and behaves like a ^^rx:resource^^ element, except that instead of an ^^id^^ attribute, it must have a ^^select^^ attribute whose value is an [RxPath] expression that must return a nodeset of zero or more resource elements. The property children of the ^^rx:query^^ are applied to each resource referenced by the selected nodeset. It is an error if a ^^rx:stmtID^^ appears on a property element that is a child of a rx:query element (because that property element is actually creating multiple RDF statements, one for each resource). 
+
+A RxML processor that does not support RxPath is not required to support the ^^rx:query^^ element.
+
+!Advanced example. 
+Below is an example written in [RhizML] that demonstrates all the features of RxML.
+
+r'''<source>
+rx:
+ prefixes:
+     a: `http://rx4rdf.sf.net/ns/archive#
+     wiki: `http://rx4rdf.sf.net/ns/wiki#
+     bNode: `http://4suite.org/rdf/anonymous/
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+     rdf: `http://www.w3.org/1999/02/22-rdf-syntax-ns#
+
+ bNode:blankNode1: ;a comment
+     a:last-modified: `1062022787.468
+     wiki:name stmtID='http://rx4rdf.sf.net/ns/archive#': `RxML
+     wiki:revisions listType='rdf:Bag': 
+         bNode:x87d0723b-fad6-488a-abcb-04b1d9323368_195
+         l xml:lang=en: `some text
+         xml:
+           html:
+             body:
+               r"some <b>xml</b> content"
+         resource id='http://asdfasdf'
+     rdf:type: 
+         a:NamedContent
+         
+ query select='\*': ; child properties are applied to each node in the nodeset returned by the xpath expression
+     prop1:dsa:
+      bNode:blankNode1
+</source>
+'''
+
+!Comparison between RxML and [RDF/XML|http://www.w3.org/TR/rdf-syntax-grammar/]
+
+The biggest differences between RxML and RDF/XML are:
+
+* The name of a resource element does not specify the [type of the resource|http://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-typed-nodes], as in RDF/XML, but rather the URI of the resource itself.
+* RxML does not support [striped syntax|http://www.w3.org/2001/10/stripes/] -- the object element of a property can not have any children.
+* There are no alternative syntax shortcuts such as [empty property elements|http://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-empty-property-elements] (^^rdf:resource^^) and [property attributes|http://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-property-attributes].
+
+![RELAX NG|http://www.oasis-open.org/committees/relax-ng/compact-20021121.html] Compact Schema for RxML
+'''
+\<source>
+# RELAX NG Compact Schema for RxML
+
+namespace local = ""
+namespace rx = "http://rx4rdf.sf.net/ns/rxml#"
+namespace rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+
+start = doc
+doc = element rx:rx { 
+     prefixesElement?, (resourceElement* & subjectResourceElement* & resQueryElement)
+}
+
+prefixesElement = element rx:prefixes { prefixesChildElement* }
+
+#any QName except if in the rx namespace (except for rx:default-ns)
+prefixesChildElement = element * - (local:* | rx:*) | rx:default-ns { URI-reference }
+
+#any QName except if in the rx namespace 
+resourceElement = element * - (local:* | rx:*)  { 
+	propertyElement* & propertyResourceElement*
+	}
+
+subjectResourceElement = element rx:resource {
+	resourceIdAttribute, 
+	propertyElement* & propertyResourceElement*
+}
+
+resQueryElement = element rx:res-query {
+	attribute select { text },
+	propertyElement* & propertyResourceElement*
+}
+
+resourceIdAttribute = attribute id { URI-reference }?
+
+#any QName except if in the rx namespace 	
+propertyElement = element * - (local:* | rx:*)  { 
+	propertyAttribute*,
+	text | propertyValueElement* 
+}
+
+propertyResourceElement = element rx:resource {
+	resourceIdAttribute, 
+	propertyAttribute*,
+	text | propertyValueElement* 
+}
+
+propertyAttribute = attribute rx:list | list | rx:stmt | stmt { URI-reference }
+	| attribute rx:listType | listType  {
+	  "rdf:List" | "rdf:Seq" | "rdf:Bag" | "rdf:Alt" 
+	  }
+	
+propertyValueElement = objectResourceElement | rx:resource { resourceIdAttribute } 
+	| literalElement | xmlLiteralElement
+
+#any QName except if in the rx namespace 
+objectResourceElement = element * - (local:* | rx:*) {}
+
+literalElement = element rx:l { 
+	attribute rdf:Datatype {URI-reference }?, 
+	attribute xml:lang { text }?, 
+	text 
+}
+
+xmlLiteralElement element rx:xml { any }
+
+URI-reference = text
+
+any = mixed { element * { attribute * { text }*, any }* }
+\</source>
+'''

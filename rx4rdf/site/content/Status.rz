@@ -1,0 +1,12 @@
+Overall, Rx4RDF is at the alpha stage -- fairly stable, mostly feature complete, but not well-tested.  
+
+The [RxPath] implementation is a reference implementation, not intended for serious production use -- in particular, it's slowww and not very scalable.  
+
+[Rhizome] is fairly full-featured compared to your generic wiki but just getting started in terms of completing the [Rhizome Vision|RhizomeStatus].
+
+For more details on particular sub-projects (including todo lists) see one of these pages:
+
+*[Rx4RDFStatus]
+*[RacoonStatus]
+*[RhizomeStatus]
+*[RhizMLStatus]

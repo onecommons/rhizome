@@ -1,0 +1,18 @@
+ faqs: 
+  part: 
+   title: `Rhizome and Racoon
+   faq:
+    question:
+Sometime when I save a page I get a "modified after edit began" error. why?
+    answer:
+This happens after recently saving an item you pressed the back button in your browser thus not reloading the edit page and so the page has the old edit-began time.  Reload the page to avoid.
+   faq:
+    question: 
+I have an external page that is python code but I always get syntax error on line 1.
+    answer: 
+external files that are python pages need to have unix linefeeds
+   faq:
+    question:
+Can I create hierarchical structure in Rhizome?
+    answer:
+You can simulate a hierarchy by using / in the WikiName (e.g. "MyProject/Todo"). However, this relationship isn't current stored in the metadata, though there are plans to fix this (see [RhizomeTodo]).

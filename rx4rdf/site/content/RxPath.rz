@@ -1,0 +1,75 @@
+RxPath is a language for querying a RDF model. It is syntactically identical to XPath 1.0 and behaves very similarly. 
+
+Compared to other query languages for RDF, it is much more expressive than SQL-like query languages such as [Squish|http://swordfish.rdfweb.org/rdfquery/ql] and even if you are not familar with XPath I think it is more intuitive than other graph-traversal query languages like [Versa|http://uche.ogbuji.net/tech/rdf/versa/].
+
+Informally, RxPath is a XPath expression evaluated on RDF model as if it has been transformed into a XML document as follows:
+* the document has a root element for every resource in model, with the element name equal to name of the ^^rdf:type^^ of the resource
+* each root element has a child element for each statement the resource is the subject of.  The name of each child is name of the property in the statement. 
+* Each of these children have child text node if the object of the statement is a literal or a child element if the object is a resource.
+* Object elements have the same name and children as the equivalent root element for the resource, thus defining a potentially infinitely recursive tree.
+
+The formal definition of RxPath can be found in [RxPathSpec].
+
+The following examples illustrate RxPath. They are based on the example RDF statements found [RDF Syntax|http://www.w3.org/TR/rdf-syntax-grammar], include the namespace prefixes used in those examples. 
+
+;Example 1:This RxPath expression returns a nodeset of all the resources in the model:
+
+^^/*
+
+;Example 2:This RxPath expression returns a nodeset of all the predicates in the model (and therefore all the statements):      
+
+^^/*/*
+
+The next 2 examples demonstrate how Name Test matches the type of a resource or the property name of a predicate:
+
+;Example 3:This expression returns all the resource with the rdf:type of class ^^ex:Document^^:
+
+^^/ex:Document
+
+;Example 4:This expression returns the objects of all the property ^^dc:title^^:
+
+^^/*/dc:title/*
+
+;Example 5:This expression finds the full name of all the people that are editors of a resource:
+
+^^/*/ex:editor/*/ex:fullName/*
+
+Note how the expression is evaluated as if object node has the same children as its equivalent top-level resource node.
+
+RxPath defines resource elements (subject and object) as having a string value equal to the resource's RDF URI reference (i.e. the value of its ^^rdf:about^^ attribute) 
+
+;Example 6:Find all objects of the resource with URI reference "http://example.com/example#foo":
+
+^^/*[[.="http://example.com/example#foo"]/*/*
+
+;Example 7:Find all the statements with a ^^dc:title^^ predicate and an object which a literal equal to "A marvelous thing"
+
+^^/*/dc:title[[.="A marvelous thing"] 
+
+Here the string value of the predicate element follows the XPath rule, thus matching the object value (its child)
+
+Two more similar examples: 
+
+;Example 8:All resources with a property rdfs:label with value "my label":
+
+^^/*[[rdfs:label='my label']
+
+;Example 9:Find all the statements with that have the resource "http://example.com/example#bar": as its object:
+
+^^/*/*[[.='http://example.com/example#bar']
+
+RxPath expressions can follow transitive properties by using the descendant axis: 
+
+;Example 10:Find all the decendant files of a folder named "foldername":
+
+^^/fs:Folder[[fs:file-name="foldername"]\//fs:has-child/fs:File
+
+Inverse transitive queries can be done the same way: 
+
+;Example 11:Find all the ancestor folder(s) of the file named "filename":
+
+^^/fs:Folder[[.\//fs:has-child/fs:File[[fs:file-name="filename]]
+
+;Example 12:A more complicated expression that does the same thing but returns a nodeset ordered by the ancestor relation.
+
+^^(\//fs:has-child/fs:File[[fs:file-name="filename])[[last()]/ancestor::fs:has-child/parent::fs:Folder

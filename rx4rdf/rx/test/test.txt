@@ -1,0 +1,30 @@
+specification:
+                             header:
+                               title: "XML:DB Initiative: XUpdate - XML Update Language"
+                                  version: "July 29 2003"
+                                  type: `Working Draft
+                            
+                             body:
+                              s1(title="Introduction"): 'sum text till the end of the line??'
+                              s2(title="DOM"):
+
+todo: 
+	title: `make sure this works
+	
+	`todo child
+	`some more
+	'''eeeee'''
+	
+	devs:
+	actions:
+	  action: `wewerwerw 
+'''continea'''
+`more 
+`and more
+            
+                            
+entry(rdf:ID='' entry-type='undefined'): 
+	contents: ''' my comments here go here
+'''
+
+

@@ -1,0 +1,15 @@
+<rx>
+<prefixes>
+	<a>http://rx4rdf.sf.net/ns/archive#</a>
+	<wiki>http://rx4rdf.sf.net/ns/wiki#</wiki>
+	<bNode>http://4suite.org/rdf/anonymous/</bNode>
+	<meta-default-ns>http://rx4rdf.sf.net/namespaces/rxml</meta-default-ns>
+	<rdf>http://www.w3.org/1999/02/22-rdf-syntax-ns#</rdf>
+</prefixes>
+<bNode:x467ce421-1a30-4a2f-9208-0a4b01cd0da1_9>
+	<a:contents><bNode:x467ce421-1a30-4a2f-9208-0a4b01cd0da1_11 /></a:contents>
+	<a:created-on>1061139829.687</a:created-on>
+	<wiki:item-disposition><wiki:item-disposition-entry /></wiki:item-disposition>
+	<rdf:type><wiki:Item /></rdf:type>
+</bNode:x467ce421-1a30-4a2f-9208-0a4b01cd0da1_9>
+</rx>
