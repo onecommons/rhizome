@@ -23,6 +23,7 @@
     
 <xsl:template match="/">
 <!-- this page is always html, not the content's mimetype -->
+<xsl:variable name='prev-content-type' select="response-header:content-type" />
 <xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />
 <xsl:variable name='title' select="f:if($previous:title, $previous:title, f:if($_prevnode/wiki:title, $_prevnode/wiki:title, $_name) )" />
 <!-- html template based on http://www.projectseven.com/tutorials/css_t/example.htm 
@@ -32,7 +33,9 @@
 <head>
 <title><xsl:value-of select="$title" /></title>
 <link href="basestyles.css" rel="stylesheet" type="text/css" />
-<link rel="icon" href="favicon.ico" />
+<xsl:if test="wf:file-exists('favicon.ico')"> <!-- performance hack (assumes favicon.ico is external) -->
+  <link rel="icon" href="favicon.ico" />
+</xsl:if>
 </head>
 <body id="bd">
 
@@ -51,17 +54,16 @@ Welcome <xsl:value-of select="$session:login" />
 </form>            
             </xsl:when>
             <xsl:otherwise>
-Login&#xa0;
 <form action='login' method='POST' >
-<input TYPE="text" NAME="loginname" />
-<input TYPE="password" NAME="password" />
+Name<input TYPE="text" NAME="loginname" SIZE="10" />
+Password<input TYPE="password" NAME="password" SIZE="10" />
 <input TYPE="hidden" NAME="redirect" value="{$_url}" />
 <input type="submit" value="login" name="login"/>    
 </form>            
-<br />Or <a href="users-guest?action=new">signup</a>
+Or <a href="users-guest?action=new">signup</a>
            </xsl:otherwise>
         </xsl:choose>
-<xsl:value-of select="$session:message" disable-output-escaping='yes' />
+&#xa0;<xsl:value-of select="$session:message" disable-output-escaping='yes' />
 </div>    
 <a href="index"><img border="0" src="{/*[wiki:name='site-template']/wiki:header-image}" /></a><xsl:value-of disable-output-escaping='yes' select="/*[wiki:name='site-template']/wiki:header-text" />
 </td>
@@ -99,16 +101,26 @@ Login&#xa0;
     <tr>
     <td valign="top" id="maincontent">
          <xsl:choose>
-            <xsl:when test="$response-header:content-type='text/plain' or $_prevnode/a:contents/a:ContentTransform/a:transformed-by = 'http://rx4rdf.sf.net/ns/wiki#item-format-text'">
+             <!-- if the content is xml or html insert it as is
+              because we don't yet always set the content-type, we'll assume any transformation other than text creates xml or html
+            todo: test for all the various xml, xhtml mimetypes
+           -->
+         <xsl:when test="starts-with($prev-content-type,'text/plain')">
             <pre>
             <xsl:value-of disable-output-escaping='no' select="$_contents" />
             </pre>
-            </xsl:when>
-            <xsl:otherwise>
+         </xsl:when>           
+         <xsl:when test="starts-with($prev-content-type,'text/xml')
+                      or starts-with($prev-content-type,'text/html')
+                       or not($_prevnode/a:contents/a:ContentTransform/a:transformed-by = 'http://rx4rdf.sf.net/ns/wiki#item-format-text')">
             <xsl:value-of disable-output-escaping='yes' select="$_contents" />
-            </xsl:otherwise>
+         </xsl:when>
+         <xsl:otherwise>
+            <pre>
+            <xsl:value-of disable-output-escaping='no' select="$_contents" />
+            </pre>
+         </xsl:otherwise>
         </xsl:choose>
-
     </td>
     </tr>
     </table>

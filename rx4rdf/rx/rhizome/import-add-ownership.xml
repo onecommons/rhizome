@@ -1,6 +1,8 @@
 <xu:modifications version="1.0" xmlns:xu="http://www.xmldb.org/xupdate"
     xmlns:a="http://rx4rdf.sf.net/ns/archive#" xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"
-    xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >
+    xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' 
+    xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
+    >
     <xu:if test='(/*/wiki:revisions/*//a:contents)[last()][a:ContentTransform]'>         
     	<xu:message text="order wrong? bug in RDFDOM?" terminate="yes" />
     </xu:if>
@@ -17,6 +19,10 @@
     </xu:append>
     
     <xu:append select='/*[wiki:name]'>
-    <wiki:owned_by rdf:resource='http://rx4rdf.sf.net/ns/wiki#owner-system'/>
+    <auth:needs-token>
+      <xu:attribute name="rdf:resource">
+        <xu:value-of select="concat($base-uri,'write-structure-token')"/>
+      </xu:attribute>
+    </auth:needs-token>
     </xu:append>     
 </xu:modifications>

@@ -825,7 +825,7 @@ def applyXUpdate(rdfdom, xup = None, vars = None, extFunctionMap = None, uri='fi
         extFunctionMap = BuiltInExtFunctions    
     processor.execute(rdfdom, xupdate, vars, extFunctionMap = extFunctionMap)
 
-def evalXPath(rdfDom, xpath, nsMap = None, vars=None, extFunctionMap = None, node = None):
+def evalXPath(rdfDom, xpath, nsMap = None, vars=None, extFunctionMap = None, node = None, expCache=None):
     node = node or rdfDom
     #print node    
     log.debug(xpath)
@@ -835,7 +835,10 @@ def evalXPath(rdfDom, xpath, nsMap = None, vars=None, extFunctionMap = None, nod
         extFunctionMap = BuiltInExtFunctions
     context = XPath.Context.Context(node, varBindings = vars, extFunctionMap = extFunctionMap, processorNss = nsMap)
     #extModuleList = os.environ.get("EXTMODULES","").split(":"))
-    compExpr = XPath.Compile(xpath)
+    if expCache:
+       compExpr = expCache.getValue(xpath)
+    else:
+        compExpr = XPath.Compile(xpath)
     res = compExpr.evaluate(context)
     return res
                            
@@ -869,6 +872,7 @@ def main():
         model, db = Util.DeserializeFromUri("./test/rdfdomtest1.rdf")
     ns =[ ('http://rx4rdf.sf.net/ns/archive#', u'a'),
           ('http://rx4rdf.sf.net/ns/wiki#', u'wiki'),
+          ('http://rx4rdf.sf.net/ns/auth#', u'auth'),
            ('http://www.w3.org/2002/07/owl#', u'owl'),
            ('http://purl.org/dc/elements/1.1/#', u'dc'),
            ( RDF_MS_BASE, u'rdf')

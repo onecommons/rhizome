@@ -21,10 +21,31 @@ STORAGE_PATH = 'mywebsite.nt'
 #default is True
 SECURE_FILE_ACCESS = True
 
+#MAX_MODEL_LITERAL when saving a page, any content whose length is greater then this will be saved to disk. 
+#default is -1 (disable save to disk) 
+MAX_MODEL_LITERAL = 0 #save any page to disk
+
+#SAVE_DIR is the directory content is saved to. Currently it is must be a relative path rooted in one of the directories on the PATH and end with a '/'
+#default is 'content/'
+SAVE_DIR='content/' 
+
 #nsMap is dictionary of namespace prefixes that may appear in RxPath expressions
 nsMap = { 'dc' : 'http://purl.org/dc/elements/1.1/#',
           'myNs' : 'http://www.example.com/#'
         }         
+
+#################################################
+## rhizome-specific configuration variables 
+## this are only used when including rhizome into your config and must be set before you include it
+#################################################
+
+#ADMIN_PASSWORD is the password for the default 'admin' super-user 
+#default password is 'admin'
+ADMIN_PASSWORD = 'topsecret'
+
+#ADMIN_PASSWORD_SHA can be set instead of ADMIN_PASSWORD if you don't want to store the password in the config file
+#you can calculate it using sha.sha( 'yourpassword' ).hexdigest()
+ADMIN_PASSWORD_SHA = '12201fe5e202883bd45fc97e87366ea05183e0e4' 
 
 #################################################
 ## advanced configuration variables 

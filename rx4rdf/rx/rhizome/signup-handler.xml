@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xu:modifications xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" xmlns:wf="http://rx4rdf.sf.net/ns/racoon/xpath-ext#" xmlns:response-header="http://rx4rdf.sf.net/ns/racoon/http-response-header#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:a="http://rx4rdf.sf.net/ns/archive#" xmlns:f="http://xmlns.4suite.org/ext" xmlns:xu="http://www.xmldb.org/xupdate" version="1.0">
+<xu:modifications xmlns:a="http://rx4rdf.sf.net/ns/archive#" xmlns:wf="http://rx4rdf.sf.net/ns/racoon/xpath-ext#" xmlns:response-header="http://rx4rdf.sf.net/ns/racoon/http-response-header#" xmlns:f="http://xmlns.4suite.org/ext" xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" xmlns:auth="http://rx4rdf.sf.net/ns/auth#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xu="http://www.xmldb.org/xupdate" version="1.0">
   <!-- validate fields
 -->
   <xu:if test="not($loginname)">
@@ -17,6 +17,56 @@
     <!-- new user     
 -->
     <xu:append select="/">
+      <!-- add access tokens for private ownership
+-->
+      <auth:AccessToken>
+        <xu:attribute name="rdf:about">
+          <xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname,'/private-rw')"/>
+        </xu:attribute>
+        <rdfs:label>Private</rdfs:label>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-view"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-edit-metadata"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-edit"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-save"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-save-metadata"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-delete"/>
+      </auth:AccessToken>
+      <auth:AccessToken>
+        <xu:attribute name="rdf:about">
+          <xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname,'/private-w')"/>
+        </xu:attribute>
+        <rdfs:label>Private Write/Public Read</rdfs:label>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-delete"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-edit"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-save"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-save-metadata"/>
+      </auth:AccessToken>
+      <!-- adding group access-tokens enables us to easily allow access to only those that are a member of one of the groups the user is a member of:
+-->
+      <!-- when the user joins a group, add her group access tokens to the group's corresponding role       
+-->
+      <auth:AccessToken>
+        <xu:attribute name="rdf:about">
+          <xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname,'/group-rw')"/>
+        </xu:attribute>
+        <rdfs:label>Group</rdfs:label>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-view"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-edit-metadata"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-edit"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-save"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-save-metadata"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-delete"/>
+      </auth:AccessToken>
+      <auth:AccessToken>
+        <xu:attribute name="rdf:about">
+          <xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname,'/group-w')"/>
+        </xu:attribute>
+        <rdfs:label>Group Write/Public Read</rdfs:label>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-delete"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-edit"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-save"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-save-metadata"/>
+      </auth:AccessToken>
       <wiki:User>
         <xu:attribute name="rdf:about">
           <xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname)"/>
@@ -24,28 +74,65 @@
         <wiki:login-name>
           <xu:value-of select="$loginname"/>
         </wiki:login-name>
+        <auth:has-token>
+          <rdf:Description>
+            <xu:attribute name="rdf:about">
+              <xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname,'/private-rw')"/>
+            </xu:attribute>
+          </rdf:Description>
+        </auth:has-token>
+        <auth:has-token>
+          <rdf:Description>
+            <xu:attribute name="rdf:about">
+              <xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname,'/private-w')"/>
+            </xu:attribute>
+          </rdf:Description>
+        </auth:has-token>
+        <auth:has-token>
+          <rdf:Description>
+            <xu:attribute name="rdf:about">
+              <xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname,'/group-rw')"/>
+            </xu:attribute>
+          </rdf:Description>
+        </auth:has-token>
+        <auth:has-token>
+          <rdf:Description>
+            <xu:attribute name="rdf:about">
+              <xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname,'/group-w')"/>
+            </xu:attribute>
+          </rdf:Description>
+        </auth:has-token>
+        <wiki:sha1-password>
+          <xu:value-of select="f:sha-hash($password)"/>
+        </wiki:sha1-password>
+        <wiki:fullname>
+          <xu:value-of select="$fullname"/>
+        </wiki:fullname>
+        <wiki:email>
+          <xu:value-of select="$email"/>
+        </wiki:email>
       </wiki:User>
-      <!--todo: add private security token and assign it to the user 
--->
     </xu:append>
   </xu:if>
-  <!--update values   
+  <xu:if test="not($action='creation')">
+    <!--editing existing user, update values   
 -->
-  <xu:append select="/wiki:User[wiki:login-name=$loginname]">
-    <!--if the password is not equal to hash of the current password, set it
+    <xu:append select="/wiki:User[wiki:login-name=$loginname]">
+      <!--if the password is not equal to hash of the current password, set it
 -->
-    <xu:if test="not(/wiki:User[wiki:login-name=$loginname]/wiki:sha1-password) or $password != /wiki:User[wiki:login-name=$loginname]/wiki:sha1-password">
-      <wiki:sha1-password>
-        <xu:value-of select="f:sha-hash($password)"/>
-      </wiki:sha1-password>
-    </xu:if>
-    <wiki:fullname>
-      <xu:value-of select="$fullname"/>
-    </wiki:fullname>
-    <wiki:email>
-      <xu:value-of select="$email"/>
-    </wiki:email>
-  </xu:append>
+      <xu:if test="not(/wiki:User[wiki:login-name=$loginname]/wiki:sha1-password) or $password != /wiki:User[wiki:login-name=$loginname]/wiki:sha1-password">
+        <wiki:sha1-password>
+          <xu:value-of select="f:sha-hash($password)"/>
+        </wiki:sha1-password>
+      </xu:if>
+      <wiki:fullname>
+        <xu:value-of select="$fullname"/>
+      </wiki:fullname>
+      <wiki:email>
+        <xu:value-of select="$email"/>
+      </wiki:email>
+    </xu:append>
+  </xu:if>
   <!--just for side-effect
 -->
   <xu:if test="wf:assign-metadata('itemname', concat('users-',$loginname))"/>

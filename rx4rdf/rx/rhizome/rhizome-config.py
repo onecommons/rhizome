@@ -6,6 +6,8 @@
     http://rx4rdf.sf.net    
 """
 
+#see site/content/RacoonConfig.txt for documentation on config file settings
+
 import rx.rhizome
 if not hasattr(__server__, 'rhizome') or not __server__.rhizome: #make executing this config file idempotent
     rhizome = rx.rhizome.Rhizome(__server__)
@@ -14,7 +16,7 @@ else:
     rhizome = __server__.rhizome
 
 rhizome.BASE_MODEL_URI = locals().get('BASE_MODEL_URI', __server__.BASE_MODEL_URI)
-
+MAX_MODEL_LITERAL = 0 #will save all content to disk
 ##############################################################################
 ## the core of Rhizome: here we define the pipeline for handling requests
 ##############################################################################
@@ -33,15 +35,11 @@ resourceQueries=[
 #2 checks:
 #1. super-user can always get in
 #2. if either the resource or an authorization group it belongs to requires an auth token,
-#   make sure the user or one of its roles has that token 
-authorizationQueries=[
-'''xf:if ( not($_user/auth:has-role/auth:super-user) and 
-    count(./auth:needs-token/*[auth:action=$authAction] | ./auth:member-of/*/auth:needs-token/*[auth:action=$authAction])
-!= count( ($authResource/auth:needs-token/*[auth:action=$authAction] | $authResource/auth:member-of/*/auth:needs-token/*[auth:action=$authAction])
-    [$authResource=$_user/auth:has-token/* or $authResource=$_user/auth:has-role/*/auth:has-token/*] ), /*[wiki:name='_not_authorized'])''',    
-   #if we made it here, we're authorized to access the resource - now we can change the resource context if necessary
-   #'/*[wiki:name=$action]/wiki:revisions/*[last()]' #choose the resource that handles the action, e.g. the edit from when mypage.html?action=edit
-]
+#   make sure the user or one of its roles has that token
+authorizationQuery = '''xf:if ( not($_user/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser') and 
+    count(./auth:needs-token/auth:AccessToken[auth:has-permission=$authAction] | ./auth:member-of/*/auth:needs-token/auth:AccessToken[auth:has-permission=$authAction])
+!= count( (./auth:needs-token/auth:AccessToken[auth:has-permission=$authAction] | ./auth:member-of/*/auth:needs-token/auth:AccessToken[auth:has-permission=$authAction])
+    [.=$_user/auth:has-token/* or .=$_user/auth:has-role/*/auth:has-token/*] ), %s)'''
 
 #now find a resource that will be used to display the resource
 contentHandlerQueries= [
@@ -49,6 +47,8 @@ contentHandlerQueries= [
 '/*[wiki:handles-action=$authAction][wiki:action-for-type = $_context/rdf:type]', #[compatibleTypes(wiki:action-for-type/*,$_context/rdf:type/*)]',
 #if the resource is content
 'self::a:NamedContent',
+#if the resource is set to the Unauthorized resource select the unauthorized page
+"xf:if(self::auth:Unauthorized, /*[wiki:name='_not_authorized'])",
 #default for any real resource (i.e. an resource element)
 "xf:if(not(self::text()), /*[wiki:name='default-resource-viewer'])"
 ]
@@ -56,11 +56,18 @@ contentHandlerQueries= [
 #context is now a content resource, now set the context to a version of the resource
 revisionQueries=[
 'wiki:revisions/*[number($revision)]', #view a particular revision e.g. mypage.html?revision=3
-'wiki:revisions/*[has-label=$label]', #view a particular label if specified 
-#select the released version if not otherwise specified and the owner isn't the current user
-"xf:if(not(wiki:revisions/*[last()]/wiki:owned_by[$user]), wiki:revisions/*[has-label='_released'])",
-'wiki:revisions/*[last()]', #get the latest if we're the owner
+'wiki:revisions/*[wiki:has-label=$label]', #view a particular label if specified
+'wiki:revisions/*[last()]', #get the last revision
 ]
+
+#todo: revision queries to support draft/release workflow
+##select the last one with a released label if not otherwise specified unless the current user is the owner of the last revision
+#'''xf:if(wiki:revisions/*[last()]/wiki:owned_by[$user], wiki:revisions/*[last()],
+#      (wiki:revisions/*[wiki:has-label='_released'])[last()] )''',
+##none labeled released: just choose the last non-draft version (so we don't require this release label feature to be used)
+#"(wiki:revisions/*[wiki:has-label!='_draft'])[last()]",
+##no viewable revisions found, what to do??: invoke edit page? what if you don't have permission for that?
+#"???" REDIRECT(not-viewable)?
 
 #finally have a resource, get its content
 contentQueries=[
@@ -92,9 +99,11 @@ findResourceAction.assign("_user", '/wiki:User[wiki:login-name=$session:login]',
                          "/wiki:User[wiki:login-name='guest']")
 findResourceAction.assign("_resource", '.', post=True)
 
-authorizationAction = Action(authorizationQueries)
-authorizationAction.assign("authResource", ".") 
-authorizationAction.assign("authAction", '$action', "'view'") #default to 'view' if not specified
+resourceAuthorizationAction = Action( [authorizationQuery % '/auth:Unauthorized'] )
+#default to 'view' if not specified
+resourceAuthorizationAction.assign("authAction", 'concat("http://rx4rdf.sf.net/ns/wiki#action-",$action)', "'http://rx4rdf.sf.net/ns/wiki#action-view'") 
+
+#revisionAuthorizationAction = Action( [authorizationQuery % "/*[wiki:name='_not_authorized']/wiki:revisions/*[last()]"] )
 
 rhizome.findRevisionAction = Action(revisionQueries)
 rhizome.findContentAction = Action(contentQueries, lambda result, kw, contextNode, retVal, self=__server__:\
@@ -107,10 +116,10 @@ templateAction.assign("_doctype", '$_doctype', "wiki:doctype/*")
 templateAction.assign("_disposition", '$_disposition', "wiki:item-disposition/*")
 
 handleRequestSequence = [ findResourceAction, #first map the request to a resource
-      authorizationAction, #see if the user is authorized to access it                          
+      resourceAuthorizationAction, #see if the user is authorized to access it                          
       Action(contentHandlerQueries), #find a resource that can display this resource
       rhizome.findRevisionAction, #get the appropriate revision
-      authorizationAction, #see if the user is authorized for this revision
+      #revisionAuthorizationAction, #see if the user is authorized for this revision #todo
       rhizome.findContentAction,#then get its content
       rhizome.processContentAction, #process the content            
       templateAction, #invoke a template
@@ -130,10 +139,13 @@ actions = { 'handle-request' : handleRequestSequence,
 ##############################################################################
 nsMap = {'a' : 'http://rx4rdf.sf.net/ns/archive#',
         'dc' : 'http://purl.org/dc/elements/1.1/#',
+         'rdf' : 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+         'rdfs' : 'http://www.w3.org/2000/01/rdf-schema#',
         'wiki' : "http://rx4rdf.sf.net/ns/wiki#",
          'auth' : "http://rx4rdf.sf.net/ns/auth#",
          'base' : rhizome.BASE_MODEL_URI
          }
+rhizome.nsMap = nsMap
 
 import os 
 PATH= __server__.PATH + os.pathsep + os.path.split(__configpath__[-1])[0]
@@ -147,9 +159,10 @@ cmd_usage = '''\n\nrhizome-config.py specific:
 import rhizml
 contentProcessors = {
     'http://rx4rdf.sf.net/ns/content#pydiff-patch-transform':
-        lambda self, contents, kw, result, context, rhizome=rhizome: rhizome.processPatch(contents, kw, result),     
+        lambda self, contents, kw, result, context, rhizome=rhizome: rhizome.processPatch(contents, kw, result),
+    #this stylesheet transforms kw['_contents'] not the rdf model
     'http://www.w3.org/1999/XSL/Transform' : lambda self, contents, kw, result, context:\
-        self.processXslt(contents, kw['_contents'], kw, self.evalXPath( #this stylesheet transforms kw['_contents'] not the rdf model
+        self.processXslt(contents, kw['_contents'], kw, uri=self.evalXPath( 
             'concat("site:///", (/a:NamedContent[wiki:revisions/*[.=$_context]]/wiki:name)[1])',node=context) ), 
     'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
         lambda self, contents, kw, result, context, rhizml=rhizml, mmf=rx.rhizome.MarkupMapFactory(): rhizml.rhizmlString2xml(contents,mmf)
@@ -210,12 +223,12 @@ templateList += rhizome.addItemTuple('faq2document.xsl', loc='path:faq2document.
 #+ rhizome.addItemTuple('todo2document.xsl', loc='path:todo2document.xsl', format='http://www.w3.org/1999/XSL/Transform', disposition='template', doctype='document', handlesDoctype='todo')\
   
 #help and sample pages
-templateList += rhizome.addItemTuple('index',loc='path:index.txt', format='rhizml', disposition='entry', owner=None)\
-+rhizome.addItemTuple('sidebar',loc='path:sidebar.txt', format='rhizml', owner=None)\
+templateList += rhizome.addItemTuple('index',loc='path:index.txt', format='rhizml', disposition='entry', accessTokens=None)\
++rhizome.addItemTuple('sidebar',loc='path:sidebar.txt', format='rhizml', accessTokens=None)\
 +rhizome.addItemTuple('TextFormattingRules',loc='path:TextFormattingRules.txt', format='rhizml', disposition='entry')\
 +rhizome.addItemTuple('MarkupFormattingRules',loc='path:MarkupFormattingRules.txt', format='rhizml', disposition='entry')\
 +rhizome.addItemTuple('RhizML',loc='path:RhizML.rz', format='rhizml', disposition='entry')\
-+rhizome.addItemTuple('SandBox', format='rhizml', disposition='entry', owner=None,
++rhizome.addItemTuple('SandBox', format='rhizml', disposition='entry', accessTokens=None,
 	contents="Feel free to [edit|?action=edit] this page to experiment with [RhizML]...")\
 
 #add the authorization and authentification structure
@@ -229,6 +242,9 @@ if not adminShaPassword:
 #rxml
 authStructure =\
 '''
+ rx:resource
+   rdf:type: auth:Unauthorized
+   
  rx:resource id='%(base)susers-guest':
   rdf:type: wiki:User
   wiki:login-name: `guest
@@ -245,22 +261,24 @@ authStructure =\
   
  auth:role-superuser:
   rdf:type: auth:Role
+  auth:has-token: base:write-structure-token
 
- ; the AuthorizationGroup for the structural pages
- base:auth-template-forstructure:
-  rdf:type: auth:AuthorizationGroup
-  auth:needs-token: base:auth-token-forstructure
+ ; add access token to protect structural pages from modification
+ ; (assign (auth:has-token) to adminstrator users or roles to give access )
+ base:write-structure-token:
+  rdf:type: auth:AccessToken
+  rdfs:label: `Administrator Write/Public Read
+  auth:has-permission: wiki:action-delete     
+  auth:has-permission: wiki:action-save
+  auth:has-permission: wiki:action-save-metadata
 
- base:auth-token-forstructure
-    rdf:type: auth:AccessToken
-    auth:action: `edit
-    auth:action: `new
-    auth:action: `creation
-    auth:action: `save
-    auth:action: `delete    
-    auth:action: `edit-metadata    
-    auth:action: `save-metadata
 ''' % {'base' : rhizome.BASE_MODEL_URI, 'adminShaPassword' : adminShaPassword }
+
+#add actions:
+for action in ['view', 'edit', 'new', 'creation', 'save', 'delete', 'confirm-delete',
+               'showrevisions', 'edit-metadata', 'save-metadata']:
+    authStructure += "\n wiki:action-%s: rdf:type: auth:Permission" % action
+
 templateList.append( (None, rxml.rhizml2nt(contents=authStructure, nsMap=nsMap)) )
 
 siteVars =\

@@ -30,8 +30,9 @@ class DocumentMarkupMap(rhizml.LowerCaseMarkupMap):
     A = 'link'
     SECTION = 'section'
     
-    def __init__(self):
+    def __init__(self, docType):
         super(DocumentMarkupMap, self).__init__()
+        self.docType = docType
         self.wikiStructure['!'] = (self.SECTION, 'title')
 
     def H(self, level, line):
@@ -44,7 +45,7 @@ class SpecificationMarkupMap(DocumentMarkupMap):
     SECTION = 's'
     
     def __init__(self):
-        super(SpecificationMarkupMap, self).__init__()        
+        super(SpecificationMarkupMap, self).__init__('http://rx4rdf.sf.net/ns/wiki#doctype-specification')
         self.wikiStructure['!'] = (self.SECTION, None)
 
     def canonizeElem(self, elem):
@@ -58,8 +59,8 @@ class SpecificationMarkupMap(DocumentMarkupMap):
 
 class MarkupMapFactory(rhizml.DefaultMarkupMapFactory):
     map = {
-        'faq' : DocumentMarkupMap(),
-        'document' : DocumentMarkupMap(),
+        'faq' : DocumentMarkupMap('http://rx4rdf.sf.net/ns/wiki#doctype-faq'),
+        'document' : DocumentMarkupMap('http://rx4rdf.sf.net/ns/wiki#doctype-document'),
         'specification' : SpecificationMarkupMap(),
         'todo' : TodoMarkupMap(),
         }
@@ -80,7 +81,7 @@ class Rhizome:
         return self.server.callActions(actions, [ '_user', '_name' ],
                                        resultNodeset, kw, contextNode, retVal)
     
-    def doImport(self, path, recurse=False, r=False, disposition='entry', xupdate="path:import.xml", format='', dest=None, **kw):
+    def doImport(self, path, recurse=False, r=False, disposition='', xupdate="path:import.xml", format='', dest=None, **kw):
           '''Import command line option
 Import the file in a directory into the site.
 If, for each file, there exists a matching file with ".metarx" appended, 
@@ -95,6 +96,7 @@ Can be used for schema migration, for example.
 Default: "path:import.xml". This disgards previous revisions and points the content to the new import location.
 '''
           defaultFormat=format
+          defaultDisposition=disposition
           path = path or '.'
           triples = []
           if dest:
@@ -136,7 +138,7 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
                       log.info('importing ' +filename)
                   moreTriples = StringIO.StringIO()                  
                   self.server.xupdateRDFDom(rdfDom,moreTriples, uri=xupdate,
-                                    kw={ 'loc' : loc, 'name' : wikiname,
+                                    kw={ 'loc' : loc, 'name' : wikiname, 'base-uri' : self.BASE_MODEL_URI,
                                          'resource-uri' : self.BASE_MODEL_URI + wikiname })
                   #print moreTriples.getvalue()
                   triples.append( moreTriples.getvalue() )
@@ -147,17 +149,37 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
                       log.warning('there is already an item named ' + wikiname +', skipping import')
                       return #hack for now skip if item already exists
                   else:
-                      log.info('importing ' +filename)
+                      log.info('importing ' +filename+ ' as ' + wikiname)
                   if not defaultFormat:
                       exts = { '.rz' : 'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml',
-                      '.xsl' : 'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt',
+                      '.xsl' : 'http://www.w3.org/1999/XSL/Transform',
+                      '.rxsl' : 'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt',
                       '.py' : 'http://rx4rdf.sf.net/ns/wiki#item-format-python',
-                      '.txt' : 'http://rx4rdf.sf.net/ns/wiki#item-format-text',
-                      }                  
-                      format = exts.get(os.path.splitext(path)[1], 'http://rx4rdf.sf.net/ns/wiki#item-format-binary')
+                      }
+                      ext = os.path.splitext(path)[1]
+                      format = exts.get(ext)
+                      if format == None:
+                          import mimetypes
+                          type, encoding = mimetypes.guess_type(ext)
+                          if type and type.startswith('text/') and not encoding:
+                              format = 'http://rx4rdf.sf.net/ns/wiki#item-format-text'
+                          else:
+                              format = 'http://rx4rdf.sf.net/ns/wiki#item-format-binary'
                   else:
                       format = defaultFormat
-                  triples.append( self.addItem(filename,loc=loc,format=format, disposition=disposition) )
+                  if not defaultDisposition:
+                      if format == 'http://rx4rdf.sf.net/ns/wiki#item-format-binary':
+                          disposition = 'complete'
+                      else:
+                          disposition = 'entry'
+                  else:
+                      disposition = defaultDisposition
+                  if format == 'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml':
+                      mm = rhizml.rhizml2xml(file(path), mmf=MarkupMapFactory(), getMM=True)
+                      doctype = mm.docType
+                  else:
+                      doctype=''
+                  triples.append( self.addItem(wikiname,loc=loc,format=format, disposition=disposition, doctype=doctype) )
               if dest:
                   import shutil
                   try: 
@@ -166,7 +188,9 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
                   shutil.copy2(path, dest)                  
 
           if os.path.isdir(path):
-                utils.walkDir(path, fileFunc, recurse = (recurse or r))
+                if recurse or r:
+                    recurse = 0xFFFF
+                utils.walkDir(path, fileFunc, recurse = recurse)
           else:
                 fileFunc(path)
           if triples:
@@ -212,7 +236,7 @@ Options:
                     exts = { 'http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate': 'xml',
                     'http://rx4rdf.sf.net/ns/wiki#item-format-python' : 'py',
                     'http://www.w3.org/1999/XSL/Transform' : 'xsl',
-                    'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt' : 'xsl',
+                    'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt' : 'rxsl',
                     'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' : 'rz',
                     'http://rx4rdf.sf.net/ns/wiki#item-format-text': 'txt',
                     }
@@ -289,62 +313,77 @@ Options:
         return [(name, self.addItem(name, **kw))]
 
     def addItem(self, name, loc=None, contents=None, disposition = 'complete', 
-                format='binary', doctype='', handlesDoctype='', handlesDisposition='',
-                handlesAction='', actionType='http://rx4rdf.sf.net/ns/archive#NamedContent',
-                baseURI=None, owner='http://rx4rdf.sf.net/site/users-admin', authorizationGroup=''):
-        if format.isalpha(): #if not a URI
-           format = 'http://rx4rdf.sf.net/ns/wiki#item-format-' + format
+                format='binary', doctype='', handlesDoctype='', handlesDisposition='', title=None,
+                handlesAction=None, actionType='http://rx4rdf.sf.net/ns/archive#NamedContent',
+                baseURI=None, owner='http://rx4rdf.sf.net/site/users-admin',
+                accessTokens=['base:write-structure-token'], authorizationGroup=''):
+        '''
+        Convenience function for adding an item the model. Returns a string of triples.
+        '''
+        from utils import Res
+        Res.nsMap = self.nsMap
+        
         if not baseURI:
             baseURI = self.BASE_MODEL_URI
-        nameUriRef = baseURI + filter(lambda c: c.isalnum() or c in '_-./', name)
-        namebNode = filter(lambda c: c.isalnum(), name)
-        listbNode = namebNode + '1List'
-        itembNode = namebNode + '1Item'
+        nameUriRef = Res(baseURI + filter(lambda c: c.isalnum() or c in '_-./', name))
+        namebNode = '_:'+ filter(lambda c: c.isalnum(), name) 
+        listbNode = Res(namebNode + '1List')
+        itembNode = Res(namebNode + '1Item')
+
+        contentbNode = Res(namebNode + '1Content')
+        itembNode['a:contents'] = contentbNode
+        contentbNode['rdf:type'] = Res('a:ContentTransform')
+        
+        if format.isalpha(): #if not a URI
+           format = 'http://rx4rdf.sf.net/ns/wiki#item-format-' + format        
+        contentbNode['a:transformed-by'] = Res(format)
+
         assert not (loc and contents)
         if loc:
-            contentTriples = ''' <http://rx4rdf.sf.net/ns/archive#contents> <%(loc)s> .
-    <%(loc)s> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .''' % locals()
+            loc = Res(loc)
+            loc['rdf:type'] = Res('a:ContentLocation')
+            contentbNode['a:contents'] = loc
         else:
-            contentTriples = ''' <http://rx4rdf.sf.net/ns/archive#contents> "%(contents)s" .''' % locals()
+            contentbNode['a:contents'] = contents
 
-        contentbNode = namebNode + '1Content'
-        contentTriples = '''_:%(itembNode)s <http://rx4rdf.sf.net/ns/archive#contents> _:%(contentbNode)s .
-    _:%(contentbNode)s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-    _:%(contentbNode)s <http://rx4rdf.sf.net/ns/archive#transformed-by> <%(format)s> .
-    _:%(contentbNode)s %(contentTriples)s''' % locals()
+        if title is not None:
+            itembNode['wiki:title'] = title        
+        if doctype:
+            if doctype.isalpha(): #if not a URI
+               doctype = 'http://rx4rdf.sf.net/ns/wiki#doctype-' + doctype
+            itembNode['wiki:doctype'] = Res(doctype)
+        if handlesDoctype:
+            nameUriRef['wiki:handles-doctype'] = Res('http://rx4rdf.sf.net/ns/wiki#doctype-' + handlesDoctype)
+        if handlesDisposition:
+            nameUriRef['wiki:handles-disposition'] = Res('http://rx4rdf.sf.net/ns/wiki#item-disposition-' + handlesDisposition)
+            
+        if handlesAction:                        
+            nameUriRef['wiki:handles-action'] = [Res('wiki:action-'+ x) for x in handlesAction]
+            if actionType:
+                nameUriRef['wiki:action-for-type'] = Res(actionType)
 
-        if doctype:    
-            doctype = "_:%(itembNode)s <http://rx4rdf.sf.net/ns/wiki#doctype> <http://rx4rdf.sf.net/ns/wiki#doctype-%(doctype)s>.\n" % locals()
-        if handlesDoctype:    
-            handlesDoctype = "<%(nameUriRef)s> <http://rx4rdf.sf.net/ns/wiki#handles-doctype> <http://rx4rdf.sf.net/ns/wiki#doctype-%(handlesDoctype)s>.\n" % locals()
-        if handlesDisposition:    
-            handlesDisposition = "<%(nameUriRef)s> <http://rx4rdf.sf.net/ns/wiki#handles-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-%(handlesDisposition)s>.\n" % locals()
-        handlesActions=''
-        if handlesAction:            
-            for action in handlesAction:
-                handlesActions += '<%(nameUriRef)s> <http://rx4rdf.sf.net/ns/wiki#handles-action> "%(action)s".\n' % locals()
-        if handlesAction and actionType:
-            actionType = '<%(nameUriRef)s> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <%(actionType)s>.\n' % locals()
-        else:
-            actionType = ''
-
-        if authorizationGroup:    
-            authorizationGroup = '<%(nameUriRef)s> <http://rx4rdf.sf.net/ns/auth#member-of> <%(authorizationGroup)s>.\n' % locals()
+        if accessTokens:
+            nameUriRef['auth:needs-token'] = [Res(x) for x in accessTokens]
+            
+        if authorizationGroup:
+            nameUriRef['auth:member-of'] = Res(authorizationGroup)
             
         if owner:
-            if owner == 'http://rx4rdf.sf.net/site/users-admin': #fix up to be the admin user for this specific site
+            if owner == 'http://rx4rdf.sf.net/site/users-admin':
+                #fix up to be the admin user for this specific site
                 owner = self.BASE_MODEL_URI + 'users-admin'
-            owner = "<%(itembNode)s> <http://rx4rdf.sf.net/ns/wiki#created-by> <%(owner)s>.\n" % locals()
-        else:
-            owner = ''
-            
-        return '''<%(nameUriRef)s> <http://rx4rdf.sf.net/ns/wiki#name> "%(name)s" .
-    <%(nameUriRef)s> <http://rx4rdf.sf.net/ns/wiki#revisions> _:%(listbNode)s .
-    <%(nameUriRef)s> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-    _:%(listbNode)s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
-    _:%(listbNode)s <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:%(itembNode)s .
-    _:%(listbNode)s <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil>.
-    _:%(itembNode)s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-    _:%(itembNode)s <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
-    _:%(itembNode)s <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-%(disposition)s> .
-    %(doctype)s%(handlesDoctype)s%(handlesDisposition)s%(handlesActions)s%(actionType)s%(authorizationGroup)s%(owner)s%(contentTriples)s\n'''% locals() 
+            itembNode['wiki:created-by'] = Res(owner)
+                
+        nameUriRef['wiki:name'] = name
+        nameUriRef['wiki:revisions'] = listbNode
+        nameUriRef['rdf:type'] = Res('a:NamedContent')
+        
+        listbNode['rdf:type'] = Res('rdf:List')
+        listbNode['rdf:first'] = itembNode
+        listbNode['rdf:rest'] = Res('rdf:nil')
+        
+        itembNode['rdf:type'] = Res('wiki:Item')
+        itembNode['a:created-on'] = "1057919732.750"
+        itembNode['wiki:item-disposition'] = Res('http://rx4rdf.sf.net/ns/wiki#item-disposition-' + disposition)
+
+        return nameUriRef.toTriplesDeep()                

@@ -7,7 +7,7 @@
 # Use per Python Software Foundation (PSF) license.
 # 
 
-class UseNode:
+class UseNode(object):
     """For linked list kept in most-recent .. least-recent *use* order"""
     __slots__ = ['value','hkey','older','newer']
     def __init__(self, value, hkey, older=None, newer=None):
@@ -42,14 +42,14 @@ class MRUCache:
         self.nodeCount = 1
         self.nodeDict = dict([(self.mru.hkey, self.mru)])
 
-    def getValue(self, *args):  # magically hidden whether lookup or calc
+    def getValue(self, *args, **kw):  # magically hidden whether lookup or calc
         """
         Get value from cache or calcuate a new value using user function.
         Either way, make the new value the most recently used, replacing
         the least recently used if cache is full.
         """
         if self.hashCalc:
-            hkey = self.hashCalc(*args)
+            hkey = self.hashCalc(*args, **kw)
         else:
             hkey = args         # use tuple of args as default key for first stage LU
         try:
@@ -58,7 +58,7 @@ class MRUCache:
         except KeyError:
             # here we know we can't get to value
             # calculate new value
-    	    value = self.valueCalc(*args)
+    	    value = self.valueCalc(*args, **kw)
 
             # get mru use node if cache is full, else make new node
             lru = self.mru.newer    # newer than mru circularly goes to lru node

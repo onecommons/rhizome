@@ -1,4 +1,6 @@
-* Add users and authentication, enhance authorization
+* make racoon much faster!
+* handle incoming email and send email notifications
+* apply authorization on a statement by statement basis when saving metadata
 * Introduce RDF shredder, a language for specifying how to extracting RDF out of a given XML schema
 * Improved linking support:
 ** store link references in RDF store
@@ -7,7 +9,5 @@
 ** link fixup of site: URLs in markup
 * Add support for composite content representations
 * Polish UI, esp.: 
-** fix search 
-** add delete confirmation page
-** add title display
+** make search work with arbitrary resources (not just pages)
 * rewrite and release archiver tool

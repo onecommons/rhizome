@@ -105,6 +105,8 @@ class MarkupMap(object):
     inlineElems = [ 'I', 'B', 'TT', 'A', 'IMG', 'SPAN', 'BR']
 
     INLINE_IMG_EXTS = ['.png', '.jpg', '.gif']
+
+    docType = ''
         
     def __init__(self):
         #wikistructure maps syntax that correspond to strutural elements that only contain block elements (as opposed to inline elements)
@@ -466,7 +468,7 @@ def handleInlineWiki(st, handler, string, wantTokenMap ):
         return _handleInlineWiki(st, handler, string, wantTokenMap)
         st.in_wikicont = 0
             
-def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False, rootElement = None):
+def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False, rootElement = None, getMM=False):
     """
     given a string of rhizml, return a str of xml
     """
@@ -780,6 +782,9 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False, rootEle
                     
     rhizmltokenize.tokenize(fd.readline, tokeneater=tokenHandler)
     handler.endDocument()
+
+    if getMM:
+        return st.mm
     
     if rootElement: 
       xml = "<%s>%s</%s>" % (rootElement, output.getvalue(), rootElement)

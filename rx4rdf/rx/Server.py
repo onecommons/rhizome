@@ -86,8 +86,8 @@ def logMessage(message):
         f.close()
 
 if not globals().has_key('hotReload'):
-####cherrypy inserts the whole contents of parseConfigFile.py here
-####which we haven't changed except to set _logToScreen=0
+####cherrypy inserts the whole contents of parseConfigFile.py here (indented)
+####which we haven't changed except to set _logToScreen=0 and the session defaults
 
     ##################################
     # Parse configuration file to get deployment option
@@ -95,11 +95,16 @@ if not globals().has_key('hotReload'):
 
     # Default values for all parameters
 
+    global _logToScreen, _logFile, _socketHost, _socketPort, _socketFile, _reverseDNS, _socketQueueSize
+    global _processPool, _threading, _forking, _threadPool, _sslKeyFile, _sslCertificateFile
+    global _typeOfRequests, _staticContentList, _flushCacheDelay, _sessionStorageType
+    global _sessionTimeout, _sessionCookieName, _sessionStorageFileDir
     _logToScreen=0 # Should logs be output to screen or not
     _logFile="" # Default log file
 
     # Parameters used to tell which socket the server should listen on
     # Note that socketPort and socketFile conflict wich each other: if one has a non-null value, the other one should be null
+    _socketHost=''
     _socketPort=0
     _socketFile='' # Used if server should listen on AF_UNIX socket
     _reverseDNS=0
@@ -128,7 +133,7 @@ if not globals().has_key('hotReload'):
     # Variable used for session handling
     _sessionStorageType="file"  #rhizome change
     _sessionTimeout=60 # In minutes
-    _sessionCookieName="CherryPySession"
+    _sessionCookieName="RhizomeSession"
     _sessionStorageFileDir="./sessions" #rhizome change
 
     # Read parameters from configFile
@@ -136,8 +141,10 @@ if not globals().has_key('hotReload'):
     except: pass
     try: _logFile=configFile.get('server', 'logFile')
     except: pass
-    try: _socketPort=int(configFile.get('server', 'socketPort'))
+    try: _socketHost=configFile.get('server', 'socketHost')
     except: pass
+    try: _socketPort=int(configFile.get('server', 'socketPort'))
+    except:pass
     try: _socketFile=configFile.get('server', 'socketFile')
     except: pass
     try: _reverseDNS=configFile.get('server', 'reverseDNS')
@@ -180,6 +187,7 @@ if not globals().has_key('hotReload'):
     logMessage("Server parameters:")
     logMessage("  logToScreen: %s"%_logToScreen)
     logMessage("  logFile: %s"%_logFile)
+    logMessage("  socketHost: %s"%_socketHost)
     logMessage("  socketPort: %s"%_socketPort)
     logMessage("  socketFile: %s"%_socketFile)
     logMessage("  reverseDNS: %s"%_reverseDNS)
@@ -199,7 +207,7 @@ if not globals().has_key('hotReload'):
     logMessage("  sessionStorageType: %s"%_sessionStorageType)
     if _sessionStorageType: logMessage("  sessionTimeout: %s min"%_sessionTimeout)
     if _sessionStorageType: logMessage("  sessionCookieName: %s"%_sessionCookieName)
-    if _sessionStorageType=="file": logMessage("  sessionStorageFileDir: %s min"%_sessionStorageFileDir)
+    if _sessionStorageType=="file": logMessage("  sessionStorageFileDir: %s"%_sessionStorageFileDir)
     logMessage("  staticContent: %s"%_staticContentList)
 
     # Check that parameters are correct and that they don't conflict with each other
@@ -207,10 +215,14 @@ if not globals().has_key('hotReload'):
     if _processPool!=1 and not hasattr(os, 'fork'): raise "CherryError: Configuration file has processPool, but forking is not available on this operating system"
     if _forking and not hasattr(os, 'fork'): raise "CherryError: Configuration file has forking, but forking is not available on this operating system"
     if _sslKeyFile:
-        try: from OpenSSL import SSL
+        try:
+            global SSL
+            from OpenSSL import SSL
         except: raise "CherryError: PyOpenSSL 0.5.1 or later must be installed to use SSL. You can get it from http://pyopenssl.sourceforge.net"
     if 'xmlRpc' in _typeOfRequests:
-        try: import xmlrpclib
+        try:
+            global xmlrpclib
+            import xmlrpclib
         except: raise "CherryError: xmlrpclib must be installed to use XML-RPC. It is included in Python-2.2 and higher, or else you can get it from http://www.pythonware.com"
     if _socketPort and _socketFile: raise "CherryError: In configuration file: socketPort and socketFile conflict with each other"
     if not _socketFile and not _socketPort: _socketPort=8000 # Default port
@@ -227,13 +239,13 @@ if not globals().has_key('hotReload'):
     for typeOfRequest in _typeOfRequests:
         if typeOfRequest not in ('xmlRpc', 'web'): raise "CherryError: Configuration file an invalid typeOfRequest: '%s'"%typeOfRequest
 
-    if _sessionStorageType not in ('', 'custom', 'ram', 'file'): raise "CherryError: Configuration file an invalid sessionStorageType: '%s'"%_sessionStorageType
-    if _sessionStorageType in ('custom', 'ram') and _sessionStorageFileDir!='': raise "CherryError: Configuration file has sessionStorageType set to 'ram' but a sessionStorageFileDir is specified"
+    if _sessionStorageType not in ('', 'custom', 'ram', 'file', 'cookie'): raise "CherryError: Configuration file an invalid sessionStorageType: '%s'"%_sessionStorageType
+    if _sessionStorageType in ('custom', 'ram', 'cookie') and _sessionStorageFileDir!='': raise "CherryError: Configuration file has sessionStorageType set to 'custom, 'ram' or 'cookie' but a sessionStorageFileDir is specified"
     if _sessionStorageType=='file' and _sessionStorageFileDir=='': raise "CherryError: Configuration file has sessionStorageType set to 'file' but no sessionStorageFileDir"
     if _sessionStorageType=='ram' and (_forking or severalProcs):
         print "CherryWarning: 'ram' sessions might be buggy when using several processes"
-
 ##end parseConfigFile.py insert
+        
     if _sessionStorageFileDir:#rhizome change
         try: os.makedirs(_sessionStorageFileDir)
         except: pass
@@ -293,6 +305,7 @@ if not globals().has_key('hotReload'):
     mimetypes.types_map['.ico']='image/x-icon'
 
     def _parseFirstLine(data):
+        data = str(data) # Get rid of unicode
         request.path=data.split()[1]
         if request.path and request.path[0]=='/': request.path=request.path[1:] # Remove starting '/' if any
         request.path=request.path.replace('&amp;', '&') # This case happens for some reason ...
@@ -304,8 +317,15 @@ if not globals().has_key('hotReload'):
         i=request.path.find('?')
         if i!=-1:
             if request.path[i+1:]:
+                k=request.path[i+1:].find('?')
+                if k!=-1:
+                    j=request.path[:k].rfind('=')
+                    if j!=-1: request.path=request.path[:j+1] + urllib.quote_plus(request.path[j+1:])
                 for _paramStr in request.path[i+1:].split('&'):
                     _sp=_paramStr.split('=')
+                    if len(_sp) > 2:
+                        j=_paramStr.find('=')
+                        _sp=(_paramStr[:j],_paramStr[j+1:])
                     if len(_sp)==2:
                         _key, _value=_sp
                         _value=urllib.unquote_plus(_value)
@@ -325,41 +345,30 @@ if not globals().has_key('hotReload'):
         
     def _parsePostData(_rfile):
         # Read request body and put it in _data
-        _len=int(request.headerMap.get("content-length","0"))
+        _len = int(request.headerMap.get("content-length","0"))
         if _len: _data=_rfile.read(_len)
         else: _data=""
 
         request.isXmlRpc=0
         # Try to parse request body as an XML-RPC call
         if 'xmlRpc' in _typeOfRequests and _data and request.headerMap.get("content-type","") == "text/xml":
-            _setRoot=0
-            if request.path=='RPC2':
-                _thisXmlRpcClass='root'
-                _setRoot=1
-            elif request.path.find('/')>-1:
-                _thisXmlRpcClass=string.join(request.path.split('/'),'_')
-            elif not request.path:
-                _thisXmlRpcClass='root'
-                _setRoot=1
-            else:
-                _thisXmlRpcClass=request.path
+            _xmlRpcPathList = []
+            if request.path == 'RPC2': pass
+            elif request.path.find('/') > -1: _xmlRpcPathList = request.path.split('/')
+            elif not request.path: pass
+            else: _xmlRpcPathList = [request.path]
             try:
                 try: request.paramTuple,_thisXmlRpcMethod=xmlrpclib.loads(_data)
                 except: raise "XML-RPC ERROR"
+                _thisXmlRpcMethod = str(_thisXmlRpcMethod) # Get rid of unicode
                 request.isXmlRpc=1 # If parsing worked, it is an XML-RPC request
-                if _thisXmlRpcMethod.find('.')>-1:
-                    _thisXmlRpcClass+='_'+string.join(_thisXmlRpcMethod.split('.')[:-1],'_')
-                    _thisXmlRpcMethod=_thisXmlRpcMethod.split('.')[-1]
-                #print "_thisXmlRpcClass:", _thisXmlRpcClass, "_thisXmlRpcMethod:", _thisXmlRpcMethod, "xmlrpcMaskAndViewMap:", str(xmlrpcMaskAndViewMap)
+                _xmlRpcPathList += _thisXmlRpcMethod.split('.')
             except "XML-RPC ERROR":
                 # error reading data; must not have been an xmlrpc file
                 pass
 
         if request.isXmlRpc:
-            request.rpcMethod=_thisXmlRpcMethod
-            if _setRoot: request.path='root'
-            else: request.path=_thisXmlRpcClass
-            request.path+='/'+string.join(request.rpcMethod.split('.'),'/')
+            request.path = '/'.join(_xmlRpcPathList)
         else:
             # It's a normal browser call
             # Put _data in a StringIO so FieldStorage can read it
@@ -462,7 +471,8 @@ if not globals().has_key('hotReload'):
                 _sessionId=response.simpleCookie[_sessionCookieName].value
                 _expirationTime=time.time()+_sessionTimeout*60
                 _obj=(sessionMap, _expirationTime)
-                saveSessionData(_sessionId, _obj)            
+                if _sessionStorageType != 'custom': ramOrFileOrCookieSaveSessionData(_sessionId, _obj)
+                else: saveSessionData(_sessionId, _obj)
 
         _wfile.write('HTTP/1.1 %s\r\n'%response.headerMap['status'])
         for _key, _valueList in response.headerMap.items():
@@ -503,6 +513,10 @@ if not globals().has_key('hotReload'):
         #modified for rhizome:
         response.headerMap={"status": "200 OK", "content-type": "text/html", "server": "Rhizome 0.1", "date": _date, "set-cookie": [], "content-length": 0}
 
+        # Two variables used for streaming
+        response.wfile = _wfile
+        response.sendResponse = 1
+
         if _sslKeyFile:
             request.base="https://"+request.headerMap['host']
         else:
@@ -540,7 +554,7 @@ if not globals().has_key('hotReload'):
                 if type(_stat) == type(()): # Python2.1
                     _modifTime = _stat[9]
                 else:
-                    _modifTime = _stat.st_ctime
+                    _modifTime = _stat.st_mtime
                     
                 _strModifTime = time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime(_modifTime))
 
@@ -578,7 +592,8 @@ if not globals().has_key('hotReload'):
             except: _sessionId=None
             if _sessionId:
                 # Load session data from wherever it was stored
-                _sessionData = loadSessionData(_sessionId)
+                if _sessionStorageType != 'custom': _sessionData = ramOrFileOrCookieLoadSessionData(_sessionId)
+                else: _sessionData = loadSessionData(_sessionId)
                 if _sessionData == None: _sessionId = None
                 else:
                     sessionMap, _expirationTime = _sessionData
@@ -590,10 +605,12 @@ if not globals().has_key('hotReload'):
             # Create a new sessionId if needed
             if not _sessionId:
                 sessionMap={}
-                _sessionId=_generateSessionId() 
-            sessionMap['_sessionId']=_sessionId #rhizome change
+                _sessionId=_generateSessionId()
+            #rhizome change: always set this (not conditional)
+            sessionMap['_sessionId'] = _sessionId
 
-#            response.simpleCookie[_sessionCookieName]=_sessionId #rhizome change
+#rhizome change: commented out
+#            response.simpleCookie[_sessionCookieName]=_sessionId 
 #            response.simpleCookie[_sessionCookieName]['path']='/'
 
         initNonStaticRequest()
@@ -682,11 +699,14 @@ if not globals().has_key('hotReload'):
             response.headerMap["content-type"]="text/xml"
 
         # Check response.body and set content-length if needed
-        if type(response.body)!=type(""):
+        if type(response.body) == type(u""):
+            raise "CherryError: The mask or view returned a unicode string instead of a regular string !"
+        if type(response.body) != type(""):
             raise "CherryError: The mask or view didn't return a string !"
         if response.headerMap.has_key('content-length') and response.headerMap['content-length']==0:
             response.headerMap['content-length']=len(response.body)
-        _sendResponse(_wfile)
+
+        if response.sendResponse: _sendResponse(_wfile)
 
     def _generateSessionId():
         s=''
@@ -696,7 +716,7 @@ if not globals().has_key('hotReload'):
         return sha.sha(s).hexdigest()
 
 ####cherrypy inserts the whole contents of httpThreadPoolServer.py and httpServer.py
-####which we have not modified except for address_string()
+####which we have not modified except for the last line of httpServer.py (run_server)
 
     # Server that handles thread pooling by Kevin Manley
 
@@ -707,41 +727,26 @@ if not globals().has_key('hotReload'):
     import sys
     import threading
 
-    try:
-        import timeoutsocket
-        timeoutError=timeoutsocket.Timeout
-    except ImportError: # timeoutsocket is not there by default on Python 2.1 and 2.2
-        timeoutsocket=None
-        timeoutError='DUMMY'
-
-    # Also see http://starship.python.net/crew/aahz/OSCON2001/ThreadPoolSpider.py
-    # TODO: conform to PEP8 style
-    # TODO: too_busy server override if Queue exceeds certain size?
-    # TODO: compare performance to Twisted on Win32 and Linux using ab, Apache Benchmark
-
-    SHUTDOWNREQUEST = (0,0)
-
-    if sys.platform.find("win32") > -1 and timeoutsocket:
-        import signal
-        # Make ctrl-break behave like Ctrl-C on Win32
-        signal.signal(signal.SIGBREAK, signal.default_int_handler)
+    _SHUTDOWNREQUEST = (0,0)
 
     class ServerThread(threading.Thread):
-        def __init__( self, RequestHandlerClass, requestQueue ):
-            threading.Thread.__init__( self )
+        def __init__(self, RequestHandlerClass, requestQueue, threadIndex):
+            threading.Thread.__init__(self)
             self._RequestHandlerClass = RequestHandlerClass
             self._requestQueue = requestQueue
+            self._threadIndex = threadIndex
             self.setName("RUNNING")
             
         def run(self):
+            initThread(self._threadIndex)
             #print "ServerThread %s running..." % threading.currentThread()
             while 1:
                 request, client_address = self._requestQueue.get()
-                if (request, client_address) == SHUTDOWNREQUEST:
+                if (request, client_address) == _SHUTDOWNREQUEST:
                     #print "ServerThread %s got SHUTDOWN token" % threading.currentThread()
                     return
                 #print "ServerThread %s got request from %s" % (threading.currentThread(), client_address )
-                if self.verify_request(request, client_address):            
+                if self.verify_request(request, client_address):			
                     try:
                         self.process_request(request, client_address)
                     except:
@@ -756,7 +761,7 @@ if not globals().has_key('hotReload'):
             return 1
 
         def process_request(self, request, client_address):
-            self._RequestHandlerClass(request, client_address, self)        
+            self._RequestHandlerClass(request, client_address, self)		
             self.close_request(request)
 
         def close_request(self, request):
@@ -789,42 +794,41 @@ if not globals().has_key('hotReload'):
            straightforward and simple programming model in the face of blocking
            requests (i.e. you don't have to bother with Deferreds).""" 
         def __init__(self, serverAddress, numThreads, RequestHandlerClass, ThreadClass=ServerThread):
-            self.TIMEOUT_SECS = 2
             assert(numThreads > 0)
 
-            # remid: SocketServer.TCPServer.__init__( self, serverAddress, RequestHandlerClass )
             # I know it says "do not override", but I have to in order to implement SSL support !
             SocketServer.BaseServer.__init__(self, serverAddress, RequestHandlerClass)
             if _sslKeyFile:
-                self.socket=SSL.Connection(ctx, socket.socket(self.address_family, self.socket_type))
+                self.socket=SSL.Connection(_sslCtx, socket.socket(self.address_family, self.socket_type))
             else:
                 self.socket=socket.socket(self.address_family, self.socket_type)
             self.server_bind()
             self.server_activate()
+            #initAfterBind() rhizome change
 
-            self._numThreads = numThreads       
+            self._numThreads = numThreads		
             self._RequestHandlerClass = RequestHandlerClass
             self._ThreadClass = ThreadClass
             self._requestQueue = Queue.Queue()
             self._workerThreads = []
                 
-        def createThread( self ):
-            return self._ThreadClass( self._RequestHandlerClass, self._requestQueue )
+        def createThread(self, threadIndex):
+            return self._ThreadClass(self._RequestHandlerClass, self._requestQueue, threadIndex)
                 
-        def start( self ):
+        def start(self):
             if self._workerThreads != []:
                 return
             for i in xrange(self._numThreads):
-                self._workerThreads.append( self.createThread() )       
+                self._workerThreads.append(self.createThread(i))		
             for worker in self._workerThreads:
                 worker.start()
                 
         def server_close(self):
             """Override server_close to shutdown thread pool"""
             #print "%s shutting down..." % str(self)
-            SocketServer.TCPServer.server_close( self )
+            SocketServer.TCPServer.server_close(self)
             for worker in self._workerThreads:
-                self._requestQueue.put( SHUTDOWNREQUEST )
+                self._requestQueue.put(_SHUTDOWNREQUEST)
             for worker in self._workerThreads:
                 #print "waiting for %s to exit..." % str(worker)
                 worker.join()
@@ -833,46 +837,58 @@ if not globals().has_key('hotReload'):
 
         def server_activate(self):
             """Override server_activate to set timeout on our listener socket"""
-            if timeoutsocket: self.socket.set_timeout( self.TIMEOUT_SECS )
-            SocketServer.TCPServer.server_activate( self )
+            if hasattr(self.socket, 'settimeout'): self.socket.settimeout(2)
+            elif hasattr(self.socket, 'set_timeout'): self.socket.set_timeout(2)
+            SocketServer.TCPServer.server_activate(self)
 
         def server_bind(self):
             """Override server_bind to store the server name."""
             SocketServer.TCPServer.server_bind(self)
             host, port = self.socket.getsockname()
-            self._serverName = socket.getfqdn(host)
+            if _reverseDNS: self._serverName = socket.getfqdn(host)
+            else: self._serverName = host
             self._serverPort = port
             #print "PooledThreadServer bound to %s:%s" % (self._serverName, self._serverPort)
 
+        def shutdown(self):
+            """Gracefully shutdown a server that is serve_forever()ing."""
+            self.__running = 0
+
+        def shutdownCtrlC(self):
+            self.server_close()
+
         def serve_forever(self):
-            """Handle one request at a time until doomsday."""
+            """Handle one request at a time until doomsday (or shutdown is called)."""
             if self._workerThreads == []:
                 self.start()
-            while 1:
+            self.__running = 1
+            while self.__running:
                 if not self.handle_request():
                     break
-            self.server_close()         
+            self.server_close()
             
         def handle_request(self):
             """Override handle_request to enqueue requests rather than handle
                them synchronously. Return 1 by default, 0 to shutdown the
                server."""
             try:
-                for t in threading.enumerate():
-                    if t.getName()=="NOT RUNNING": return 0
+                if _debug:
+                    for t in threading.enumerate():
+                        if t.getName()=="NOT RUNNING": return 0
                 request, client_address = self.get_request()
-            except timeoutError:
+                request.setblocking(1)
+            except _timeoutError:
                 # TODO: the only reason for the timeout is so we can notice keyboard
                 # interrupts on Win32, which don't interrupt accept() by default
                 return 1
             except KeyboardInterrupt:
-                #print "%s got shutdown request" % str(self)
+                print "<Ctrl-C> hit: shutting down"
                 return 0
             except socket.error, e:
-                print "get_request error '%s'" % str(e)
                 return 1
-            self._requestQueue.put( (request, client_address) )
+            self._requestQueue.put((request, client_address))
             return 1
+
 
 
     """
@@ -909,10 +925,17 @@ if not globals().has_key('hotReload'):
 
     """
 
+    # python2.3 has settimeout by default, but previous version can use the "timeousocket" module
+    try:
+        import timeoutsocket
+        _timeoutError = timeoutsocket.Timeout
+    except:
+        _timeoutError = ''
+
     __all__ = ["CherryHTTPRequestHandler"]
 
     import BaseHTTPServer, mimetypes, Cookie, whrandom, os.path, cPickle
-    import SocketServer
+
 
     class CherryHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
@@ -925,7 +948,7 @@ if not globals().has_key('hotReload'):
 
         """
 
-        def address_string(self):  #modified by Rhizome (cherrpy bug?)
+        def address_string(self):
             """ Try to do a reverse DNS based on [server]reverseDNS in the config file """
             if _reverseDNS: return BaseHTTPServer.BaseHTTPRequestHandler.address_string(self)
             else: return self.client_address[0]
@@ -947,21 +970,28 @@ if not globals().has_key('hotReload'):
 
         def do_GET(self):
             """Serve a GET request."""
+            request.method = 'GET'
             _parseFirstLine(self.raw_requestline)
             self.cook_headers()
             _doRequest(self.wfile)
 
         def do_HEAD(self): # TBC: head is not implemented yet
             """Serve a HEAD request."""
+            request.method = 'HEAD'
             _parseFirstLine(self.raw_requestline)
             self.cook_headers()
             _doRequest(self.wfile)
 
         def do_POST(self):
             """Serve a POST request."""
+            request.method = 'POST'
             _parseFirstLine(self.raw_requestline)
             self.cook_headers()
-            _parsePostData(self.rfile)
+            _parseIt = 1
+            try: _parseIt = int(configFile.get('server', 'parsePostData'))
+            except: pass
+            if _parseIt: _parsePostData(self.rfile)
+            else: request.rfile = self.rfile
             _doRequest(self.wfile)
 
         def do_HOTRELOAD(self):
@@ -993,14 +1023,13 @@ if not globals().has_key('hotReload'):
                                 self.log_date_time_string(),
                                 format%args))
 
-
     # I'm a bit confused here: "some" sockets have a "sendall" method, some don't.
     # From my testing, the following sockets do have a "sendall" method:
-    #   - Regular sockets in Python2.2 or higher
-    #   - SSL sockets in pyOpenSSL-0.5.1 on Linux
+    #	- Regular sockets in Python2.2 or higher
+    #	- SSL sockets in pyOpenSSL-0.5.1 on Linux
     # The following sockets don't have a "sendall" method
-    #   - Regular sockets in Python2.1 or lower
-    #   - SSL sockets in pyOpenSSL-0.5.1 on Windows (doh)
+    #	- Regular sockets in Python2.1 or lower
+    #	- SSL sockets in pyOpenSSL-0.5.1 on Windows (doh)
     # So I'm just taking advantage of the sendall method when it's there. Otherwise, I'm using the good old way of doing it with "send" (but I'm afraid this might be blocking in some cases)
 
     if sys.platform[:4]!="java":
@@ -1036,11 +1065,12 @@ if not globals().has_key('hotReload'):
 
         def process_request(self, request, client_address):
             """Start a new thread to process the request."""
-            import threading
-            for t in threading.enumerate():
-                if t.getName() == "NOT RUNNING": os._exit(-1)
+            if _debug:
+                for t in threading.enumerate():
+                    if t.getName() == "NOT RUNNING":
+                        os._exit(-1)
             t = threading.Thread(target = self.process_request_thread, args = (request, client_address))
-            t.setName("RUNNING")
+            if _debug: t.setName("RUNNING")
             t.start()
 
     class CherryHTTPServer(BaseHTTPServer.HTTPServer):
@@ -1048,37 +1078,66 @@ if not globals().has_key('hotReload'):
             # I know it says "do not override", but I have to in order to implement SSL support !
             SocketServer.BaseServer.__init__(self, server_address, RequestHandlerClass)
             if _sslKeyFile:
-                self.socket=SSL.Connection(ctx, socket.socket(self.address_family, self.socket_type))
+                self.socket=SSL.Connection(_sslCtx, socket.socket(self.address_family, self.socket_type))
             else:
                 self.socket=socket.socket(self.address_family, self.socket_type)
             self.server_bind()
             self.server_activate()
+            #initAfterBind() rhizome change
+
+        def server_activate(self):
+            """Override server_activate to set timeout on our listener socket"""
+            if hasattr(self.socket, 'settimeout'): self.socket.settimeout(2)
+            elif hasattr(self.socket, 'set_timeout'): self.socket.set_timeout(2)
+            BaseHTTPServer.HTTPServer.server_activate(self)
 
         def server_bind(self):
             # Removed getfqdn call because it was timing out on localhost when calling gethostbyaddr
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.socket.bind(self.server_address)
 
-    def run_server(HandlerClass, ServerClass, _socketPort, _socketFile, protocol="HTTP/1.1"):
-        """Run the HTTP request handler class."""
+        def get_request(self):
+            # With Python 2.3 it seems that an accept socket in timeout (nonblocking) mode
+            #  results in request sockets that are also set in nonblocking mode. Since that doesn't play
+            #  well with makefile() (where wfile and rfile are set in SocketServer.py) we explicitly set
+            #  the request socket to nonblocking
+            request, client_address = self.socket.accept()
+            request.setblocking(1)
+            return request, client_address
 
-        if _socketPort: server_address=('', _socketPort)
-        else:
+        def handle_request(self):
+            """Override handle_request to trap timeout exception."""
+            try:
+                BaseHTTPServer.HTTPServer.handle_request(self)
+            except _timeoutError:
+                # The only reason for the timeout is so we can notice keyboard
+                # interrupts on Win32, which don't interrupt accept() by default
+                return 1
+            except KeyboardInterrupt:
+                print "<Ctrl-C> hit: shutting down"
+                sys.exit(0)
+
+        def shutdownCtrlC(self):
+            self.shutdown()
+
+    def run_server(HandlerClass, ServerClass, server_address, _socketFile):
+        """Run the HTTP request handler class."""
+        global __myCherryHTTPServer
+        if _socketFile:
             try: os.unlink(_socketFile) # So we can reuse the socket
             except: pass
             server_address=_socketFile
-        HandlerClass.protocol_version = protocol
         if _threadPool>1:
-            httpd = ServerClass(server_address, _threadPool, HandlerClass)
+            __myCherryHTTPServer = ServerClass(server_address, _threadPool, HandlerClass)
         else:
-            httpd = ServerClass(server_address, HandlerClass)
+            __myCherryHTTPServer = ServerClass(server_address, HandlerClass)
         if _socketFile:
             try: os.chmod(_socketFile, 0777) # So everyone can access the socket
             except: pass
 
         if _sslKeyFile: servingWhat="HTTPS"
         else: servingWhat="HTTP"
-        if _socketPort: onWhat="socket port: %s"%_socketPort
+        if _socketPort: onWhat="socket: ('%s', %s)" % (_socketHost, _socketPort)
         else: onWhat="socket file: %s"%_socketFile
         logMessage("Serving %s on %s"%(servingWhat, onWhat))
 
@@ -1088,47 +1147,66 @@ if not globals().has_key('hotReload'):
                 logMessage("Forking a kid")
                 if not os.fork():
                     # Kid
-                    httpd.serve_forever()
+                    initProcess(i)
+                    try: __myCherryHTTPServer.serve_forever()
+                    except KeyboardInterrupt:
+                        print "<Ctrl-C> hit: shutting down"
+                        __myCherryHTTPServer.shutdownCtrlC()
         else:
-            httpd.serve_forever()
+            try: __myCherryHTTPServer.serve_forever()
+            except KeyboardInterrupt:
+                print "<Ctrl-C> hit: shutting down"
+                __myCherryHTTPServer.shutdownCtrlC()
 
-    # If SSL is used, perform some initialization
-    if _sslKeyFile:
-        # Setup SSL mode
-        ctx=SSL.Context(SSL.SSLv23_METHOD)
-        # ctx.set_options(SSL.OP_NO_SSLv2) # Doesn't work on Windows
-        ctx.use_privatekey_file(_sslKeyFile)
-        ctx.use_certificate_file(_sslCertificateFile)
+    def run(argv):
+        #mainInit(argv) #rhizome change
+        if not globals().has_key('hotReload'):
+            # If SSL is used, perform some initialization
+            if _sslKeyFile:
+                # Setup SSL mode
+                global _sslCtx
+                _sslCtx=SSL.Context(SSL.SSLv23_METHOD)
+                # _sslCtx.set_options(SSL.OP_NO_SSLv2) # Doesn't work on Windows
+                _sslCtx.use_privatekey_file(_sslKeyFile)
+                _sslCtx.use_certificate_file(_sslCertificateFile)
+            
+            # If sessions are stored in files and we use threading, we need a lock on the file
+            if (_threadPool>1 or _threading) and _sessionStorageType == 'file':
+                global _sessionFileLock
+                import threading
+                _sessionFileLock = threading.RLock()
+            
+            import SocketServer
+            if _socketFile:
+                # AF_UNIX socket
+                if _forking:
+                    class MyCherryHTTPServer(SocketServer.ForkingMixIn,CherryHTTPServer): address_family=socket.AF_UNIX
+                elif _threading:
+                    import threading
+                    class MyCherryHTTPServer(CherryThreadingMixIn,CherryHTTPServer): address_family=socket.AF_UNIX
+                else:
+                    class MyCherryHTTPServer(CherryHTTPServer): address_family=socket.AF_UNIX
+            else:
+                # AF_INET socket
+                if _forking:
+                    class MyCherryHTTPServer(SocketServer.ForkingMixIn,CherryHTTPServer): pass
+                elif _threading:
+                    class MyCherryHTTPServer(CherryThreadingMixIn,CherryHTTPServer):pass
+                elif _threadPool>1:
+                    MyCherryHTTPServer=PooledThreadServer
+                else:
+                    MyCherryHTTPServer=CherryHTTPServer
+        
+            MyCherryHTTPServer.request_queue_size = _socketQueueSize
+            run_server(CherryHTTPRequestHandler, MyCherryHTTPServer, (_socketHost, _socketPort), _socketFile)
 
-    # If sessions are stored in files and we use threading, we need a lock on the file
-    if (_threadPool>1 or _threading) and _sessionStorageType == 'file':
-        global _sessionFileLock
-        _sessionFileLock = threading.RLock()
-
-    if _socketFile:
-        # AF_UNIX socket
-        if _forking:
-            class MyCherryHTTPServer(SocketServer.ForkingMixIn,CherryHTTPServer): address_family=socket.AF_UNIX
-        elif _threading:
-            class MyCherryHTTPServer(CherryThreadingMixIn,CherryHTTPServer): address_family=socket.AF_UNIX
-        else:
-            class MyCherryHTTPServer(CherryHTTPServer): address_family=socket.AF_UNIX
-    else:
-        # AF_INET socket
-        if _forking:
-            class MyCherryHTTPServer(SocketServer.ForkingMixIn,CherryHTTPServer): pass
-        elif _threading:
-            class MyCherryHTTPServer(CherryThreadingMixIn,CherryHTTPServer):pass
-        elif _threadPool>1:
-            MyCherryHTTPServer=PooledThreadServer
-        else:
-            MyCherryHTTPServer=CherryHTTPServer
-    MyCherryHTTPServer.request_queue_size = _socketQueueSize
+    def shutdown():
+        __myCherryHTTPServer.shutdown()
 
 ###end cherrypy insert
 
 #from cherrypy.py:
-def saveSessionData(sessionId, sessionData):
+def ramOrFileOrCookieSaveSessionData(sessionId, sessionData):
     # Save session to file if needed
     if _sessionStorageType=='file':
         fname=os.path.join(_sessionStorageFileDir,sessionId)
@@ -1143,9 +1221,30 @@ def saveSessionData(sessionId, sessionData):
         # Update expiration time
         sessionMap = sessionData[0]
         _sessionMap[sessionId]=(sessionMap, time.time()+_sessionTimeout*60)
+    elif _sessionStorageType == "cookie":
+        global _SITE_KEY_
+        if not globals().has_key('_SITE_KEY_'):
+            # Get site key from config file or compute it
+            try: _SITE_KEY_ = configFile.get('server','siteKey')
+            except:
+                _SITE_KEY_ = ''
+                for i in range(30):
+                    _SITE_KEY_ += whrandom.choice(string.letters)
+        # Update expiration time
+        sessionMap = sessionData[0]
+        _sessionData = (sessionMap, time.time()+_sessionTimeout*60)
+        _dumpStr = cPickle.dumps(_sessionData)
+        try: _dumpStr = zlib.compress(_dumpStr)
+        except: pass # zlib is not available in all python distros
+        _dumpStr = binascii.hexlify(_dumpStr) # Need to hexlify it because it will be stored in a cookie
+        response.simpleCookie['CSession']=_dumpStr
+        response.simpleCookie['CSession-sig']=md5.md5(_dumpStr+_SITE_KEY_).hexdigest()
+        response.simpleCookie['CSession']['path']='/'
+        response.simpleCookie['CSession']['max-age']=3600
+        response.simpleCookie['CSession-sig']['path']='/'
+        response.simpleCookie['CSession-sig']['max-age']=3600
 
-#todo: these files are never deleted?
-def loadSessionData(sessionId):
+def ramOrFileOrCookieLoadSessionData(sessionId):
     _now=time.time()
     global sessionMap
     # Check if this sessionId is valid (it exists and has not expired)
@@ -1166,6 +1265,24 @@ def loadSessionData(sessionId):
                 _sessionFileLock.release()
             return _sessionData
         else: return None
+    elif _sessionStorageType == "cookie":
+        global _SITE_KEY_
+        if not globals().has_key('_SITE_KEY_'):
+            try: _SITE_KEY_ = configFile.get('server','siteKey')
+            except:
+                return None
+        if request.simpleCookie.has_key('CSession') and request.simpleCookie.has_key('CSession-sig'):
+            _data = request.simpleCookie['CSession'].value
+            _sig  = request.simpleCookie['CSession-sig'].value
+            if md5.md5(_data + _SITE_KEY_).hexdigest() == _sig:
+                try:
+                    _dumpStr = binascii.unhexlify(_data)
+                    try: _dumpStr = zlib.decompress(_dumpStr)
+                    except: pass # zlib is not available in all python distros
+                    _dumpStr = cPickle.loads(_dumpStr)
+                    return _dumpStr
+                except: pass
+        return None
 
 def start_server(serve, record = False, requestRecordPath = 'debug-wiki.pkl'):
     global root, recordRequests, requestRecordFilePath
@@ -1173,7 +1290,7 @@ def start_server(serve, record = False, requestRecordPath = 'debug-wiki.pkl'):
     recordRequests = record
     requestRecordFilePath = requestRecordPath
     try:
-        run_server(CherryHTTPRequestHandler,MyCherryHTTPServer,_socketPort,_socketFile)
+        run([]) #todo? integrate better
     finally:
         if requestRecordFilePath and requestsRecord:            
             requestRecordFile = file(requestRecordFilePath, 'w')

@@ -4,6 +4,8 @@ def _req_default_save(self, **kw):
     wikiname = kw['itemname'] 
     contents = kw['file'] or kw['contents']
     title = kw['title']
+    label = ''#kw['label']
+    authtoken = kw['authtoken']
     #sha = utils.shaDigestString(contents)
     itemURI = generateBnode()
     nameURI = self.BASE_MODEL_URI + filter(lambda c: c.isalnum() or c in '_-./', wikiname) #note filter: URI fragment might not match wikiname
@@ -41,11 +43,6 @@ def _req_default_save(self, **kw):
     kw['patch'] = patch
     #note: we just compared the raw content, so any encoding has to happen after diff-ing
 
-    #if contentLength > MAX_LITERAL; save as file, blah blah
-    #    contentRef = <a:ContentLocation rdf:about='file://filepath' />
-    #else:
-    contentRef = "<xu:value-of select='$contents'/>"
-
     format = kw['format']
     if not format: 
         format = 'http://rx4rdf.sf.net/ns/wiki#item-format-binary'  #unnecessary, but for now always have a format
@@ -61,6 +58,23 @@ def _req_default_save(self, **kw):
             patchRefURI = encodedURI#we want our patch to reference the raw content (thus the innermost content resource)
             contents = base64.encodestring(contents)
 
+    contentLength = len(contents)            
+    if self.MAX_MODEL_LITERAL > -1 and contentLength > self.MAX_MODEL_LITERAL:  #save as file
+        import os.path
+        filepath = self.SAVE_DIR + wikiname
+        try: 
+           os.makedirs(self.SAVE_DIR)
+        except OSError: pass #dir might already exist
+        f = file(filepath, 'wb')
+        f.write(contents)
+        f.close()
+        #we assume SAVE_DIR is a relative path rooted in one of the directories on the RHIZOME_PATH
+        contentRef = "<rdf:Description rdf:about='path:" + filepath+"' />"
+        contentResource = "<a:ContentLocation rdf:about='path:" + filepath+"' />"
+    else:
+        contentRef = "<xu:value-of select='$contents'/>"
+        contentResource = ""
+
     kw['contents'] = contents
         
     disposition = kw['disposition']    
@@ -71,6 +85,7 @@ def _req_default_save(self, **kw):
     '''<xu:modifications version="1.0" xmlns:xu="http://www.xmldb.org/xupdate"
 		    xmlns="http://rx4rdf.sf.net/ns/archive#" xmlns:a="http://rx4rdf.sf.net/ns/archive#"
 			xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" xmlns:wf='http://rx4rdf.sf.net/ns/racoon/xpath-ext#'
+			xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
 			xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >
 
     <xu:if test='number($startTime) &lt; /*[wiki:name/text()="%(wikiname)s"]/a:last-modified/text()'>
@@ -109,9 +124,16 @@ def _req_default_save(self, **kw):
     <xu:if test='wf:get-metadata("minor_edit") and /*[wiki:name/text()="%(wikiname)s"]/wiki:revisions/*'>
     <xu:remove select='/*[wiki:name/text()="%(wikiname)s"]/wiki:revisions/*[last()]'/>
     </xu:if>
+
+    <!-- set access control: remove previous, add selected, if any -->
+    <xu:remove select='/*[wiki:name="%(wikiname)s"]/auth:needs-token'/>
+    <xu:if test="$authtoken"> 
+       <xu:append select='/*[wiki:name="%(wikiname)s"]'>    
+         <auth:needs-token><xu:attribute name="rdf:resource"><xu:value-of select="$authtoken"/></xu:attribute></auth:needs-token>
+       </xu:append>
+    </xu:if>
     
     <!-- add a new revision -->
-    <!-- todo: add <wiki:summary> <wiki:created-by> -->
     <xu:append select='/'>
         <xu:if test="string('%(encodedURI)s')"> 
             <a:ContentTransform rdf:about='%(encodedURI)s'>
@@ -127,6 +149,7 @@ def _req_default_save(self, **kw):
             <xu:if test='not(string("%(encodedURI)s"))'>%(contentRef)s</xu:if>
         </a:contents>
         </a:ContentTransform>
+        %(contentResource)s
     
         <wiki:Item rdf:about='%(itemURI)s'>
             <a:contents><rdf:Description rdf:about='%(formatTransformURI)s' /></a:contents>
@@ -137,6 +160,9 @@ def _req_default_save(self, **kw):
             <xu:if test='$title'>
                 <wiki:title>%(title)s</wiki:title>
             </xu:if>
+            <!--<xu:if test='$label'>
+                <wiki:has-label>%(label)s</wiki:has-label>
+            </xu:if> -->
             <a:created-on>%(curtime).3f</a:created-on>
             <wiki:created-by><xu:attribute name="rdf:resource"><xu:value-of select="$_user"/></xu:attribute></wiki:created-by>
         </wiki:Item>        	    

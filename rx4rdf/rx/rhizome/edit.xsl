@@ -8,9 +8,11 @@
 		xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
 		xmlns:f = 'http://xmlns.4suite.org/ext'
 		xmlns:response-header = 'http://rx4rdf.sf.net/ns/racoon/http-response-header#'
-		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header" >
+		xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
+		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header auth" >
 <xsl:output method='html' indent='no' />
 <xsl:param name="_name" />
+<xsl:param name="_user" />
 <xsl:param name="action" />
 <xsl:variable name='target'>
      <xsl:choose>
@@ -22,7 +24,8 @@
 <!-- this edit page is always html, not the content's mimetype -->
 <xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />
 
-<xsl:variable name='item' select="/*[wiki:name/text()=$target]/wiki:revisions/*[last()]" />
+<xsl:variable name='namedContent' select="/*[wiki:name/text()=$target]" />
+<xsl:variable name='item' select="$namedContent/wiki:revisions/*[last()]" />
 
 <xsl:variable name="contents">
      <xsl:choose>
@@ -74,7 +77,7 @@
             </xsl:call-template>
 	</xsl:for-each>
 	</select>
-    <br />Output Document Type 
+    &#xa0;Output Document Type 
 	<select name="doctype" size="1" width="100">
 	    <xsl:call-template name="add-option" >
 	        <xsl:with-param name="text">N/A</xsl:with-param>
@@ -91,7 +94,7 @@
             </xsl:call-template>
 	</xsl:for-each>
 	</select>    
-	<br />Item Type:
+	&#xa0;Item Type:
 	<select name="disposition" size="1" width="100">	
         <xsl:for-each select="/wiki:ItemDisposition">
             <xsl:variable name="i" select="./@rdf:about" />
@@ -102,6 +105,21 @@
             </xsl:call-template>
 	</xsl:for-each>
 	</select>
+	<br />Sharing
+	<select name="authtoken" size="1" width="100">	
+	    <xsl:variable name="tokens" select="$_user/auth:has-token/* | $_user/auth:has-role/*/auth:has-token/*" />
+	    <xsl:call-template name="add-option" >
+	        <xsl:with-param name="text">Public</xsl:with-param>
+	        <xsl:with-param name="value" />
+	    </xsl:call-template>		
+        <xsl:for-each select="$tokens">
+            <xsl:call-template name="add-option" >
+                <xsl:with-param name="text" select="rdfs:label/text()" />
+                <xsl:with-param name="value" select="." />
+                <xsl:with-param name="selected" select=". = ($namedContent/auth:needs-token/* | $namedContent/auth:member-of/*/auth:needs-token/*)" />
+            </xsl:call-template>
+	    </xsl:for-each>
+	</select>	
 	<br />
 	<input TYPE="checkbox" NAME="minor_edit" VALUE="on" />This change is a minor edit.<br/>
 	<input TYPE="submit" NAME="save" VALUE="Save" />
@@ -111,6 +129,7 @@
 <a href="RhizML">RhizML</a> Formatting Quick Reference (see <a href="TextFormattingRules">TextFormattingRules</a> for more info)
 <pre class="code">
 ----             Horizontal ruler
+                 Blank line starts a new paragraph
 [text|ann; link] Create a hyperlink. where "link" can be either an internal 
 		 page name or an external link (e.g http://).  
 		 Both annotation and text may be omitted.
@@ -118,7 +137,8 @@
                  for deeper indentations.
 #                Make a numbered list (must be in first column). Use more (##, ###) 
                  for deeper indentations.
-:                Indent line
+:                Indent line (must be in first column). Use more (::, ::) 
+                 for deeper indentations.
 ::		 (on a line by itself) Start (or end) a block quote.
 +term=def        Defines 'term' with 'def'.  
 !, !!, !!!       Start a line with an exclamation mark (!) to make a heading. 
@@ -127,8 +147,9 @@ __bold__         Makes text bold.
 //italic//       Makes text in italics (notice that these are single quotes ('))
 ^^monospace^^    Makes text in monospaced font.
 |text|more text| Makes a table. Double bars for a table heading.
-\                If in-line: Use to escape these special formatting characters. 
-                 At end of line: Treat next line as continuation of this line.                               
+~~               Creates a line break without starting a new paragraph
+\                If in-line: Prints the next formatting character as is. 
+                 At end of line: Treat next line as continuation of this line.  
 </pre>
 </xsl:template>
 </xsl:stylesheet>

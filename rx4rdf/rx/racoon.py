@@ -237,6 +237,7 @@ class Requestor(object):
         
     def invokeEx__(self, name, kw):
         #print 'invoke', kw
+        kw.update( self.server.requestContext )
         kw['_name']=name
         result = self.server.runActions(self.triggerName, kw) 
         if result is not None: #'cause '' is OK
@@ -399,8 +400,16 @@ class Root(object):
 
     DEFAULT_CONFIG_PATH = 'wiki-default-config.py'
     lock = None
+                
+    requestContext = utils.createThreadLocalProperty('__requestContext',
+        doc='variables you want made available to anyone during this request (e.g. the session)')
+
+    import MRUCache
+    import Ft.Xml.XPath
+    expCache = MRUCache.MRUCache(200, XPath.Compile)
     
     def __init__(self,argv):
+        self.requestContext = {}
         configpath = self.DEFAULT_CONFIG_PATH
         self.source = None
         i = 0
@@ -423,7 +432,7 @@ class Root(object):
                     self.source = arg
                 break
             i += 1
-        argsForConfig = argv[i+1:]
+        argsForConfig = argv[i+1:]        
         self.cmd_usage = DEFAULT_cmd_usage
         self.loadConfig(configpath, argsForConfig)
         self.loadModel()
@@ -488,6 +497,8 @@ class Root(object):
         initConstants( ['ROOT_PATH'], '/')
         assert self.ROOT_PATH[0] == '/', "ROOT_PATH must start with a '/'"
         initConstants( ['BASE_MODEL_URI'], self.BASE_MODEL_URI)
+        initConstants( ['MAX_MODEL_LITERAL'], -1)
+        self.SAVE_DIR = kw.get('SAVE_DIR', 'content/')
         self.PATH = kw.get('PATH', self.PATH)
         self.SECURE_FILE_ACCESS= kw.get('SECURE_FILE_ACCESS', True)        
         self.cmd_usage = DEFAULT_cmd_usage + kw.get('cmd_usage', '')    
@@ -602,14 +613,14 @@ class Root(object):
         return vars, extFuncs
 
     def evalXPath(self, xpath,  vars=None, extFunctionMap = None, node = None):
-        #print 'eval node', node
+        #print 'eval node', node        
         try:
             if not vars:
                 context = node or self.rdfDom 
                 vars = { (None, '_context'): [ context ] } #we also set this in doActions()
-            return evalXPath(self.rdfDom, xpath, nsMap = self.nsMap, vars=vars, extFunctionMap = extFunctionMap , node = node)
+            return evalXPath(self.rdfDom, xpath, nsMap = self.nsMap, vars=vars, extFunctionMap = extFunctionMap , node = node, expCache = self.expCache)
         except (RuntimeException), e:
-            if e.errorCode == RuntimeException.UNDEFINED_VARIABLE:
+            if e.errorCode == RuntimeException.UNDEFINED_VARIABLE:                            
                 log.debug(e.message) #undefined variables are ok
             else:
                 raise
@@ -634,7 +645,7 @@ class Root(object):
                 #print exp
                 result = self.evalXPath(exp, vars=vars, extFunctionMap = extFunMap, node = contextNode)
                 if result:
-                    if name == '_resource' and isinstance(result, type([])):
+                    if name == '_resource' and isinstance(result, type([])): #todo: fix this hack to work around xlst bug
                         result = result[0]
                     kw[name] = result
                     break
@@ -665,7 +676,7 @@ class Root(object):
                 if result: #todo: != []: #if not equal empty nodeset (empty strings ok)
                     if not action.action: #if no action is defined this action resets the contextNode instead
                         contextNode = result
-                        #print 'context ', result
+                        log.debug('context changed: %s', result)
                         assert action.matchFirst #why would you want to evalute every query in this case?
                         break;
                     else:
@@ -771,8 +782,8 @@ class Root(object):
         sys_stdout = sys.stdout
         sys.stdout = output
         try:        
-            #exec '%s' % `cmds` in globals(), kw
-            exec cmds.strip()+'\n' in globals(), kw
+            #exec only likes unix-line feeds
+            exec cmds.strip().replace('\r', '\n')+'\n' in globals(), kw
             contents = output.getvalue()
         except:
             sys.stdout = sys_stdout
@@ -854,9 +865,18 @@ class Root(object):
             contentType=mimetypes.types_map.get(ext, "text/html")
             kw['_response'].headerMap['content-type']=contentType
 
-        result = self.runActions('handle-request', kw) 
-        if result is not None: #'cause '' is OK
-            return result
+        try:
+            rc = {}
+            rc['_session']=kw['_session']
+            #todo: probably should put request.simpleCookie in the requestContext somehow too
+            self.requestContext= rc
+
+            result = self.runActions('handle-request', kw)
+            
+            if result is not None: #'cause '' is OK
+                return result
+        finally:
+            self.requestContext = {}
         
         kw['_response'].headerMap['status'] = 404 #not found
         return self._default_not_found(kw)
@@ -929,8 +949,6 @@ if __name__ == '__main__':
         else:
             rootArgs.append( sys.argv[i] )
             
-    root = Root(rootArgs)            
-
     if '-l' in mainArgs:
         try:
             logConfig=mainArgs[mainArgs.index("-l")+1]
@@ -951,7 +969,9 @@ if __name__ == '__main__':
     else: #set defaults        
         logging.BASIC_FORMAT = "%(asctime)s %(levelname)s %(name)s:%(message)s" 
         logging.basicConfig()
-        
+
+    root = Root(rootArgs)
+       
     if '-h' in mainArgs or '--help' in mainArgs:
         #print DEFAULT_cmd_usage,'[config specific options]'
         print root.cmd_usage

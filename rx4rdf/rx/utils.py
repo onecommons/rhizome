@@ -37,6 +37,54 @@ def cond(ifexp, thenexp, elseexp = lambda: None):
     else:
         return elseexp()
 
+def createThreadLocalProperty(name, fget=True, fset=True, fdel=True, doc=None, initAttr=False, initValue=None):
+    '''
+    usage:
+      class foo(object):
+         aThreadLocalAttribute = utils.createThreadLocalProperty('__aThreadLocalAttribute')
+
+    A KeyError will be thrown when attempting to get an attribute that has not been set in the current thread.
+    For example, if an attribute is set in __init__() and then retrieved in another thread.
+    To avoid this, set initAttr to True, which will set the attribute value to initValue by default.
+    
+    Deleting an attribute will delete it for all threads.
+    '''
+    import thread
+    
+    def getThreadLocalAttr(self):    
+        attr = getattr(self, name, None)
+        if attr is None:
+            attr = {}
+            setattr(self, name, attr)
+        if initAttr:            
+            return attr.setdefault(thread.get_ident(), initValue)
+        else:
+            return attr[thread.get_ident()]
+    
+    def setThreadLocalAttr(self, value):        
+        attr = getattr(self, name, None)
+        if attr is None:
+            attr = {}
+            setattr(self, name, attr)            
+        attr[thread.get_ident()] = value
+
+    if fget:
+        fget = getThreadLocalAttr
+    else:
+        fget = None
+
+    if fset:
+        fset = setThreadLocalAttr
+    else:
+        fset = None
+
+    if fdel:
+        fdel = lambda self: delattr(self, name)
+    else:
+        fdel = None
+        
+    return property(fget, fset, fdel, doc)
+
 def htmlQuote(data):
     return data.replace('&','&amp').replace('<','&lt;').replace('>','&gt;')
 
@@ -86,7 +134,7 @@ def walkDir(path, fileFunc, *funcArgs, **kw):
 ##            filefuncArgs = () #to pass None as arguement pass in (None, )            
     assert S_ISDIR( os.stat(path)[ST_MODE] )
 
-    def _walkDir(path, funcArgs, kw):
+    def _walkDir(path, recurse, funcArgs, kw):
         '''recursively descend the directory rooted at dir
         '''
         for f in os.listdir(path):
@@ -95,11 +143,12 @@ def walkDir(path, fileFunc, *funcArgs, **kw):
             if S_ISDIR(mode):
                 # It's a directory, recurse into it
                 if recurse:
+                    recurse -= 1
                     if not dirFunc:
-                        _walkDir(pathname, funcArgs)
+                        _walkDir(pathname, recurse, funcArgs, kw)
                     else:
                         dirFunc(pathname, lambda *args, **kw:
-                                _walkDir(pathname, args, **kw), *funcArgs, **kw)   
+                                _walkDir(pathname, recurse, args, kw), *funcArgs, **kw)   
             elif S_ISREG(mode):
                 if fileFunc:
                     fileFunc(pathname, f, *funcArgs, **kw)
@@ -109,15 +158,16 @@ def walkDir(path, fileFunc, *funcArgs, **kw):
 
     if kw.has_key('recurse'):
         recurse = kw['recurse']
+        assert recurse >= 0
         del kw['recurse']
     else:
-        recurse = True        
+        recurse = 0xFFFFFF
     dirFunc = kw.get('dirFunc')
     if not dirFunc:
-        _walkDir(path, funcArgs, kw)
+        _walkDir(path, recurse, funcArgs, kw)
     else:
         del kw['dirFunc']
-        return dirFunc(path, lambda *args, **kw: _walkDir(path, args, kw), *funcArgs, **kw)
+        return dirFunc(path, lambda *args, **kw: _walkDir(path, recurse, args, kw), *funcArgs, **kw)
 
 class SLListIter(object):
     def __init__(self, sllist):
@@ -387,9 +437,21 @@ class Res(dict):
             'rdfs' : 'http://www.w3.org/2000/01/rdf-schema#' }
 
     def __init__(self, uri, nsMap = None):
-        self.uri = uri
         if nsMap is not None:
             self.nsMap = nsMap
+        self.uri = self.getURI(uri)
+
+    def __eq__(self, other):
+        return self.uri == other.uri
+
+    def __ne__(self, other):
+        return self.uri != other.uri
+    
+    def __cmp__(self, other):
+        return cmp(self.uri, other.uri)
+
+    def __hash__(self):
+        return hash(self.uri, other.uri)        
 
     def __getitem__(self, key):
         return super(Res, self).__getitem__(self.getURI(key))
@@ -404,6 +466,8 @@ class Res(dict):
         return super(Res, self).__contains__(self.getURI(key))
 
     def getURI(self, key):
+        if key.startswith('_:'):
+            return key #its a bNode
         index = key.find(':')
         if index == -1: #default ns
             prefix = ''
@@ -415,20 +479,48 @@ class Res(dict):
             return self.nsMap[prefix] + local 
         else:#otherwise assume its a uri
             return key
+
+    def toTriplesDeep(self):
+        t = ''
+        curlist = [ self ]
+        done = [ self ]
+        while curlist:
+            #print [x.uri for x in reslist], [x.uri for x in done]
+            res = curlist.pop()
+            t2, reslist = res.toTriples(done)
+            done.extend(reslist)
+            curlist.extend(reslist)
+            t += t2
+        return t
         
-    def toTriples(self):
-        s = ''
+    def toTriples(self, doneList = None):
+        triples = ''
+        reslist = []
+        if not self.uri.startswith('_:'):
+            s = '<' + self.uri + '>'
+        else:
+            s = self.uri
         for p, v in self.items():
+            if not p.startswith('_:'):
+                p = '<' + p + '>'
             if not isinstance(v, (type(()), type([])) ):
-                v = (v)
-            for o in v:
-                s += '<' + self.uri + '> <' + p + '> '
+                v = (v,)
+            for o in v:                                    
+                triples += s + ' ' + p
                 if isinstance(o, Res):
-                    s += '<'+ o.uri + '>. \n'
-                else:
+                    if o.uri.startswith('_:'):
+                        triples += ' '+ o.uri + '. \n'
+                    else:
+                        triples += ' <'+ o.uri + '>. \n'                        
+                    if doneList is not None and o not in doneList:
+                        reslist.append(o)
+                else: #todo: datatype, lang
                     escaped = o.replace('\\', r'\\').replace('\"', r'\"').replace('\n', r'\n').replace('\r', r'\r').replace('\t', r'\t')
-                    s += '"' + escaped.encode('utf8') + '" .\n'
-        return s
+                    triples += ' "' + escaped.encode('utf8') + '" .\n'
+        if doneList is None:
+            return triples
+        else:
+            return triples, reslist
     
 class InterfaceDelegator:
     '''assumes only methods will be called on this object'''
@@ -454,3 +546,4 @@ class Singleton(type):
         if cls.instance is None:
             cls.instance=super(Singleton,cls).__call__(*args,**kw)
         return cls.instance
+
