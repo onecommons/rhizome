@@ -46,4 +46,4 @@ See the [Rhizome Manual] for general documentation.
 For more technical details see ^^rhizome/rhizome-config.py^^ -- the core behavior of Rhizome is defined in there and the comments should be useful to read. Also, see the pages on [Raccoon].
 
 !Status
-Rhizome's young but it can run small-scale websites (such as the this [one|about]). See [RhizomeStatus] for more details.
+Rhizome's young but it can run small-scale websites (such as this [one|about]). See [RhizomeStatus] for more details.

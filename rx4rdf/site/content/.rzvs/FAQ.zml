@@ -23,3 +23,9 @@ This can happen if, after recently saving an item, you pressed the back button i
 I've added my own namespace prefixes to the ^^nsMap^^ config variable but when I try to use it with Rhizome's search form I get an undefined prefix error?
 <   answer:
 Since the XPath query is executed in the search.xsl page, it only uses the namespaces declared in that stylesheet, so unfortunately you'll need to update search.xsl to add your namespace declarations.
+<  faq:
+<   question:
+When I try to view a XSLT page I created I get a "Key Error: '_contents'" error message.
+<   answer:
+Content created using the "XSLT" Item Format is expecting to transform content from another page (as determined by metadata properties such as ^^wiki:handlea-doctype^^ -- see the [Rhizome Manual] for more details). If you have a stylesheet that needs no source document set its Item Type to "RxSLT" -- in that case the source "document" is the RDF model, but that shouldn't make a difference to your stylesheet.
+
