@@ -62,10 +62,15 @@ $Id$
           <font size="-2">
             <xsl:for-each select="header/authors/person">
               <xsl:choose>
-                <xsl:when test="position()=1">by&#160;</xsl:when>
+                <xsl:when test="position()=1"></xsl:when>
                 <xsl:otherwise>,&#160;</xsl:otherwise>
               </xsl:choose>
-              <xsl:value-of select="@name"/>
+              <xsl:if test='@email'>
+                <a href="mailto:{@email}"><xsl:value-of select="@name"/></a>
+              </xsl:if>
+              <xsl:if test='not(@email)'>              
+                <xsl:value-of select="@name"/>
+              </xsl:if>
             </xsl:for-each>
           </font>
         </p>
@@ -278,4 +283,34 @@ $Id$
       <xsl:apply-templates/>
     </xsl:copy>
   </xsl:template>
-</xsl:stylesheet>
+
+<!-- ====================================================================== -->
+<!-- bibliography (taken from spec2html.xsl) -->
+<!-- ====================================================================== -->
+
+ <xsl:template match="bl">
+  <ul>
+   <xsl:apply-templates/>
+  </ul>
+ </xsl:template>
+
+ <xsl:template match="bi">
+  <li>
+   <b>
+    <a name="{@name}"/>
+    <xsl:text>[</xsl:text>
+     <a href="{@href}"><xsl:value-of select="@name"/></a>
+    <xsl:text>]</xsl:text>
+   </b>
+   <xsl:text> &quot;</xsl:text>
+   <a href="{@href}"><xsl:value-of select="@title"/></a>
+   <xsl:text>&quot;, </xsl:text>
+   <xsl:value-of select="@authors"/>
+   <xsl:if test="@date">
+    <xsl:text>, </xsl:text>
+    <xsl:value-of select="@date"/>
+   </xsl:if>
+  </li>
+ </xsl:template>
+ 
+ </xsl:stylesheet>

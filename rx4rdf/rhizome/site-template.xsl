@@ -13,7 +13,7 @@
     <xsl:param name="_contents" />		
     <xsl:param name="previous:title" />		
     <xsl:param name="_name" />		
-    <xsl:param name="_orginalContext" />		    
+    <xsl:param name="_originalContext" />		    
     <xsl:param name="_previousContext" />		        
     <xsl:param name="session:login" />
     <xsl:param name="session:message" />
@@ -24,12 +24,42 @@
     <xsl:param name="previous:itemname" />
     <xsl:param name="previous:search" />				
     <xsl:param name="previous:searchType" />				
+    <xsl:param name='previous:rsslink'/>
+    <xsl:param name="previous:action" />
+    
     <xsl:output method='html' indent='no' />
+
+<xsl:template name="display-content" >
+<xsl:param name="contents" />
+<xsl:param name="content-type" />
+<xsl:param name="action" select="'view'" />
+   <div id='maincontent'>
+     <xsl:choose>
+     <xsl:when test="(contains($content-type,'xml')
+                  or starts-with($content-type,'text/html')) and $action != 'view-source'">
+        <xsl:value-of disable-output-escaping='yes' select="$contents" />
+     </xsl:when>         
+    <!-- 
+    we never get this far for binary content because xslt.Processor._normalizeParams calls to_unicode on $_contents
+     <xsl:when test="$_previousContext/a:contents/a:ContentTransform/a:transformed-by = 'http://rx4rdf.sf.net/ns/wiki#item-format-binary'">         
+         <xsl:variable name='aboutparam' select="f:if($previous:about, concat('&amp;about=', f:escape-url($previous:about)), '')" />
+        <iframe height='100%' width='100%' 
+  href='site:///{$_name}?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-complete{$aboutparam}' />
+     </xsl:when>           
+    -->         
+     <xsl:otherwise>             
+        <pre>
+        <xsl:value-of disable-output-escaping='no' select="$contents" />
+        </pre>
+     </xsl:otherwise>
+    </xsl:choose>    
+  </div>
+</xsl:template>
     
 <xsl:template match="/">
 <xsl:variable name='prev-content-type' select="$response-header:content-type" />
 
-<xsl:variable name='title' select="f:if($previous:title, $previous:title, f:if($_orginalContext/wiki:title, $_orginalContext/wiki:title, $_name) )" />
+<xsl:variable name='title' select="f:if($previous:title, $previous:title, f:if($_originalContext/wiki:title, $_originalContext/wiki:title, $_name) )" />
 
 <!-- html template based on http://www.projectseven.com/tutorials/css_t/example.htm 
     (well, not much anymore, gave up and started using nested tables)
@@ -41,6 +71,9 @@
 <link href="site:///basestyles.css" rel="stylesheet" type="text/css" />
 <xsl:if test="wf:file-exists('favicon.ico')"> <!-- performance hack (assumes favicon.ico is external) -->
   <link rel="icon" href="site:///favicon.ico" />
+</xsl:if>
+<xsl:if test="$previous:rsslink"> 
+  <link rel="alternate" type="application/rss+xml" title="RSS" href="{$previous:rsslink}" />
 </xsl:if>
 </head>
 <body id="bd">
@@ -112,25 +145,12 @@ Or <a href="site:///users/guest?action=new">signup</a>
 
     <!-- Main Content -->
     <tr>
-    <td valign="top" id="maincontent">        
-         <xsl:choose>
-         <xsl:when test="contains($prev-content-type,'xml')
-                      or starts-with($prev-content-type,'text/html')">
-            <xsl:value-of disable-output-escaping='yes' select="$_contents" />
-         </xsl:when>         
-         <!-- we never get this far for binary content because xslt.Processor._normalizeParams calls to_unicode on $_contents
-         <xsl:when test="$_previousContext/a:contents/a:ContentTransform/a:transformed-by = 'http://rx4rdf.sf.net/ns/wiki#item-format-binary'">         
-             <xsl:variable name='aboutparam' select="f:if($previous:about, concat('&amp;about=', f:escape-url($previous:about)), '')" />
-            <iframe height='100%' width='100%' 
-      href='site:///{$_name}?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-complete{$aboutparam}' />
-         </xsl:when>           
-        -->         
-         <xsl:otherwise>             
-            <pre>
-            <xsl:value-of disable-output-escaping='no' select="$_contents" />
-            </pre>
-         </xsl:otherwise>
-        </xsl:choose>    
+    <td valign="top">        
+      	<xsl:call-template name="display-content" >
+		   <xsl:with-param name="contents" select="$_contents" />
+		   <xsl:with-param name="content-type" select="$prev-content-type" />
+		   <xsl:with-param name="action" select="$previous:action" />
+     	</xsl:call-template>    
     </td>
     </tr>
     </table>
@@ -143,8 +163,8 @@ Or <a href="site:///users/guest?action=new">signup</a>
 <p>
 <div style='float: right'>
     <a href="site:///edit">New</a>
-    &#xa0;<a href="site:///search?search=%2F*%5Bwiki%3Aname%5D&amp;searchType=RxPath&amp;view=html&amp;title=All%20Pages">List</a>
-    &#xa0;<a href="site:///search?search=wf%3Asort%28%2Fa%3ANamedContent%2C%27%28wiki%3Arevisions%2F*%2Frdf%3Afirst%2F*%29%5Blast%28%29%5D%2Fa%3Acreated-on%27%2C%27number%27%2C%27descending%27%29&amp;searchType=RxPath&amp;view=html&amp;title=Recently%20Changed%20Pages">Recent</a>
+    &#xa0;<a href="site:///search?search=%2F*%5Bwiki%3Aname%5D&amp;searchType=RxPath&amp;view=list&amp;title=All%20Pages">List</a>
+    &#xa0;<a href="site:///search?search=wf%3Asort%28%2Fa%3ANamedContent%2C%27%28wiki%3Arevisions%2F*%2Frdf%3Afirst%2F*%29%5Blast%28%29%5D%2Fa%3Acreated-on%27%2C%27number%27%2C%27descending%27%29&amp;searchType=RxPath&amp;view=list&amp;title=Recently%20Changed%20Pages">Recent</a>
     &#xa0;<a href="site:///administration">Admin</a>
     &#xa0;<a href="site:///help">Help</a>
 </div>
@@ -179,8 +199,9 @@ Type<select name="searchType">
     Regex</option>
     </select>
 &#xa0;View<select name="view">
-    <option value="html" selected='selected'>HTML</option>
-    <option value="rss91" >RSS .91</option>
+    <option value="list" selected='selected'>List</option>
+    <option value="summary">Summary</option>
+    <option value="rss20" >RSS 2.0</option>
     <option value="rxml" >RxML</option>
     <option value="rdf" >RDF/XML</option>
     <option value="edit" >Edit</option>

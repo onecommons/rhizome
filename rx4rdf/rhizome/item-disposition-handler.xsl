@@ -14,6 +14,7 @@
     <xsl:param name="previous:error" />
     <xsl:param name="previous:about" />
     <xsl:param name="previous:redirect" />
+    <xsl:param name="_contents" />		
 <xsl:template match="/">  
     <div class='message'>
     <xsl:choose>    
@@ -30,7 +31,12 @@
         href="{f:if($previous:about, 
                 concat('site:///',$previous:itemname, '?about=',f:escape-url($previous:about)),
                 concat('site:///',$previous:itemname))}" >
-        <b><xsl:value-of select='$previous:itemname'/></b></a>!
+        <b><xsl:value-of select='$previous:itemname'/></b></a>.
+    <xsl:if test='$_contents'>
+    <p class='note'> 
+         <xsl:value-of disable-output-escaping='yes' select="$_contents" />		
+    </p>
+    </xsl:if> 
     </xsl:otherwise>
     </xsl:choose>    
     </div>

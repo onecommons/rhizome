@@ -1,7 +1,10 @@
 <xu:modifications version="1.0" xmlns:xu="http://www.xmldb.org/xupdate"
 		    xmlns:a="http://rx4rdf.sf.net/ns/archive#" xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" 
-		    xmlns:f = 'http://xmlns.4suite.org/ext' xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'
+		    xmlns:kw = "http://rx4rdf.sf.net/ns/kw#"
+		    xmlns:f = 'http://xmlns.4suite.org/ext' xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'		    
+		    xmlns:request-header = 'http://rx4rdf.sf.net/ns/raccoon/http-request-header#'
 			xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
+			xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
 			xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >
 
     <xu:if test='number($startTime) &lt; /*[wiki:name=$itemname]/a:last-modified/text()'>
@@ -29,11 +32,13 @@
          if no itemname was specified assume the item is anonymous
          in either case, we create a name based on the current time
      -->    
+    <xu:variable name='isAnonymous' select="wf:get-metadata('anonymous') or not($itemname)"/>
+    
     <xu:if test="wf:get-metadata('anonymous') and $itemname">
         <xu:if test="substring($itemname, string-length($itemname)) != '/'">
             <xu:variable name='itemname' select="concat($itemname, '/')" />
         </xu:if>
-        <xu:variable name='itemname' select="concat($itemname, translate(f:pytime-to-exslt($current-time), ':', '_') )" />
+        <xu:variable name='itemname' select="concat($itemname, translate(f:pytime-to-exslt($current-time), ':', '_') )" />        
     </xu:if>
     <xu:if test="not($itemname)">
         <xu:variable name='itemname' select="translate(f:pytime-to-exslt($current-time), ':', '_')" />
@@ -88,8 +93,11 @@
 			<a:NamedContent>
 			<xu:attribute name="rdf:about"><xu:value-of select="wf:get-nameURI($itemname)"/></xu:attribute>
 			<wiki:name><xu:value-of select="$itemname" /></wiki:name>
+			<xu:if test='$isAnonymous'>
+			  <wiki:name-type rdf:resource='{uri("wiki:name-type-anonymous")}'/>
+			</xu:if>
 			<!-- add empty list resource that will be appended to below -->
-			<wiki:revisions><rdf:List/></wiki:revisions>
+			<wiki:revisions><rdf:List/></wiki:revisions>			
 			</a:NamedContent>
         </xu:append>
         <!-- now that we've created it, rebind the variable -->
@@ -105,6 +113,15 @@
         </xu:if>
     </xu:if>
     
+    <!-- do this check now, before we call a function that might save content or patches to disk -->
+    <xu:if test='wf:get-metadata("label")'>
+      <xu:if test='wf:find-unauthorized($__user, "http://rx4rdf.sf.net/ns/auth#permission-add-statement", 
+              $resource, "http://rx4rdf.sf.net/ns/wiki#has-label", $label)' >
+        <xu:message terminate='yes'
+          text='Authorization error: you do not have rights to set this label: "{/*[.=$label]/rdfs:label}" - go back and choose another (or none).' />
+      </xu:if>            
+    </xu:if>            
+        
     <!-- add or update last modified -->
     <xu:remove select='$resource/a:last-modified'/> 
     <xu:append select='$resource'>
@@ -118,6 +135,39 @@
          <auth:guarded-by rdf:resource='{$authtoken}'/>
        </xu:append>
     </xu:if>
+
+    <xu:define-template name='addKeywords'>
+    <xu:if test='$keywordsLeft'>
+       <!-- if the keyword doesn't have a prefix put it in the 'kw' namespace  
+         we url escape the keyword in case the specified name has invalid characters
+       -->            
+       <xu:variable name='kw' select="uri(f:if(contains($keywordsLeft[1],':') , 
+          $keywordsLeft[1], concat('kw:', f:escape-url($keywordsLeft[1])) ))" />
+
+       <xu:append select='$resource'>  
+         <wiki:about rdf:resource='{$kw}' />         
+       </xu:append>      
+       
+       <xu:if test='not(/wiki:Keyword[.=$kw])'>
+           <!-- not found, add a keyword resource -->
+           <xu:append select='/'>
+             <wiki:Keyword rdf:about='{$kw}'>
+                <wiki:name>keywords/<xu:value-of select="f:escape-url(f:if(contains($keywordsLeft[1],':'), 
+                            substring-after($keywordsLeft[1], ':'), $keywordsLeft[1]))"/></wiki:name>
+             </wiki:Keyword>
+           </xu:append>
+       </xu:if>
+       
+      <xu:variable name='keywordsLeft' select='$keywordsLeft[position()!=1]' />
+      <xu:call-template name='addKeywords'/>
+    </xu:if>
+    </xu:define-template>
+    
+    <xu:if test='wf:get-metadata("keywords")'>
+        <xu:remove select='$resource/wiki:about'/>
+        <xu:variable name='keywordsLeft' select='wf:split($keywords)' />
+        <xu:call-template name='addKeywords'/>
+    </xu:if>
     
     <xu:variable name="formatTransformURI" select="wf:generate-bnode()"/>                
     
@@ -126,17 +176,42 @@
 
     we disallow minor edit logic if the previous revision was edited by a different user or we're the guest user
     (instead we add a minor-edit property to mark the revision as minor)
+    todo: if the user is guest allow a minor revision if remote-host and remote-host = last revision's remote host 
     -->
     <xu:variable name='replaceRevision' select="wf:get-metadata('minor_edit') and 
        not($__user/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-guest') and 
        (not($resource/wiki:revisions/*) or ($resource/wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by = $__user)" /> 
+
+   <!-- check if the label is draft and there was a non-draft previous revision -->   
+   <xu:variable name='draftAndPreviousNonDraft' select='wf:get-metadata("label") and /*[.=wf:get-metadata("label")]/wiki:is-draft and     
+         $resource/wiki:revisions/*/rdf:first/*[not(wiki:has-label/*/wiki:is-draft)]' />
+   <xu:if test='$draftAndPreviousNonDraft' >
+      <xu:variable name='revnumber' select='count($resource/wiki:revisions/*/rdf:first/*)+number(not($replaceRevision))' />
+      <xu:message terminate='no'
+          text="Note: This revision was given a draft label and so will not be displayed by default.
+          &lt;br/>You can view this revision using this URL:
+          &lt;a href='site:///{$itemname}?revision={$revnumber}'>{$itemname}?revision={$revnumber}&lt;/a>." />
+   </xu:if>            
+
+   <!-- do these checks before we add or replace the revision -->
+   <!-- if no label or label is not release check if there's previous revision that was released -->   
+   <xu:if test='not($draftAndPreviousNonDraft) and (not(wf:get-metadata("label")) 
+         or not(/*[.=wf:get-metadata("label")]/wiki:is-released)) and     
+         $resource/wiki:revisions/*/rdf:first/*[wiki:has-label/*/wiki:is-released]' >
+      <xu:variable name='revnumber' select='count($resource/wiki:revisions/*/rdf:first/*)+number(not($replaceRevision))' />
+      <xu:message terminate='no'
+          text="Note: This revision will not be displayed by default because it doesn't have a released label but a previous revision does.
+          &lt;br/>You can view this revision using this URL:
+          &lt;a href='site:///{$itemname}?revision={$revnumber}'>{$itemname}?revision={$revnumber}&lt;/a>." />
+   </xu:if>            
         
-    <xu:if test='$replaceRevision'>    
-    
+    <xu:if test='$replaceRevision'>        
         <!-- for simplicity's sake we implement this by just removing the last revision 
         before we add the new revision 
         We must do this before any possible patching because we may need to re-generate the last patch
-        -->
+        -->        
+        <!-- save a reference to the last contents before we delete this revision so that we can pass it to save-contents -->
+        <xu:variable name = 'lastContents' select="( ($resource/wiki:revisions/*/rdf:first/*)[last()]//a:contents)[last()]" />
         <xu:remove select='($resource/wiki:revisions/*/rdf:first)[last()]'/>
     </xu:if>
         
@@ -226,7 +301,8 @@
                    </a:transformed-by>
                    <a:contents>
                      <xu:copy-of select="wf:save-contents($itemname, $format, $contents,
-                                                count($resource/wiki:revisions/*/rdf:first)+1 )"/> 
+                                    count($resource/wiki:revisions/*/rdf:first)+1, $resource, 
+                                    $title, string($lastContents), string($lastContents/*/a:sha1-digest))"/> 
                    </a:contents>
                </a:ContentTransform>
            </a:contents>
@@ -241,10 +317,20 @@
             <xu:if test='$title'>
                 <wiki:title><xu:value-of select="$title"/></wiki:title>
             </xu:if>
-            <xu:if test='wf:get-metadata("label")'>
-                <wiki:has-label rdf:resource="{$label}"/>
+            <xu:if test='not($title) and $resource/wiki:name-type = uri("wiki:name-type-anonymous")'>
+                <!-- the user didn't specify a name or title, so select the first line of text so we have something to show  -->
+                <wiki:auto-summary><xu:value-of select="substring($contents, 1, 80)"/></wiki:auto-summary>
             </xu:if>
+            <xu:if test='$change_comment'>
+                <rdfs:comment><xu:value-of select="$change_comment"/></rdfs:comment>
+            </xu:if>
+            <xu:if test='wf:get-metadata("label")'>
+              <wiki:has-label rdf:resource="{$label}"/>
+            </xu:if>            
             <a:created-on><xu:value-of select="$current-time"/></a:created-on>
+            <wiki:created-from><xu:value-of select="wf:if(wf:has-metadata('request-header:remote-host'), 
+                                '$request-header:remote-host','$request-header:remote-addr')"/>
+            </wiki:created-from>
             <wiki:created-by rdf:resource="{$__user}"/>
             <xu:if test='not($replaceRevision) and wf:get-metadata("minor_edit")'>
                 <wiki:minor-edit>1</wiki:minor-edit>
@@ -252,7 +338,7 @@
         </wiki:Item>
        </rdf:first>
     </xu:append>
-              
+                    
     <xu:if test="wf:assign-metadata('revision-added', $itemURI)" /> <!-- do nothing - just for the side-effect -->
     <xu:if test="wf:assign-metadata('_update-trigger', 'revision-added')" /> <!-- do nothing - just for the side-effect -->            
 </xu:modifications>

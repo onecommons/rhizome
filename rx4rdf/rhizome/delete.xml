@@ -7,5 +7,11 @@
     <!-- do it this way (instead of <xu:remove select="$__resource" />) 
          in order to use fine-grained authentication -->
     <xu:variable name="dummy" select="wf:save-metadata('', $__user,$__resource)"/>
+    <!-- remove the has-child statement if its a child of a folder -->
     <xu:remove select="/*/wiki:has-child[.=$__resource]" />
+    <!-- delete external contents if necessary 
+    todo: issue: need to do before deleting from model but need to do authentication first
+    plus need authentication for delete-contents function
+    <xu:variable name="dummy" select="wf:delete-contents($__resource)"/>
+    -->
 </xu:modifications>

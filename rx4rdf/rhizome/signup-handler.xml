@@ -1,16 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xu:modifications xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" xmlns:wf="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:a="http://rx4rdf.sf.net/ns/archive#" xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" xmlns:f="http://xmlns.4suite.org/ext" xmlns:auth="http://rx4rdf.sf.net/ns/auth#" xmlns:xu="http://www.xmldb.org/xupdate" version="1.0">
-  <!-- validate fields
--->
+<xu:modifications xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" xmlns:wf="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#" 
+xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" 
+xmlns:a="http://rx4rdf.sf.net/ns/archive#" 
+xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" 
+xmlns:f="http://xmlns.4suite.org/ext" xmlns:auth="http://rx4rdf.sf.net/ns/auth#" 
+xmlns:foaf="http://xmlns.com/foaf/0.1/"
+xmlns:xu="http://www.xmldb.org/xupdate" 
+version="1.0">
+  <!-- validate fields-->
   <xu:if test="not($loginname)">
     <xu:message text="login name must be specified" terminate="yes"/>
   </xu:if>
   <xu:if test="$password != $confirm-password">
     <xu:message text="password must match" terminate="yes"/>
   </xu:if>
-  <!-- if we're a creating a new user check for duplicates
--->
-  <xu:if test="$action='creation' and /wiki:User[wiki:login-name=$loginname]">
+  <!-- if we're a creating a new user check for duplicates-->
+  <xu:if test="$action='creation' and /foaf:Person[wiki:login-name=$loginname]">
     <xu:message text="name already taken: please choose new login name" terminate="yes"/>
   </xu:if>
   <xu:if test="$action='creation'">
@@ -23,6 +28,7 @@
         <rdfs:label>Private</rdfs:label>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-view"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-view-metadata"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-view-source"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-edit-metadata"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-edit"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-showrevisions"/>
@@ -34,6 +40,7 @@
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/auth#permission-add-statement"/>
         <auth:priority>1</auth:priority>
       </auth:AccessToken>
+
       <auth:AccessToken rdf:about="{$BASE_MODEL_URI}users/{$loginname}/private-w">
         <rdfs:label>Private Write/Public Read</rdfs:label>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-confirm-delete"/>
@@ -76,7 +83,7 @@
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/auth#permission-add-statement"/>
         <auth:priority>1</auth:priority>
       </auth:AccessToken>
-      <wiki:User rdf:about="{$BASE_MODEL_URI}users/{$loginname}">
+      <foaf:Person rdf:about="{$BASE_MODEL_URI}users/{$loginname}">
         <wiki:login-name>
           <xu:value-of select="$loginname"/>
         </wiki:login-name>
@@ -90,14 +97,12 @@
         <xu:element namespace="{namespace-uri-from-uri($__passwordHashProperty)}" name="{name-from-uri($__passwordHashProperty)}">
           <xu:value-of select="wf:secure-hash($password)"/>
         </xu:element>
-        <wiki:fullname>
+        <foaf:name>
           <xu:value-of select="$fullname"/>
-        </wiki:fullname>
-        <wiki:email>
-          <xu:value-of select="$email"/>
-        </wiki:email>
+        </foaf:name>
+        <foaf:mbox rdf:resource='mailto:{$email}' />
         <auth:guarded-by rdf:resource="{$BASE_MODEL_URI}users/{$loginname}/private-rw"/>
-      </wiki:User>
+      </foaf:Person>
     </xu:append>
     <xu:append select="/wiki:Folder[wiki:name='users']">
       <wiki:has-child rdf:resource="{$BASE_MODEL_URI}users/{$loginname}"/>
@@ -106,7 +111,7 @@
   <xu:if test="not($action='creation')">
     <!--editing existing user, update values   
 -->
-    <xu:variable name="user" select="/wiki:User[wiki:login-name=$loginname]"/>
+    <xu:variable name="user" select="/foaf:Person[wiki:login-name=$loginname]"/>
     <!--if the password is not equal to hash of the current password, set it
 -->
     <xu:variable name="passwordHash" select="$user/*[uri(.)=$__passwordHashProperty]"/>
@@ -117,15 +122,13 @@
         </xu:element>
       </xu:replace>
     </xu:if>
-    <xu:replace select="$user/wiki:fullname">
-      <wiki:fullname>
+    <xu:replace select="$user/foaf:name">
+      <foaf:name>
         <xu:value-of select="$fullname"/>
-      </wiki:fullname>
+      </foaf:name>
     </xu:replace>
-    <xu:replace select="$user/wiki:email">
-      <wiki:email>
-        <xu:value-of select="$email"/>
-      </wiki:email>
+    <xu:replace select="$user/foaf:mbox">
+      <foaf:mbox rdf:resource='mailto:{$email}' />
     </xu:replace>
   </xu:if>
   <!--just for side-effect
