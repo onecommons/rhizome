@@ -43,7 +43,7 @@ from xml.dom import IndexSizeErr
 from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL
 from Ft.Xml import SplitQName, XML_NAMESPACE
 from utils import NotSet
-from rx.RxPath import RDF_MS_BASE
+from rx.RxPath import RDF_MS_BASE, RDF_SCHEMA_BASE
 import sys, copy
 from rx import logging #for python 2.2 compatibility
 log = logging.getLogger("RxPath")
@@ -114,6 +114,8 @@ class Node(xml.dom.Node, object):
         if self is other:
             return True
         if not isinstance(other, Node):
+            return False
+        if self.nodeType != other.nodeType:
             return False
         
         if self.parentNode != other.parentNode:
@@ -275,6 +277,7 @@ class Resource(Element):
     _childNodes = None
     _firstChild = None
     _lastChild = None
+    __attributes = None                    
     uriNode = None
     
     def __init__(self, owner, uri):
@@ -312,8 +315,10 @@ class Resource(Element):
             return False
 
     def _get_attributes(self):
-        attr = self.getAttributeNodeNS(RDF_MS_BASE, 'about')
-        return { (RDF_MS_BASE, u'about') : attr }
+        if self.__attributes is None:
+            attr = self.getAttributeNodeNS(RDF_MS_BASE, 'about')        
+            self.__attributes = { (RDF_MS_BASE, u'about') : attr }
+        return self.__attributes
     
     attributes = property(_get_attributes)
 
@@ -347,10 +352,13 @@ class Resource(Element):
         for n in self.childNodes:
             if n.nodeType == Node.ELEMENT_NODE and n.localName == 'type' and n.namespaceURI == RDF_MS_BASE:
                 type = n.childNodes[0].uri
-                if local == '*' and type.startswith(namespaceURI):
-                    return True
-                elif type == (namespaceURI + RxPath.getURIFragmentFromLocal(local)): #schema.compatibleType(namespace+local, type)
-                    return True
+                if self.ownerDocument.schema.isCompatibleType(type, 
+                    namespaceURI + RxPath.getURIFragmentFromLocal(local)):
+                        return True
+                #if local == '*' and type.startswith(namespaceURI):
+                #    return True
+                #elif type == (namespaceURI + RxPath.getURIFragmentFromLocal(local)): #schema.compatibleType(namespace+local, type)
+                #    return True
                 
         return False
 
@@ -466,6 +474,7 @@ class Subject(Resource):
         If the RDF list or container has non-membership statements (usually just rdf:type) those will appear first.
         '''
         stmts = self.ownerDocument.model.getStatements(self.uri) #we assume list will be sorted
+        stmts.extend( self.ownerDocument.schema.findStatements(self.uri, stmts) )
         children = []
         containerItems = {}
         listItem = nextList = None        
@@ -493,7 +502,7 @@ class Subject(Resource):
         for ordinal in ordinals:
             stmt = containerItems[ordinal]
             realPredicate = stmt.predicate
-            stmt.predicate = RDF_MS_BASE+'li'
+            stmt.predicate = RDF_SCHEMA_BASE+'member'
             self._doAppendChild(children, Predicate(stmt, self, listID=realPredicate))            
         return children
 
@@ -614,8 +623,9 @@ class Subject(Resource):
                     self.ownerDocument.model.addStatement( restListStmt)                
                 #update statement with the real subject, the listID
                 stmt.subject = listID
-                self.ownerDocument.model.addStatement( stmt )                
-            elif stmt.predicate == RDF_MS_BASE+'li': 
+                self.ownerDocument.model.addStatement( stmt )
+                self.ownerDocument.schema.addToSchema( [stmt] )
+            elif stmt.predicate == RDF_SCHEMA_BASE+'member': 
                 if refChild:
                     raise NotSupportedErr("inserting items into lists not yet supported") #todo
                 ordinal = 0
@@ -651,18 +661,19 @@ class Subject(Resource):
                 self.ownerDocument.model.addStatement( stmt )
             else:                
                 if self.childNodes and self.childNodes[-1].stmt.predicate in \
-                   [ RDF_MS_BASE + 'first', RDF_MS_BASE + 'li' ]:
+                   [ RDF_MS_BASE + 'first', RDF_SCHEMA_BASE + 'member' ]:
                     # the resource is a container or rdf list so insert
                     # this non-ordering statement before any of those                    
                     for i in xrange(len(self.childNodes) ):
                         #find the first ordering predicate
-                        if self.childNodes[i].stmt.predicate in [ RDF_MS_BASE + 'first', RDF_MS_BASE + 'li' ]:
+                        if self.childNodes[i].stmt.predicate in [ RDF_MS_BASE + 'first', RDF_SCHEMA_BASE + 'member' ]:
                             hi = i-1
                             break
                 else:
                     hi = None
                 predicateNode = self._orderedInsert(stmt, Predicate, hi = hi)
                 self.ownerDocument.model.addStatement( stmt )
+                self.ownerDocument.schema.addToSchema( [stmt] )
             self.revision += 1        
             self.ownerDocument.revision += 1
             return predicateNode 
@@ -674,7 +685,7 @@ class Subject(Resource):
         '''
             removes the statement identified by the child Predicate node oldChild.
             If the predicate is rdf:first then previous and next list item statements are adjusted.
-            (Note: In the case of rdf:li, sibling rdf:_n statements are not adjusted.)            
+            (Note: In the case of rdfs:member, sibling rdf:_n statements are not adjusted.)            
         '''
         if oldChild.stmt.predicate == RDF_MS_BASE+'first': #if a list item
             assert oldChild.listID
@@ -717,13 +728,14 @@ class Subject(Resource):
             #the subject of the item is really listID, set that so we can remove the correct statement below
             oldChild.stmt.subject = oldChild.listID
         
-        if oldChild.stmt.predicate == RDF_MS_BASE+'li':
+        if oldChild.stmt.predicate == RDF_SCHEMA_BASE+'member':
             #restore the orginal predicate before removing the statement from the model 
             assert oldChild.listID
             oldChild.stmt.predicate = oldChild.listID
             #we don't bother reordering the sibling rdf:_n because their order is still preserved after removing this on
             #(if not monotonic)
         self.ownerDocument.model.removeStatement( oldChild.stmt ) #handle exception here?
+        self.ownerDocument.schema.removeFromSchema([oldChild.stmt])
         self._doRemoveChild(self._childNodes, oldChild)        
         self.revision += 1
         self.ownerDocument.revision += 1
@@ -817,7 +829,8 @@ class Object(Resource):
             return self.parentNode == other.parentNode and self.uri == other.uri 
 
     def __repr__(self):
-        return "!" + Resource.__repr__(self) + " parent id: " + `id(self.parentNode)`
+        return "!%s parent id: %X" % (Resource.__repr__(self), id(self.parentNode))
+        #return "!" + Resource.__repr__(self) + " parent id: " + (id(self.parentNode))
         
     def _updateListNodes(self):
         '''
@@ -986,7 +999,7 @@ class BasePredicate(Element):
         '''
         if self.listID:
             stmt = copy.copy(self.stmt)
-            if self.stmt.predicate == RDF_MS_BASE+'li':
+            if self.stmt.predicate == RDF_SCHEMA_BASE+'member':
                 stmt.predicate = self.listID
                 return (stmt,)
             else:
@@ -1093,6 +1106,10 @@ class BasePredicate(Element):
             else:
                 self.__id = None
         return self.__id            
+
+    def matchName(self, namespaceURI, local):
+        return self.ownerDocument.schema.isCompatibleProperty(self.stmt.predicate,
+                namespaceURI + RxPath.getURIFragmentFromLocal(local))            
         
     #work around for a 'bug' in _conversions.c, unlike Conversion.py (and object_to_string),
     #node_descendants() doesn't check for a stringvalue attribute
@@ -1290,25 +1307,36 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     globalRecurseCheck = False
 
     nextIndex = 0 #never used
-    defaultNsRevMap = { RDF_MS_BASE : 'rdf' }
+    defaultNsRevMap = { RDF_MS_BASE : 'rdf', RDF_SCHEMA_BASE : 'rdfs' }
     
     def __init__(self, model, nsRevMap = None):        
         self.rootNode = self
         self.ownerDocument = self #bug in dom implementation?
         self.model = model
-        self.nsRevMap = nsRevMap or self.defaultNsRevMap
+        self.nsRevMap = nsRevMap or self.defaultNsRevMap.copy()
         if self.nsRevMap.get(RDF_MS_BASE) is None:
             self.nsRevMap[RDF_MS_BASE] = 'rdf'
+        if self.nsRevMap.get(RDF_SCHEMA_BASE) is None:
+            self.nsRevMap[RDF_SCHEMA_BASE] = 'rdfs'
+
         self.revision = 0
+        self.schema = None
     
     def _get_childNodes(self):
-        if self._childNodes is None:            
+        if self._childNodes is None:
             self._childNodes = self.toSubjectNodes()
+            #todo: remove this temporary hack
+            if not self.schema:
+                #set this the first time the DOM is loaded
+                self.schema = RxPath.RDFSSchema()
+                stmts = self.model.getStatements()
+                self.schema.addToSchema(stmts)                                
+                
             if self._childNodes:
                 self._firstChild = self._childNodes[0]
                 self._lastChild = self._childNodes[-1]
             else:
-                self._firstChild = self._lastChild = None
+                self._firstChild = self._lastChild = None            
         return self._childNodes 
     
     childNodes = property(_get_childNodes)
@@ -1424,6 +1452,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
             try:
                 predicateNode = subjectNode._orderedInsert(typeStmt, Predicate) 
                 self.model.addStatement( typeStmt )
+                self.schema.addToSchema( [typeStmt] )
                 self.revision += 1
             except IndexError:
                 #thrown by _orderedInsert: statement already exists in the model
@@ -1469,18 +1498,21 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
 
     def begin(self):
         self.model.begin()
+        self.schema.begin()
 
     def commit(self, **kw):
         self.model.commit(**kw)
+        self.schema.commit(**kw)
 
     def rollback(self):
         self.model.rollback()
+        self.schema.rollback()
         #to remove the changes we need to rollback we just force the
         #DOM's nodes to be regenerated from the model by null-ing out
         #childNodes and then incrementing revision.
         
         #warning: its still possible the application may have a
-        #dangling references to a node that don't know they've been
+        #dangling references to nodes that don't know they've been
         #deleted
 
         #todo: to fix this, add a rollbackCount to the doc and subject
