@@ -40,7 +40,8 @@ resourceQueries=[
 #name not found, see if there's an external file on the Raccoon path with this name:
 #if it matches, the context will be a text node
 '''wf:if(wf:file-exists($_name), "wf:assign-metadata('externalfile', wf:string-to-nodeset($_name))")''',
-"/*[wiki:name='_not_found']", #invoke the not found page 
+#by treating not found as an error, we prevent an endless loop from happening when the not found page includes a resource that is not found
+"wf:error(concat('page not found: ', $_name), 404)", #invoke the not found page 
 ]
 
 #now see if we're authorized to handle this request
@@ -110,10 +111,10 @@ templateQueries=[
 #'''$REDIRECT''', #set this to the resource you want to redirect to
 '''f:if($externalfile,$STOP)''', #short circuit -- $STOP is a magic variable that stops the evaluation of the queries
 '''f:if($action="view-source",$STOP)''', #todo: fix this hack
-'/*[wiki:handles-doctype/*=$_doctype]',
+'f:if($_doctype, /*[wiki:handles-doctype/*=$_doctype])',
 '''f:if($_disposition='http://rx4rdf.sf.net/ns/wiki#item-disposition-complete', $STOP)''', #short circuit
 '''f:if($_disposition='http://rx4rdf.sf.net/ns/wiki#item-disposition-template', $STOP)''', #short circuit
-'/*[wiki:handles-disposition=$_disposition]',
+'f:if($_disposition, /*[wiki:handles-disposition=$_disposition])',
 #'''/*[wiki:name='_default-template']''',
 ]
 
@@ -151,7 +152,7 @@ templateAction.assign("_doctype", '$_doctype', "wiki:doctype/*")
 #a bit hackish, but we want to preserve the initial _disposition until we encounter 
 #the disposition template itself and then use its disposition
 #thus we check for the wiki:handles-disposition property
-#even more hackish: added $_dispositionDisposition to allow a disposition to dynamically set its dispostion
+#even more hackish: added $_dispositionDisposition to allow a disposition template to dynamically set its own disposition
 templateAction.assign("_disposition", 'f:if($previous:_template/wiki:handles-disposition, $_dispositionDisposition)',
                     'f:if($previous:_template/wiki:handles-disposition, wiki:item-disposition/*)', 
                     '$_disposition', 
@@ -160,7 +161,7 @@ templateAction.assign("_disposition", 'f:if($previous:_template/wiki:handles-dis
 #(always let the template set the content type)
 templateAction.assign('response-header:content-type', '$_contenttype', 'f:if($action="view-source", "text/plain")', #todo: hack
    'string(/*[.=$_doctype]/a:content-type)', 
-   "f:if(not(wf:has-metadata('previous:_template')), $response-header:content-type)", 
+   "f:if(not(wf:has-metadata('previous:_template')), $response-header:content-type)", #check if we're a template resource
    'string(/*[.=$__lastFormat]/a:content-type)')
 
 handleRequestSequence = [ findResourceAction, #first map the request to a resource
@@ -176,18 +177,21 @@ handleRequestSequence = [ findResourceAction, #first map the request to a resour
 rhizome.handleRequestSequence = handleRequestSequence
 
 errorAction = Action( [ 
-    #by assigning a XPath expression to this variable a script can set its own custom error handler 
-    'f:evaluate($previous:_errorhandler)', 
-    '''f:if($error:name='KeyError' and $error:message="'_contents'", /*[wiki:name='xslt-error-handler'])''',                
-    "/*[wiki:name='default-error-handler']",
+    #by assigning a XPath expression to '_errorhandler' a script can set its own custom error handler:
+    #'wf:evaluate($previous:_errorhandler)', #disable for now -- unless we authorize this resource this is a security hole
+    "f:if($error:name='XPathUserError' and $error:errorCode=404, /*[wiki:name='_not_found'])", #invoke the not found page     
+    '''f:if($error:name='KeyError' and $error:message="'_contents'", /*[wiki:name='xslt-error-handler'])''',
+    "/*[wiki:name='default-error-handler']",    
 ])
 errorAction.assign("__resource", '.', post=True)               
 #map errors messages that are "expected" and should be shown to the user:
 from rx import XUpdate
+from Ft.Xml.Xslt import Error
 errorAction.assign('error:userMsg', 
     "f:if($error:name='NotAuthorized', $error:message)",
-    "f:if($error:name='ZMLParseError', $error:message)",
+    "f:if($error:name='ZMLParseError' or $error:name='RxMLError', $error:message)",    
     """f:if($error:errorCode = %d, $error:message)""" % XUpdate.XUpdateException.STYLESHEET_REQUESTED_TERMINATION, 
+    """f:if($error:errorCode = %d, $error:message)""" % Error.STYLESHEET_REQUESTED_TERMINATION, 
     "''")
                
 actions = { 'http-request' : handleRequestSequence,
@@ -229,21 +233,26 @@ cmd_usage = '''\n\nrhizome-config.py specific:
 from rx import zml
 contentProcessors = {
     'http://rx4rdf.sf.net/ns/content#pydiff-patch-transform':
-        lambda result, kw, contextNode, contents, rhizome=rhizome: rhizome.processPatch(contents, kw, result),
-    #this stylesheet transforms kw['_contents'] not the rdf model
-    'http://www.w3.org/1999/XSL/Transform' : lambda result, kw, contextNode, contents, self=__server__:\
-        self.processXslt(contents, kw['_contents'], kw, uri=kw.get('_contentsURI') or self.evalXPath( 
-            'concat("site:///", (/a:NamedContent[wiki:revisions/*/*[.=$__context]]/wiki:name)[1])',node=contextNode) ), 
-    'http://rx4rdf.sf.net/ns/wiki#item-format-zml' :
-        lambda result, kw, contextNode, contents, rhizome=rhizome: rhizome.processZML(contextNode, contents, kw),
+        lambda result, kw, contextNode, contents, rhizome=rhizome: 
+                            rhizome.processPatch(contents, kw, result),
+    #this stylesheet processor transforms kw['_contents'] not the rdf model:    
+    'http://www.w3.org/1999/XSL/Transform' : rhizome.processXSLT, 
+    'http://rx4rdf.sf.net/ns/wiki#item-format-zml':
+        lambda result, kw, contextNode, contents, rhizome=rhizome: 
+                         rhizome.processZML(contextNode, contents, kw),
+    #replace the xml/html processor with one that sanitizes the markup if the user doesn't have the proper access token
+    'http://rx4rdf.sf.net/ns/wiki#item-format-xml': 
+        lambda result, kw, contextNode, contents, rhizome=rhizome: 
+        rhizome.processMarkup(rhizome.BASE_MODEL_URI+'create-unsanitary-content-token', result, kw, contextNode, contents)
 }
 
 contentProcessorCachePredicates = {
-    'http://www.w3.org/1999/XSL/Transform' : lambda result, kw, contextNode, contents, self=__server__:\
-          self.partialXsltCacheKeyPredicate(contents, kw['_contents'], kw, contextNode, kw.get('_contentsURI') or self.evalXPath( 
+    'http://www.w3.org/1999/XSL/Transform' : lambda result, kw, contextNode, contents, self=__server__:
+          self.partialXsltCacheKeyPredicate(contents, kw['_contents'], kw, 
+            contextNode, kw.get('_contentsURI') or self.evalXPath( 
             'concat("site:///", (/a:NamedContent[wiki:revisions/*/*[.=$__context]]/wiki:name)[1])',
-            node=contextNode)) , 
-    
+            node=contextNode)), 
+    'http://rx4rdf.sf.net/ns/wiki#item-format-xml' : rhizome.processMarkupCachePredicate,
     'http://rx4rdf.sf.net/ns/wiki#item-format-zml' :
         lambda result, kw, contextNode, contents: contents #the key is just the contents
 }
@@ -310,6 +319,7 @@ MODEL_UPDATE_PREDICATE = 'http://rx4rdf.sf.net/ns/wiki#model-update-id'
 configHook = rhizome.configHook
 getPrincipleFunc = lambda kw: kw.get('__user', '')
 authorizeMetadata=rhizome.authorizeMetadata
+validateExternalRequest=rhizome.validateExternalRequest
 authorizeAdditions=rhizome.authorizeAdditions
 authorizeRemovals=rhizome.authorizeRemovals
 authorizeXPathFuncs=rhizome.authorizeXPathFuncs
@@ -386,6 +396,8 @@ rhizome._addItemTuple('new-doctype-template', loc='path:new-doctype-template.txt
             disposition='rxml-template', format='text', title='Create New DocType'), 
 rhizome._addItemTuple('new-keyword-template', loc='path:new-keyword-template.txt', handlesAction=['new'], actionType='wiki:Keyword',
             disposition='rxml-template', format='text', title='Create New Keyword'), 
+rhizome._addItemTuple('new-sitetheme-template', loc='path:new-sitetheme-template.txt', handlesAction=['new'], actionType='wiki:SiteTheme',
+            disposition='rxml-template', format='text', title='Create New Site Theme'),             
 rhizome._addItemTuple('Sandbox',loc='path:sandbox.xsl', format='rxslt', disposition='entry'),               	
 rhizome._addItemTuple('process-contents',loc='path:process-contents.xsl', format='rxslt', 
                         disposition='complete'),               	
@@ -408,9 +420,9 @@ rhizome._addItemTuple('docbook2document.xsl', loc='path:docbook2document.xsl', f
   
 #sample pages
 templateList += [rhizome._addItemTuple('index',loc='path:index.zml', format='zml', 
-                disposition='entry', accessTokens=None, keywords=None),
+                title="Home", disposition='entry', accessTokens=None, keywords=None),
 rhizome._addItemTuple('sidebar',loc='path:sidebar.zml', format='zml', accessTokens=None, keywords=None),
-rhizome._addItemTuple('ZMLSandbox', format='zml', disposition='entry', accessTokens=None, keywords=None,
+rhizome._addItemTuple('ZMLSandbox', format='zml', label='None', disposition='entry', accessTokens=None, keywords=None,
 	contents="Feel free to [edit|?action=edit] this page to experiment with [ZML]..."),
 rhizome._addItemTuple('RxMLSandbox',loc='path:RxMLSandbox.xsl', format='rxslt', keywords=None,
                         disposition='entry', title="RxML Sandbox"),               	
@@ -432,13 +444,57 @@ rhizome._addItemTuple('RaccoonConfig',loc='path:help/RaccoonConfig.txt', disposi
      format='text', title="Raccoon Config Settings", keywords=['help']),
 ]
 
+#themes:
+templateList += [
+    rhizome._addItemTuple('default/theme.xsl', loc='path:themes/default/theme.xsl', 
+       format='http://www.w3.org/1999/XSL/Transform', disposition='template'),
+    rhizome._addItemTuple('default/theme.css', loc='path:themes/default/theme.css',  
+       format='text', disposition='complete'),
+    rhizome._addItemTuple('movabletype/theme.xsl', loc='path:themes/movabletype/theme.xsl', 
+       format='http://www.w3.org/1999/XSL/Transform', disposition='template'),
+    rhizome._addItemTuple('movabletype/theme.css', loc='path:themes/movabletype/theme.css',  
+       format='text', disposition='complete'),
+    ]
+
+themes =\
+'''
+ base:default-theme:
+  a: wiki:SiteTheme
+  wiki:uses-site-template-stylesheet: {%(base)sdefault/theme.xsl}
+  wiki:uses-css-stylesheet: {%(base)sdefault/theme.css}
+  rdfs:comment: `the default theme
+
+ base:movabletype-theme:
+  a: wiki:SiteTheme
+  wiki:uses-site-template-stylesheet: {%(base)smovabletype/theme.xsl}
+  wiki:uses-css-stylesheet: {%(base)smovabletype/theme.css}
+  rdfs:comment: `looks like movabletype
+''' % {'base' : rhizome.BASE_MODEL_URI }
+
+templateList.append( ('@themes', rxml.zml2nt(contents=themes, nsMap=nsMap)) )
+
+siteVars =\
+'''
+ base:site-template:
+  wiki:header-image: `underconstruction.gif
+  wiki:header-text: `Header, site title goes here: edit the <a href="site-template?action=edit-metadata">site template's metadata</a>
+  wiki:uses-theme: base:default-theme
+  
+ #unfortunately we also have to add this alias in addition to setting wiki:uses-theme
+ #because site-template.xsl can only statically import an URL
+ {%(base)sdefault/theme.xsl}:
+   wiki:alias: `theme.xsl
+'''% {'base' : rhizome.BASE_MODEL_URI }
+templateList.append( ('@sitevars', rxml.zml2nt(contents=siteVars, nsMap=nsMap)) )
+
+
 #add the authorization and authentification structure
 
 #secureHashSeed is a string that is combined with plaintext when generating a secure hash of passwords
 #You really should set your own private value. If it is compromised, it will be much
 #easier to mount a dictionary attack on the password hashes.
 #If you change this all previously generated password hashes will no longer work.
-secureHashSeed = locals().get('secureHashSeed', 'YOU REALLY SHOULD CHANGE THIS!')
+secureHashSeed = locals().get('SECURE_HASH_SEED', 'YOU REALLY SHOULD CHANGE THIS!')
 
 passwordHashProperty  = locals().get('passwordHashProperty', rhizome.BASE_MODEL_URI+'password-hash')
 
@@ -584,6 +640,11 @@ authStructure =\
   auth:with-value: wiki:item-format-rxupdate        
   auth:priority: 100
 
+ base:create-unsanitary-content-token:
+  rdfs:comment: `If the content creator has this token, rhizome.processMarkup() will not try to sanitize the HTML or XML.
+  rdf:type: auth:AccessToken  
+  auth:priority: 100
+  
  auth:Role:
   auth:guarded-by: base:role-guard
 
@@ -639,14 +700,6 @@ for action in ['view', 'edit', 'new', 'creation', 'save', 'delete', 'confirm-del
 
 templateList.append( ('@auth', rxml.zml2nt(contents=authStructure, nsMap=nsMap)) )
 
-siteVars =\
-'''
- base:site-template:
-  wiki:header-image: `underconstruction.gif
-  wiki:header-text: `Header, site title goes here: edit the<a href="site-template?action=edit-metadata">site template</a>
-'''
-templateList.append( ('@sitevars', rxml.zml2nt(contents=siteVars, nsMap=nsMap)) )
-
 import sys, time
 currentTime = "%.3f" % time.time() 
 platform = 'python ' + sys.version.replace('\n','').replace('\r','')
@@ -691,7 +744,8 @@ def addStructure(type, structure, extraProps=[], name2uri=name2uri):
 userClasses = [ ('foaf:Person', 'User', ''), ('wiki:Folder', 'Folder', ''), 
    ('auth:Role', 'Role', ''), ('auth:AccessToken', 'Access Token', ''),
    ('wiki:Label', 'Label', ''), ('wiki:DocType', 'Doc Type', ''), ('wiki:Keyword', 'Keyword', ''),
-   ('wiki:ItemDisposition', 'Disposition', ''), ('a:NamedContent', 'Named Content', '')]
+   ('wiki:ItemDisposition', 'Disposition', ''), ('a:NamedContent', 'Named Content', ''),
+   ('wiki:SiteTheme', 'Site Theme','')]
 
 templateList.append( ('@userClasses', addStructure('rdfs:Class', userClasses, ['rdfs:comment'])) )
 
@@ -709,6 +763,7 @@ docTypes = [ ('http://rx4rdf.sf.net/ns/wiki#doctype-faq', 'FAQ', 'text/xml'),
                 ('http://rx4rdf.sf.net/ns/wiki#doctype-document', 'Document', 'text/xml'),
                 ('http://rx4rdf.sf.net/ns/wiki#doctype-specification', 'Specification', 'text/xml'),
                 ('http://rx4rdf.sf.net/ns/wiki#doctype-docbook', 'DocBook', 'text/xml'),                
+                #('http://rx4rdf.sf.net/ns/wiki#doctype-wiki', 'Wiki', 'text/html'), #todo: uncomment this when we can hide it from users
               ]
 
 labels = [ ('http://rx4rdf.sf.net/ns/wiki#label-draft', 'Draft'),
@@ -768,9 +823,10 @@ def __addItem__(name, rhizome=rhizome, configlocals=locals(), **kw):
 def __addRxML__(contents='', replace=None, rxml=rxml, configlocals=locals()):
     templateMap=configlocals['templateMap']
     if contents:
+        nsMap=configlocals['nsMap']
         contents = rxml.zml2nt(contents=contents, nsMap=configlocals['nsMap'])
     if replace is None:
-        replace = str(id(contents))            
+        replace = str(id(contents))
     templateMap[replace] = contents
     configlocals['STORAGE_TEMPLATE']= "".join(templateMap.values())
     
