@@ -40,7 +40,10 @@ if _windows:
         import win32event, win32api, pywintypes
     except ImportError:
         lockingDisabled=1
-        sys.stderr.write('Error! The win32 extensions not installed -- locking disabled.')
+        sys.stderr.write('Warning! The win32 extensions not installed -- locking disabled.')
+elif sys.platform == 'cygwin':
+    lockingDisabled=1
+    sys.stderr.write('Warning! locking does not seem to work on cygwin -- locking disabled.')
 else:   # assume Unix
     try:
         import fcntl

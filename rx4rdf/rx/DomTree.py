@@ -2,7 +2,7 @@
 ## 
 # $Header$
 """
-Code below based on FtMiniDom/DomTree.py with a few additions
+Code below based on Ft.Xml.FtMiniDom.DomTree.py with a few additions
 (in particular the DocIndex class)
 
 A Python implementation for the Domlette interface.  It is provided solely
@@ -82,7 +82,7 @@ def findnearestcommonancestors(x, y):
     return the nearest common ancestor and the its two immediate children (or self)
     that are the ancestor-or-self of x and y respectively. 
     '''
-    ancx = []
+    ancx = [] #this will be a list including x and its ancestors
     nextancx = x
     while nextancx:        
         if nextancx == y: #y is an ancestor-or-self of x
@@ -96,10 +96,10 @@ def findnearestcommonancestors(x, y):
         try:  
             i = ancx.index(nextancy.parentNode) #if found, common ancestor found            
             if i > 0:
-                xSiblingIndex = i - 1
+                xSiblingIndex = i - 1 #index to the child of the common ancestor
             else:
                 xSiblingIndex = 0 #x is an ancestor-or-self of y
-            #print 'fnd2', ancx[i], ancx[xSiblingIndex], nextancy 
+            #print 'fnd2\n\t', i, xSiblingIndex, ancx[xSiblingIndex], '\n\t', nextancy            
             return ancx[i], ancx[xSiblingIndex], nextancy 
         except ValueError:
             nextancy = nextancy.parentNode
@@ -119,24 +119,22 @@ class DocIndex:
     def __cmp__(self, other):
         #print 'compare', self, other
         #print 'compare', self.node, other.node
-        root, nextancestorx, nextancestory = findnearestcommonancestors(self.node, other.node) 
-        if self.node == nextancestorx: #self is the ancestor-or-self of other
-            if nextancestorx == nextancestory:
-                #print 'eq-b', nextancestorx, nextancestory
-                return 0
-            else:
-                #print 'before'
-                return -1 
-        elif other.node == nextancestory: #other is the anscestor-or-self of self
-            if nextancestorx == nextancestory:
-                #print 'eq-a', root, nextancestorx, nextancestory
-                return 0
-            else:
-                #print 'after'
-                return 1        
-        else:  #they're siblings or two roots from different trees
-            assert nextancestorx.parentNode == nextancestory.parentNode or not root
-            #print 'cmp', nextancestorx.cmpSiblingOrder(nextancestory)            
+        if self.node == other.node:
+            return 0
+        
+        root, nextancestorx, nextancestory = findnearestcommonancestors(self.node, other.node)
+        if not root:
+            #they're not part of the same tree
+            return cmp(self.node.ownerDocument, other.node.ownerDocument)
+        elif self.node == root: #self is the ancestor-or-self of other
+            #print 'before',self.node#, nextancestorx, nextancestory
+            return -1 
+        elif other.node == root: #other is the anscestor-or-self of self
+            #print 'after'
+            return 1        
+        else:  #they're siblings 
+            assert nextancestorx.parentNode == nextancestory.parentNode
+            #print 'cmp', nextancestorx.cmpSiblingOrder(nextancestory)
             return nextancestorx.cmpSiblingOrder(nextancestory)            
     
 class Node(_Node, _ComputedAttributes, object): #change to derive from object for __getattribute__() support
@@ -170,17 +168,41 @@ class Node(_Node, _ComputedAttributes, object): #change to derive from object fo
     def _get_docIndex(self):
         return DocIndex(self)
 
+    def __ne__(self, other): #so __eq__ is called instead of __cmp__
+        return not self.__eq__(other)
+
     def __eq__(self, other):
+        '''
+        Equal if both nodes are in the same position in the tree
+        '''
+        #this can be operation is expensive -- note the recursive calls
+        if self is other:
+            return True
         if not isinstance(other, Node):
             return False
-        if self.previousSibling:
+        
+        if self.parentNode != other.parentNode:
+            return False
+        elif self.parentNode is None:
+            #both nodes have parentNode == None and so both are roots:
+            # apply object equality (and we already did above)
+            return False
+        
+        #at this point we must be siblings with other
+        if self.previousSibling:            
             if self.previousSibling != other.previousSibling:
                 return False
-        elif self.nextSibling:            
+        elif other.previousSibling:
+            return False
+        
+        if self.nextSibling:            
             if self.nextSibling != other.nextSibling:
                 return False
-        return self.parentNode == other.parentNode 
+        elif other.nextSibling:
+            return False
         
+        return True
+          
     def cmpSiblingOrder(self, other):
         '''
         Assumes the other node is a sibling 
@@ -319,7 +341,7 @@ class Node(_Node, _ComputedAttributes, object): #change to derive from object fo
         return not not self.childNodes
 
     def normalize(self):
-        node = node.firstChild
+        node = self.firstChild
         while node:
             if isinstance(node, Text):
                 next = node.nextSibling

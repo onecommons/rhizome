@@ -1,12 +1,14 @@
 """
     Helper classes for Rhizome
+    This classes includes functionality dependent on the Rhizome schemas
+    and so aren't included in the Racoon module.
 
     Copyright (c) 2003 by Adam Souzis <asouzis@users.sf.net>
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
 import rhizml, rxml, racoon
-import utils, RDFDom
+import utils, RxPath
 import Ft
 from Ft.Lib import Uri
 from Ft.Rdf import RDF_MS_BASE,OBJECT_TYPE_RESOURCE
@@ -126,33 +128,34 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
                   loc = Uri.OsPathToUri(os.path.abspath(destpath))
                   
               if os.path.exists(path + METADATAEXT):
-                  xml = rhizml.rhizml2xml(open(path + METADATAEXT))#parse the rxity to rx xml
-                  try:
-                      model, db = rxml.rx2model(StringIO.StringIO('<rx:rx>'+ xml+'</rx:rx>'))
-                  except:
-                      #file('badrxml.xml','w').write(xml)
-                      raise
-                  rdfDom = RDFDom.RDFDoc(model, self.server.revNsMap)                  
+                  #parse the rzml to rxml then load it into a RxPath DOM
+                  xml = rhizml.rhizml2xml(open(path + METADATAEXT))
+                  model, db = rxml.rx2model(StringIO.StringIO('<rx:rx>'+ xml+'</rx:rx>'))
+                  rdfDom = RxPath.createDOM(RxPath.FtModel(model), self.server.revNsMap)                  
                   #Ft.Xml.Lib.Print.PrettyPrint(rdfDom, asHtml=1, stream=file('rdfdom1.xml','w')) #asHtml to suppress <?xml ...>
-                  #delete all revisions except last 
-                  #replace the innermost a:contents with content location
-                  #print map(lambda x: x.firstChild, RDFDom.evalXPath(rdfDom, '/*/wiki:revisions/*//a:contents', nsMap = self.server.nsMap))
-                  #print map(lambda x: x.firstChild, RDFDom.evalXPath(rdfDom, '(/*/wiki:revisions/*//a:contents)[last()]', nsMap = self.server.nsMap))
+                  
+                  #check to see if the page already exists in the site                  
                   wikiname = rdfDom.evalXPath('string(/*/wiki:name)', nsMap = self.server.nsMap)
-                  assert wikiname
+                  assert wikiname, 'could not find a wikiname when importing %s' % path + METADATAEXT
                   if self.server.evalXPath("/*[wiki:name='%s']"% wikiname):
                       log.warning('there is already an item named ' + wikiname +', skipping import')
                       return #hack for now skip if item already exists
-                  else:                    
+                  else:                      
                       log.info('importing ' +filename)
-                  moreTriples = StringIO.StringIO()                  
-                  self.server.xupdateRDFDom(rdfDom,moreTriples, uri=xupdate,
+
+                  #update the page's metadata using the xupdate script
+                  self.server.xupdateRDFDom(rdfDom, uri=xupdate,
                                     kw={ 'loc' : loc, 'name' : wikiname, 'base-uri' : self.BASE_MODEL_URI,
                                          'resource-uri' : self.BASE_MODEL_URI + wikiname })
+
+                  #write out the model as nt triples
+                  moreTriples = StringIO.StringIO()                  
+                  stmts = db._statements['default'] #get statements directly, avoid copying list
+                  utils.writeTriples(stmts, moreTriples)
                   #print moreTriples.getvalue()
                   triples.append( moreTriples.getvalue() )
               else:
-                  #try to guess the wikiname
+                  #no metadata file found -- try to guess the some default metadata
                   wikiname = filter(lambda c: c.isalnum() or c in '_-./', os.path.splitext(filename)[0])
                   if self.server.evalXPath("/*[wiki:name='%s']"% wikiname):
                       log.warning('there is already an item named ' + wikiname +', skipping import')
@@ -188,12 +191,13 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
                       doctype = mm.docType
                   else:
                       doctype=''
-                  triples.append( self.addItem(wikiname,loc=loc,format=format, disposition=disposition, doctype=doctype) )
+                  triples.append( self.addItem(wikiname,loc=loc,format=format,
+                                    disposition=disposition, doctype=doctype) )
               if dest:
                   import shutil
                   try: 
                     os.makedirs(dest)
-                  except OSError: pass #dir might already exist                    
+                  except OSError: pass #dir might already exist
                   shutil.copy2(path, dest)                  
 
           if os.path.isdir(path):
@@ -204,20 +208,8 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
                 fileFunc(path)
           if triples:
               triples = ''.join(triples)
-              #get current model
-              db = Ft.Rdf.Drivers.Memory.CreateDb('', 'default')
-              outputModel = Ft.Rdf.Model.Model(db)
-              lock = self.server.getLock()
-              RDFDom.treeToModel(self.server.rdfDom, outputModel, '')
-              #add the new imported statements
-              utils.DeserializeFromN3File(StringIO.StringIO(triples), model = outputModel)
-              #save the model and reload the RDFDom
-              outputfile = file(self.server.STORAGE_PATH, "w+", -1)
-              stmts = db._statements['default'] #get statements directly, avoid copying list
-              utils.writeTriples(stmts, outputfile)
-              outputfile.close()
-              self.server.loadModel()
-              lock.release()              
+              model, db = utils.DeserializeFromN3File(StringIO.StringIO(triples))
+              self.server.updateDom(model.statements())
           
     def doExport(self, dir, xpath=None, filter='wiki:name', name=None, static=False, **kw):
          '''
@@ -232,34 +224,43 @@ Options:
         (those that require parameters) are skipped.
 '''
          assert not (xpath and name), self.server.cmd_usage
-         if not xpath and name: xpath = '/*[wiki:name=%s]' % name
+         if not xpath and name: xpath = '/*[wiki:name="%s"]' % name
          else: xpath = xpath or ('/*[%s]' % filter) 
          results = self.server.evalXPath(xpath)
          for item in results:
              name = self.server.evalXPath('string(wiki:name)', node = item)
              assert name
              orginalName = name
-             format = self.server.evalXPath('string(wiki:revisions/*[last()]//a:contents/a:ContentTransform/a:transformed-by/wiki:ItemFormat)', node = item)
-             ext = os.path.splitext(name)[1]
-             if not ext and format:                 
-                if self.exts.get(format):
-                    name += '.' + self.exts[format]
              content = None
+             log.info('attempting to export %s ' % name)
              if static:
                  try:
-                     content = kw['__requestor__'].invoke__(orginalName) 
+                     rc = { '_static' : static} 
+                     #add these to the requestContext so invocation know its intent
+                     self.server.requestContext.append(rc)
+                     content = self.server.requestDispatcher.invoke__(orginalName) 
                      #todo: do we need any special link fixup?
                      #todo: what about external files (e.g. images)
                      #todo: change extension based on output mime type
                      #       (use invokeEx but move default mimetype handling out of handleRequest())
                      #       but adding an extension means fixing up links
-                 except AttributeError:
-                     log.warning('%s is dynamic, can not do static export', name)
-                     pass #note: only works with static site (ones with no arguments to pass
+                 except:
+                     log.warning('%s is dynamic, can not do static export' % name)
+                     self.server.requestContext.pop()
+                     #note: only works with static site (ones with no required arguments)
+                 else:
+                     self.server.requestContext.pop()
              else:
                  #just run the revision action and the contentAction
                  #todo: process patch
-                 content = self.server.doActions([self.findRevisionAction, self.findContentAction], kw.copy(), item)             
+                 content = self.server.doActions([self.findRevisionAction, self.findContentAction], kw.copy(), item)
+
+                 format = self.server.evalXPath('string((wiki:revisions/*/rdf:first)[last()]/wiki:Item//a:contents/a:ContentTransform/a:transformed-by/wiki:ItemFormat)', node = item)
+                 ext = os.path.splitext(name)[1]
+                 if not ext and format:                 
+                    if self.exts.get(format):
+                        name += '.' + self.exts[format]
+                 
              if content is None:
                  continue
                 
@@ -270,43 +271,36 @@ Options:
              itemfile = file(path, 'w+b')
              itemfile.write( content)
              itemfile.close()
-             
-             lastrevision = self.server.evalXPath('wiki:revisions/*[last()] | wiki:revisions/*[last()]//a:contents/*', node = item)
-             lastrevision.insert(0, item)
-             metadata = rxml.getRXAsRhizmlFromNode(lastrevision)
-             metadatafile = file(path + METADATAEXT, 'w+b')
-             metadatafile.write( metadata)
-             metadatafile.close()             
+
+             if not static:             
+                 lastrevision = self.server.evalXPath('(wiki:revisions/*/rdf:first)[last()]/wiki:Item | (wiki:revisions/*/rdf:first)[last()]/wiki:Item//a:contents/*', node = item)
+                 lastrevision.insert(0, item)
+                 metadata = rxml.getRXAsRhizmlFromNode(lastrevision)
+                 metadatafile = file(path + METADATAEXT, 'w+b')
+                 metadatafile.write( metadata)
+                 metadatafile.close()             
 
     def processPatch(self, contents, kw, result):
         #we assume result is a:ContentTransform/a:transformed-by/*, set context to the parent a:ContentTransform
         patchBaseResource =  self.server.evalXPath('../../a:pydiff-patch-base/*', node = result)
-        #print 'r', result
         #print 'b', patchBaseResource
+        #print 'context: ', result, result.parentNode, result.parentNode.parentNode
         #print 'c', contents
-        #print 'context: ', result
-        #print 'pr', patchBaseResource
-
+        
         #get the contents of the resource which this patch will use as the base to run its patch against
         #todo: issue kw.copy() is not a deep copy -- what to do?
         base = self.server.doActions([self.findContentAction, self.processContentAction], kw.copy(), patchBaseResource)
-        patch = pickle.loads(str(contents))
+        assert base, "patch failed: couldn't find contents for %s" % repr(base)
+        patch = pickle.loads(str(contents))        
         return utils.patch(base,patch)
 
     def metadata_save(self, about, contents):
       #print >>sys.stderr, 'about ', about
       if not isinstance(about, ( types.ListType, types.TupleType ) ):
-        about = [ about ]
-      resources = []
+          about = [ about ]
       try:
-       for s in self.server.rdfDom.childNodes:
-            if not about:
-                break
-            if s.getAttributeNS(RDF_MS_BASE, 'about') in about:            
-                resources.append(s)
-                about.remove( s.getAttributeNS(RDF_MS_BASE, 'about') )
-       xml = rhizml.rhizmlString2xml(contents)#parse the rxity to rx xml
-       self.server.processRxML('<rx:rx>'+ xml+'</rx:rx>', resources)
+          xml = rhizml.rhizmlString2xml(contents)#parse the rxity to rx xml
+          self.server.processRxML('<rx:rx>'+ xml+'</rx:rx>', about)
       except:
         log.exception("metadata save failed")
         raise
@@ -315,8 +309,9 @@ Options:
         return [(name, self.addItem(name, **kw))]
 
     def addItem(self, name, loc=None, contents=None, disposition = 'complete', 
-                format='binary', doctype='', handlesDoctype='', handlesDisposition='', title=None,
-                handlesAction=None, actionType='http://rx4rdf.sf.net/ns/archive#NamedContent',
+                format='binary', doctype='', handlesDoctype='', handlesDisposition='',
+                title=None, handlesAction=None,
+                actionType='http://rx4rdf.sf.net/ns/archive#NamedContent',
                 baseURI=None, owner='http://rx4rdf.sf.net/site/users-admin',
                 accessTokens=['base:write-structure-token'], authorizationGroup=''):
         '''
@@ -388,4 +383,4 @@ Options:
         itembNode['a:created-on'] = "1057919732.750"
         itembNode['wiki:item-disposition'] = Res('http://rx4rdf.sf.net/ns/wiki#item-disposition-' + disposition)
 
-        return nameUriRef.toTriplesDeep()                
+        return nameUriRef.toTriplesDeep()

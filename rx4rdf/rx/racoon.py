@@ -6,12 +6,14 @@
     http://rx4rdf.sf.net    
 """
 import utils, glock
-from RDFDom import *
+import RxPath
+from xml.dom import Node as _Node
+
 from Ft.Rdf.Drivers import Memory
 import os, time, cStringIO, sys, base64, mimetypes, types
 from Ft.Xml.Lib.Print import PrettyPrint
 from Ft.Xml.XPath.Conversions import StringValue        
-from Ft.Xml import SplitQName
+from Ft.Xml import SplitQName, XPath, InputSource
 from Ft.Xml.XPath import RuntimeException,FT_EXT_NAMESPACE
 from Ft.Xml.Xslt import XSL_NAMESPACE
 from Ft.Lib import Uri, UriException
@@ -74,7 +76,7 @@ def String2NodeSet(context, string):
 def GenerateBnode(context, name=None):
     if name is not None:
         name = StringValue(name)
-    return generateBnode(name)
+    return utils.generateBnode(name)
 
 def FileExists(context, uri):
     path = StringValue(uri)
@@ -248,10 +250,10 @@ class Requestor(object):
     def invoke__(self, name, **kw):
         return self.invokeEx__(name, kw)[0]
         
-    def invokeEx__(self, name, kw):
-        #print 'invoke', kw
-        kw.update( self.server.requestContext )
+    def invokeEx__(self, name, kw):        
+        kw.update( self.server.requestContext[-1] )
         kw['_name']=name
+        #print 'invoke', kw
         result = self.server.runActions(self.triggerName, kw) 
         if result is not None: #'cause '' is OK
             return (result, kw)
@@ -438,20 +440,29 @@ def _getKeyFromXPathExp(compExpr, context, notCacheableXPathFunctions):
     The key consists of:
         expr, context.node, (var1, value1), (var2, value2), etc. for each var referenced in the expression
     '''
-    
-    key = [ repr(compExpr), context.node ] 
+
+    key = [ repr(compExpr) ]
+    DomDependent = False
     for field in compExpr:
         if isinstance(field, XPath.ParsedExpr.ParsedVariableReferenceExpr):
            value = field.evaluate(context) #may raise RuntimeException.UNDEFINED_VARIABLE
-           (expanded, local) = _splitKey(field._key, context)
+           expanded = _splitKey(field._key, context)
            if type(value) is type([]):
                 value = tuple(value)
+                DomDependent = True
+           elif isinstance(value, _Node):
+                DomDependent = True                
            key.append( (expanded, value) )
         elif isinstance(field, XPath.ParsedExpr.FunctionCall):
+           DomDependent = True #we could check if its a 'static' function that isn't domdendent
            expandedKey = _splitKey(field._key, context)
            if expandedKey in notCacheableXPathFunctions:               
                raise MRUCache.NotCacheable
            #else: log.debug("%s cacheable! not in %s" % (str(expandedKey), str(notCacheableXPathFunctions) ) )
+        else:
+            DomDependent = True
+    if DomDependent:
+        key += [context.node, id(context.node.ownerDocument), getattr(context.node.ownerDocument, 'revision', None)]
     #print 'returning key', tuple(key)
     return tuple(key)
 
@@ -526,7 +537,7 @@ DefaultNotCacheableFunctions = [(RXWIKI_XPATH_EXT_NS, 'get-metadata'),
 EnvironmentDependentFunctions = [ (None, 'document'),
     (RXWIKI_XPATH_EXT_NS, 'openurl'),
     (RXWIKI_XPATH_EXT_NS, 'file-exists') ]
-
+    
 ############################################################
 ##Racoon main class
 ############################################################
@@ -538,19 +549,16 @@ class Root(object):
         python: _name, _content, _request, _response, __requestor__
         
     '''
-
     DEFAULT_CONFIG_PATH = 'wiki-default-config.py'
     lock = None
                 
     requestContext = utils.createThreadLocalProperty('__requestContext',
         doc='variables you want made available to anyone during this request (e.g. the session)')
-
-    import Ft.Xml.XPath
             
     expCache = MRUCache.MRUCache(0, XPath.Compile)#, sideEffectsFunc=_resetFunctions)
 
     def __init__(self,argv):
-        self.requestContext = {}
+        self.requestContext = [] #stack of dicts
         configpath = self.DEFAULT_CONFIG_PATH
         self.source = None
         i = 0
@@ -604,9 +612,9 @@ class Root(object):
                     kw[name] = arg
                     arg = i.next()  
         except StopIteration: pass
-        #print 'args', kw 
-        self.runActions('run-cmds', kw) 
-        
+        #print 'args', kw
+        self.runActions('run-cmds', kw)        
+            
     def loadConfig(self, path, argsForConfig=None):
         if not os.path.exists(path):
             path = self.DEFAULT_CONFIG_PATH
@@ -624,7 +632,7 @@ class Root(object):
             kw['__include__'] = includeConfig
             kw['__configpath__'] = [os.path.abspath(path)]
             execfile(path, globals(), kw)
-        #else: todo: support for xml, rdf? 
+
         def initConstants(varlist, default):
             import copy 
             for name in varlist:                
@@ -637,14 +645,15 @@ class Root(object):
                          'contentProcessorCachePredicates',
                          'contentProcessorSideEffectsFuncs',
                          'contentProcessorSideEffectsPredicates'], {} )
-        initConstants( [ 'STORAGE_PATH', 'STORAGE_TEMPLATE_PATH', 'STORAGE_TEMPLATE', 'APPLICATION_MODEL'], '')
+        initConstants( [ 'STORAGE_PATH', 'STORAGE_TEMPLATE', 'APPLICATION_MODEL', 'DEFAULT_MIME_TYPE'], '')
+        setattr(self, 'initModel', kw.get('initModel', RxPath.initFileModel))
         initConstants( ['ROOT_PATH'], '/')
         assert self.ROOT_PATH[0] == '/', "ROOT_PATH must start with a '/'"
         initConstants( ['BASE_MODEL_URI'], self.BASE_MODEL_URI)
-        initConstants( ['MAX_MODEL_LITERAL'], -1)
+        initConstants( ['MAX_MODEL_LITERAL'], -1)        
         #cache settings:
         initConstants( ['NOT_CACHEABLE_FUNCTIONS'], [])
-        initConstants( ['LIVE_ENVIRONMENT'], False)
+        initConstants( ['LIVE_ENVIRONMENT'], 1)
         initConstants( ['XPATH_CACHE_SIZE','ACTION_CACHE_SIZE'], 1000)
         initConstants( ['XPATH_PARSER_CACHE_SIZE','STYLESHEET_CACHE_SIZE'], 200)
         self.expCache.capacity = self.XPATH_PARSER_CACHE_SIZE
@@ -667,7 +676,6 @@ class Root(object):
         self.contentProcessorSideEffectsPredicates.update(DefaultContentProcessorSideEffectsPredicates)
         self.extFunctions.update(DefaultExtFunctions)
 
-
     def getLock(self):
         '''
         acquires the class lock.
@@ -676,36 +684,28 @@ class Root(object):
         '''
         assert self.lock
         return glock.LockGetter(self.lock)
-            
-    def loadModel(self):
-        source = self.source
-        if not source:
-            if os.path.exists(self.STORAGE_PATH):
-                source = self.STORAGE_PATH
-            else:
-                if not os.path.exists(self.STORAGE_TEMPLATE_PATH):
-                    outputfile = file(self.STORAGE_TEMPLATE_PATH, "w+", -1)
-                    outputfile.write(self.STORAGE_TEMPLATE)
-                    outputfile.close()
-                source = self.STORAGE_TEMPLATE_PATH
+
+    def loadModel(self):        
+        if self.source:
+            source = self.source
         else:
-            if source.endswith('.nt'):
-                self.STORAGE_PATH = source
-            else:
-                self.STORAGE_PATH = os.path.splitext(self.source)[0] + '.nt'
-                                    
-        if not self.lock:
-            lockName = self.STORAGE_PATH + '.lock'
+            source = self.STORAGE_PATH
+        assert source, 'no model path given and STORAGE_PATH not set!'
+
+        if not self.lock:            
+            lockName = 'r' + `hash(repr(source))` + '.lock'
             self.lock = glock.GlobalLock(lockName)
             
-        lock = self.getLock()
-        
-        model, memorydb = utils.deserializeRDF(source)        
+        lock = self.getLock()            
+        model = self.initModel(source, StringIO.StringIO(self.STORAGE_TEMPLATE))
+                
         if self.APPLICATION_MODEL:
-            utils.DeserializeFromN3File(cStringIO.StringIO(self.APPLICATION_MODEL), model = model, scope='application')
+            appmodel, appdb = utils.DeserializeFromN3File(StringIO.StringIO(self.APPLICATION_MODEL), scope='application')
+            model = RxPath.MultiModel(model, RxPath.FtModel(appmodel))
                                         
         self.revNsMap = dict(map(lambda x: (x[1], x[0]), self.nsMap.items()) )#reverse namespace map #todo: bug! revNsMap doesn't work with 2 prefixes one ns
-        self.rdfDom = RDFDoc(model, self.revNsMap)
+        self.rdfDom = RxPath.createDOM(model, self.revNsMap)
+        
         self.rdfDom.queryCache = MRUCache.MRUCache(self.XPATH_CACHE_SIZE, lambda compExpr, context: compExpr.evaluate(context),
                 lambda compExpr, context: _getKeyFromXPathExp(compExpr, context, self.NOT_CACHEABLE_FUNCTIONS),
                 _processXPathExpSideEffects, _calcXPathSideEffects)
@@ -794,7 +794,8 @@ class Root(object):
             context = XPath.Context.Context(node, varBindings = vars,
                         extFunctionMap = extFunctionMap, processorNss = self.nsMap)
             #sorry this confusing... call RDFDom modules' evalXPath
-            return evalXPath(xpath, context, expCache = self.expCache, queryCache=getattr(self.rdfDom, 'queryCache', None))
+            return RxPath.evalXPath(xpath, context, expCache = self.expCache,
+                    queryCache=getattr(self.rdfDom, 'queryCache', None))
         except (RuntimeException), e:
             if e.errorCode == RuntimeException.UNDEFINED_VARIABLE:                            
                 log.debug(e.message) #undefined variables are ok
@@ -821,8 +822,6 @@ class Root(object):
                 #print exp
                 result = self.evalXPath(exp, vars=vars, extFunctionMap = extFunMap, node = contextNode)
                 if result:
-                    if name == '_resource' and isinstance(result, type([])): #todo: fix this hack to work around xlst bug
-                        result = result[0]
                     kw[name] = result
                     break
             if not result:
@@ -862,7 +861,10 @@ class Root(object):
                             result = [ result ]
                         if action.forEachNode:
                             if action.depthFirst:
-                                result.reverse()#we probably want the reverse of document order (e.g. the deepest first)
+                                #we probably want the reverse of document order (e.g. the deepest first)
+                                result = result[:] #copy the list since it might have been cached
+                                result.reverse()
+                                #print '!!!res', contextNode.childNodes
                             for node in result:
                                 if kw.get('_metadatachanges'): del kw['_metadatachanges']
                                 retVal = self.rdfDom.actionCache.getOrCalcValue(action.action,
@@ -955,53 +957,43 @@ class Root(object):
                     self, cacheValue, sideEffects, result, kw, contextNode, contents)
         else:
             return None 
-
+        
     def transform(self, stylesheet, kw=None):
         if kw is None: kw = {}        
         vars, funcs = self.mapToXPathVars(kw)
-
+        
         #processor = utils.XsltProcessor()        
         #def contextHook(context): context.varBindings[(None, '_kw')] = kw
         #processor.contextSetterHook = contextHook 
         
-        return applyXslt(self.rdfDom, stylesheet, vars, funcs, baseUri='path:',
+        return RxPath.applyXslt(self.rdfDom, stylesheet, vars, funcs, baseUri='path:',
                          styleSheetCache=styleSheetCache)#, processor = processor)
 
-    def xupdateRDFDom(self, rdfDom, outputfile, xupdate=None, kw=None, uri=None):
+    def xupdateRDFDom(self, rdfDom, xupdate=None, kw=None, uri=None):
+        '''execute the xupdate script on the specified RxPath DOM
+        '''
         kw = kw or {}
         baseUri= uri or 'path:'
         vars, funcs = self.mapToXPathVars(kw)
-        applyXUpdate(rdfDom, xupdate, vars, funcs, uri=baseUri)
-
-        #rdfDomOutput = StringIO.StringIO()                  
-        #Ft.Xml.Lib.Print.PrettyPrint(rdfDom, asHtml=1, stream=rdfDomOutput)
-        #print rdfDomOutput.getvalue()
-                          
-        db = Memory.CreateDb('', 'default')
-        outputModel = Ft.Rdf.Model.Model(db)                
-        treeToModel(rdfDom, outputModel, '') #just save the default scope, not the 'application' scope
-        stmts = db._statements['default'] #get statements directly, avoid copying list
-        utils.writeTriples(stmts, outputfile)
-        
-    def xupdate(self, xupdate=None, kw=None, uri=None):        
-        if kw is None: kw = {}
-        baseUri=uri or 'path:'
-        #print xupdate
         lock = self.getLock()
-        #todo: use _xupdateRDFDom with "two-phase commit" to temp file
-        vars, funcs = self.mapToXPathVars(kw)
-        applyXUpdate(self.rdfDom, xupdate,  vars = vars, extFunctionMap = funcs, uri=baseUri)
-        db = Memory.CreateDb('', 'default')
-        outputModel = Ft.Rdf.Model.Model(db)        
-        treeToModel(self.rdfDom, outputModel, '') #just save the default scope, not the 'application' scope
-        outputfile = file(self.STORAGE_PATH, "w+", -1)
-        stmts = db._statements['default'] #get statements directly, avoid copying list
-        utils.writeTriples(stmts, outputfile)
-        ##end xupdateRDFDom
-        outputfile.close()        
-        self.loadModel()
+        rdfDom.begin()
+        try:
+            RxPath.applyXUpdate(rdfDom, xupdate, vars, funcs, uri=baseUri)
+        except:
+            rdfDom.rollback()
+            lock.release()
+            raise
+        else:
+            rdfDom.commit()
+            lock.release()
+        
+    def xupdate(self, xupdate=None, kw=None, uri=None):
+        '''execute the xupdate script, updating the server's model
+        '''        
+        lock = self.getLock()
+        self.xupdateRDFDom(self.rdfDom, xupdate, kw, uri)
         lock.release()
-
+                
     def executePython(self, cmds, kw = None):
         if kw is None: kw = {}
         #todo: thread synchronize
@@ -1028,7 +1020,7 @@ class Root(object):
             contents = "<pre>Unable to invoke script: \nerror:\n%s\nscript:\n%s</pre>" % (str(e), contents)
         return contents
         
-    def processXslt(self, source, contents, kw = None, uri='path:'):
+    def processXslt(self, styleSheetContents, contents, kw = None, uri='path:'):
         if kw is None: kw = {}
         vars, extFunMap = self.mapToXPathVars(kw)
         
@@ -1039,57 +1031,69 @@ class Root(object):
         #processor.contextSetterHook = contextHook
         
         #print 'xslt ', uri
-        #print 'xslt template:', source
+        #print 'xslt template:', styleSheetContents
         #print 'xslt source: ', contents
-        styleSheet = styleSheetCache.getValue(source, uri)
+        styleSheet = styleSheetCache.getValue(styleSheetContents, uri)
         processor.appendStylesheetInstance( styleSheet, uri) 
         for (k, v) in extFunMap.items():
             namespace, localName = k
             processor.registerExtensionFunction(namespace, localName, v)        
         return processor.run(InputSource.DefaultFactory.fromString(contents, uri), topLevelParams = vars) 
-    
-    def processRxML(self, xml, resources=None):      
-      from Ft.Xml import Domlette
-      import rxml
-      #parse the xml    
-      isrc = InputSource.DefaultFactory.fromString(xml)
-      #print >>sys.stderr, 'rxml', xml
-      doc = Domlette.NonvalidatingReader.parse(isrc)
-      #replace the resources with the statements in the doc
-      #should we assert the doc only has statements about this resource?
-      #delete our resource from the dom:      
-      #print >>sys.stderr, 'resources', resources
-      lock = self.getLock()
-      if resources:
-          if not isinstance(resources, ( types.ListType, types.TupleType ) ):
-            resources = ( resources, )
-          for resource in resources:
-              self.rdfDom.removeChild(resource)
-      #write RDFDom out to a model 
-      db = Memory.CreateDb('', 'default')
-      outputModel = Ft.Rdf.Model.Model(db)
-      treeToModel(self.rdfDom, outputModel, '') #just save the default scope, not the 'application' scope  
-      #update the model with the resource's new statements
-      nsMap = self.nsMap.copy()
-      nsMap.update( { 
+
+    def processRxML(self, xml, resources=None):
+        '''Updates the DOM and model by replaceing the resources contained in the resources list with the statements asserted in the RxML doc.
+        If resources is None, the RxML statements are just added to the 
+        '''
+        from Ft.Xml import Domlette
+        import rxml
+        #parse the rxml
+        #print >>sys.stderr, 'rxml', xml
+        isrc = InputSource.DefaultFactory.fromString(xml)
+        rxmlDoc = Domlette.NonvalidatingReader.parse(isrc)
+        
+        #create a temporary model to write the rxml statements to 
+        db = Memory.CreateDb('', 'default')
+        outputModel = Ft.Rdf.Model.Model(db)
+
+        nsMap = self.nsMap.copy()
+        nsMap.update( { 
                     None : rxml.RX_NS,
                    'rx': rxml.RX_NS  
-                    })
-      
-      rxml.addRxdom2Model(doc, outputModel, nsMap , self.rdfDom)        
-      #save and reload the model
-      outputfile = file(self.STORAGE_PATH, "w+", -1)        
-      stmts = db._statements['default'] #get statements directly, avoid copying list
-      utils.writeTriples(stmts, outputfile)
-      outputfile.close()      
-      self.loadModel()
-      lock.release()      
-
-    def partialXsltCacheKeyPredicate(self, retVal, kw, contextNode, styleSheetUri):
+                    })        
+        rxml.addRxdom2Model(rxmlDoc, outputModel, nsMap , self.rdfDom)        
+                    
+        return self.updateDom(outputModel.statements(), resources, True)
+            
+    def updateDom(self, addStmts, removeResources=None, removeListObjects=False):
+        '''update our DOM
+        addStmts is a list of Statements to add
+        removeResources is a list of resource URIs to remove
+        '''
+        lock = self.getLock()        
+        self.rdfDom.begin()
+        #log.debug('removing %s' % removeResources)
+        try:
+            #delete the resources from the dom:        
+            if removeResources:
+                for uri in removeResources:
+                    self.rdfDom.removeResource(uri, removeListObjects)
+            #and add the statements
+            self.rdfDom.addStatements(addStmts)
+        except:
+            self.rdfDom.rollback()
+            lock.release()
+            raise
+        else:
+            self.rdfDom.commit()        
+            lock.release()
+            
+    def partialXsltCacheKeyPredicate(self, styleSheetContents, sourceContents, kw, contextNode, styleSheetUri):
       styleSheetNotCacheableFunctions = self.NOT_CACHEABLE_FUNCTIONS
-      key = [retVal, styleSheetUri, contextNode]
+      revision = getattr(contextNode.ownerDocument, 'revision', None)            
+      key = [styleSheetContents, styleSheetUri, sourceContents, contextNode,
+             id(contextNode.ownerDocument), revision]
       
-      styleSheet = styleSheetCache.getValue(retVal, styleSheetUri)
+      styleSheet = styleSheetCache.getValue(styleSheetContents, styleSheetUri)
       
       try:
           isCacheable = styleSheet.isCacheable
@@ -1102,7 +1106,8 @@ class Root(object):
           
       if not isCacheable:
           raise MRUCache.NotCacheable
-          
+
+      #the top level xsl:param element determines the parameters of the stylesheet: extract them          
       topLevelParams = [child for child in styleSheet.children \
          if child.expandedName[0] == XSL_NAMESPACE and child.expandedName[1] == 'param']
            
@@ -1141,29 +1146,49 @@ class Root(object):
 ###########################################
 ## http request handling
 ###########################################
-        
+    def guessMimeTypeFromContent(self, result):
+        #obviously this could improved,
+        #e.g. detect encoding in xml header or html meta tag
+        #or handle the BOM mark in front of the <?xml 
+        #detect binary vs. text, etc.
+        if result.startswith("<html"):
+            return "text/html"
+        elif result.startswith("<?xml"):
+            return "text/xml"
+        elif self.DEFAULT_MIME_TYPE:
+            return self.DEFAULT_MIME_TYPE
+        else:
+            return None
+            
     def handleRequest(self, _name_, **kw):
         #print 'name:', _name_
         kw['_name'] = _name_ #explictly replace _name -- do it this way to avoid TypeError: handleRequest() got multiple values for keyword argument '_name'
 
+        #if the request name has an extension try to set a default mimetype before executing the request
         i=_name_.rfind('.')
         if i!=-1:
             ext=_name_[i:]      
-            contentType=mimetypes.types_map.get(ext, "text/html")
-            kw['_response'].headerMap['content-type']=contentType
+            contentType=mimetypes.types_map.get(ext)
+            if contentType:
+                kw['_response'].headerMap['content-type']=contentType
 
         try:
             rc = {}
             rc['_session']=kw['_session']
             #todo: probably should put request.simpleCookie in the requestContext somehow too
-            self.requestContext= rc
+            self.requestContext.append(rc)
 
             result = self.runActions('handle-request', kw)
             
             if result is not None: #'cause '' is OK
+                #if mimetype is not set, make another attempt
+                if not kw['_response'].headerMap.get('content-type'):
+                    contentType = self.guessMimeTypeFromContent(result)
+                    if contentType:
+                        kw['_response'].headerMap['content-type']=contentType
                 return result
         finally:
-            self.requestContext = {}
+            self.requestContext.pop()
         
         kw['_response'].headerMap['status'] = 404 #not found
         return self._default_not_found(kw)
@@ -1263,7 +1288,7 @@ def isCacheableStylesheet(nodes, styleSheetNotCacheableFunctions):
 
 DefaultContentProcessorCachePredicates = {
     'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt' : lambda self, result, kw, contextNode, contents:\
-        self.partialXsltCacheKeyPredicate(contents, kw, contextNode, 'path:'), 
+        self.partialXsltCacheKeyPredicate(contents, None, kw, contextNode, 'path:'), 
     
     'http://www.w3.org/2000/09/xmldsig#base64' :
         lambda self, result, kw, contextNode, contents: contents #the key is just the contents
@@ -1323,11 +1348,12 @@ def main(argv):
         for logger in logging.Logger.manager.loggerDict.itervalues():
             logger.disabled = 0        
     else: #set defaults        
-        logging.BASIC_FORMAT = "%(asctime)s %(levelname)s %(name)s:%(message)s" 
+        logging.BASIC_FORMAT = "%(asctime)s %(levelname)s %(name)s:%(message)s"
+        logging.root.setLevel(logging.INFO)
         logging.basicConfig()
 
     root = Root(rootArgs)
-    print 'ma', mainArgs  
+    #print 'ma', mainArgs  
     if '-h' in mainArgs or '--help' in mainArgs:
         #print DEFAULT_cmd_usage,'[config specific options]'
         print root.cmd_usage
@@ -1346,9 +1372,9 @@ def main(argv):
         sys.argv = mainArgs #hack for Server
         import Server
         debug = '-r' in mainArgs
-        print 'starting server!'
+        #print 'starting server!'
         Server.start_server(root, debug) #kicks off the whole process
-        print 'dying!'
+        #print 'dying!'
 
 if __name__ == '__main__':
     main(sys.argv[1:])

@@ -247,6 +247,38 @@ class Processor:
                 else:
                     refnode.insertBefore(result, refnode.childNodes[position])
                 context.processorNss = oldNss
+            elif node.localName == 'replace':
+                select = node.getAttributeNS(EMPTY_NAMESPACE, u'select')
+                if not select:
+                    raise XUpdateException(XUpdateException.NO_SELECT)
+                try:
+                    _select = self.parseExpression(select)
+                except SyntaxError, e:
+                    raise SyntaxError("Select Expression %s: %s" % (select, str(e)))
+
+                oldNss = context.processorNss
+                context.processorNss = Domlette.GetAllNs(node)
+
+                nodeset = _select.evaluate(context)
+                if not nodeset:
+                    raise XUpdateException(XUpdateException.INVALID_SELECT, node.getAttributeNS(EMPTY_NAMESPACE, u'select'))
+                refnode = nodeset[0]
+
+                self.pushDomResult(refnode.ownerDocument)
+                try:
+                    for child in node.childNodes:
+                        context = self.visit(context, child, preserveSpace)
+                finally:
+                    result = self.popResult()
+
+                if refnode.nodeType == Node.ATTRIBUTE_NODE:
+                    owner = refnode.parentNode
+                    owner.removeAttributeNode(refnode)
+                    owner.setAttributeNodeNS(result)
+                else:
+                    refnode.parentNode.replaceChild(result, refnode)
+
+                context.processorNss = oldNss
             elif node.localName == 'update':
                 select = node.getAttributeNS(EMPTY_NAMESPACE, u'select')
                 if not select:
@@ -333,6 +365,8 @@ class Processor:
 
                 context.processorNss = oldNss
             elif node.localName == 'value-of':
+                #moved XUpdate draft's semantics to xupdate:copy-of
+                #now has semantics to equivalent to XSLT's value-of
                 select = node.getAttributeNS(EMPTY_NAMESPACE, u'select')
                 if not select:
                     raise XUpdateException(XUpdateException.NO_SELECT)
@@ -342,18 +376,34 @@ class Processor:
                 context.processorNss = Domlette.GetAllNs(node)
 
                 result = _select.evaluate(context)
-                #4suite bug CopyNode and processor undefined
-                #instead let's convert everything to string like XSLT
-                #if type(result) is type([]):
-                #    # a node-set
-                #    for node in result:
-                #        CopyNode(processor, node) 
-                #else:
-                    # a string, number or boolean
                 if type(result) is not type(u''):
                     result = Conversions.StringValue(result)
                 self.writers[-1].text(result)
                 context.processorNss = oldNss
+            elif node.localName == 'copy-of':
+                #equivalent XUpdate draft's semantics for xupdate:value-of
+                #and XSLT's copy-of                
+                select = node.getAttributeNS(EMPTY_NAMESPACE, u'select')
+                if not select:
+                    raise XUpdateException(XUpdateException.NO_SELECT)
+                _select = self.parseExpression(select)
+
+                oldNss = context.processorNss
+                context.processorNss = Domlette.GetAllNs(node)
+
+                result = _select.evaluate(context)
+                #fixed 4suite bug CopyNode and processor undefined
+                from Ft.Xml.Xslt.CopyOfElement import CopyNode
+                processor = self #CopyNode just accesses writers[-1]        
+                if type(result) is type([]): # a node-set                    
+                    for node in result:
+                        CopyNode(processor, node) 
+                else:
+                    # a string, number or boolean
+                    if type(result) is not type(u''):
+                        result = Conversions.StringValue(result)
+                    self.writers[-1].text(result)
+                context.processorNss = oldNss                
             elif node.localName == 'text':
                 for child in node.childNodes:
                     context = self.visit(context, child, 1)

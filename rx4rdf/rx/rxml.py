@@ -11,7 +11,7 @@
 """
 import sys, re
 import utils
-import RDFDom
+import RxPath
 from Ft.Xml import EMPTY_NAMESPACE,InputSource,SplitQName
 from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, RDF_MS_BASE, BNODE_BASE
 from Ft.Rdf.Statement import Statement
@@ -88,14 +88,14 @@ def getResource(s, rxNSPrefix, nsMap, thisResource):
         id = s.getAttributeNS(EMPTY_NAMESPACE, 'id')
         resource = id 
         if not id:
-            resource = RDFDom.generateBnode()
+            resource = RxPath.generateBnode()
     else:
         #deprecated if the element has an id element treat as the resource URI ref and the element name as the class type
         id = getAttributefromQName(s, rxNSPrefix, 'id')
         if id is not None:
             resource = id
             if not resource:
-                resource = RDFDom.generateBnode()                            
+                resource = RxPath.generateBnode()                            
             typeName = getURIFromElementName(s, nsMap)
         else:
             resource = getURIFromElementName(s, nsMap)
@@ -111,13 +111,13 @@ def getObject(elem, rxNSPrefix,nsMap, thisResource):
             literal = ""#if no child we assume its an empty literal
         #todo: support for xml:lang and rdf:datatype
         return literal, OBJECT_TYPE_LITERAL
-    elif matchName(elem, rxNSPrefix, RX_XMLLITERALELEM): #xmlliteral #todo: test and fix!! 
-        docFrag = RDFDom.DocumentFragment() 
+    elif matchName(elem, rxNSPrefix, RX_XMLLITERALELEM): #xmlliteral #todo: test and fix!!        
+        docFrag = elem.ownerDocument.createDocumentFragment()
         docFrag.childNodes = elem.childNodes
         prettyOutput = StringIO.StringIO()
         import Ft.Xml.Lib.Print
         Ft.Xml.Lib.Print.Print(docFrag, stream=prettyOutput)
-        return prettyOutput.getvalue(), RDFDom.OBJECT_TYPE_XMLLITERAL 
+        return prettyOutput.getvalue(), RxPath.OBJECT_TYPE_XMLLITERAL 
     else:
         return getResource(elem, rxNSPrefix,nsMap, thisResource)[0], OBJECT_TYPE_RESOURCE
 
@@ -128,7 +128,7 @@ def addList2Model(model, subject, p, listID, id, scope, getObject = getObject):
             continue
         object, objectType = getObject(child)
         if prevListID:
-            listID = RDFDom.generateBnode()
+            listID = RxPath.generateBnode()
             model.add( Statement( prevListID, RDF_MS_BASE+'type', RDF_MS_BASE+'List', '', scope, OBJECT_TYPE_RESOURCE))                
             model.add( Statement( prevListID, RDF_MS_BASE+'rest', listID, '', scope, OBJECT_TYPE_RESOURCE))                        
         model.add( Statement( listID, RDF_MS_BASE+'first', object, '', scope, objectType))
@@ -138,7 +138,7 @@ def addList2Model(model, subject, p, listID, id, scope, getObject = getObject):
     
 def addResource(model, scope, resource, resourceElem, rxNSPrefix,nsMap, thisResource, noStmtIds=False):
     '''
-    add the children of a RXML element to the model
+    add the children of a RXML resource element to the model
     '''
     for p in resourceElem.childNodes:
         if p.nodeType != p.ELEMENT_NODE:
@@ -159,12 +159,14 @@ def addResource(model, scope, resource, resourceElem, rxNSPrefix,nsMap, thisReso
              or getAttributefromQName(p, {'': EMPTY_NAMESPACE}, 'list') is not None\
              or getAttributefromQName(p, rxNSPrefix, 'listType') is not None\
              or getAttributefromQName(p, {'': EMPTY_NAMESPACE}, 'listType') is not None\
-             or len([c for c in p.childNodes if c.nodeType != p.COMMENT_NODE and c.nodeValue and c.nodeValue.strip()]) > 1:
+             or len([c for c in p.childNodes if c.nodeType != p.COMMENT_NODE \
+                and c.nodeValue and c.nodeValue.strip()]) > 1:
+            #the object of this predicate is a list
             listID = getAttributefromQName(p, rxNSPrefix, 'list')
             if not listID:
                 listID = p.getAttributeNS(EMPTY_NAMESPACE, 'list')
             if not listID:
-                listID = RDFDom.generateBnode()
+                listID = RxPath.generateBnode()
             model.add( Statement(resource, predicate, listID, id, scope, OBJECT_TYPE_RESOURCE))
             addList2Model(model, resource, p, listID, id, scope,
                           lambda elem: getObject(elem, rxNSPrefix,nsMap,thisResource))
@@ -235,13 +237,13 @@ def addRxdom2Model(rootNode, model, nsMap = None, rdfdom = None, thisResource = 
         else:
             resource, typeName = getResource(s, rxNSPrefix, nsMap, thisResource)
             if typeName:
-                model.add( Statement( resource, RDF_MS_BASE + 'type', typeName, '', scope, OBJECT_TYPE_RESOURCE))                
+                model.add( Statement( resource, RDF_MS_BASE + 'type', typeName, '', scope, OBJECT_TYPE_RESOURCE))
             resources = [ resource ]
         for resource in resources:
             addResource(model, scope, resource, s, rxNSPrefix,nsMap,thisResource, len(resources) > 1)        
         
 def getResourceNameFromURI(namespaceURI, revNsMap, rxPrefix):
-    prefixURI, rest = RDFDom.splitUri(namespaceURI)
+    prefixURI, rest = RxPath.splitUri(namespaceURI)
     #print 'spl %s %s %s' % (namespaceURI, prefixURI, rest)
     #print revNsMap
     if rest and revNsMap.has_key(prefixURI): 
@@ -249,10 +251,10 @@ def getResourceNameFromURI(namespaceURI, revNsMap, rxPrefix):
         return prefix + ':' + rest
     else:
         return rxPrefix + 'resource id="' + namespaceURI + '"'
-
+    
 def getRXAsRhizmlFromNode(resourceNodes, nsMap=None, includeRoot = False,
                          INDENT = '    ', NL = '\n', INITINDENT=' ', rescomment=''):
-    '''given a nodeset of RDFDom nodes, return RXML serialization in Rhizml markup format'''    
+    '''given a nodeset of RxPathDom nodes, return RXML serialization in Rhizml markup format'''    
     def outputPredicate(predNode, indent):
         if revNsMap.has_key(predNode.namespaceURI):
             prefix = revNsMap[predNode.namespaceURI]
@@ -266,26 +268,36 @@ def getRXAsRhizmlFromNode(resourceNodes, nsMap=None, includeRoot = False,
         id = predNode.getAttributeNS(RDF_MS_BASE, 'ID')
         if id:
             line += ' '+rxPrefix+RX_STMTID_ATTRIB+'="' + id + '"'
-        listID = predNode.getAttributeNS(None, 'listID')
-        if listID:
-            line += ' '+rxPrefix+'list="' + listID + '"'
-        line += ': '
-        if not predNode.childNodes:
-            return line
-        if predNode.childNodes[0].nodeType == predNode.COMMENT_NODE:
-            line += ';' + predNode.childNodes[0].nodeValue + NL
-        elif len(predNode.childNodes) == 1 and predNode.childNodes[0].nodeType == predNode.TEXT_NODE:
+        
+        assert len(predNode.childNodes) == 1        
+        if  predNode.childNodes[0].nodeType == predNode.TEXT_NODE:
+            line += ': '
             line += quoteString(predNode.childNodes[0].nodeValue) + NL #todo: datatype, xml literal
         else:
+            object = predNode.childNodes[0]
+            isList = object.isCompound()
+            if isList:
+                line += ' '+rxPrefix+'list="' + object.getAttributeNS(RDF_MS_BASE, 'about') + '"'
+
+            line += ': '
             line += NL
             indent += INDENT
-            for c in predNode.childNodes:
-                if c.nodeType == c.TEXT_NODE: #todo: datatype, xml literal
-                    line += indent + rxPrefix + RX_LITERALELEM + ':'+ quoteString(c.nodeValue) + NL
-                elif c.nodeType == c.COMMENT_NODE:
-                    line += indent + ';' + c.nodeValue + NL
-                elif c.nodeType == c.ELEMENT_NODE: 
-                    line += indent + getResourceNameFromURI(c.getAttributeNS(RDF_MS_BASE, 'about'),revNsMap,rxPrefix) + NL
+
+            if isList == RDF_MS_BASE+'List': #is the object a list resource?
+                for li in [p.childNodes[0] for p in object.childNodes\
+                        if p.stmt.predicate == RDF_MS_BASE+'first']:            
+                    if li.nodeType == li.TEXT_NODE: #todo: datatype, xml literal
+                        line += indent + rxPrefix + RX_LITERALELEM + ':'+ quoteString(li.nodeValue) + NL
+                    elif li.nodeType == li.ELEMENT_NODE: 
+                        line += indent + getResourceNameFromURI(
+                            li.getAttributeNS(RDF_MS_BASE, 'about'),revNsMap,rxPrefix) + NL
+            #todo: elif isList in [rdf:seq, rdf:alt, rdf:bag]:
+                #set listType
+                #for p.stmt.predicate == 'rdf:li' #handle containers
+            else:
+                line += indent + getResourceNameFromURI(
+                    object.getAttributeNS(RDF_MS_BASE, 'about'),revNsMap,rxPrefix) + NL
+                
         return line
 
     if nsMap is None:
@@ -337,7 +349,7 @@ def rx2model(path, url=None, debug=0, nsMap = None):
     elif isinstance(path, ( type(''), type(u'') )):
         isrc = InputSource.DefaultFactory.fromUri(Uri.OsPathToUri(path))    
     else:
-        isrc = InputSource.DefaultFactory.fromStream(path)    
+        isrc = InputSource.DefaultFactory.fromStream(path, 'file:')    
     doc = Domlette.NonvalidatingReader.parse(isrc)
 
     from Ft.Rdf.Drivers import Memory    
@@ -395,6 +407,6 @@ if __name__ == '__main__':
                'rx': RX_NS              
             }
         revNsMap = dict( [ (x[1], x[0]) for x in nsMap.items() if x[0] and ':' not in x[0] ])
-        rdfDom = RDFDom.RDFDoc(model, revNsMap)        
+        rdfDom = RxPath.createDOM(RxPath.FtModel(model), revNsMap)        
         print getRXAsRhizmlFromNode(rdfDom.childNodes, nsMap)
         

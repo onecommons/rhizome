@@ -1,12 +1,12 @@
                             README
 
                          Rx4RDF and Rhizome
-                         Version 0.1.3
-                         Dec 15, 2003
+                         Version 0.2.0
+                         Feb 25, 2004
  
   Introduction
   ------------
-  This is the second release of Rx4RDF and Rhizome.  It is 
+  This is the third release of Rx4RDF and Rhizome.  It is 
   alpha quality: not many known bugs, but many missing features and not 
   extensively tested. Please send feedback to rx4rdf-discuss@lists.sf.net
 
@@ -14,61 +14,83 @@
   -----------
   Rx4RDF is a specification and reference implementation for           
   querying, transforming and updating RDF.
-  Rhizome is a Wiki-like content management and delivery system        
-  built on Rx4RDF.
-
+  
+  Rhizome is a Wiki-like content management and delivery system built on 
+  Rx4RDF that generalizes the wiki concept in several ways.
+  
   What's new in this release?
-  ---------------------------
-  * Major changes to Rhizome (and Racoon): it now supports users, sessions, 
-  authentication, and authorization (via access tokens, permissions, roles, 
-  and authorization groups). To modify structural pages you must now login 
-  in as the default administrator: login "admin", default password "admin".
-       
-  * Logging is now used throughout Rx4RDF and Rhizome (including with Python 2.2). 
-  The command line option -l [log.config] will load the specified log config file. 
+  ---------------------------  
+  RxPath has been completely reimplemented.  The first implementation was a 
+  proof-of-concept, this one is intended for production use. 
+  Enhancements include: signficant performance boost, retrieves statements 
+  from the underlying model on demand, incrementally updates the underlying model, 
+  support transactions and rollback, and provides RDF model independence through 
+  a simple API (includes adapters for 4Suite and Redland).
   
-  * Many minor bug fixes and a few critical ones, including support for Python 2.3.
-  
-  * Other changes include search (output as RSS or HTML), improved RhizML and more.
-  See changelog.txt for more details.
+  Racoon is several times faster as result of adding various caches throughout 
+  the request pipeline (taking advantage of the (nearly) side-effect free nature
+  of XPath and XSLT).
 
-  Known bugs
+  In addition there have several other enhancements, see changelog.txt for more
+  details.
+
+  Known (major) bugs
   ----------
-  (Also see http://rx4rdf.liminalzone.org/Status for more general infomation.)
+  (Also see http://rx4rdf.liminalzone.org/Status for more general information.)
   
   Rx4RDF
-  * See comment at top of RDFDom.py for discrepancies with the RxPath
+  * See comment at top of RxPathDom.py for discrepancies with the RxPath
   specification. In particular, the descendant axis is too greedy -- it 
   doesn't only follow transitive relations.
-  * RxSLT doesn't handle xsl:copy as specified in the RxPath spec.
+  * RxSLT doesn't handle xsl:copy-of as specified in the RxPath spec.
   
   Racoon
-  * The stand-alone http server often throws socket exceptions, but this appears
-  to be harmless.
-  * when saving a page or metadata the whole RDF model is reloaded but 
-  the Action still has a reference to the old model which might lead 
-  to unexpected behavior when developing custom applications.
-
+  * The stand-alone http server often throws socket exceptions with the message 
+  "(10053, 'Software caused connection abort')", but this appears to be harmless.
+  * The global write lock doesn't seem to work correctly on CygWin and is disabled 
+  on that platform.
+  
   Rhizome
   * Rhizome stores previous revisions as a diff against the next version
-  so if you change the content file on disk or use the "minor edit" checkbox, 
-  the Rhizome will not be able reconstruct the diff.
+  so if you directly change the content file on disk, the Rhizome will not 
+  be able reconstruct the diff.
   * Unrelated to this, you can only view the current and previous revisions, 
-  trying to view older ones result in an error (but they are there).
+  trying to view older ones result in an error (but they are there -- the  
+  query fails because of the above mentioned greedy descendant axis bug).
     
+  Requirements
+  ------------
+    
+  Rx4RDF requires Python 2.2 or later and 4Suite 1.0a1 (4Suite.org).
+   
+  Rx4RDF and Rhizome are known to run on Linux, Windows 2000 and Cygwin.  
+  
+  On Windows, the Python Win32 Extensions (python.org/windows/win32all) 
+  must be installed or locking will be disabled.
+  
+  Installation
+  ------------
+
+  This is a standard Python source distribution. To install:
+
+  1. Unzip
+  2. Run python <unzip dir>/setup.py install     
+  
+  docs/Download contains a quick start guide.
+
   Documentation
   -------------
-
-  Unfortunately the /doc directory is currently empty, to view documentation 
-  (such as it is) visit http://rx4rdf.sf.net or run the local copy of the site 
+  
+  The /docs directory is contains a static export of the Rx4RDF site.
+  Alternatively, you can visit http://rx4rdf.sf.net or run the local copy of the site 
   in the /site directory:
   
+  cd <unzip>
+  python setup.py install
   cd <unzip dir>/site
   python ../rx/racoon.py -a site-config.py
   browse to http://localhost:8000 (edit server.cfg to change the port).
-
-  Or you can view the raw content in site/content.
-  
+   
   Licensing
   ---------
 

@@ -33,7 +33,7 @@ if not globals().has_key('hotReload'):
     #if not (len(sys.argv)==1 or (len(sys.argv)==3 and sys.argv[1]=="-C")): printUsageAndExit() 
     #if len(sys.argv)==3: configFileName=sys.argv[2]        
     try:    
-        configFileName=sys.argv[sys.argv.index("-s")+1] #todo: splice argv at '-a'
+        configFileName=sys.argv[sys.argv.index("-s")+1] 
     except (IndexError, ValueError):
         pass
     configFile=ConfigParser.ConfigParser()
@@ -245,7 +245,17 @@ if not globals().has_key('hotReload'):
     if _sessionStorageType=='ram' and (_forking or severalProcs):
         print "CherryWarning: 'ram' sessions might be buggy when using several processes"
 ##end parseConfigFile.py insert
-        
+    #rhizome change: make default page name configurable
+    global _indexName
+    _indexName= 'index'
+    try: _indexName=configFile.get('server', '_indexName')
+    except: pass
+
+    global _usevdomain
+    _usevdomain = False
+    try: _indexName=configFile.get('server', '_useSubDomainAsName')
+    except: pass
+     
     if _sessionStorageFileDir:#rhizome change
         try: os.makedirs(_sessionStorageFileDir)
         except: pass
@@ -511,7 +521,7 @@ if not globals().has_key('hotReload'):
         _year, _month, _day, _hh, _mm, _ss, _wd, _y, _z = time.gmtime(_now)
         _date="%s, %02d %3s %4d %02d:%02d:%02d GMT"%(_weekdayname[_wd],_day,_monthname[_month],_year,_hh,_mm,_ss)
         #modified for rhizome:
-        response.headerMap={"status": "200 OK", "content-type": "text/html", "server": "Rhizome 0.1", "date": _date, "set-cookie": [], "content-length": 0}
+        response.headerMap={"status": "200 OK", "server": "Rhizome 0.2", "date": _date, "set-cookie": [], "content-length": 0}
 
         # Two variables used for streaming
         response.wfile = _wfile
@@ -675,9 +685,18 @@ if not globals().has_key('hotReload'):
         
         request.browserBase = request.base + root.ROOT_PATH 
         request.browserPath = request.browserUrl[len(request.browserBase):] #the operative part of the url (browserUrl = browserBase + browserPath)
-        
-        if not name:
-            name= 'index'
+
+        #use virtual domain name in place of index
+        #note: they still share the same set of page and also www.foo.com/bar == bar.foo.com/
+        if not name or name == _indexName:            
+            if _usevdomain and headerMap['host'].count('.') > 1:
+                subdomain = headerMap['host'].split('.')[0]
+                if subdomain != 'www':
+                    name= subdomain
+                else:
+                    name= _indexName                    
+            else:
+                name= _indexName
             
         request.paramMap['_request']=request
         request.paramMap['_response']=response
@@ -1049,8 +1068,9 @@ if not globals().has_key('hotReload'):
                             _sentChar=self._sock.send(self._wbuf)
                             self._wbuf=self._wbuf[_sentChar:]
             def __del__(self):
-                if self._sock and self._sock.fileno()!=-1: self.close()
-
+                try: self.close() #changed merged from 0.10-beta
+                except: pass
+            
     class CherryThreadingMixIn(SocketServer.ThreadingMixIn):
         def process_request_thread(self, request, client_address):
             """Same as in BaseServer but as a thread.

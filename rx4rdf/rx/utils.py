@@ -19,7 +19,8 @@ from Ft.Rdf.Drivers import Memory
 from Ft.Rdf import BNODE_BASE, BNODE_BASE_LEN
 from Ft.Lib import Uuid
 _bNodeCounter  = 0
-_sessionBNodeUUID = "x" + Uuid.UuidAsString(Uuid.GenerateUuid()) + "_"  #like this so this will be a valid xml nmtoken
+#like this so this will be a valid bNode token (NTriples only allows alphanumeric, no _ or - etc.
+_sessionBNodeUUID = "x%032xx" % Uuid.GenerateUuid()
 
 def generateBnode(name=None):
     """
@@ -36,6 +37,28 @@ def cond(ifexp, thenexp, elseexp = lambda: None):
         return thenexp()
     else:
         return elseexp()
+
+def bisect_left(a, x, cmp=cmp, lo=0, hi=None):
+    """
+    Like bisect.bisect_left except it takes a comparision function.
+    
+    Return the index where to insert item x in list a, assuming a is sorted.
+
+    The return value i is such that all e in a[:i] have e < x, and all e in
+    a[i:] have e >= x.  So if x already appears in the list, i points just
+    before the leftmost x already there.
+
+    Optional args lo (default 0) and hi (default len(a)) bound the
+    slice of a to be searched.
+    """
+
+    if hi is None:
+        hi = len(a)
+    while lo < hi:
+        mid = (lo+hi)//2        
+        if cmp(a[mid],x) < 0: lo = mid+1
+        else: hi = mid
+    return lo
 
 def createThreadLocalProperty(name, fget=True, fset=True, fdel=True, doc=None, initAttr=False, initValue=None):
     '''
@@ -169,65 +192,20 @@ def walkDir(path, fileFunc, *funcArgs, **kw):
         del kw['dirFunc']
         return dirFunc(path, lambda *args, **kw: _walkDir(path, recurse, args, kw), *funcArgs, **kw)
 
-class SLListIter(object):
-    def __init__(self, sllist):
-        self._iter = iter(sllist.data)
-        self._next = sllist.next
-        
-    def __iter__(self):
-        return self
-
-    def next(self):
-        try: 
-            return self._iter.next()
-        except StopIteration:
-            if self._next is None:                        
-                raise
-            else:
-                self._iter = iter(self._next.data)
-                self._next = self._next.next
-            return self.next()
-
-class SLList(object):
-    def __init__(self, init = []):
-        self.data = init
-        self.next = None
-
-    def __iter__(self):
-        return SLListIter(self)
-
-    def extend(self, sllist):
-        if isinstance(sllist, SLList):
-            if self.next is None:
-                self.next = sllist
-            else:
-                self.data.extend(sllist)
-        else:
-            self.data.extend(sllist)
-            
-    def __getitem__(self, index):
-        l = len(self.data)
-        if index < l:
-            return self.data[index]
-        elif not self.next is None:
-            return self.next[index - l]
-        else:
-            raise IndexError()
-            
-    def __len__(self):    
-        if self.next is None:
-            return len(self.data)
-        else:
-            return len(self.data) + self.next.__len__() 
-
 #see w3.org/TR/rdf-testcases/#ntriples 
 #todo: assumes utf8 encoding and not string escapes for unicode
-def parseTriples(lines, bNodeToURI = None):        
+Removed = object()
+def parseTriples(lines, bNodeToURI = None):
+    remove = False
     for line in lines:
         line = line.strip().decode('utf8')
         if not line: #trailing whitespace
             break;
-        if line[0] == '#': #comment
+        if line.startswith('#!remove'): #this extension to NTriples allows us to incrementally update a model using NTriples
+            remove = True
+            continue
+        elif line[0] == '#': #comment
+            remove = False
             continue
         subject, predicate, object = line.split(None,2)
         if subject.startswith('_:'):
@@ -235,7 +213,13 @@ def parseTriples(lines, bNodeToURI = None):
             subject = bNodeToURI(subject)
         else:
             subject = subject[1:-1] #uri
-        predicate = predicate[1:-1] #uri
+            
+        if predicate.startswith('_:'):
+            predicate = predicate[2:] #bNode
+            predicate = bNodeToURI(predicate)
+        else:            
+            predicate = predicate[1:-1] #uri
+            
         object = object.strip()        
         if object[0] == '<': #if uri
             object = object[1:object.find('>')]
@@ -251,7 +235,11 @@ def parseTriples(lines, bNodeToURI = None):
                 object = object.replace(r'\\', '\\').replace('\\' + quote, quote).replace(r'\n', '\n').replace(r'\r', '\r').replace(r'\t', '\t')
             objectType = OBJECT_TYPE_LITERAL
         #print "parsed: ", subject, predicate, object
-        yield (subject, predicate, object, objectType)
+        if remove:
+            remove = False
+            yield (Removed, (subject, predicate, object, objectType))
+        else:
+            yield (subject, predicate, object, objectType)
 
 def DeserializeFromN3File(n3filepath, driver=Memory, dbName='', create=0, scope='',
                         modelName='default', model=None):
@@ -270,9 +258,15 @@ def DeserializeFromN3File(n3filepath, driver=Memory, dbName='', create=0, scope=
     else:
         stream = n3filepath
         
-    bNodeMap = {}
-    for stmt in parseTriples(stream, lambda bNode: bNodeMap.setdefault(bNode, generateBnode(bNode)) ):
-        model.add( Statement.Statement(stmt[0], stmt[1], stmt[2], '', scope, stmt[3]) )                
+    #bNodeMap = {}
+    #makebNode = lambda bNode: bNodeMap.setdefault(bNode, generateBnode(bNode))
+    makebNode = lambda bNode: BNODE_BASE + bNode
+    for stmt in parseTriples(stream,  makebNode):
+        if stmt[0] is Removed:            
+            stmt = stmt[1]
+            model.remove( Statement.Statement(stmt[0], stmt[1], stmt[2], '', scope, stmt[3]) )
+        else:
+            model.add( Statement.Statement(stmt[0], stmt[1], stmt[2], '', scope, stmt[3]) )                
     #db.commit()
     return model, db
 
@@ -294,11 +288,23 @@ def writeTriples(stmts, stream):
     predicate = 1
     object = 2
     objectType = 5
-    for stmt in stmts:            
-       stream.write("<" + stmt[subject] + "> ")
-       stream.write("<" + stmt[predicate] + "> ")
+    for stmt in stmts:
+       if stmt[0] is Removed:
+           stream.write("#!remove\n")
+           stmt = stmt[1]
+       if stmt[subject].startswith(BNODE_BASE):
+            stream.write('_:' + stmt[subject][BNODE_BASE_LEN:]) 
+       else:
+            stream.write("<" + stmt[subject] + ">")
+       if stmt[predicate].startswith(BNODE_BASE):
+            stream.write( '_:' + stmt[predicate][BNODE_BASE_LEN:]) 
+       else:            
+           stream.write(" <" + stmt[predicate] + ">")
        if stmt[objectType] == OBJECT_TYPE_RESOURCE:
-            stream.write("<" + stmt[object] + "> .\n")
+            if stmt[object].startswith(BNODE_BASE):
+                stream.write(' _:' + stmt[object][BNODE_BASE_LEN:] + ".\n") 
+            else:
+                stream.write(" <" + stmt[object] + "> .\n")
        else:           
            #escaped = repr(stmt[object])
            #if escaped[0] = 'u': 
@@ -308,7 +314,7 @@ def writeTriples(stmts, stream):
            escaped = stmt[object].replace('\\', r'\\').replace('\"', r'\"').replace('\n', r'\n').replace('\r', r'\r').replace('\t', r'\t')
 
            if stmt[objectType] in [OBJECT_TYPE_LITERAL, OBJECT_TYPE_UNKNOWN]:
-               stream.write('"' + escaped.encode('utf8') + '" .\n')
+               stream.write(' "' + escaped.encode('utf8') + '" .\n')
 	       #else:
            #    stream.write('"' + escaped.encode('utf8') + '"^^' + stmt[objectType])
 	       #    stream.write(" .\n")
@@ -329,10 +335,6 @@ def nilsimsa(filepath):
         try:
             val = execcmd('\\cygwin\\usr\\local\\bin\\nilsimsa "' + filepath + '"')[:64]#just read the first 64 bytes of first line
             #todo: don't hard code path
-            #    stdout = os.popen('\\cygwin\\usr\\local\\bin\\nilsimsa ' + filepath) 
-            #    val = stdout.read(64) #just read the first 64 bytes of first line     #re.match('[\dA-Fa-f]{64}', input)
-            #    err = stdout.close()
-            #    assert err is None, "nilsimsa returned an error: " + str(err) #todo error handling
             assert long(val, 16) #this will throw an exception if input isn't valid
             return val #e.g. 'e932f4a082fb0aa8b6926cb190145188d583e9520f9e87ab8070cec1c304648f' 
         except:
@@ -531,7 +533,7 @@ class Res(dict):
             return triples, reslist
     
 class InterfaceDelegator:
-    '''assumes only methods will be called on this object'''
+    '''assumes only methods will be called on this object and the methods always return None'''
     def __init__(self, handlers):
         self.handlers = handlers
     
@@ -556,6 +558,28 @@ class Singleton(type):
         return cls.instance
 
 class Patcher(type):
+    '''
+    Note: untested!! Probably have to deal with Method._im_func for __old_ methods
+    
+    This metaclass provides a convenient way to patch an existing instead of defining a subclass.
+    This is useful when you need to fix bugs or add critical functionality to a library without
+    modifying its source code.
+    
+    usage:
+    given a class named NeedsPatching that needs the method 'buggy' patched.
+    'unused' never needs to be instantiated, the patching occurs as soon as the class statement is executed.
+    
+    class unused(NeedsPatching):
+        __metaclass__ = Patcher
+
+        def buggy(self):           
+           self.__old_buggy() 
+           self.newFunc()
+           
+        def newFunc(self):
+            pass    
+    '''
+    
     def __init__(self,name,bases,dic):
         assert len(bases) == 1
         self.base = bases[0]
@@ -567,7 +591,7 @@ class Patcher(type):
                 hasOldValue = False
             setattr(self.base, name, value)
             if hasOldValue:
-                setattr(self.base, '_super_' + name, oldValue)
+                setattr(self.base, '__old_' + name, oldValue)
 
     def __call__(self,*args,**kw):
         '''instantiate the base object'''        
@@ -589,7 +613,8 @@ class DynaExceptionFactory(object):
     raise NotFoundError()
     '''    
     def __init__(self, module, base = DynaException):
-        self.module = __import__(module)
+        self.module = sys.modules[module] #we assume the module has already been loaded
+        #self.module = __import__(module) #doesn't work for package -- see the docs for __import__ 
         self.base = base
                         
     def __call__(self, name, msg = None):
@@ -597,7 +622,7 @@ class DynaExceptionFactory(object):
         dynaexception = getattr(self.module, classname, None)
         if dynaexception is None:
             #create a new class derived from the base Exception type
-            msg = msg or name                
+            msg = msg or name            
             dynaexception = type(self.base)(classname, (self.base,), { 'msg': msg })
             setattr(self.module, classname, dynaexception)
         return dynaexception

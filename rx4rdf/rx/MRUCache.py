@@ -31,6 +31,8 @@ class MRUCache:
     MRU/LRU list is initialized with a dummy node to a circular list of length one.
     This node becomes LRU and gets overwritten when the list fills to capacity.
     """
+    debug = False
+    
     def __init__(self,
         capacity,       # max number of simultaneous cache MRU values kept
         valueCalc=None,      # user function to calculate actual value from args
@@ -108,6 +110,7 @@ class MRUCache:
             #warning: kw args will not be part of key
         try:
             node = self.nodeDict[hkey]
+            if self.debug: print 'found key', hkey, 'value', node.value
             assert node.hkey == hkey
             #if node.invalidate and node.invalidate(node.value, *args, **kw):
             #    self.removeNode(node)

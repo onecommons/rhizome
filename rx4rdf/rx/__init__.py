@@ -3,7 +3,7 @@
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
-__all__ = ["racoon", "RDFDom", "DomTree", "utils", 'MRUCache',
+__all__ = ["racoon", "RxPathDom", "RxPath", "DomTree", "utils", 'MRUCache',
            "rxml", "rhizome", "rhizml", "rhizmltokenize",
            "Server", "XUpdate", "glock", "metakitdriver"]
 try:
