@@ -12,7 +12,7 @@ import Ft
 from Ft.Lib import Uri
 from Ft.Rdf import RDF_MS_BASE,OBJECT_TYPE_RESOURCE
 from Ft.Xml import InputSource
-import os, sys, types, base64, fnmatch, traceback
+import os, os.path, sys, types, base64, fnmatch, traceback
 try:
     import cPickle
     pickle = cPickle
@@ -38,7 +38,8 @@ class RhizomeBaseMarkupMap(zml.LowerCaseMarkupMap):
         tag, attribs, text = super(RhizomeBaseMarkupMap, self).mapLinkToMarkup(
                 link, name, annotations, isImage, isAnchorName)
 
-        if tag != self.A:#todo: this means that interwiki links only work in <a> tags
+        if self.rhizome.uninitialized or tag != self.A:
+            #todo: this means that interwiki links only work in <a> tags
             return tag, attribs, text
 
         attribDict = dict(attribs)
@@ -89,6 +90,7 @@ class DocumentMarkupMap(RhizomeBaseMarkupMap):
     TT = 'code'
     A = 'link'
     SECTION = 'section'
+    IMG = 'figure' #todo: figure is block, icon is inline
     
     def __init__(self, docType,rhizome):
         super(DocumentMarkupMap, self).__init__(rhizome)
@@ -168,6 +170,12 @@ class Rhizome(object):
     'http://rx4rdf.sf.net/ns/wiki#item-format-xml':'xml',
     'http://rx4rdf.sf.net/ns/content#pydiff-patch-transform':'pkl'
     }
+
+    defaultIndexableFormats = ['http://rx4rdf.sf.net/ns/wiki#item-format-text',
+                               'http://rx4rdf.sf.net/ns/wiki#item-format-xml',
+                               'http://rx4rdf.sf.net/ns/wiki#item-format-zml']
+
+    uninitialized = True
     
     def __init__(self, server):
         self.server = server
@@ -184,11 +192,33 @@ class Rhizome(object):
             return raccoon.assignVars(self, kw, varlist, default)
         
         initConstants( ['MAX_MODEL_LITERAL'], -1)        
-        self.SAVE_DIR = kw.get('SAVE_DIR', 'content/.rzvs/')
-        self.ALTSAVE_DIR = kw.get('ALTSAVE_DIR', 'content/')
+        self.SAVE_DIR = os.path.abspath( kw.get('SAVE_DIR', 'content/.rzvs') )
+        self.ALTSAVE_DIR = os.path.abspath( kw.get('ALTSAVE_DIR', 'content') )
+
+        if not kw.has_key('PATH'):
+            #set the path to be ALT_SAVE_DIR followed by the directory
+            #that rhizome-config.py lives in (i.e. probably 'rhizome')
+            #we assume that SAVE_DIR is a subdirectory of one of these
+            #if not, you need to set the PATH manually            
+            self.server.PATH = os.path.split(kw['_rhizomeConfigPath'])[0] #set in rhizome-config.py
+            if self.ALTSAVE_DIR:
+                self.server.PATH = self.ALTSAVE_DIR + os.pathsep + self.server.PATH
+        log.debug('path is %s' % self.server.PATH)
+        if self.MAX_MODEL_LITERAL > -1:
+            assert [prefix for prefix in self.server.PATH
+                if self.ALTSAVE_DIR.startswith(os.path.abspath(prefix)) ], 'ALT_SAVE_DIR must be on the PATH'
+                
+            #SAVE_DIR should be a sub-dir of one of the PATH
+            #directories so that 'path:' URLs to files there include
+            #the subfolder to make them distinctive. (Because you don't want to be able override them)
+            saveDirPrefix = [prefix for prefix in self.server.PATH
+                if self.SAVE_DIR.startswith(os.path.abspath(prefix)) ]
+            assert saveDirPrefix and self.SAVE_DIR[len(saveDirPrefix[0]):],\
+                  'SAVE_DIR must be a distinct sub-directory of a directory on the PATH'
+                
         self.interWikiMapURL = kw.get('interWikiMapURL', 'site:///intermap.txt')
-        initConstants( ['undefinedPageIndicator', 'externalLinkIndicator', 'interWikiLinkIndicator' ], 1)
-        initConstants( ['authPredicates', 'globalRequestVars'], [])
+        initConstants( ['undefinedPageIndicator', 'externalLinkIndicator', 'interWikiLinkIndicator', 'useIndex' ], 1)
+        initConstants( ['authPredicates'], [])
         initConstants( ['RHIZOME_APP_ID'], '')
 
         self.passwordHashProperty = kw.get('passwordHashProperty',
@@ -209,7 +239,11 @@ class Rhizome(object):
         #used by hasPage
         self.checkForResourceAction = raccoon.Action(self.findResourceAction.queries[:-1])
         self.checkForResourceAction.assign("__resource", '.', post=True)
+        self.indexDir = kw.get('INDEX_DIR', 'contentindex')
+        self.indexableFormats = kw.get('indexableFormats', self.defaultIndexableFormats)
 
+        self.uninitialized = False
+        
     def getInterWikiMap(self):        
         if self.interWikiMap is not None:
             return self.interWikiMap
@@ -294,8 +328,9 @@ class Rhizome(object):
 
             authorizingResources.sort()
             authorizingResources = utils.removeDupsFromSortedList(authorizingResources)
-            self.authorizeUpdate(user, node.stmt, authorizingResources,
-                "http://rx4rdf.sf.net/ns/auth#permission-add-statement")
+            self.authorizeUpdate(user, authorizingResources,
+                "http://rx4rdf.sf.net/ns/auth#permission-add-statement",
+                node.stmt.subject, node.stmt.predicate,node.stmt.object)
 
     def authorizeRemovals(self, additions, removals, reordered, user):
         forAllResource = self.server.rdfDom.findSubject(self.server.BASE_MODEL_URI + 'common-access-checks')
@@ -304,10 +339,18 @@ class Rhizome(object):
             authorizingResources = self.getAuthorizingResources( node.parentNode )
             if forAllResource:
                 authorizingResources.append(forAllResource)
-            self.authorizeUpdate(user, node.stmt, authorizingResources,
-                "http://rx4rdf.sf.net/ns/auth#permission-remove-statement")
+            self.authorizeUpdate(user, authorizingResources,
+                "http://rx4rdf.sf.net/ns/auth#permission-remove-statement",
+                node.stmt.subject, node.stmt.predicate,node.stmt.object)
             
     def getAuthorizingResources(self, node, membershipList = None):
+        #check authorization on all the applicable nodes: find all the subject
+        #resources that are reachable by inverse transitively
+        #following the subject of the statement and applying the authorization
+        #expression to them. equivalent to:
+        #(.//auth:requires-authorization-for[* = $resource]/ancestors::*/..)[authquery]
+        #but for now its more efficient to manually find the ancestors:    
+
         rdfDom = node.ownerDocument
         nodeset = [ node ]
         authresources = [ node ]
@@ -322,19 +365,14 @@ class Rhizome(object):
             authresources.extend(nodeset)
         return authresources
         
-    def authorizeUpdate(self, user, stmt, authorizingResources, action):
-        #check authorization on all the nodes in: find all the subject
-        #resources that are reachable by inverse transitively
-        #following the subject of the statement and applying the authorization
-        #expression to them:
-        #(.//auth:requires-authorization-for[* = $resource]/ancestors::*/..)[authquery]
-        #for now its more efficient to manually find the ancestors:    
-            
-        #if any other the authresources requires an auth token the
-        #user doesn't have access to the nodeset will be not empty        
-        if self.server.evalXPath('($nodeset)[%s]'%self.authorizationQuery,
+    def authorizeUpdate(self, user, authorizingResources, action, subject,
+                        predicate=0, object=0, noraise=False):            
+        #if any of the authresources requires an auth token that the
+        #user doesn't have access to, the nodeset will not be empty        
+        result = self.server.evalXPath('($nodeset)[%s]'%self.authorizationQuery,
             kw2vars(__authAction=action, __user=user, nodeset = authorizingResources,
-                    __authProperty=stmt.predicate, __authValue=stmt.object)):
+                    __authProperty=predicate, __authValue=object))
+        if result and not noraise:
            if action == 'http://rx4rdf.sf.net/ns/auth#permission-add-statement':
                actionName = 'add'
            elif action == 'http://rx4rdf.sf.net/ns/auth#permission-remove-statement':
@@ -342,13 +380,44 @@ class Rhizome(object):
            else:
                actionName = action
            raise raccoon.NotAuthorized('You are not authorized to %s this statement: %s %s %s'
-                    % (actionName, stmt.subject, stmt.predicate,stmt.object))
+                    % (actionName, subject, predicate,object))
+        #return the nodes of the resources that user isn't authorized to perform this action on 
+        return result
+
+    def authorizeDynamicContent(self, accesstoken, calldefault, contents, formatType, kw, dynamicFormat):
+        if dynamicFormat:
+            if not self.server.evalXPath(
+    '''$__user/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser' or
+    /*[.='%s'][.=$__user/auth:has-rights-to/* or .=$__user/auth:has-role/*/auth:has-rights-to/*]'''
+                % accesstoken, kw2vars(__user=kw.get('__user',[]))):
+               raise raccoon.NotAuthorized(
+    'You are not authorized to create dynamic content with this format: %s' 
+                    % (formatType))
+            elif not calldefault:
+                #success so return now if we don't want try the default
+                return         
+        #try the default authorization, if any
+        return self.server.authorizeContentProcessing(
+                self.server.DefaultAuthorizeContentProcessors,
+                contents, formatType, kw, dynamicFormat)
+
+    def authorizeXPathFuncs(self, server, funcs, kw):
+        #we don't authorization for accessing individual XPath extension functions yet,
+        #but as a temporary security measure take advantage of the
+        #fact that Raccoon doesn't call authorizeXPathFuncs for
+        #XUpdate scripts, allowing us to delete unsafe from other contexts (e.g. XSLT)
         
+        for unsafe in [(raccoon.RXWIKI_XPATH_EXT_NS, 'generate-patch'),
+                       (raccoon.RXWIKI_XPATH_EXT_NS, 'save-contents')]:
+            if unsafe in funcs:
+                del funcs[unsafe]
+
     ###command line handlers####
     def doImport(self, path, recurse=False, r=False, disposition='',
                  filenameonly=False, xupdate="path:import.xml",
                  doctype='', format='', dest=None, folder=None, token = None,
-                 keepext = False, **kw):
+                 label=None, keepext=False, noindex=False, save=True,
+                 fixedBaseURI=None, **kw):
           '''Import command line option
 Import the file in a directory into the site.
 If, for each file, there exists a matching file with ".metarx" appended, 
@@ -365,13 +434,15 @@ Options:
 Can be used for schema migration, for example.
 Default: "path:import.xml". This disgards previous revisions and
          points the content to the new import location.
+-noindex Don't add the content to the index
 
 The following options only apply when no metarx file is present: 
 -folder path (prepended to name and creates folder resource if necessary)
 -keepext Don't drop the file extension when naming the page.
 Each of these set the equivalent metadata property:
 -disposition (wiki:item-disposition), -doctype (wiki:doctype),
--format (wiki:item-format), -token (auth:guarded-by)
+-format (wiki:item-format), -token (auth:guarded-by),
+-label  (wiki:has-label)
 Their value can be either an URI or a QName.
 '''
           defaultFormat=format
@@ -390,12 +461,16 @@ Their value can be either an URI or a QName.
               filePattern = ''
           rootPath = os.path.normpath(path or '.').replace(os.sep, '/')
           log.info('beginning import of ' + rootPath)
-          triples = []
-          #folders = [] #list of relevant directory paths encounters
-          if dest:
-              prefixlen = len(InputSource.DefaultFactory.resolver.getPrefix(dest))  
+          triples = {}
+
+          if fixedBaseURI:
+              assert not (recurse or r), 'this combination of options is not supported yet'
           else:
-              prefixlen = len(InputSource.DefaultFactory.resolver.getPrefix(rootPath))
+              if dest:
+                  prefixlen = len(InputSource.DefaultFactory.resolver.getPrefix(dest))  
+              else:
+                  prefixlen = len(InputSource.DefaultFactory.resolver.getPrefix(rootPath))
+                
           #todo: support storing contents directly in model (use saveContents()?)
               
           def fileFunc(path, filename):
@@ -408,54 +483,59 @@ Their value can be either an URI or a QName.
                   destpath = os.path.join(dest, filename)
               else:
                   destpath = path
-              if prefixlen: #if the destination is on the raccoon path use a path: URL
+
+              if fixedBaseURI:
+                  loc = fixedBaseURI + filename                  
+              elif prefixlen: #if the destination is on the raccoon path use a path: URL
                   loc = raccoon.SiteUriResolver.OsPathToPathUri(os.path.abspath(destpath)[prefixlen+1:])
               else: #use a file:// URL 
                   loc = Uri.OsPathToUri(os.path.abspath(destpath))
                   
               if os.path.exists(path + METADATAEXT):
                   #parse the rzml to rxml then load it into a RxPath DOM
-                  xml = zml.zml2xml(open(path + METADATAEXT))
+                  xml = zml.zml2xml(open(path + METADATAEXT), URIAdjust = True)
                   rdfDom = rxml.rxml2RxPathDOM(StringIO.StringIO('<rx:rx>'+ xml+'</rx:rx>'))
                   #Ft.Xml.Lib.Print.PrettyPrint(rdfDom, asHtml=1, stream=file('rdfdom1.xml','w')) #asHtml to suppress <?xml ...>
                   
                   #check to see if the page already exists in the site                  
                   wikiname = rdfDom.evalXPath('string(/*/wiki:name)', nsMap = self.server.nsMap)
                   assert wikiname, 'could not find a wikiname when importing %s' % path + METADATAEXT
-                  if self.server.evalXPath("/*[wiki:name='%s']"% wikiname):
+                  if save and self.server.evalXPath("/*[wiki:name='%s']"% wikiname):
                       log.warning('there is already an item named ' + wikiname +', skipping import')
                       return #hack for now skip if item already exists
                   else:                      
                       log.info('importing ' +filename)
-                  
-                  #dirsegments = wikiname.split('/')[:-1]
-                  #paths = dirsegments[:1]
-                  #for path in dirsegments[1:]:
-                  #    paths.append( paths[-1] + '/' + path)                      
-                  #folders += paths
-                  
+                                    
                   #update the page's metadata using the xupdate script
                   self.server.xupdateRDFDom(rdfDom, uri=xupdate,
                                     kw={ 'loc' : loc, 'name' : wikiname, 'base-uri' : self.BASE_MODEL_URI,
-                                         'resource-uri' : self.BASE_MODEL_URI + wikiname })
+                                         'resource-uri' : self.getNameURI(None,wikiname) })
 
                   #write out the model as nt triples
                   moreTriples = StringIO.StringIO()                  
                   stmts = rdfDom.model.getStatements() 
                   utils.writeTriples(stmts, moreTriples)
                   #print moreTriples.getvalue()
-                  triples.append( moreTriples.getvalue() )
+                  triples[wikiname] = moreTriples.getvalue() 
 
+                  #get the resource's uri (it might have changed)
+                  resourceURI = rdfDom.evalXPath('string(/*[wiki:name])', nsMap = self.server.nsMap)
+                  assert resourceURI
+                  resourceURI = rdfDom.evalXPath('/*[wiki:name]/', nsMap = self.server.nsMap)
+                  
                   #create folder resources if necessary
                   pathSegments = wikiname.split('/')
                   rootFolder, parentFolder = self.addFolders(pathSegments[:-1])
                   if parentFolder:
-                      #get the resource's uri (it might have changed)
-                      itemUriRef = rdfDom.evalXPath('string(/*[wiki:name])', nsMap = self.server.nsMap)
-                      assert itemUriRef
-                      parentFolder['wiki:has-child'] = itemUriRef
+                      parentFolder['wiki:has-child'] = resourceURI
                   if rootFolder:
-                      triples.append( rootFolder.toTriplesDeep() )
+                      triples['@importedfolders'] = \
+                        triples.get('@importedfolders','') + rootFolder.toTriplesDeep() 
+                      
+                  format = rdfDom.evalXPath(
+                  '''string((/*[wiki:name]/wiki:revisions/*/rdf:first)[last()]/
+                     wiki:Item/a:contents/a:ContentTransform/a:transformed-by/wiki:ItemFormat)''',
+                     nsMap = self.server.nsMap)
               else:
                   #no metadata file found -- try to guess the some default metadata             
                   if not filenameonly:
@@ -469,7 +549,7 @@ Their value can be either an URI or a QName.
                   else:
                       wikiname = filepath
                   wikiname = filter(lambda c: c.isalnum() or c in '_-./', wikiname)
-                  if self.server.evalXPath("/*[wiki:name='%s']"% wikiname):
+                  if save and self.server.evalXPath("/*[wiki:name='%s']"% wikiname):
                       log.warning('there is already an item named ' + wikiname +', skipping import')
                       return #hack for now skip if item already exists
                   else:
@@ -500,51 +580,47 @@ Their value can be either an URI or a QName.
                       disposition = defaultDisposition
                   if not defaultDoctype:
                       if format == 'http://rx4rdf.sf.net/ns/wiki#item-format-zml':
-                          mm = zml.zml2xml(file(path), mmf=self.mmf, getMM=True)
+                          mm = zml.detectMarkupMap(file(path), mmf=self.mmf)
                           doctype = mm.docType
                       else:
                           doctype=''
                   else:
                       doctype = defaultDoctype
-                  triples.append( self.addItem(wikiname,loc=loc,format=format,
+                  triples[wikiname] = self.addItem(wikiname,loc=loc,format=format,
                                     disposition=disposition, doctype=doctype,
                                     contentLength = str(os.stat(path).st_size),
                                     digest = utils.shaDigest(path),
-                                    accessTokens=accessTokens
-                                    ) )
+                                    accessTokens=accessTokens) 
+                  title = ''
+                  resourceURI = self.getNameURI(None, wikiname)
+                  
               if dest:
                   import shutil
                   try: 
                     os.makedirs(dest)
                   except OSError: pass #dir might already exist
                   shutil.copy2(path, dest)
-
+                  
+              if save and self.index and not noindex:
+                  if format in self.indexableFormats:
+                      self.addToIndex(resourceURI, file(path, 'r').read(), title)
+                  
           if os.path.isdir(rootPath):
                 if recurse or r:
                     recurse = 0xFFFF
                 utils.walkDir(rootPath, fileFunc, recurse = recurse)
           else:
-                fileFunc(rootPath, os.path.split(rootPath)[1])
-          if triples:
-              triples = ''.join(triples)
-              model, db = utils.DeserializeFromN3File(StringIO.StringIO(triples))
-              
-##              #incrementally add references folders resources to minimize duplicate statements
-##              rdfDom = RxPath.createDOM(RxPath.FtModel(model), self.server.revNsMap)
-##              for folder in folders:
-##                  if not rdfDom.evalXPath("/wiki:Folder[wiki:name='%s']"% folder,
-##                                                      nsMap = self.server.nsMap):
-##                      rootFolder, folder = self.addFolders(folder)                      
-##                      folder['wiki:has-child'] = nameUriRef
-##                      moreTriples = rootFolder.toTriplesDeep()
-##                      folderModel, folderDb = utils.DeserializeFromN3File(StringIO.StringIO(moreTriples))
-##                      rdfDom.addStatements(folderModel.statements() )
-
+                fileFunc(rootPath, os.path.split(rootPath)[1])                    
+          if triples and save:
+              model, db = utils.DeserializeFromN3File(
+                  StringIO.StringIO(''.join(triples.values()) ))              
               #add all the statements from the model containing the newly imported triples
               #to our server's model
               self.server.updateDom(model.statements())
+          return triples
           
-    def doExport(self, dir, xpath=None, filter='wiki:name', name=None, static=False, **kw):
+    def doExport(self, dir, xpath=None, filter='wiki:name', name=None,
+                 static=False, noalias=False, **kw):
          '''
 Export command line option
 Exports the content of each item in the site as a file.  Also, for each file, 
@@ -555,6 +631,7 @@ Options:
 -name  Name of item to export (for exporting one item) (no effect if -xpath is specified)
 -static Have export attempt to render the content as html. Dynamic pages 
         (those that require parameters) are skipped.
+-noalias Don't create static copies of page aliases (use with -static only)
 -label Name of revision label
 '''
          assert not (xpath and name), self.server.cmd_usage
@@ -567,7 +644,7 @@ Options:
              orginalName = name
              content = None
              log.info('attempting to export %s ' % name)
-             if static:
+             if static:                 
                  try:
                      class _dummyRequest:
                          def __init__(self):
@@ -575,6 +652,7 @@ Options:
                              self.simpleCookie = {}
 
                      rc = { '_static' : static,
+                            '_noErrorHandling': 1,
                             '_response': _dummyRequest() #we need this for the mimetype
                             }
                      
@@ -593,7 +671,7 @@ Options:
                      #traceback.print_exc()
                      log.warning('%s is dynamic, can not do static export' % name)
                      self.server.requestContext.pop()
-                     #note: only works with static site (ones with no required arguments)
+                     #note: only works with static pages (ones with no required parameters)
                  else:
                      self.server.requestContext.pop()
              else:
@@ -622,7 +700,19 @@ Options:
              itemfile.write( content)
              itemfile.close()
 
-             if not static:             
+             if static:
+                 if not noalias:
+                    aliases = self.server.evalXPath('wiki:alias/text()', node = item)
+                    for alias in aliases:
+                         path = dir+'/'+ alias.nodeValue
+                         try: os.makedirs(os.path.split(path)[0])
+                         except os.error:
+                             #traceback.print_exc()
+                             pass 
+                         itemfile = file(path, 'w+b')
+                         itemfile.write( content)
+                         itemfile.close()                        
+             else:
                  lastrevision = self.server.evalXPath(
                      '''(wiki:revisions/*/rdf:first)[last()]/wiki:Item |
                        (wiki:revisions/*/rdf:first)[last()]/wiki:Item//a:contents/*''',
@@ -657,7 +747,7 @@ Options:
         #print 'template resource', resultNodeset
         kw["_template"] = resultNodeset
         
-        return self.server.callActions(actions, self.globalRequestVars,
+        return self.server.callActions(actions, self.server.globalRequestVars,
                                        resultNodeset, kw, contextNode, retVal)
 
     def processPatch(self, contents, kw, result):
@@ -674,13 +764,6 @@ Options:
         assert base, "patch failed: couldn't find contents for %s" % repr(base)
         patch = pickle.loads(str(contents)) 
         return utils.patch(base,patch)
-
-    def customProcessor(self, contents, kw):
-        #return getattr(self.customHandler, kw['_name'])(contents.strip(), kw)
-        name = contents.strip()
-        if name=='dump' and not kw.get('_static'):
-            return self.server.dump()
-        raise 'Error: unknown customHandler! ' + name
         
     ######XPath extension functions#####        
     def getZML(self, context, resultset = None):        
@@ -691,6 +774,11 @@ Options:
 
     def getRxML(self, context, resultset = None, comment = '',
                                 fixUp=None, fixUpPredicate=None):
+      '''
+      Returns a string of an RxML/ZML representation of the node.
+      RxPathDOM nodes contained in resultset parameter. If
+      resultset is None, it will be set to the context node
+      '''
       if resultset is None:
             resultset = [ context.node ]
       return rxml.getRXAsZMLFromNode(resultset, rescomment = comment,
@@ -703,6 +791,9 @@ Options:
         return sha.sha(plaintext + self.secureHashMap[secureProperty] ).hexdigest()    
                 
     def getContents(self, context, node=None):
+        '''
+        Given a node, find the contents associated with it.
+        '''
         if node is None:
             node = context.node
         elif not node:
@@ -741,9 +832,9 @@ Options:
         self.server.doActions([self.checkForResourceAction], kw)
         if kw['__resource'] and kw['__resource'] != [self.server.rdfDom]\
            or kw.get('externalfile'):            
-            return True
+            return raccoon.XTrue
         else:
-            return False
+            return raccoon.XFalse
         
     def getNameURI(self, context, wikiname):
         #note filter: URI fragment might not match wikiname
@@ -751,7 +842,20 @@ Options:
         #todo I8N (return a IRI?)
         return self.server.BASE_MODEL_URI + \
                filter(lambda c: c.isalnum() or c in '_-./', str(wikiname))
-    
+
+    def findUnauthorizedActions(self, context, user, action, resources, predicate=0, object=0):
+        '''
+        Given an nodeset of resources, returns a nodeset
+        containing the resources that user is authorized to perform the
+        given action.
+        '''        
+        if predicate != 0:
+            predicate = raccoon.StringValue(predicate)            
+        if object != 0:
+            object = raccoon.StringValue(object)
+        return self.authorizeUpdate(user, resources,action, 
+                '',predicate, object, noraise=True)
+            
     def generatePatch(self, context, contents, oldcontentsNode, base64decode):
         patch = ''
         if oldcontentsNode:
@@ -769,36 +873,73 @@ Options:
         if patch:            
             #save patch to disk:
             filepath = self.server.evalXPath("string(.//a:contents/a:ContentLocation)", node=oldcontentsNode)
-            #replace the revision's file with the patch (and if the revision doesn't have a file don't save to disk)
+            #replace the revision's file with the patch
+            #(and if the revision doesn't have a file don't save the patch to disk)
             if not filepath or not filepath.startswith('path:'): 
                 filepath = None
-            else:                
-                filepath = filepath[len('path:'):]            
-                if not filepath.startswith(self.SAVE_DIR):
+            else:        
+                #convert from path back to os file path
+                filepath = InputSource.DefaultFactory.resolver.PathUriToOsPath(filepath)                
+                #if the revision we're replacing wasn't in the SAVE_DIR                
+                if not filepath.startswith(self.SAVE_DIR):                    
                     #when we import content or for the initial rhizome files
-                    #the initial version won't be in the .rzvs dir
-                    filepath = self.SAVE_DIR + os.path.split(filepath)[1] + '.1'
+                    #the initial version may not be in the SAVE_DIR, but we want to save it there
+                    filepath = os.path.join(self.SAVE_DIR, os.path.split(filepath)[1] + '.1')                    
+                    if os.path.exists(filepath):
+                        #huh? this file shouldn't exist, so let's abandon
+                        #patching so we don't accidently overwrite something we shouldn't
+                        log.warning("aborting creation of patch: %s unexpectedly exists" % filepath)
+                        return '' #no patch
             return self._saveContents(filepath, patch)
         else:
             return patch
               
-    def saveContents(self, context, wikiname, format, contents, revisionCount):
+    def saveContents(self, context, wikiname, format, contents, revisionCount,
+                     indexURI=None, title='', previousContentURI='',
+                     previousRevisionDigest=''):
         filename = wikiname
         if filename.find('.') == -1 and self.exts.get(format):
             filename += '.' + self.exts[format]
-
-        filepath = self.SAVE_DIR + filename + '.' + str(int(revisionCount))
         
-        return self._saveContents(filepath, contents, filename)
+        filepath = os.path.join(self.SAVE_DIR, filename) + '.' + str(int(revisionCount))
+
+        abspath = os.path.abspath(filepath)        
+        prefixlen = len(InputSource.DefaultFactory.resolver.getPrefix(abspath))
+        fileURI = raccoon.SiteUriResolver.OsPathToPathUri(abspath[prefixlen+1:])
+
+        #check if a file with the same name already exists and is not this resource's content file
+        #if so choose another file name to avoid accidently overwriting something important
+        if fileURI != previousContentURI:
+            #note if the content uri for this revision == the content uri for the last revision then
+            #we must be replacing the revisions (as in minor edit) and so want to do this check
+            attempt = 1
+            while os.path.exists(filepath): 
+                #should not exist, perhaps we've renamed this page to the name of an old page?
+                #well, it does so save the contents to a different name
+                newfilepath = os.path.join(self.SAVE_DIR, filename) + str(attempt) + '.' + str(int(revisionCount))                
+                log.warning("while saving content: %s unexpectedly exists, trying %s" % (filepath, newfilepath) )
+                filepath = newfilepath
+                attempt += 1
+            
+        #don't try to index binary content
+        if format not in self.indexableFormats:
+            indexURI = None 
+        elif indexURI:
+            indexURI = raccoon.StringValue(indexURI)
+            title = raccoon.StringValue(title)
+        return self._saveContents(filepath, contents, filename, indexURI, title,previousRevisionDigest)
     
-    def _saveContents(self, filepath, contents, altfilename=None):
+    def _saveContents(self, filepath, contents, altfilename=None, indexURI=None,
+                      title='',previousRevisionDigest=''):
         '''        
         this is kind of ugly; XUpdate doesn't have an eval() function, so we
         build up a string of xml and then parse it and then return the doc as
         a nodeset and use xupdate:copy-of on the nodeset
         '''
-        #todo at some point add sha = utils.shaDigestString(contents)
-        #print >>sys.stderr, 'sc', wikiname, format, contents, revisionCount
+        if indexURI:
+            self.addToIndex(indexURI, contents, title)
+
+        #print >>sys.stderr, 'sc', filepath, title, contents
         ns = '''xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'
             xmlns:a="http://rx4rdf.sf.net/ns/archive#"
             xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"'''
@@ -812,30 +953,67 @@ Options:
             f = file(filepath, 'wb')
             f.write(contents)
             f.close()
+            digest=utils.shaDigestString(contents)
 
             if altfilename and self.ALTSAVE_DIR:
-                #we save another copy of the last revision in order that minor edit
-                #or external changes don't effect diffs etc.                
-                altfilepath = self.ALTSAVE_DIR + altfilename
-                dir = os.path.split(altfilepath)[0]
-                try:  os.makedirs(dir) 
-                except OSError: pass #dir might already exist
-                f = file(altfilepath, 'wb')
-                f.write(contents)
-                f.close()                
-                altContents = "<wiki:alt-contents><a:ContentLocation rdf:about='path:%s' /></wiki:alt-contents>" % altfilepath
+                #we save another copy of the last revision in a location that
+                #that can be safely accessed and modified by external programs
+                #without breaking diffs etc.
+                altfilepath = os.path.join(self.ALTSAVE_DIR, altfilename)
+                abspath = os.path.abspath(altfilepath)        
+                prefixlen = len(InputSource.DefaultFactory.resolver.getPrefix(abspath))
+                assert prefixlen, ("filepath %s must be on Raccoon's PATH" % abspath)
+                altPathURI = raccoon.SiteUriResolver.OsPathToPathUri(abspath[prefixlen+1:])
+
+                #if the altfilepath already exists compare its digest with the previous
+                #revisions digest and don't overwrite this file if they don't match
+                #-- instead add a wiki:save-conflict property to the new contentlocation.
+                if os.path.exists(altfilepath):
+                    existingDigest = utils.shaDigest(altfilepath)
+                    if existingDigest == digest:
+                        #identical to the contents, so no need to write
+                        saveAltFile = False
+                        conflict = False
+                    else:
+                        conflict = True
+                        if previousRevisionDigest:
+                            #if these are equal, its ok to overwrite
+                            saveAltFile = previousRevisionDigest == existingDigest
+                        else:
+                            saveAltFile = False                    
+                else:
+                    saveAltFile = True
+                    
+                altContents = ("<wiki:alt-contents><a:ContentLocation "
+                        "rdf:about='%s' /></wiki:alt-contents>" % altPathURI)                    
+                if saveAltFile:                    
+                    dir = os.path.split(altfilepath)[0]                
+                    try:  os.makedirs(dir) 
+                    except OSError: pass #dir might already exist
+                    f = file(altfilepath, 'wb')
+                    f.write(contents)
+                    f.close()                    
+                elif conflict:
+                    log.warning("conflict trying to save revision to ALTSAVE_DIR: "
+                                "unrecognized contents at %s" % altfilepath)
+                    altContents = ("<wiki:save-conflict><a:ContentLocation "
+                            "rdf:about='%s' /></wiki:save-conflict>" % altPathURI)                    
             else:
                 altContents = ''
-
-            digest=utils.shaDigestString(contents)
-            contentProps = "<a:content-length>%u</a:content-length><a:sha1-digest>%s</a:sha1-digest>"\
-                           % (contentLength, digest)
             
-            #we assume SAVE_DIR and ALTSAVE_DIR is a relative path rooted in one of the directories on the RHIZOME_PATH
-            xml = '''<a:ContentLocation %(ns)s rdf:about='path:%(filepath)s'>%(contentProps)s%(altContents)s</a:ContentLocation>''' % locals()
+            contentProps = ("<a:content-length>%u</a:content-length>"
+              "<a:sha1-digest>%s</a:sha1-digest>"% (contentLength, digest))
+            
+            abspath = os.path.abspath(filepath)        
+            prefixlen = len(InputSource.DefaultFactory.resolver.getPrefix(abspath))
+            assert prefixlen, ("filepath %s must be on Raccoon's PATH" % abspath)
+            filepathURI = raccoon.SiteUriResolver.OsPathToPathUri(abspath[prefixlen+1:])
+            #print >>sys.stderr, abspath, abspath[prefixlen+1:], prefixlen, filepathURI
+            xml = ("<a:ContentLocation %(ns)s rdf:about='%(filepathURI)s'>"
+             "%(contentProps)s%(altContents)s</a:ContentLocation>" % locals())
         else: #save the contents inside the model
             try:
-                contents.encode('ascii') #test to see if is just ascii (all <128)
+                contents.encode('ascii') #test to see if it is just ascii (all <128)
                 return contents
                 #contents = utils.htmlQuote(contents)
                 #xml = '''<a:Content rdf:about='%(sha1urn)'>%(contentProps)s<a:contents>%(contents)s</a:contents></<a:Content>''' % locals()
@@ -843,10 +1021,12 @@ Options:
                 #could be binary, base64 encode
                 encodedURI = utils.generateBnode()
                 contents = base64.encodestring(contents)            
-                xml = '''<a:ContentTransform %(ns)s rdf:about='%(encodedURI)s'>
-                    <a:transformed-by><rdf:Description rdf:about='http://www.w3.org/2000/09/xmldsig#base64'/></a:transformed-by>
-                    <a:contents>%(xml)s</a:contents>
-                   </a:ContentTransform>''' % locals()
+                xml = ("<a:ContentTransform %(ns)s rdf:about='%(encodedURI)s'>"
+                    "<a:transformed-by>"
+                    "<rdf:Description rdf:about='http://www.w3.org/2000/09/xmldsig#base64'/>"
+                    "</a:transformed-by>"
+                    "<a:contents>%(xml)s</a:contents>"
+                   "</a:ContentTransform>" % locals())
 
         #print >>sys.stderr, 'sc', xml
         from Ft.Xml import Domlette
@@ -857,6 +1037,97 @@ Options:
         #print >>sys.stderr, 'sc', xmlDoc.documentElement
         return [ xmlDoc.documentElement ]
 
+    ###text indexing ###
+    #todo:
+    #1.delete resource from index when page is deleted
+    #1.handle multiple revisions, add query term based on context (e.g. 'released')
+    #1.add refresh-index to deal with alt-content changes (store sha1 as field in index to compare)
+    #1.index other metadata fields
+    try:
+        import lupy
+        def initIndex(self):
+            if not self.useIndex:
+                self.index = None
+                return
+
+            import lupy.indexer
+            try:
+                self.index = lupy.indexer.Index(self.indexDir)
+            except:
+                #opening the index failed create a new one
+                log.info('creating lupy index in %s' % self.indexDir)
+                self.index = lupy.indexer.Index(self.indexDir, True)
+                #get all the content in the site and add it to the index
+                for node in self.server.evalXPath("/a:NamedContent"):
+                    resource = node.uri
+                    #print 'res', resource
+                    kw = {}
+                    self.server.doActions([self.findRevisionAction], kw, node)
+                    revisionNode = kw['__context'][0] #context will be set to the revision
+                    #print 'rn', revisionNode
+                    format = self.server.evalXPath("string(a:contents/a:ContentTransform/a:transformed-by/*)",
+                            node = revisionNode)
+                    #print 'fmt', format
+                    if format in self.indexableFormats:                        
+                        kw['_staticFormat'] = 1 #don't do dynamic format chaining here
+                        contents = self.server.doActions(
+                            [self.findContentAction, self.processContentAction],
+                            kw, revisionNode)                        
+                        if contents:
+                            title = ''
+                            for predicate in revisionNode.childNodes:
+                                if predicate.stmt.predicate == 'http://rx4rdf.sf.net/ns/wiki#title':
+                                    title = predicate.stmt.object
+                                    break
+                            log.debug('adding resource %s to index', resource)
+                            self.index.index(_resource = resource, contents = contents, title = title)
+
+        def addToIndex(self, resource, contents, title=''):
+            #delete the existing resource if necessary
+            self.index.delete(resource = resource)
+            self.index.index(_resource = resource, contents = contents, title = title)
+
+        def deleteFromIndex(self, resource):
+            self.index.delete(resource = resource)
+
+        def findInIndex(self, query, maxResults = sys.maxint):
+            hits = self.index.find(query)
+            #results = [x.get('resource') for x in hits]
+            results = [] #list of resource URIs
+            try:
+                for i in xrange(maxResults):
+                    results.append( hits[i].get('resource') )
+                    #score = hits.score(i)
+            except IndexError:
+                #print sys.exc_info()
+                pass            
+            return results
+            
+    except ImportError:
+        def initIndex(self, *args, **kw):
+            self.index = None
+
+        def addToIndex(self, *args, **kw):
+            pass
+
+        def deleteFromIndex(self, *args, **kw):
+            pass
+                        
+    def searchIndex(self, context, query):
+        query = raccoon.StringValue(query)            
+        if self.index:
+            return [self.server.rdfDom.findSubject(x)
+                      for x in self.findInIndex(query)
+                         if self.server.rdfDom.findSubject(x)]
+        else:
+            #linear search
+            searchExp = '''/a:NamedContent[
+            wiki:revisions/*/rdf:first/wiki:Item[
+                (.//a:contents/*/a:transformed-by !='http://rx4rdf.sf.net/ns/wiki#item-format-binary'
+                and contains( wf:get-contents(.), $search))
+                or contains(wiki:title,$search)] ]'''
+            return self.server.evalXPath(searchExp, vars = { (None, 'search'): query})
+        
     ###template generation####
     def addFolders(self, pathSegments, baseURI=None):
         from rx.utils import Res
@@ -887,7 +1158,7 @@ Options:
                 title=None, label='http://rx4rdf.sf.net/ns/wiki#label-released',
                 handlesAction=None, actionType='http://rx4rdf.sf.net/ns/archive#NamedContent',
                 baseURI=None, owner='http://rx4rdf.sf.net/site/users/admin',
-                accessTokens=['base:write-structure-token'], authorizationGroup='',
+                accessTokens=None, authorizationGroup='',
                 contentLength = None, digest = None):
         '''
         Convenience function for adding an item the model. Returns a string of triples.
@@ -897,7 +1168,6 @@ Options:
                 return default + kw
             else:
                 return kw
-
 
         from rx.utils import Res
         Res.nsMap = self.nsMap
@@ -976,8 +1246,8 @@ Options:
         itembNode['a:created-on'] = "1057919732.750"
         if disposition:
             itembNode['wiki:item-disposition'] = Res(kw2uri(disposition, 'wiki:item-disposition-'))
-
+        
         if rootFolder:
             return rootFolder.toTriplesDeep()
         else:
-            return nameUriRef.toTriplesDeep()
+            return nameUriRef.toTriplesDeep()        

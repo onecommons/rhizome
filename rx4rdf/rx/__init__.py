@@ -3,9 +3,14 @@
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
-__all__ = ["raccoon", "RxPathDom", "RxPath", "DomTree", "utils", 'MRUCache',
+__all__ = ["raccoon", "RxPathDom", "RxPath", "utils", 
            "rxml", "rhizome", "zml",
-           "Server", "XUpdate", "glock", "metakitdriver"]
+           #3rd party libraries with varying degrees of modifications:
+           "Server", "XUpdate", 'MRUCache', "DomTree", 
+           "glock", "metakitdriver", "htmldiff" ]
+
+__version__ = '0.3.1'
+
 try:
     import Ft
 except ImportError:

@@ -530,7 +530,7 @@ if not globals().has_key('hotReload'):
         _year, _month, _day, _hh, _mm, _ss, _wd, _y, _z = time.gmtime(_now)
         _date="%s, %02d %3s %4d %02d:%02d:%02d GMT"%(_weekdayname[_wd],_day,_monthname[_month],_year,_hh,_mm,_ss)
         #modified for rhizome:
-        response.headerMap={"status": "200 OK", "server": "Rhizome 0.3/Python "
+        response.headerMap={"status": "200 OK", "server": "Rhizome 0.3.1/Python "
                             + sys.version.replace('\n','').replace('\r',''),
                             "date": _date, "set-cookie": [], "content-length": 0}
 

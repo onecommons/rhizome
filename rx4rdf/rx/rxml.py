@@ -47,7 +47,9 @@ def getURIFromElementName(elem, nsMap):
     #print nsMap
     if elem.namespaceURI: #namespace aware node
         u = elem.namespaceURI
-        assert u == nsMap.get(prefix, u), 'namespace URI for ' + prefix + ' mismatch xmlns declaration ' + u + ' with rx:prefix ' + nsMap[prefix]
+        #comment out this assertion because ZML will add namespaces with the {URIRef} tokens
+        #assert u == nsMap.get(prefix, u), ('namespace URI for ' + prefix + 
+        # ' mismatch xmlns declaration ' + u + ' with rx:prefix ' + nsMap[prefix])
     else:
         u = nsMap[prefix]
         
@@ -68,8 +70,8 @@ def quoteString(string):
         return '`' + string # ` strings in zml are raw (no escape characters)
     
 def matchName(node, prefixes, local):
-    if node.namespaceURI: #namespace aware node 
-        return node.namespaceURI in prefixes.values() and node.localName == local
+    #if node.namespaceURI: #namespace aware node 
+    #    return node.namespaceURI in prefixes.values() and node.localName == local
     
     if node.prefix is None:
         prefix, localName = SplitQName(node.localName)
@@ -151,7 +153,7 @@ def addResource(model, scope, resource, resourceElem, rxNSPrefix,nsMap, thisReso
     '''
     for p in resourceElem.childNodes:
         if p.nodeType != p.ELEMENT_NODE:
-            continue
+            continue        
         if matchName(p, rxNSPrefix, 'resource'):
             predicate = p.getAttributeNS(EMPTY_NAMESPACE, 'id')
         elif matchName(p, rxNSPrefix, 'a'): #alias for rdf:type
@@ -442,20 +444,22 @@ def rx2nt(path, url=None, debug=0, nsMap = None):
 
 def zml2nt(stream=None, contents=None, debug=0, nsMap = None, addRootElement=True):
     from rx import zml
+    #parse the zml to rx xml
     if stream is not None:
-        xml = zml.zml2xml(stream, mixed=False)
+        xml = zml.zml2xml(stream, mixed=False, URIAdjust = True)
     else:
-        xml = zml.zmlString2xml(contents, mixed=False)#parse the zml to rx xml
+        xml = zml.zmlString2xml(contents, mixed=False, URIAdjust = True)
     if addRootElement:
         xml = '<rx:rx>'+ xml+'</rx:rx>'
     return rx2nt(StringIO.StringIO(xml), debug=debug, nsMap = nsMap)
 
 def zml2RDF_XML(stream=None, contents=None, debug=0, nsMap = None, addRootElement=True):
     from rx import zml
+    #parse the zml to rx xml
     if stream is not None:
-        xml = zml.zml2xml(stream, mixed=False)
+        xml = zml.zml2xml(stream, mixed=False, URIAdjust = True)
     else:
-        xml = zml.zmlString2xml(contents, mixed=False)#parse the zml to rx xml
+        xml = zml.zmlString2xml(contents, mixed=False, URIAdjust = True)
     if addRootElement:
         xml = '<rx:rx>'+ xml+'</rx:rx>'
 

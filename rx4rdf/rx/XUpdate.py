@@ -143,15 +143,18 @@ class Processor:
                 context.processorNss = Domlette.GetAllNs(node)
                 nodeset = _select.evaluate(context)
                 if nodeset:
-                    refnode = nodeset[0]
-                    if refnode.nodeType == Node.ATTRIBUTE_NODE:
-                        parent = refnode.ownerElement
-                        parent.removeAttributeNode(refnode)
-                    else:
-                        parent = refnode.parentNode
-                        if parent is None:
-                            parent = refnode.ownerDocument
-                        parent.removeChild(nodeset[0])
+                    #change from 4Suite -- why did it only delete the first node in the nodeset?
+                    #that's not in the spec or very intuitive
+                    #refnode = nodeset[0]
+                    for refnode in nodeset:
+                        if refnode.nodeType == Node.ATTRIBUTE_NODE:
+                            parent = refnode.ownerElement
+                            parent.removeAttributeNode(refnode)
+                        else:
+                            parent = refnode.parentNode
+                            if parent is None:
+                                parent = refnode.ownerDocument
+                            parent.removeChild(refnode)
                 context.processorNss = oldNss
             elif node.localName in ['insert-after', 'insert-before']:
                 select = node.getAttributeNS(EMPTY_NAMESPACE, u'select')
@@ -460,6 +463,29 @@ class Processor:
                                     extFunctionMap=context.functions, processorNss = t_nss)
                 for n in t_node.childNodes:
                     self.visit(t_context, n, t_preserveSpace)
+            elif node.localName == 'for-each':
+                select = node.getAttributeNS(EMPTY_NAMESPACE, u'select')
+                if not select:
+                    raise XUpdateException(XUpdateException.NO_SELECT)
+                try:
+                    _select = self.parseExpression(select)
+                except SyntaxError, e:
+                    raise SyntaxError("Select Expression %s: %s" % (select, str(e)))
+
+                oldNss = context.processorNss
+                context.processorNss = Domlette.GetAllNs(node)
+                
+                nodeset = _select.evaluate(context)
+
+                #support nested for-each:
+                oldCurrent = context.varBindings.get((EMPTY_NAMESPACE, 'current'), []) 
+                for refnode in nodeset:
+                    for child in node.childNodes:
+                        context.varBindings[(EMPTY_NAMESPACE, 'current')] = [refnode]
+                        context = self.visit(context, child, preserveSpace)
+                context.varBindings[(EMPTY_NAMESPACE, 'current')] = oldCurrent
+
+                context.processorNss = oldNss                
             elif node.localName == 'text':
                 for child in node.childNodes:
                     context = self.visit(context, child, 1)
@@ -471,6 +497,7 @@ class Processor:
                 test = node.getAttributeNS(EMPTY_NAMESPACE, u'test')
                 if not test:
                     raise XUpdateException(XUpdateException.NO_TEST)
+                #print >>sys.stderr, 'test', test
                 test = self.parseExpression(test)
 
                 oldNss = context.processorNss
@@ -507,7 +534,8 @@ class Processor:
                         for child in node.childNodes:
                             context = self.visit(context, child, preserveSpace)
                     finally:
-                        result = self.popResult()
+                        #result will be a documentfragment
+                        result = self.popResult().childNodes
                         
                 context.varBindings[(namespace, local)] = result
                 #print >>sys.stderr, local, result

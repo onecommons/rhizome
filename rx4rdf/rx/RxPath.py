@@ -12,11 +12,12 @@
 '''
 from __future__ import generators
 
+from rx import utils
+from Ft.Lib.boolean import false as XFalse, true as XTrue, bool as Xbool
 from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, Util, BNODE_BASE, BNODE_BASE_LEN,RDF_MS_BASE
 from Ft.Xml.XPath.Conversions import StringValue, NumberValue
 from Ft.Xml import XPath, InputSource, SplitQName, EMPTY_NAMESPACE
 from Ft.Rdf.Statement import Statement
-from rx import utils
 from rx.utils import generateBnode, removeDupsFromSortedList
 import os.path, sys
 
@@ -84,7 +85,7 @@ def getResourcesFromStatements(stmts):
             resourceDict[stmt.subject] = 1
         if stmt.objectType == OBJECT_TYPE_RESOURCE:
             resourceDict[stmt.object] = 1
-              
+    assert not resourceDict.has_key(''), resourceDict.get('')
     resources = resourceDict.keys()
     for uri, isHead in lists.items():
         if isHead:
@@ -473,13 +474,13 @@ def splitUri(uri):
         if index == -1:
             index = uri.rfind(':')
             if index == -1:
-                return (uri, '')
+                return (uri, '') #no ':'? what kind of URI is this?
     local = uri[index+1:]
     if not local or (not local[0].isalpha() and local[0] != '_'):
-       return (uri, '')    
+       return (uri, '')  #local name doesn't start with a namechar or _  
     if not local.replace('_', '0').replace('.', '0').replace('-', '0').isalnum():
-       return (uri, '')    
-    if local and not local.lstrip('_'): #must be all '_'s
+       return (uri, '')  #local name has invalid characters  
+    if local and not local.lstrip('_'): #if all '_'s
         local += '_' #add one more
     return (uri[:index+1], local)
 
@@ -919,9 +920,9 @@ def isPredicate(context, nodeset=None):
         if nodeset[1:]:
             return isPredicate(context, nodeset[1:])
         else:
-            return True #we made it to the end 
+            return XTrue #we made it to the end 
     else:
-        return False
+        return XFalse
 
 def isResource(context, nodeset=None):
     if nodeset is None:
@@ -932,9 +933,9 @@ def isResource(context, nodeset=None):
         if nodeset[1:]:
             return isResource(context, nodeset[1:])
         else:
-            return True #we made it to the end 
+            return XTrue #we made it to the end 
     else:
-        return False
+        return XFalse
 
 def getResource(context, nodeset=None):
     '''
@@ -963,6 +964,9 @@ def getQNameFromURI(context, uri=None):
 def getNamespaceURIFromURI(context, uri=None):
     return _getNamesFromURI(context, uri)[1]
 
+def getPrefixFromURI(context, uri=None):
+    return _getNamesFromURI(context, uri)[2]
+
 def getLocalNameFromURI(context, uri=None):
     return _getNamesFromURI(context, uri)[3]
 
@@ -984,7 +988,7 @@ def getURIFromElement(context, nodeset=None):
             if node.nodeType != Node.ELEMENT_NODE:
                string = node
         else:
-            return ''
+            return u''
     else:
         string = nodeset
         
@@ -1000,7 +1004,7 @@ def getURIFromElement(context, nodeset=None):
         return namespace + getURIFragmentFromLocal(local)
     else:
         return getURIFromElementName(node)
-
+       
 RFDOM_XPATH_EXT_NS = None #todo: put these in an extension namespace?
 BuiltInExtFunctions = {
 (RFDOM_XPATH_EXT_NS, 'is-predicate'): isPredicate,
@@ -1008,6 +1012,7 @@ BuiltInExtFunctions = {
 (RFDOM_XPATH_EXT_NS, 'resource'): getResource,
 
 (RFDOM_XPATH_EXT_NS, 'name-from-uri'): getQNameFromURI,
+(RFDOM_XPATH_EXT_NS, 'prefix-from-uri'): getPrefixFromURI,
 (RFDOM_XPATH_EXT_NS, 'local-name-from-uri'): getLocalNameFromURI,
 (RFDOM_XPATH_EXT_NS, 'namespace-uri-from-uri'): getNamespaceURIFromURI,
 (RFDOM_XPATH_EXT_NS, 'uri'): getURIFromElement,
@@ -1285,3 +1290,63 @@ XPath.ParsedExpr.FunctionCall3.evaluate = lambda self, context, \
 XPath.ParsedExpr.FunctionCallN.evaluate = lambda self, context, \
     func = XPath.ParsedExpr.FunctionCallN.evaluate.im_func: \
         _FunctionCallEvaluate(self, context, func)
+
+#patch a new GenerateId that uses hash(node) instead of id(node)
+from Ft.Xml.Xslt import XsltRuntimeException, Error,XsltFunctions,AttributeInfo
+def GenerateId(context, nodeSet=None):
+    """
+    Implementation of generate-id().
+
+    Returns a string that uniquely identifies the node in the argument
+    node-set that is first in document order. If the argument node-set
+    is empty, the empty string is returned. If the argument is omitted,
+    it defaults to the context node.
+    """
+    if nodeSet is not None and type(nodeSet) != type([]):
+        raise XsltRuntimeException(Error.WRONG_ARGUMENT_TYPE,
+                                   context.currentInstruction)
+    if nodeSet is None:
+        # If no argument is given, use the context node
+        return u'id' + `hash(context.node)` #hash instead of id
+    elif nodeSet:
+        # first node in nodeset
+        node = XPath.Util.SortDocOrder(context, nodeSet)[0]
+        return u'id' + `hash(node)`
+    else:
+        # When the nodeset is empty, return an empty string
+        return u''
+XsltFunctions.GenerateId = GenerateId
+
+#patch this function so that higher-level code has
+#access to the underlying exception
+def ExpressionWrapper_evaluate(self,context):
+ try:
+     return self.expression.evaluate(context)
+ except XPath.RuntimeException, e:
+     from Ft.Xml.Xslt import MessageSource
+     e.message = MessageSource.EXPRESSION_POSITION_INFO % (
+         self.element.baseUri, self.element.lineNumber,
+         self.element.columnNumber, self.original, str(e))
+     # By modifying the exception value directly, we do not need
+     # to raise with that value, thus leaving the frame stack
+     # intact (original traceback is displayed).
+     raise
+ except XsltRuntimeException, e:
+     from Ft.Xml.Xslt import MessageSource
+     e.message = MessageSource.XSLT_EXPRESSION_POSITION_INFO % (
+         str(e), self.original)
+     # By modifying the exception value directly, we do not need
+     # to raise with that value, thus leaving the frame stack
+     # intact (original traceback is displayed).
+     raise
+ except Exception, e:
+     from Ft.Xml.Xslt import MessageSource
+     import StringIO, traceback
+     tb = StringIO.StringIO()
+     tb.write("Lower-level traceback:\n")
+     traceback.print_exc(1000, tb)
+     raise utils.NestedException(MessageSource.EXPRESSION_POSITION_INFO % (
+         self.element.baseUri, self.element.lineNumber,
+         self.element.columnNumber, self.original, tb.getvalue()),
+                       useNested = True)
+AttributeInfo.ExpressionWrapper.evaluate = ExpressionWrapper_evaluate

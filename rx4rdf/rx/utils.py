@@ -16,8 +16,14 @@ from binascii import unhexlify, b2a_base64
 from Ft.Rdf import Util, Model, Statement, OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, OBJECT_TYPE_UNKNOWN
 from Ft.Rdf.Drivers import Memory
 
-from Ft.Rdf import BNODE_BASE, BNODE_BASE_LEN
 from Ft.Lib import Uuid
+import Ft.Rdf
+#note: because we change these values here other modules need to import utils
+#before importing any Ft.Rdf modules
+Ft.Rdf.BNODE_BASE = 'bnode:'
+Ft.Rdf.BNODE_BASE_LEN = len('bnode:')
+from Ft.Rdf import BNODE_BASE, BNODE_BASE_LEN
+
 _bNodeCounter  = 0
 #like this so this will be a valid bNode token (NTriples only allows alphanumeric, no _ or - etc.
 _sessionBNodeUUID = "x%032xx" % Uuid.GenerateUuid()
@@ -132,7 +138,74 @@ def diff(new, old, cutoffOffset = -100, sep = '\n'):
     import difflib
     cruncher = difflib.SequenceMatcher(None, new, old)
     return opcodes2Patch(new, old, cruncher.get_opcodes(), maxlen)
-    
+
+##def merge3(base, first, second):
+##    #compare first set changes with second set of changes
+##    #if any of the ranges overlap its a conflict
+##    #for each change 
+##    
+##    old = old.split(sep) 
+##    new = new.split(sep)     
+##    import difflib
+##    cruncher = difflib.SequenceMatcher(None, new, old)
+##    changeset1 = cruncher1.get_opcodes()
+##    ranges1 = [(alo, ahi) for tag, alo, ahi, blo, bhi in changeset1
+##       if tag != 'equals']
+##    ranges1.sort()
+##
+##    changeset2 = cruncher2.get_opcodes()
+##    ranges2 = [(alo, ahi) for tag, alo, ahi, blo, bhi in changeset2
+##       if tag != 'equals']
+##    ranges2.sort()
+##    range2 = iter(range2)
+##    for lo, hi in range1: pass
+##
+##def merge3ToPatch(new1, old, opcodes1, new2, opcodes2):
+##    '''
+##    Converts a list of opcodes as returned by difflib.SequenceMatcher.get_opcodes()
+##    into a list that can be applied to the first sequence using patchList() or patch(),
+##    allowing the second list to be discarded.
+##    '''
+##    changes = []
+##    patchlen = 0
+##    offset = 0    
+##    for tag, alo, ahi, blo, bhi in opcodes1:#to turn a into b
+##        clo, chi = opcodes2.next()
+##        if clo < alo:
+##            if chi < ahi: #overlapping change: conflict
+##                #for each new version, find the content that covers the overlapping ranges
+##                lo = min(alo1, alo2)
+##                hi = max(ahi1, ahi2)
+##                #...keep looking left and right make the sure the outer overlap doesn't overlap with another change
+##                changes.append( ( 'c', alo1+offset, ahi2+offset, old1[blo:bhi] ))
+##            else:
+##                updatePatch(changes, old, offset, patchlen, tag2, alo2, ahi2, blo2, bhi2)
+##        else:
+##            if clo < ahi: #overlapping change: conflict
+##                'c'
+##            else:
+##                updatePatch(changes, old, offset, patchlen, tag1, alo1, ahi1, blo1, bhi1)
+##    return changes
+                
+def updatePatch(changes, old, offset, patchlen, tag, alo, ahi, blo, bhi, maxlen=0):
+    if tag == 'replace':        
+        #g = self._fancy_replace(a, alo, ahi, b, blo, bhi)            
+        changes.append( ( 'r', alo+offset, ahi+offset, old[blo:bhi] ))
+        offset += (bhi - blo) - (ahi - alo)
+        if maxlen:
+            patchlen = reduce(lambda x, y: x + len(y), old[blo:bhi], patchlen)
+    elif tag == 'delete':            
+        changes.append( ( 'd', alo+offset, ahi+offset) )
+        offset -= ahi - alo
+    elif tag == 'insert':            
+        changes.append( ( 'i', alo+offset, old[blo:bhi] ))
+        offset += bhi - blo
+        if maxlen:
+            patchlen = reduce(lambda x, y: x + len(y), old[blo:bhi], patchlen)
+    if patchlen > maxlen:
+        return None #don't bother
+    return offset, patchlen
+            
 def opcodes2Patch(new, old, opcodes, maxlen = 0):
     '''
     Converts a list of opcodes as returned by difflib.SequenceMatcher.get_opcodes()
@@ -142,23 +215,12 @@ def opcodes2Patch(new, old, opcodes, maxlen = 0):
     changes = []
     patchlen = 0
     offset = 0    
-    for tag, alo, ahi, blo, bhi in opcodes:#to turn a into b
-        if tag == 'replace':        
-            #g = self._fancy_replace(a, alo, ahi, b, blo, bhi)            
-            changes.append( ( 'r', alo+offset, ahi+offset, old[blo:bhi] ))
-            offset += (bhi - blo) - (ahi - alo)
-            if maxlen:
-                patchlen = reduce(lambda x, y: x + len(y), old[blo:bhi], patchlen)
-        elif tag == 'delete':            
-            changes.append( ( 'd', alo+offset, ahi+offset) )
-            offset -= ahi - alo
-        elif tag == 'insert':            
-            changes.append( ( 'i', alo+offset, old[blo:bhi] ))
-            offset += bhi - blo
-            if maxlen:
-                patchlen = reduce(lambda x, y: x + len(y), old[blo:bhi], patchlen)
-        if patchlen > maxlen:
+    for tag, alo, ahi, blo, bhi in opcodes:#to turn a into bn
+        retVal = updatePatch(changes, old, offset, patchlen, tag, alo, ahi, blo, bhi, maxlen)
+        if retVal is None:
             return None #don't bother
+        else:
+            offset, patchlen = retVal
     return changes
 
 def patch(base, patch, sep = '\n'):
@@ -170,6 +232,13 @@ def patch(base, patch, sep = '\n'):
             del base[ op[1]:op[2]]
         elif op[0] == 'i':
             base.insert(op[1], sep.join(op[2]) )
+        elif op[0] == 'c':
+            #todo: 'c' not yet implemented
+            base.insert(op[1], '<<<<<')
+            base.insert(op[1], sep.join(op[2]) )
+            base.insert(op[1], '=====')
+            base.insert(op[1], sep.join(op[2]) )
+            base.insert(op[1], '>>>>>')            
     return sep.join(base)
 
 def patchList(base, patch):
@@ -356,17 +425,20 @@ def parseTriples(lines, bNodeToURI = None):
             quote = object[0] #add support for using either ' or " (spec says just ")
             object = object[1:object.rfind(quote)] #todo: also handle the optional ^^datatype or @lang after the "
             if object.find('\\') != -1:
-                object = object.replace(r'\\', '\\').replace('\\' + quote, quote).replace(r'\n', '\n').replace(r'\r', '\r').replace(r'\t', '\t')
+                object = object.replace('\\' + quote, quote).replace(r'\n', '\n').\
+                         replace(r'\r', '\r').replace(r'\t', '\t').replace(r'\\', '\\')
             objectType = OBJECT_TYPE_LITERAL
         #print "parsed: ", subject, predicate, object
         if remove:
             remove = False
             yield (Removed, (subject, predicate, object, objectType))
         else:
-            yield (subject, predicate, object, objectType)
+            if objectType != OBJECT_TYPE_RESOURCE or object: #ignore <> as objects
+                yield (subject, predicate, object, objectType)
 
 def DeserializeFromN3File(n3filepath, driver=Memory, dbName='', create=0, scope='',
                         modelName='default', model=None):
+    #rename this function to ...NTFile
     if not model:
         if create:
             db = driver.CreateDb(dbName, modelName)
@@ -724,13 +796,22 @@ class Patcher(type):
     def __call__(self,*args,**kw):
         '''instantiate the base object'''        
         return self.base.__metaclass__.__call__(*args,**kw)
-            
-class DynaException(Exception):
-    def __init__(self, msg = None):
+
+class NestedException(Exception):
+    def __init__(self, msg = None,useNested = False):
         if not msg is None:
             self.msg = msg
+        self.nested_exc_info = sys.exc_info()
+        self.useNested = useNested
+        Exception.__init__(self, msg)
+            
+class DynaException(Exception):
+    def __init__(self, msg = None, ):
+        if not msg is None:
+            self.msg = msg        
         Exception.__init__(self, msg)
 
+    
 class DynaExceptionFactory(object):
     '''
     Defines an Exception class
@@ -757,7 +838,10 @@ class DynaExceptionFactory(object):
             setattr(self.module, classname, dynaexception)
         return dynaexception
 
-def toXPathDataType(value, ownerDocument):        
+def toXPathDataType(value, ownerDocument):
+    #todo: handle XML-RPC classes DateTime and Binary
+    #todo: handle dictionaries that have keys as strings by using
+    # the dictionary name as the namespace (optional param)
     if isinstance(value, ( types.ListType, types.TupleType ) ):
         newvalue = []
         for item in value:

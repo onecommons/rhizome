@@ -27,12 +27,11 @@
     http://rx4rdf.sf.net    
 '''
 import xml.dom
-import DomTree
+from rx import RxPath, utils, DomTree
 from xml.dom import NotSupportedErr, HierarchyRequestErr, NotFoundErr
 from xml.dom import IndexSizeErr
 from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL
 from Ft.Xml import SplitQName, XMLNS_NAMESPACE
-from rx import RxPath, utils
 from utils import NotSet
 from rx.RxPath import RDF_MS_BASE
 import sys, copy
@@ -1006,7 +1005,9 @@ class BasePredicate(Element):
             if localName == 'ID':
                 return self.stmt.uri
             #elif localName == 'datatype': #todo support datatype and xml:lang
-            #    datatype        
+            #    datatype
+            else:
+                return ''
         elif not namespaceURI and localName == 'listID':
             return self.listID or ''
         elif not namespaceURI and localName == 'uri':
