@@ -69,6 +69,8 @@ class Node(xml.dom.Node, object):
 
     # XPath Data Model
     rootNode = None
+    xpathAttributes = []    
+    xpathNamespaces = []
 
     def insertBefore(self, newChild, refChild):
         raise HierarchyRequestErr(self.nodeName + " nodes cannot have children")
@@ -102,6 +104,9 @@ class Node(xml.dom.Node, object):
         return DomTree.DocIndex(self)
     
     docIndex = property(_get_docIndex)
+
+    def __cmp__(self, other):
+        return cmp(self.docIndex, other.docIndex)
 
     def __ne__(self, other): #so __eq__ is called instead of __cmp__
         return not self.__eq__(other)
@@ -251,6 +256,13 @@ def looksLikePredicate(node):
 
 class Element(Node):
     nodeType = Node.ELEMENT_NODE
+
+    def _get_xpathAttributes(self):
+        #there won't be any namespace attributes so we don't need to filter those out
+        return self.attributes.values()
+    xpathAttributes = property(_get_xpathAttributes)
+    
+    xpathNamespaces = [] #there won't be any namespace attributes
     
     def getAttributeNS(self, namespaceURI, localName):
         raise HierarchyRequestErr(self.nodeName + " nodes cannot have attributes")
@@ -387,12 +399,6 @@ class Resource(Element):
                 return RDF_MS_BASE + 'List'                
         return None #not a list
                         
-    def __cmp__(self, other):
-        if isinstance(other, Resource):
-            return cmp(self.uri, other.uri)
-        else:
-            return cmp(self.uri, other)
-
     def cmpSiblingOrder(self, other):
         '''
         Assumes the other node is a sibling 
@@ -671,7 +677,7 @@ class Subject(Resource):
                             break
                 else:
                     hi = None
-                predicateNode = self._orderedInsert(stmt, Predicate, hi = hi)
+                predicateNode = self._orderedInsert(stmt, Predicate, lambda x, y: cmp(x.stmt, y), hi = hi)
                 self.ownerDocument.model.addStatement( stmt )
                 self.ownerDocument.schema.addToSchema( [stmt] )
             self.revision += 1        
@@ -1025,12 +1031,6 @@ class BasePredicate(Element):
         else:
             return cmp(self.stmt, other.stmt)
 
-    def __cmp__(self, other):
-        if isinstance(other, BasePredicate):
-            return cmp(self.stmt, other.stmt)
-        else:
-            return cmp(self.stmt, other)
-
     def __eq__(self, other):        
         if self is other:
             return True
@@ -1311,7 +1311,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     
     def __init__(self, model, nsRevMap = None, schemaClass = RxPath.RDFSSchema):        
         self.rootNode = self
-        self.ownerDocument = self #bug in dom implementation?
+        self.ownerDocument = self #todo: this violates the W3C DOM spec i think but fixes some bugs
         self.model = model
         self.nsRevMap = nsRevMap or self.defaultNsRevMap.copy()
         if self.nsRevMap.get(RDF_MS_BASE) is None:
@@ -1374,12 +1374,12 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         
         #children are always sorted so we can use bisect
         #ugh... the default comparison logic choose the right operand's __cmp__
-        #      over the left operand's __cmp__ if its an old-style class and the left is a new-style class!
-        index = utils.bisect_left(self.childNodes, uri, lambda x, y: x.__cmp__(y))
+        #      over the left operand's __cmp__ if its an old-style class and the left if its is a new-style class!
+        index = utils.bisect_left(self.childNodes, uri, lambda x, y: cmp(x.uri, y))
         if index == len(self.childNodes):
             return None
         node = self.childNodes[index]
-        if cmp(node, uri) != 0: 
+        if node.uri != uri: 
             return None    
         else:
             return node
@@ -1442,7 +1442,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         log.debug('attempting to adding resource %s' % uri)
         subjectNode = self.findSubject(uri)
         if not subjectNode:
-            subjectNode = self._orderedInsert(uri, Subject) #todo: catch this exception?
+            subjectNode = self._orderedInsert(uri, Subject, lambda x, y: cmp(x.uri, y)) #todo: catch this exception?
             #self.model.addResource(uri)
             self.revision += 1
         if not (newChild.namespaceURI == RDF_MS_BASE and newChild.localName == 'Description'):
@@ -1451,7 +1451,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
             log.debug('attempting to adding type statement %s for %s' % (typeName, uri))
             typeStmt = RxPath.Statement(uri, RDF_MS_BASE+'type', typeName, objectType=OBJECT_TYPE_RESOURCE)
             try:
-                predicateNode = subjectNode._orderedInsert(typeStmt, Predicate) 
+                predicateNode = subjectNode._orderedInsert(typeStmt, Predicate,lambda x, y: cmp(x.stmt, y)) 
                 self.model.addStatement( typeStmt )
                 self.schema.addToSchema( [typeStmt] )
                 self.revision += 1
@@ -1475,7 +1475,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         Add a new resource to the model and return the new Subject node
         Raises IndexError if the resource is already part of the model.
         '''
-        subjectNode = self._orderedInsert(uri, Subject)
+        subjectNode = self._orderedInsert(uri, Subject, lambda x, y: cmp(x.uri, y))
         #self.model.addResource(uri)
         return subjectNode
 

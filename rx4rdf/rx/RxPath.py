@@ -375,8 +375,8 @@ class _IncrementalNTriplesFileModelBase(object):
                         yield self.dummyFtModel._unmapStatements( (stmt[0],))[0]
                         
             comment = kw.get('source','')
-            if isinstance(comment, (type([]), type(()))):
-                comment = comment[0]
+            if isinstance(comment, (list, tuple)):                
+                comment = comment and comment[0] or ''
             if getattr(comment, 'getAttributeNS', None):
                 comment = comment.getAttributeNS(RDF_MS_BASE, 'about')
                 
@@ -837,8 +837,8 @@ class RDFSSchema(BaseSchema):
 
     def isCompatibleType(self, testType, wantType):
         '''
-        Is the given testType resource compatible with (equal to or a subtype of) the specified wantType?
-        wantType can end in a * (to the namespace:* node test in RxPath)
+        Is the given testType resource compatible with (equivalent to or a subtype of) the specified wantType?
+        wantType can end in a * (to support the namespace:* node test in RxPath)
         '''
         if wantType == RDF_SCHEMA_BASE+'Resource': 
             return True
@@ -846,8 +846,8 @@ class RDFSSchema(BaseSchema):
     
     def isCompatibleProperty(self, testProp, wantProp):
         '''
-        Is the given propery compatible with (equal to or a subpropery of) the specified property?
-        wantProp can end in a * (to the namespace:* node test in RxPath)
+        Is the given propery compatible with (equivalent to or a subpropery of) the specified property?
+        wantProp can end in a * (to support the namespace:* node test in RxPath)
         '''
         return self._testCompatibility(self.currentSubProperties, testProp, wantProp)
     
@@ -1799,12 +1799,19 @@ def _descendants(self, context, nodeset, startNode=None):
             self._descendants(context, nodeset, startNode)
 XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath._descendants = _descendants
 
+if hasattr(XPath.Util, 'SortDocOrder'): #4Suite versions prior to 1.0b1
+    def SortDocOrder(context, nodeset):
+        return XPath.Util.SortDocOrder(context, nodeset)
+else:
+    def SortDocOrder(context, nodeset):
+        nodeset.sort()
+        return nodeset
+        
 def _ParsedAbbreviatedAbsoluteLocationPath_evaluate(self, context):    
     state = context.copy()
 
-    # Start at the document node
-    if context.node.ownerDocument:
-        context.node = context.node.ownerDocument
+    # Start at the document node    
+    context.node = context.node.rootNode
 
     if getattr(context.node, 'getSafeChildNodes', None):
         #todo: bug if you reuse this parsed expression on a non-RxPath dom
@@ -1820,7 +1827,7 @@ def _ParsedAbbreviatedAbsoluteLocationPath_evaluate(self, context):
     self._descendants(context, nodeset)
 
     context.set(state)
-    return XPath.Util.SortDocOrder(context, nodeset)
+    return SortDocOrder(context, nodeset)
 
 XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath.evaluate = _ParsedAbbreviatedAbsoluteLocationPath_evaluate
 XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath.select = XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath.evaluate
@@ -1845,7 +1852,8 @@ def _QualifiedNameTest_match(self, context, node, principalType=Node.ELEMENT_NOD
         return _QualifiedNameTest_oldMatch(self, context, node, principalType)
     else:
         try:
-            return node.nodeType == principalType and node.matchName(context.processorNss[self._prefix], self._localName)
+            return node.nodeType == principalType and node.matchName(
+                    context.processorNss[self._prefix], self._localName)
         except KeyError:
             raise XPath.RuntimeException(XPath.RuntimeException.UNDEFINED_PREFIX, self._prefix)        
     
@@ -1862,32 +1870,6 @@ def _NamespaceTest_match(self, context, node, principalType=Node.ELEMENT_NODE):
             raise XPath.RuntimeException(XPath.RuntimeException.UNDEFINED_PREFIX, self._prefix)        
         
 XPath.ParsedNodeTest.NamespaceTest.match = _NamespaceTest_match
-
-#patch a new GenerateId that uses hash(node) instead of id(node)
-from Ft.Xml.Xslt import XsltRuntimeException, Error,XsltFunctions
-def GenerateId(context, nodeSet=None):
-    """
-    Implementation of generate-id().
-
-    Returns a string that uniquely identifies the node in the argument
-    node-set that is first in document order. If the argument node-set
-    is empty, the empty string is returned. If the argument is omitted,
-    it defaults to the context node.
-    """
-    if nodeSet is not None and type(nodeSet) != type([]):
-        raise XsltRuntimeException(Error.WRONG_ARGUMENT_TYPE,
-                                   context.currentInstruction)
-    if nodeSet is None:
-        # If no argument is given, use the context node
-        return u'id' + `hash(context.node)` #hash instead of id
-    elif nodeSet:
-        # first node in nodeset
-        node = XPath.Util.SortDocOrder(context, nodeSet)[0]
-        return u'id' + `hash(node)`
-    else:
-        # When the nodeset is empty, return an empty string
-        return u''
-XsltFunctions.GenerateId = GenerateId
 
 from Ft.Lib import Set
 def _FunctionCallEvaluate(self, context, oldFunc):
@@ -1924,34 +1906,9 @@ XPath.ParsedExpr.FunctionCallN.evaluate = lambda self, context, \
     func = XPath.ParsedExpr.FunctionCallN.evaluate.im_func: \
         _FunctionCallEvaluate(self, context, func)
 
-#patch a new GenerateId that uses hash(node) instead of id(node)
-from Ft.Xml.Xslt import XsltRuntimeException, Error,XsltFunctions,AttributeInfo
-def GenerateId(context, nodeSet=None):
-    """
-    Implementation of generate-id().
-
-    Returns a string that uniquely identifies the node in the argument
-    node-set that is first in document order. If the argument node-set
-    is empty, the empty string is returned. If the argument is omitted,
-    it defaults to the context node.
-    """
-    if nodeSet is not None and type(nodeSet) != type([]):
-        raise XsltRuntimeException(Error.WRONG_ARGUMENT_TYPE,
-                                   context.currentInstruction)
-    if nodeSet is None:
-        # If no argument is given, use the context node
-        return u'id' + `hash(context.node)` #hash instead of id
-    elif nodeSet:
-        # first node in nodeset
-        node = XPath.Util.SortDocOrder(context, nodeSet)[0]
-        return u'id' + `hash(node)`
-    else:
-        # When the nodeset is empty, return an empty string
-        return u''
-XsltFunctions.GenerateId = GenerateId
-
 #patch this function so that higher-level code has
 #access to the underlying exception
+from Ft.Xml.Xslt import XsltRuntimeException, Error,XsltFunctions,AttributeInfo
 def ExpressionWrapper_evaluate(self,context):
  try:
      return self.expression.evaluate(context)

@@ -18,7 +18,6 @@ XUPDATE_NS = 'http://www.xmldb.org/xupdate'
 import string, sys
 
 from Ft import FtException
-from Ft.Xml.FtMiniDom import NonvalReader
 from Ft.Xml.XPath import parser
 from Ft.Xml.XPath import Context, Conversions
 from Ft.Xml.Xslt import NullWriter, DomWriter, AttributeValueTemplate
