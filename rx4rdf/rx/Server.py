@@ -39,22 +39,8 @@ if not globals().has_key('hotReload'):
     configFile=ConfigParser.ConfigParser()
     configFile.read(configFileName)
 
-#rhizome changes:
-recordRequests = False
-requestRecordFilePath = ''
-requestsRecord = []
-root = None
-try:
-    import cPickle
-    pickle = cPickle
-except ImportError:
-    import pickle
-    
-def saveRequestHistory():
-    if requestRecordFilePath and requestsRecord:
-        requestRecordFile = file(requestRecordFilePath, 'wb')
-        pickle.dump(requestsRecord, requestRecordFile)
-        requestRecordFile.close()       
+#rhizome change:
+root = None    
 
 def initRequest():
     pass
@@ -253,12 +239,6 @@ if not globals().has_key('hotReload'):
     if _sessionStorageType=='ram' and (_forking or severalProcs):
         print "CherryWarning: 'ram' sessions might be buggy when using several processes"
 ##end parseConfigFile.py insert
-    #rhizome change: make default page name configurable
-    global _indexName
-    _indexName= 'index'
-    try: _indexName=configFile.get('server', 'defaultPageName')
-    except: pass
-
     global _usevdomain
     _usevdomain = False
     try: _usevdomain=int(configFile.get('server', 'useSubDomainAsName'))
@@ -448,7 +428,7 @@ if not globals().has_key('hotReload'):
         except KeyboardInterrupt, e:
                 print 'request interrupted with <ctrl-C>'
                 onError()
-                saveRequestHistory()
+                root.saveRequestHistory()
         except:
             _err=""
             _exc_info_1=sys.exc_info()[1]
@@ -494,7 +474,7 @@ if not globals().has_key('hotReload'):
                 _wfile.write('\r\n')
                 _wfile.write(_body)
 
-    def _sendResponse(_wfile):
+    def _sendResponse(_wfile, appBase = '/'):
         # Save page in the cache if needed
         _cacheKey=""
         try: _cacheKey=request.cacheKey # Cannot use "hasattr", because it fails under jython when threading is turned on
@@ -508,14 +488,16 @@ if not globals().has_key('hotReload'):
             newSession = not request.simpleCookie.get(_sessionCookieName)
             _sessionId=sessionMap['_sessionId']
             del sessionMap['_sessionId']
+            #if its a new session, only save the session cookie if the sessionMap isn't empty
             if sessionMap or not newSession:
-                response.simpleCookie[_sessionCookieName]=_sessionId 
-                response.simpleCookie[_sessionCookieName]['path']='/'
+                response.simpleCookie[_sessionCookieName]=_sessionId
+                #Rhizome change:
+                response.simpleCookie[_sessionCookieName]['path']=appBase
                 
                 _sessionId=response.simpleCookie[_sessionCookieName].value
                 _expirationTime=time.time()+_sessionTimeout*60
                 _obj=(sessionMap, _expirationTime)
-                if _sessionStorageType != 'custom': ramOrFileOrCookieSaveSessionData(_sessionId, _obj)
+                if _sessionStorageType != 'custom': ramOrFileOrCookieSaveSessionData(_sessionId, _obj, appBase)
                 else: saveSessionData(_sessionId, _obj)
 
         #rhizome change:                
@@ -566,10 +548,12 @@ if not globals().has_key('hotReload'):
         response.wfile = _wfile
         response.sendResponse = 1
 
-        if _sslKeyFile:
+        #rhizome change: include port if necessary        
+        if _sslKeyFile:               
             request.base="https://"+request.headerMap['host']
         else:
             request.base="http://"+request.headerMap['host']
+            
         request.browserUrl=request.base+'/'+request.browserUrl
         request.isStaticFile = 0
 
@@ -718,35 +702,22 @@ if not globals().has_key('hotReload'):
     #replaced with:  
         if request.isXmlRpc:
             request.paramMap = dict( zip( [str(x) for x in range(len(request.paramTuple))], request.paramTuple))
-                        
-        #assume we only handle requests inside our home path:        
-        name = request.path[len(root.ROOT_PATH)-1:] #skip ROOT_PATH's initial '/'        
-        request.browserBase = request.base + root.ROOT_PATH         
-        #the operative part of the url (browserUrl = browserBase + browserPath + '?' + browserQuery)
-        path = request.browserUrl[len(request.browserBase):]
-        if path.find('?') > -1:
-            request.browserPath, request.browserQuery = path.split('?', 1)
-        else:
-            request.browserPath, request.browserQuery = path, ''
+        
+        name = urllib.unquote(request.path)
+
         #use virtual domain name in place of index
-        #note: they still share the same set of page and also www.foo.com/bar == bar.foo.com/
-        if not name or name == _indexName:            
+        #note: they still share the same set of pages and also www.foo.com/bar == bar.foo.com/
+        if not name or name == root.defaultPageName:
             if _usevdomain and request.headerMap['host'].count('.') > 1:
                 subdomain = request.headerMap['host'].split('.')[0]
                 if subdomain != 'www':
                     name= subdomain
-                else:
-                    name= _indexName                    
-            else:
-                name= _indexName
-        else:
-            name = urllib.unquote(name)
+        
         request.paramMap['_request']=request
         request.paramMap['_response']=response
         request.paramMap['_session']=sessionMap
-        if recordRequests:
-            requestsRecord.append([ name, request.paramMap ])
-        response.body=root.handleRequest(name, **request.paramMap)
+        kw = request.paramMap.copy()
+        response.body=root.handleHTTPRequest(name, kw)
     #end replaced with
         
         initResponse()
@@ -768,7 +739,7 @@ if not globals().has_key('hotReload'):
         if response.headerMap.has_key('content-length') and response.headerMap['content-length']==0:
             response.headerMap['content-length']=len(response.body)
 
-        if response.sendResponse: _sendResponse(_wfile)
+        if response.sendResponse: _sendResponse(_wfile, appBase = kw.get('_APP_BASE', '/') ) #Rhizome change
 
     def _generateSessionId():
         s=''
@@ -1269,7 +1240,7 @@ if not globals().has_key('hotReload'):
 ###end cherrypy insert
 
 #from cherrypy.py:
-def ramOrFileOrCookieSaveSessionData(sessionId, sessionData):
+def ramOrFileOrCookieSaveSessionData(sessionId, sessionData, appBase = '/'):
     # Save session to file if needed
     if _sessionStorageType=='file':
         fname=os.path.join(_sessionStorageFileDir,sessionId)
@@ -1302,9 +1273,9 @@ def ramOrFileOrCookieSaveSessionData(sessionId, sessionData):
         _dumpStr = binascii.hexlify(_dumpStr) # Need to hexlify it because it will be stored in a cookie
         response.simpleCookie['CSession']=_dumpStr
         response.simpleCookie['CSession-sig']=md5.md5(_dumpStr+_SITE_KEY_).hexdigest()
-        response.simpleCookie['CSession']['path']='/'
+        response.simpleCookie['CSession']['path']=appBase
         response.simpleCookie['CSession']['max-age']=3600
-        response.simpleCookie['CSession-sig']['path']='/'
+        response.simpleCookie['CSession-sig']['path']=appBase
         response.simpleCookie['CSession-sig']['max-age']=3600
 
 def ramOrFileOrCookieLoadSessionData(sessionId):
@@ -1348,12 +1319,10 @@ def ramOrFileOrCookieLoadSessionData(sessionId):
         return None
 
 #rhizome change:
-def start_server(serve, record = False, requestRecordPath = 'debug-wiki.pkl'):
-    global root, recordRequests, requestRecordFilePath
+def start_server(serve):
+    global root
     root = serve
-    recordRequests = record
-    requestRecordFilePath = requestRecordPath
     try:
         run([]) #todo? integrate better
     finally:
-        saveRequestHistory()
+        root.saveRequestHistory()

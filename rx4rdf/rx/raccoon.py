@@ -22,7 +22,7 @@ else:
 
     from Ft.Rdf.Drivers import Memory
     import os, time, cStringIO, sys, base64, mimetypes, types, traceback
-    import urllib
+    import urllib, re
     from Ft.Xml.Lib.Print import PrettyPrint
     from Ft.Xml.XPath.Conversions import StringValue, NumberValue
     from Ft.Xml import SplitQName, XPath, InputSource, EMPTY_NAMESPACE
@@ -446,6 +446,7 @@ else:
 
     def instanceof(context, test, cmptype):
         '''sort of like the "instance of" operator in XPath 2.0'''
+        #todo: do we really need this when there is exsl:object-type 
         cmptype = StringValue(cmptype)    
         if cmptype == 'number':
            result = isinstance(test, (int, float)) #float
@@ -489,7 +490,7 @@ else:
             return value
 
     ############################################################
-    ##Racoon defaults
+    ##Raccoon defaults
     ############################################################
 
     DefaultExtFunctions = {
@@ -533,7 +534,7 @@ else:
 
     class Requestor(object):
         '''
-        Requestor is a helper class that allows python code to invoke a Racoon request as if it was function call
+        Requestor is a helper class that allows python code to invoke a Raccoon request as if it was function call
         Usage:
         response = __requestor__.requestname(**kw) where keywords are the optional request parameters
         An AttributeError exception is raised if the server does recognize the request
@@ -554,7 +555,7 @@ else:
             #print 'invoke', kw
             #defaultTriggerName let's us have different trigger type per thread
             #allowing site:/// urls to rely on the defaultTriggerName
-            triggerName = self.triggerName or self.server.currentRequestTrigger        
+            triggerName = self.triggerName or self.server.defaultRequestTrigger
             result = self.server.runActions(triggerName, kw)
             if result is not None: #'cause '' is OK
                 return (result, kw)
@@ -569,7 +570,7 @@ else:
 
     class SiteUriResolver(Uri.SchemeRegistryResolver):
         '''
-        SiteUriResolver supports the site URI scheme which is used to enable a Racoon request to be invoked via an URL.
+        SiteUriResolver supports the site URI scheme which is used to enable a Raccoon request to be invoked via an URL.
         Site URLs typically look like:
             "site:///index"
         or
@@ -815,8 +816,8 @@ else:
                 self.preVars.append( (varName,  exps, assignWhenEmpty) )
                 
     class FunctorAction(Action):        
-        def __init__(self, actionFunc, indexes = []):
-            Action.__init__(self, ['true()'], lambda *args: actionFunc(*[args[i] for i in indexes]) )
+        def __init__(self, actionFunc, indexes = [], **kw):
+            Action.__init__(self, ['true()'], (lambda *args: actionFunc(*[args[i] for i in indexes])), **kw)
             
     #functions used by the caches
     def _splitKey(key, context):
@@ -1032,7 +1033,7 @@ else:
             setattr(self, name, value)
         
     ############################################################
-    ##Racoon main class
+    ##Raccoon main class
     ############################################################
     class RequestProcessor(object):
         '''        
@@ -1044,10 +1045,15 @@ else:
         requestContext = utils.createThreadLocalProperty('__requestContext',
             doc='variables you want made available to anyone during this request (e.g. the session)')
 
-        inErrorHandler = utils.createThreadLocalProperty('__inErrorHandler', initAttr=True, initValue=0)
+        inErrorHandler = utils.createThreadLocalProperty('__inErrorHandler', initValue=0)
         
-        expCache = MRUCache.MRUCache(0, XPath.Compile)#, sideEffectsFunc=_resetFunctions)
+        previousResolvers = utils.createThreadLocalProperty('__previousResolvers', initValue=None)
 
+        expCache = MRUCache.MRUCache(0, XPath.Compile)#, sideEffectsFunc=_resetFunctions)
+                
+        requestsRecord = None
+        log = log
+        
         def _setContentProcessorDefaults(self):
             self.DefaultAuthorizeContentProcessors = {
                 'http://rx4rdf.sf.net/ns/wiki#item-format-python': self.authorizeByDigest
@@ -1056,10 +1062,7 @@ else:
             'http://rx4rdf.sf.net/ns/wiki#item-format-text' : lambda result, kw, contextNode, contents: contents,
             'http://rx4rdf.sf.net/ns/wiki#item-format-binary' : lambda result, kw, contextNode, contents: contents,
             'http://rx4rdf.sf.net/ns/wiki#item-format-xml':
-                lambda result, kw, contextNode, contents: self.processMarkup(
-                        contents,kw.get('_docpath',
-                        kw.get('_path', getattr(kw.get('_request'),'browserPath', kw.get('_name')))
-                                       )                                    ),
+                lambda result, kw, contextNode, contents: self.processMarkup(contents),
             'http://www.w3.org/2000/09/xmldsig#base64' :
                 lambda result, kw, contextNode, contents: base64.decodestring(contents),
             'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt':
@@ -1076,7 +1079,7 @@ else:
                 'http://www.w3.org/2000/09/xmldsig#base64' :
                     lambda result, kw, contextNode, contents: contents, #the key is just the contents
                 'http://rx4rdf.sf.net/ns/wiki#item-format-xml':
-                    lambda result, kw, contextNode, contents: (kw.get('_docpath', kw.get('_name', '')).count('/'), contents)
+                    lambda result, kw, contextNode, contents: contents
             }
 
             self.DefaultContentProcessorSideEffectsFuncs = {
@@ -1085,25 +1088,32 @@ else:
                 'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt' :  self.xsltSideEffectsCalc }
             self.DefaultContentProcessorIsValueCacheablePredicates = {}
 
-        def __init__(self,a=None, m=None, p=None, argsForConfig=None):
+        def __init__(self,a=None, m=None, p=None, argsForConfig=None,
+                     appBase='/', model_uri=None, appName=''):
             self.requestContext = [{}] #stack of dicts
             configpath = a or self.DEFAULT_CONFIG_PATH
             self.source = m
             self.PATH = p or os.environ.get('RACCOONPATH',os.getcwd())
-            
+            self.BASE_MODEL_URI = model_uri
+            #use first directory on the PATH as the base for relative paths
+            #unless this was specifically set it will be the current dir            
+            self.baseDir = self.PATH.split(os.pathsep)[0]
+            self.appBase = appBase or '/'
+            self.appName = appName
             self.cmd_usage = DEFAULT_cmd_usage
+            self.styleSheetCache = MRUCache.MRUCache(0, styleSheetValueCalc)
             self._setContentProcessorDefaults()
-            self.loadConfig(configpath, argsForConfig)            
-            self.requestDispatcher = Requestor(self)
-            InputSource.DefaultFactory.resolver = SiteUriResolver(self)
+            self.loadConfig(configpath, argsForConfig)
+            self.requestDispatcher = Requestor(self)            
+            self.resolver = SiteUriResolver(self)            
             self.loadModel()
             self.handleCommandLine(argsForConfig or [])
                     
         def handleCommandLine(self, argv):
             '''        
             the command line is translated into XPath variables as follows:
-            * arguments beginning with a '-' are treated a variable name with its value
-            being next argument unless that argument also starts with a '-'
+            * arguments beginning with a '-' are treated as a variable name with its value
+            being the next argument unless that argument also starts with a '-'
             
             * the whole command line is assigned to the variable '_cmdline'
             '''
@@ -1118,8 +1128,9 @@ else:
                 raise CmdArgError('%s not found' % path) 
 
             kw = {}
-            import socket
-            self.BASE_MODEL_URI= 'http://' + socket.getfqdn() + '/'
+            if not self.BASE_MODEL_URI:
+                import socket            
+                self.BASE_MODEL_URI= 'http://' + socket.getfqdn() + '/'
             
             def includeConfig(path):
                  kw['__configpath__'].append(os.path.abspath(path))
@@ -1140,23 +1151,29 @@ else:
             initConstants( [ 'STORAGE_PATH', 'STORAGE_TEMPLATE', 'APPLICATION_MODEL',
                              'DEFAULT_MIME_TYPE', 'transactionLog'], '')
             setattr(self, 'initModel', kw.get('initModel', RxPath.initFileModel))            
-            initConstants( ['ROOT_PATH'], '/')
-            assert self.ROOT_PATH[0] == '/', "ROOT_PATH must start with a '/'"
+            initConstants( ['appBase'], self.appBase)
+            assert self.appBase[0] == '/', "appBase must start with a '/'"
             initConstants( ['BASE_MODEL_URI'], self.BASE_MODEL_URI)
-            self.DEFAULT_TRIGGER = kw.get('DEFAULT_TRIGGER', 'http-request')
-            self.__class__.currentRequestTrigger = utils.createThreadLocalProperty(
-                '__currentRequestTrigger', initAttr=True, initValue=self.DEFAULT_TRIGGER)
-            initConstants( ['globalRequestVars'], [])
-            self.globalRequestVars.extend( ['_docpath', '_name', '_noErrorHandling'] )
+            initConstants( ['appName'], self.appName)
+            #appName is a unique name for this request processor instance
+            if not self.appName:            
+                self.appName = re.sub(r'\W','_', self.BASE_MODEL_URI)            
+            self.log = logging.getLogger("raccoon." + self.appName)
             
+            self.defaultRequestTrigger = kw.get('DEFAULT_TRIGGER', 'http-request')
+            initConstants( ['globalRequestVars'], [])
+            self.globalRequestVars.extend( ['_name', '_noErrorHandling'] )
+            self.defaultPageName = kw.get('defaultPageName', 'index')
             #cache settings:                
             initConstants( ['LIVE_ENVIRONMENT', 'useEtags'], 1)
             initConstants( ['XPATH_CACHE_SIZE','ACTION_CACHE_SIZE'], 1000)
             initConstants( ['XPATH_PARSER_CACHE_SIZE','STYLESHEET_CACHE_SIZE'], 200)
-            initConstants( ['FILE_CACHE_SIZE'], 0)#10000000) #~10mb
-            fileCache.maxFileSize = kw.get('MAX_CACHEABLE_FILE_SIZE', 0)        
+            initConstants( ['FILE_CACHE_SIZE'], 0)#10000000) #~10mb     
+            self.styleSheetCache.capacity = self.STYLESHEET_CACHE_SIZE
+                        
+            #todo: these caches are global, only let the root RequestProcessor set these value                   
+            fileCache.maxFileSize = kw.get('MAX_CACHEABLE_FILE_SIZE', 0)                        
             self.expCache.capacity = self.XPATH_PARSER_CACHE_SIZE
-            styleSheetCache.capacity = self.STYLESHEET_CACHE_SIZE
             fileCache.capacity = self.FILE_CACHE_SIZE
             fileCache.hashValue = lambda path: getFileCacheKey(path, fileCache.maxFileSize)
                     
@@ -1174,7 +1191,6 @@ else:
             self.authorizeContentProcessors = kw.get('authorizeContentProcessors',
                                                 self.DefaultAuthorizeContentProcessors)
             
-
             self.MODEL_UPDATE_PREDICATE = kw.get('MODEL_UPDATE_PREDICATE')
             self.MODEL_RESOURCE_URI = kw.get('MODEL_RESOURCE_URI', self.BASE_MODEL_URI)
             
@@ -1183,10 +1199,10 @@ else:
             self.NOT_CACHEABLE_FUNCTIONS.update(DefaultNotCacheableFunctions)
             if self.LIVE_ENVIRONMENT:
                 self.NOT_CACHEABLE_FUNCTIONS.update( EnvironmentDependentFunctions )
-                styleSheetCache.isValueCacheableCalc = isStyleSheetCacheable
+                self.styleSheetCache.isValueCacheableCalc = isStyleSheetCacheable
             else:
-                styleSheetCache.sideEffectsFunc = self.styleSheetParserSideEffectsFunc
-                styleSheetCache.sideEffectsCalc = self.styleSheetParserSideEffectsCalc
+                self.styleSheetCache.sideEffectsFunc = self.styleSheetParserSideEffectsFunc
+                self.styleSheetCache.sideEffectsCalc = self.styleSheetParserSideEffectsCalc
                 
             self.nsMap.update(DefaultNsMap)
             
@@ -1231,7 +1247,9 @@ else:
             else:
                 source = self.STORAGE_PATH
             if not source:
-                log.warning('no model path given and STORAGE_PATH not set -- model is read-only.')
+                self.log.warning('no model path given and STORAGE_PATH not set -- model is read-only.')
+            elif not os.path.isabs(source): #todo its possible for source to not be file path -- this will break that
+                source = os.path.join( self.baseDir, source)
 
             if not self.lock:            
                 lockName = 'r' + `hash(repr(source))` + '.lock'
@@ -1281,8 +1299,16 @@ else:
             if kw is None: kw = {}            
             sequence = self.actions.get(triggerName)
             if sequence:
-                return self.doActions(sequence, kw)
-
+                try:
+                    #this is a stack in case runActions is re-entrant
+                    if self.previousResolvers is None:
+                        self.previousResolvers = []                    
+                    self.previousResolvers.append( InputSource.DefaultFactory.resolver )
+                    InputSource.DefaultFactory.resolver = self.resolver
+                    return self.doActions(sequence, kw)
+                finally:
+                    InputSource.DefaultFactory.resolver = self.previousResolvers.pop()
+                    
         COMPLEX_REQUESTVARS = ['__requestor__', '__server__','_request','_response',
                                '_session', '_prevkw', '__argv__', '_errorInfo']
         
@@ -1304,13 +1330,13 @@ else:
                           if x[0] not in self.COMPLEX_REQUESTVARS and x[0] != '_metadatachanges'] )
             #magic constants:
             vars[(None, 'STOP')] = self.STOP_VALUE
-            vars[(None, 'ROOT_PATH')] = self.ROOT_PATH        
+            vars[(None, '_APP_BASE')] = self.appBase
             vars[(None, 'BASE_MODEL_URI')] = self.BASE_MODEL_URI        
             #http request and response vars:
             request = kw.get('_request', None)
             if request:
                 vars[(None, '_url')] = request.browserUrl
-                vars[(None, '_base-url')] = request.browserBase            
+                vars[(None, '_base-url')] = request.base            
                 vars[(None, '_path')] = request.browserPath
                 vars[(None, '_url-query')] = request.browserQuery
                 vars[(None, '_method')] = request.method
@@ -1351,7 +1377,7 @@ else:
                         queryCache=getattr(self.rdfDom, 'queryCache', None))
             except (RuntimeException), e:
                 if e.errorCode == RuntimeException.UNDEFINED_VARIABLE:                            
-                    log.debug(e.message) #undefined variables are ok
+                    self.log.debug(e.message) #undefined variables are ok
                     return None
                 else:
                     raise
@@ -1408,12 +1434,12 @@ else:
                         result = self.evalXPath(xpath, vars=vars, extFunctionMap = extFunMap, node = contextNode)
                         if type(result) == type(u'') and result == self.STOP_VALUE:#for $STOP
                             break
-                        if result: #todo: != []: #if not equal empty nodeset (empty strings ok)
+                        if result: #todo: != []: #if not equal empty nodeset (empty strings ok)                            
                             if not action.action: #if no action is defined this action resets the contextNode instead
                                 assert type(result) == type([]) and len(result) #result must be a nonempty nodeset
                                 contextNode = result[0]
                                 kw['__context'] = [ contextNode ]
-                                log.debug('context changed: %s', result)
+                                self.log.debug('context changed: %s', result)
                                 assert action.matchFirst #why would you want to evalute every query in this case?
                                 break
                             else:
@@ -1473,7 +1499,7 @@ else:
                             details = ''.join( traceback_module.format_exception(type, value, traceback) )
                             return locals()
                         kw['_errorInfo'] = getErrorKWs()
-                        log.warning("invoking error handler on exception", exc_info=1)
+                        self.log.warning("invoking error handler on exception", exc_info=1)
                         #todo provide a protocol for mapping exceptions to XPath variables, e.g. line # for parsing errors
                         #kw['errorInfo'].update(self.extractXPathVars(kw['errorInfo']['value']) )
                         return self.callActions(errorSequence, self.globalRequestVars, result, kw, contextNode, retVal)
@@ -1540,7 +1566,7 @@ else:
             if contents is None:
                 return contents        
             formatType = self.getStringFromXPathResult(result)        
-            log.debug('enc %s', formatType)
+            self.log.debug('enc %s', formatType)
             if kw.get('_staticFormat'):
                 kw['__lastFormat']=formatType
                 staticFormat = True
@@ -1629,17 +1655,22 @@ else:
             '''
             Converts site: URLs to external (usually http) URLs.
             Absolute site links ('site:///') are fixed up as follows:
-            If a relative url of the current document is specified they will be converted to relative paths.
+            
+            url: If a relative url of the current document is specified site:/// links will be converted to relative paths.
             e.g. if the relative doc url is 'folder/foo/bar' then the 'site:///' prefix will be replaced with '../../'
-            Otherwise it will be replaced with the specified baseurl (which defaults to '/')
+            
+            baseurl: Otherwise they will be replaced by prepending the specified baseurl (which defaults to '/')
             
             Relative site URLs ('site:') just have their 'site:' prefix stripped off
             '''
-            def __init__(self, out, url = None, baseurl = '/', enableFormatPI = True):
+            def __init__(self, out, baseurl = '/', url = None, enableFormatPI = True):
                 utils.LinkFixer.__init__(self, out)
                 self.nextFormat = None
-                self.ignorePIs = not enableFormatPI
-                if url is not None:                
+                self.ignorePIs = not enableFormatPI                
+                if url is not None:
+                    #here we try to calculate a relative path from the base url back to the root
+                    #the advantage here is that 
+                    #too complicated to test right now
                     index = url.find('?')
                     if index > -1:
                         url = url[:index]
@@ -1650,8 +1681,10 @@ else:
                     dirCount = url.count('/')                    
                     self.rootpath = '../' * dirCount
                 else:
-                    self.rootpath = baseurl
-                #print 'rootpath', repr(url), self.rootpath
+                    if baseurl[-1] != '/':                        
+                        baseurl = baseurl + '/'
+                    self.rootpath = baseurl 
+                #print 'rootpath', repr(url), self.rootpath, baseurl
 
             def handle_pi(self, data):
                 if data.startswith('raccoon-ignore'):
@@ -1685,7 +1718,7 @@ else:
                 #for any other site: URLs we assume they're relative and just strip out the 'site:'
                 return value.replace('site:', '')
 
-        def processMarkup(self, contents, docpath, linkFixerFactory=None):
+        def processMarkup(self, contents, docpath=None, linkFixerFactory=None, baseURL=None):
             ''' HTML/XML content processors. Fixes up any 'site:' URLs
             that appear in the XML or HTML content and handle
             <?raccoon-format contentprocessURI ?> processor
@@ -1693,7 +1726,9 @@ else:
             out = StringIO.StringIO()
             if not linkFixerFactory:
                 linkFixerFactory = self.SiteLinkFixer
-            fixlinks = linkFixerFactory(out, docpath, self.ROOT_PATH)
+            if baseURL is None:
+                baseURL = self.appBase
+            fixlinks = linkFixerFactory(out, url=docpath, baseurl=baseURL)
             fixlinks.feed(contents)
             fixlinks.close()
             if fixlinks.nextFormat:
@@ -1711,7 +1746,7 @@ else:
             
             processor = RxPath.RxSLTProcessor()        
             contents = RxPath.applyXslt(self.rdfDom, stylesheet, vars, funcs, baseUri='path:',
-                             styleSheetCache=styleSheetCache, processor = processor)
+                             styleSheetCache=self.styleSheetCache, processor = processor)
             format = kw.get('_nextFormat')                    
             if format is None:
                 format = self._getFormatFromStyleSheet(processor.stylesheet)
@@ -1726,7 +1761,7 @@ else:
             '''
             modelNode = rdfDom.findSubject(self.MODEL_RESOURCE_URI)
             if not modelNode:
-                log.warning("model resource not found: %s" % self.MODEL_RESOURCE_URI)
+                self.log.warning("model resource not found: %s" % self.MODEL_RESOURCE_URI)
                 return
             for p in modelNode.childNodes:
                 if p.stmt.predicate == self.MODEL_UPDATE_PREDICATE:
@@ -1782,7 +1817,7 @@ else:
                 contents = output.getvalue()
             except:
                 sys.stdout = sys_stdout
-                log.exception('got this far before exception %s', output.getvalue())
+                self.log.exception('got this far before exception %s', output.getvalue())
                 raise
             else:   #can't have a finally here
                 sys.stdout = sys_stdout
@@ -1829,7 +1864,7 @@ else:
             #print 'xslt ', uri
             #print 'xslt template:', styleSheetContents
             #print 'xslt source: ', contents
-            styleSheet = styleSheetCache.getValue(styleSheetContents, uri)
+            styleSheet = self.styleSheetCache.getValue(styleSheetContents, uri)
             processor.appendStylesheetInstance( styleSheet, uri) 
             for (k, v) in extFunMap.items():
                 namespace, localName = k
@@ -1902,7 +1937,7 @@ else:
           except NotAuthorized:
             raise
           except:
-            log.exception("metadata save failed")
+            self.log.exception("metadata save failed")
             raise
                 
         def updateDom(self, addStmts, removedNodes=None, source='', authorize=None):
@@ -1954,7 +1989,7 @@ else:
           key = [styleSheetContents, styleSheetUri, sourceContents, contextNode,
                  id(contextNode.ownerDocument), revision]
           
-          styleSheet = styleSheetCache.getValue(styleSheetContents, styleSheetUri)
+          styleSheet = self.styleSheetCache.getValue(styleSheetContents, styleSheetUri)
           
           try:
               styleSheetKeys = styleSheet.isCacheable
@@ -1962,7 +1997,7 @@ else:
               styleSheetKeys = styleSheet.isCacheable = getStylesheetCacheKey(
                       styleSheet.children, styleSheetNotCacheableFunctions)
               if isinstance(styleSheetKeys, MRUCache.NotCacheable):
-                  log.debug("stylesheet %s is not cacheable" % styleSheetUri)
+                  self.log.debug("stylesheet %s is not cacheable" % styleSheetUri)
               
           if isinstance(styleSheetKeys, MRUCache.NotCacheable):
               raise styleSheetKeys
@@ -2049,14 +2084,40 @@ else:
             else:
                 return None
                 
-        def handleRequest(self, _name_, **kw):
-            #print 'name:', _name_
-            kw['_name'] = _name_ #explictly replace _name -- do it this way to avoid TypeError: handleRequest() got multiple values for keyword argument '_name'
+        def handleHTTPRequest(self, name, kw):                        
+            if self.requestsRecord is not None:
+                self.requestsRecord.append([ name, kw ])
+
+            request = kw['_request']
+            
+            #cgi: REQUEST_METHOD [http[s]://] HTTP_HOST : SERVER_PORT REQUEST_URI ? QUERY_STRING            
+            #cherrypy:
+            #request.base = http[s]:// + request.headerMap['host'] + [:port]
+            #request.browserUrl = request.base + / + [request uri]
+            #request.path = [path w/no leading or trailing slash]
+            #name = urllib.unquote(request.path) or _usevdomain logic
+
+            request.browserBase = request.base + '/'
+            
+            #the operative part of the url (browserUrl = browserBase + browserPath + '?' + browserQuery)
+            path = request.browserUrl[len(request.browserBase):]
+            if path.find('?') > -1:
+                request.browserPath, request.browserQuery = path.split('?', 1)
+            else:
+                request.browserPath, request.browserQuery = path, ''
+
+            appBaseLength = len(self.appBase)
+            if appBaseLength > 1: #appBase always starts with /
+                name = name[appBaseLength:] 
+            if not name or name == '/':
+                name = self.defaultPageName
+            kw['_name'] = name
+            #import pprint; pprint.pprint(kw)
 
             #if the request name has an extension try to set a default mimetype before executing the request
-            i=_name_.rfind('.')
+            i=name.rfind('.')
             if i!=-1:
-                ext=_name_[i:]      
+                ext=name[i:]      
                 contentType=mimetypes.types_map.get(ext)
                 if contentType:
                     kw['_response'].headerMap['content-type']=contentType
@@ -2065,7 +2126,7 @@ else:
                 rc = {}
                 #requestContext is used by all Requestor objects in the current thread 
                 rc['_session']=kw['_session']
-                #todo: probably should put request.simpleCookie in the requestContext somehow too
+                rc['_request']=kw['_request']
                 self.requestContext.append(rc)
                 
                 self.validateExternalRequest(kw)
@@ -2137,10 +2198,14 @@ else:
             </xsl:stylesheet>'''
             return self.transform(styleSheet)
 
-    #more cacheing functions (xslt, rxslt content processors)
+        def saveRequestHistory(self):
+            if self.requestsRecord:
+                requestRecordFile = file(requestRecordFilePath, 'wb')
+                pickle.dump(requestsRecord, requestRecordFile)
+                requestRecordFile.close()       
         
-    styleSheetCache = MRUCache.MRUCache(0, styleSheetValueCalc)
-
+    #more cacheing functions (xslt, rxslt content processors)
+                
     def addXPathExprCacheKey(compExpr, nsMap, key, notCacheableXPathFunctions):
         #note: we don't know the contextNode now, keyfunc must be prepared to handle that
         context = XPath.Context.Context(None, processorNss = nsMap)    
@@ -2187,12 +2252,11 @@ else:
                 outputAttrs = getattr(node, '_output_attrs', None) 
                 if outputAttrs is not None:
                     for (qname, namespace, value) in outputAttrs:
-                        if value is not None:
-                            #value will be a AttributeValueTemplate.AttributeValueTemplate
+                        if isinstance(value, AttributeValueTemplate.AttributeValueTemplate):                           
                             for expr in value._parsedParts:
                                 addXPathExprCacheKey(expr, node.namespaces,
-                                                 key, styleSheetNotCacheableFunctions)                                
-                
+                                                 key, styleSheetNotCacheableFunctions)                
+
                 if node.children is not None:
                     key = getStylesheetCacheKey(node.children, styleSheetNotCacheableFunctions, key)
                     if isinstance(key, MRUCache.NotCacheable):
@@ -2286,7 +2350,7 @@ else:
             if '-h' in mainArgs or '--help' in mainArgs:
                 raise CmdArgError('')
             try:
-                root = RequestProcessor(**kw)
+                root = RequestProcessor(appName='root', **kw)
             except (TypeError), e:
                 index = str(e).find('argument') #bad keyword arguement
                 if index > -1:                    
@@ -2302,13 +2366,15 @@ else:
                     debugFileName = 'debug-wiki.pkl'
                 requests = pickle.load(file(debugFileName, 'rb'))
                 for request in requests:
-                    root.handleRequest(request[0], **request[1])
+                    root.handleHTTPRequest(request[0], request[1])
             elif '-x' not in mainArgs: #if -x (execute cmdline and exit) we're done
                 sys.argv = mainArgs #hack for Server
                 from rx import Server
-                debug = '-r' in mainArgs
+                if '-r' in mainArgs:
+                    root.requestsRecord = []                    
+                    root.requestRecordPath = 'debug-wiki.pkl' 
                 #print 'starting server!'
-                Server.start_server(root, debug) #kicks off the whole process
+                Server.start_server(root) #kicks off the whole process
                 #print 'dying!'
         except (CmdArgError), e:
             print>>out, e

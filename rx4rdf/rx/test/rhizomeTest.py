@@ -115,7 +115,119 @@ class RhizomeTestCase(unittest.TestCase):
             print 'testing ', configpath
             self.executeScript(configpath, glob.glob('nonascii.*.pkl'))
 
+    def doHTTPRequest(self, requestProcessor, kw, url, method='GET'):
+        '''
+        turns a dictionary into one that looks like an HTTP request 
+        and then call handleHTTPRequest    
+        '''
+        #we need to add this to make this look like a http request
+                
+        #copied from rhizome.doExport():
+        class _dummyRequest:
+           def __init__(self):
+              self.headerMap = {}
+              self.simpleCookie = {}
 
+        request  = _dummyRequest()
+        request.method = method
+        parts = url.split('/',3)        
+        #request needs request.host, request.base, request.browserURL
+        request.headerMap['host'] = parts[2]
+        request.base = '/'.join(parts[:3])
+        request.browserUrl = url
+        path = parts[3:] 
+        request.path = path and path[0] or '' #path is a list
+        if request.path[-1:] == '/':
+            request.path = request.path[:-1]
+        
+                      
+        response = _dummyRequest()
+
+        request.paramMap = kw
+        request.paramMap['_request']=request
+        request.paramMap['_response']=response
+        request.paramMap['_session']= {}
+           
+        import urllib        
+        name = urllib.unquote(request.path)
+        
+        newkw = request.paramMap.copy()
+        return requestProcessor.handleHTTPRequest(name, newkw) 
+
+    def testLocalLinks(self):
+        #the main point of this test is to test virtual hosts
+        
+        #test-links.py contains links to internal pages
+        #if any of those link to pages that are missing this test will fail
+        #because hasPage() will fail
+        #also, because these uses the default template with the sidebar
+        #we also test link generation with content generated through internal link resolution
+
+        
+        argsForConfig = ['--rhizomedir', os.path.abspath(RHIZOMEDIR)]
+        root = raccoon.RequestProcessor(a='test-links.py',
+                                argsForConfig=argsForConfig)
+
+        self.doHTTPRequest(root, {}, 'http://www.foo.com/page1')
+        self.doHTTPRequest(root, {}, 'http://www.foo.com/page1/')
+        self.doHTTPRequest(root, {}, 'http://www.foo.com/folder/page2')
+
+        self.doHTTPRequest(root, {}, 'http://www.foo.com/')
+        self.doHTTPRequest(root, {}, 'http://www.foo.com')
+
+        self.doHTTPRequest(root, {}, 'http://www.foo.com:8000')
+        
+        root = raccoon.RequestProcessor(a='test-root-config.py',
+                                argsForConfig=argsForConfig)
+
+        def not_found(kw):
+            if raiseWhenNotFound:            
+                raise kw['_name'] + ' not found'
+            else:
+                return 'notfound'
+        root.default_not_found = not_found
+
+        raiseWhenNotFound = True
+        #self.doHTTPRequest(root, {}, 'http://www.anydomain.com/page1')
+        
+        self.doHTTPRequest(root, {}, 'http://www.foo.com/page1')
+        self.doHTTPRequest(root, {}, 'http://www.foo.com/folder/page2')
+
+        self.doHTTPRequest(root, {}, 'http://foo.org/page1')
+        self.doHTTPRequest(root, {}, 'http://foo.org:8000/folder/page2')
+
+        self.doHTTPRequest(root, {}, 'http://foo.bar.org/page1')
+        self.doHTTPRequest(root, {}, 'http://foo.bar.org/folder/page2')
+        self.doHTTPRequest(root, {}, 'http://foo.bar.org/folder/page2/')
+
+        self.doHTTPRequest(root, {}, 'http://foo.bar.org/')
+        self.doHTTPRequest(root, {}, 'http://foo.bar.org')
+
+        self.doHTTPRequest(root, {}, 'http://www.bar.org/bar/page1')
+        self.doHTTPRequest(root, {}, 'http://www.bar.org/bar/folder/page2')
+        self.doHTTPRequest(root, {}, 'http://www.bar.org/bar/folder/page2/')
+
+        self.doHTTPRequest(root, {}, 'http://www.bar.org/bar/')
+        self.doHTTPRequest(root, {}, 'http://www.bar.org/bar')
+
+        raiseWhenNotFound = False
+        #result = self.doHTTPRequest(root, {}, 'http://www.foo.com/foo/page1')
+        #self.failUnless(result == 'notfound')
+        
+        #result = self.doHTTPRequest(root, {}, 'http://www.foo.com/foo/folder/page2')
+        #self.failUnless(result == 'notfound')
+        
+        result = self.doHTTPRequest(root, {}, 'http://www.bar.org/page1')
+        self.failUnless(result == 'notfound')
+        
+        #result = self.doHTTPRequest(root, {}, 'http://www.bar.org/folder/page2')
+        #self.failUnless(result == 'notfound') 
+
+        result = self.doHTTPRequest(root, {}, 'http://www.anyolddomain.org/page1')
+        self.failUnless(result == 'notfound')
+
+
+                
 SAVE_WORK=False
 DEBUG = False
 

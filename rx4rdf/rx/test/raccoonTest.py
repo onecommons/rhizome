@@ -53,7 +53,8 @@ class RaccoonTestCase(unittest.TestCase):
         response = "<html><body>page content.</body></html>"
         self.failUnless(response == result)
         
-        result = raccoon.InputSource.DefaultFactory.fromUri('site:///foo').read()    
+        result = raccoon.InputSource.DefaultFactory.fromUri(
+            'site:///foo', resolver=root.resolver).read()    
         #print type(result), repr(result), result
         self.failUnless(response == result)
         

@@ -1,6 +1,19 @@
 Rx4RDF and Rhizome Changelog
 ============================
 
+Changes in Version 0.4.4 (March xx, 2005)
+----------------------------------------
+Major changes and bug fixes:
+* Raccoon: allow multiple applications
+** cookies (including session) are set to the app's path
+** fixed and renamed ROOT_PATH to appBase
+** separate loggers per application created (see log.config)
+** added root-config.py application for configuring multiple applications
+** moved defaultPageName from server.cfg to application config
+** changed link fixups to uses absolute paths
+* Rhizome: fixed spurious 'admin password not set' warning
+* various: support for 4Suite 1.0b1 
+
 Changes in Version 0.4.3 (Jan 25, 2005)
 ----------------------------------------
 Major changes and bug fixes:

@@ -228,7 +228,10 @@ class Rhizome(object):
                                'http://rx4rdf.sf.net/ns/wiki#item-format-zml']
 
     uninitialized = True
-    
+    log = log
+    defaultPassword = 'admin'
+    defaultSecureHashSeed = 'YOU SHOULD CHANGE THIS!'
+                
     def __init__(self, server):
         self.server = server
         #this is just like findContentAction except we don't want to try to retrieve alt-contents' ContentLocation        
@@ -253,22 +256,27 @@ class Rhizome(object):
         setattr(self, name, result)
                     
     def configHook(self, kw):
+        self.log = logging.getLogger("rhizome." + self.server.appName)
+        
         def initConstants(varlist, default):
             return raccoon.assignVars(self, kw, varlist, default)
 
         self.server.APPLICATION_MODEL += RxPath.RDFSSchema.schemaTriples
         
         initConstants( ['MAX_MODEL_LITERAL'], -1)        
-        self.SAVE_DIR = os.path.abspath( kw.get('SAVE_DIR', 'content/.rzvs') )
+        
+        self.SAVE_DIR = kw.get('SAVE_DIR', 'content/.rzvs')
+        if not os.path.isabs(self.SAVE_DIR):
+            self.SAVE_DIR = os.path.join(self.server.baseDir, self.SAVE_DIR)
+                                               
         altsaveSetting = kw.get('ALTSAVE_DIR', 'content')
         if altsaveSetting:
-            self.ALTSAVE_DIR = os.path.abspath( altsaveSetting )
+            self.ALTSAVE_DIR = os.path.join(self.server.baseDir, altsaveSetting)
         else:
             self.ALTSAVE_DIR = ''
         self.THEME_DIR = kw.get('THEME_DIR', 'themes/default')
             
-        if not kw.has_key('PATH'):
-            #theme path : rhizome path 
+        if not kw.has_key('PATH'): 
             #if PATH hasn't been set in the config, set the path to be:
             #ALT_SAVE_DIR: THEME_DIR : RhizomeDir
             #where RhizomeDir is directory that rhizome-config.py lives in
@@ -286,7 +294,7 @@ class Rhizome(object):
                 self.server.PATH = rhizomeDir
             if self.ALTSAVE_DIR:
                 self.server.PATH = self.ALTSAVE_DIR + os.pathsep + self.server.PATH
-        log.debug('path is %s' % self.server.PATH)
+        self.log.debug('path is %s' % self.server.PATH)
         if self.MAX_MODEL_LITERAL > -1:
             if self.ALTSAVE_DIR:
                 assert [prefix for prefix in self.server.PATH
@@ -307,23 +315,25 @@ class Rhizome(object):
 
         self.passwordHashProperty = kw.get('passwordHashProperty',
                                           self.BASE_MODEL_URI+'password-hash')
-        self.secureHashSeed = kw.get('SECURE_HASH_SEED',
-                                          'YOU REALLY SHOULD CHANGE THIS!')
-        if self.secureHashSeed == 'YOU REALLY SHOULD CHANGE THIS!':
-            log.warning("SECURE_HASH_SEED using default seed -- set your own private value!")
+        self.secureHashSeed = kw.get('SECURE_HASH_SEED', self.defaultSecureHashSeed)
+        if self.secureHashSeed == self.defaultSecureHashSeed:
+            self.log.warning("SECURE_HASH_SEED using default seed -- set your own private value.")
         self.secureHashMap = kw.get('secureHashMap',        
             { self.passwordHashProperty :  self.secureHashSeed })
         #make this available as an XPath variable
         self.resourceAuthorizationAction.assign("__passwordHashProperty",
                         "'"+self.passwordHashProperty+"'")
 
-        if not kw.get('ADMIN_PASSWORD_HASH') or not kw.get('ADMIN_PASSWORD'):
-            log.warning("neither ADMIN_PASSWORD nor ADMIN_PASSWORD_HASH was set; using default admin password")
+        if not kw.get('ADMIN_PASSWORD_HASH') and not kw.get('ADMIN_PASSWORD'):
+            self.log.warning("neither ADMIN_PASSWORD nor ADMIN_PASSWORD_HASH was set; using default admin password.")
+        elif kw.get('ADMIN_PASSWORD') == self.defaultPassword:
+            self.log.warning("ADMIN_PASSWORD set is to the default admin password.")
+
         #this is just like findResourceAction except we don't assign the 'not found' resource
         #used by hasPage
         self.checkForResourceAction = raccoon.Action(self.findResourceAction.queries[:-1])
         self.checkForResourceAction.assign("__resource", '.', post=True)
-        self.indexDir = kw.get('INDEX_DIR', 'contentindex')
+        self.indexDir = kw.get('INDEX_DIR', os.path.join(self.server.baseDir, 'contentindex'))
         self.indexableFormats = kw.get('indexableFormats', self.defaultIndexableFormats)
 
         for args in [ ('blacklistedContent', lambda x,y: (re.compile(x), re.compile(y)) ),
@@ -562,7 +572,7 @@ Their value can be either an URI or a QName.
           else:
               filePattern = ''
           rootPath = os.path.normpath(path or '.').replace(os.sep, '/')
-          log.info('beginning import of ' + rootPath)
+          self.log.info('beginning import of ' + rootPath)
           triples = {}
 
           if fixedBaseURI:
@@ -603,10 +613,10 @@ Their value can be either an URI or a QName.
                   wikiname = rdfDom.evalXPath('string(/*/wiki:name)', nsMap = self.server.nsMap)
                   assert wikiname, 'could not find a wikiname when importing %s' % path + METADATAEXT
                   if save and self.server.evalXPath("/*[wiki:name='%s']"% wikiname):
-                      log.warning('there is already an item named ' + wikiname +', skipping import')
+                      self.log.warning('there is already an item named ' + wikiname +', skipping import')
                       return #hack for now skip if item already exists
                   else:                      
-                      log.info('importing ' +filename)
+                      self.log.info('importing ' +filename)
                                     
                   #update the page's metadata using the xupdate script
                   self.server.xupdateRDFDom(rdfDom, uri=xupdate,
@@ -652,10 +662,10 @@ Their value can be either an URI or a QName.
                       wikiname = filepath
                   wikiname = filter(lambda c: c.isalnum() or c in '_-./', wikiname)
                   if save and self.server.evalXPath("/*[wiki:name='%s']"% wikiname):
-                      log.warning('there is already an item named ' + wikiname +', skipping import')
+                      self.log.warning('there is already an item named ' + wikiname +', skipping import')
                       return #hack for now skip if item already exists
                   else:
-                      log.info('importing ' +filepath+ ' as ' + wikiname)
+                      self.log.info('importing ' +filepath+ ' as ' + wikiname)
                   if not defaultFormat:
                       exts = { '.zml' : 'http://rx4rdf.sf.net/ns/wiki#item-format-zml',
                       '.xsl' : 'http://www.w3.org/1999/XSL/Transform',
@@ -753,7 +763,7 @@ Options:
              assert name
              orginalName = name
              content = None
-             log.info('attempting to export %s ' % name)
+             self.log.info('attempting to export %s ' % name)
              if static:                 
                  try:
                      #we need this to store the mimetype:
@@ -780,7 +790,7 @@ Options:
                      #       but adding an extension means fixing up links
                  except:
                      #traceback.print_exc()
-                     log.warning('%s is dynamic, can not do static export' % name)
+                     self.log.warning('%s is dynamic, can not do static export' % name)
                      self.server.requestContext.pop()
                      #note: only works with static pages (ones with no required parameters)
                  else:
@@ -888,16 +898,16 @@ Options:
     'concat("site:///", (/a:NamedContent[wiki:revisions/*/*[.=$__context]]/wiki:name)[1])',
                         node=contextNode) )
                 
-    def linkFixerFactory(self, sanitize, addNoFollow, args):
-        fixer = SanitizeHTML(*args)        
+    def linkFixerFactory(self, sanitize, addNoFollow, args, kwargs):
+        fixer = SanitizeHTML(*args, **kwargs)        
         fixer.addRelNofollow = addNoFollow
         fixer.blacklistedElements = sanitize and self.blacklistedElements or []
         fixer.blacklistedContent = sanitize and self.blacklistedContent or {}
         fixer.blacklistedAttributeNames = sanitize and self.blacklistedAttributes or {}
         return fixer
 
-    def truncateHTMLFactory(self, maxwords, maxlines, args):
-        fixer = TruncateHTML(*args)        
+    def truncateHTMLFactory(self, maxwords, maxlines, args, kwargs):
+        fixer = TruncateHTML(*args, **kwargs)        
                                     
         fixer.blacklistedElements = self.blacklistedElements
         fixer.blacklistedContent = self.blacklistedContent
@@ -910,13 +920,14 @@ Options:
         
     def processMarkup(self, result, kw, contextNode, contents,
                       sanitizeToken=None, nospamToken=None):
-        #if the content was not created by an user with the 
-        #with the trusted author token we need to strip out any dangerous HTML        
-        #because html maybe generated dynamically we need to check this while spitting out the HTML
+        #if the content was not created by an user with a 
+        #trusted author token we need to strip out any dangerous HTML.
+        #Because html maybe generated dynamically we need to check this while spitting out the HTML.
         maxwords = kw.get('maxwords') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxwords'))
         maxlines = kw.get('maxlines') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxlines'))
         if maxwords or maxlines:
-            linkFixerFactory = lambda *args: self.truncateHTMLFactory(maxwords, maxlines, args)
+            #we always santize the HTML when rendering HTML for a summary
+            linkFixerFactory = lambda *args, **kwargs: self.truncateHTMLFactory(maxwords, maxlines, args, kwargs)
         else:
             sanitize = nofollow = True
             #get the accessTokens granted to the author of the content            
@@ -934,16 +945,15 @@ Options:
                     nofollow = False
 
             if sanitize or nofollow:
-                linkFixerFactory = lambda *args: self.linkFixerFactory(sanitize, nofollow, args)
+                linkFixerFactory = lambda *args, **kwargs: self.linkFixerFactory(sanitize, nofollow, args, kwargs)
             else: #permission to generate any kind of html/xml -- so use the default                        
                 linkFixerFactory = None
-        path = kw.get('_docpath', kw.get('_path', getattr(kw.get('_request'),'browserPath', kw.get('_name'))) )
-        return self.server.processMarkup(contents,path,linkFixerFactory)
+
+        return self.server.processMarkup(contents,linkFixerFactory=linkFixerFactory)
 
     def processMarkupCachePredicate(self, result, kw, contextNode, contents):
-        path = kw.get('_docpath', kw.get('_path', getattr(kw.get('_request'),'browserPath', kw.get('_name'))) )
         return (contents, contextNode, id(contextNode.ownerDocument),
-                contextNode.ownerDocument.revision, path,
+                contextNode.ownerDocument.revision,
                 kw.get('maxwords') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxwords')),
                 kw.get('maxlines') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxlines'))
                 )
@@ -960,6 +970,7 @@ Options:
     def processZML(self, contextNode, contents, kw):
         self.processZMLSideEffects(contextNode, kw)
         contents = zml.zmlString2xml(contents,self.mmf)
+        #todo: optimize: don't fix up links if doctype is set since we're gonna do that again anyway
         return (contents, 'http://rx4rdf.sf.net/ns/wiki#item-format-xml') #fixes up site://links
         
     def processTemplateAction(self, resultNodeset, kw, contextNode, retVal):
@@ -968,7 +979,7 @@ Options:
         actions = self.handleRequestSequence[3:]
 
         #so we can reference the template resource (will be placed in the the 'previous' namespace)
-        log.debug('calling template resource: %s' % resultNodeset)
+        self.log.debug('calling template resource: %s' % resultNodeset)
         kw["_template"] = resultNodeset
         
         return self.server.callActions(actions, self.server.globalRequestVars,
@@ -1150,7 +1161,7 @@ Options:
                     if os.path.exists(filepath):
                         #huh? this file shouldn't exist, so let's abandon
                         #patching so we don't accidently overwrite something we shouldn't
-                        log.warning("aborting creation of patch: %s unexpectedly exists" % filepath)
+                        self.log.warning("aborting creation of patch: %s unexpectedly exists" % filepath)
                         return '' #no patch
             return self._saveContents(filepath, patch)
         else:
@@ -1180,7 +1191,7 @@ Options:
                 #should not exist, perhaps we've renamed this page to the name of an old page?
                 #well, it does so save the contents to a different name
                 newfilepath = os.path.join(self.SAVE_DIR, filename) + str(attempt) + '.' + str(int(revisionCount))                
-                log.warning("while saving content: %s unexpectedly exists, trying %s" % (filepath, newfilepath) )
+                self.log.warning("while saving content: %s unexpectedly exists, trying %s" % (filepath, newfilepath) )
                 filepath = newfilepath
                 attempt += 1
             
@@ -1259,7 +1270,7 @@ Options:
                     f.write(contents)
                     f.close()                    
                 elif conflict:
-                    log.warning("conflict trying to save revision to ALTSAVE_DIR: "
+                    self.log.warning("conflict trying to save revision to ALTSAVE_DIR: "
                                 "unrecognized contents at %s" % altfilepath)
                     altContents = ("<wiki:save-conflict><a:ContentLocation "
                             "rdf:about='%s' /></wiki:save-conflict>" % altPathURI)                    
@@ -1322,7 +1333,7 @@ Options:
                 self.index = lupy.indexer.Index(self.indexDir)
             except:
                 #opening the index failed create a new one
-                log.info('creating lupy index in %s' % self.indexDir)
+                self.log.info('creating lupy index in %s' % self.indexDir)
                 self.index = lupy.indexer.Index(self.indexDir, True)
                 #get all the content in the site and add it to the index
                 for node in self.server.evalXPath("/a:NamedContent"):
@@ -1346,7 +1357,7 @@ Options:
                                 if predicate.stmt.predicate == 'http://rx4rdf.sf.net/ns/wiki#title':
                                     title = predicate.stmt.object
                                     break
-                            log.debug('adding resource %s to index', resource)
+                            self.log.debug('adding resource %s to index', resource)
                             self.index.index(_resource = resource, contents = contents, title = title)
 
         def addToIndex(self, resource, contents, title=''):
