@@ -12,13 +12,14 @@ from __future__ import generators
 
 from rx import utils
 from Ft.Lib.boolean import false as XFalse, true as XTrue, bool as Xbool
-from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, Util, BNODE_BASE, BNODE_BASE_LEN,RDF_MS_BASE
+from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, Util
+from Ft.Rdf import BNODE_BASE, BNODE_BASE_LEN,RDF_MS_BASE,RDF_SCHEMA_BASE
 import Ft.Rdf.Model
 from Ft.Xml.XPath.Conversions import StringValue, NumberValue
 from Ft.Xml import XPath, InputSource, SplitQName, EMPTY_NAMESPACE
 from Ft.Rdf.Statement import Statement
 from rx.utils import generateBnode
-import os.path, sys
+import os.path, sys, StringIO, traceback
 
 from rx import logging #for python 2.2 compatibility
 log = logging.getLogger("RxPath")
@@ -114,6 +115,7 @@ def getResourcesFromStatements(stmts):
     '''
     resourceDict = {}
     lists = {}
+    predicates = {}
     for stmt in stmts:
         if stmt.predicate == RDF_MS_BASE+'rest':
             lists[stmt.object] = 0 #mark this as not the head 
@@ -126,11 +128,19 @@ def getResourcesFromStatements(stmts):
             resourceDict[stmt.subject] = 1
         if stmt.objectType == OBJECT_TYPE_RESOURCE:
             resourceDict[stmt.object] = 1
+        predicates[stmt.predicate] = 1
     assert not resourceDict.has_key(''), resourceDict.get('')
-    resources = resourceDict.keys()
+    resourceDict.update( predicates )
+    #todo: get rid of this hack!:    
+    for x in RDFSSchema.requiredProperties + RDFSSchema.requiredClasses:
+        resourceDict[x] = 1
+    #todo: a more complete approach would be to call _baseSchema.findStatements()
+    #on each resource and add any new resources in the resulting statements
+    resources = resourceDict.keys()    
     for uri, isHead in lists.items():
         if isHead:
-            resources.append(uri)    
+            resources.append(uri)
+    
     resources.sort()
     return resources
     
@@ -160,7 +170,7 @@ class FtModel(Model):
         ''' Return all the statements in the model that match the given arguments.
         Any combination of subject and predicate can be None, and any None slot is
         treated as a wildcard that matches any value in the model.'''
-        statements = self.model.complete(subject, predicate, None)
+        statements = self.model.complete(subject, predicate, None)        
         statements.sort()
         return removeDupStatementsFromSortedList(statements)
                      
@@ -630,7 +640,381 @@ try:
     
 except ImportError:
     log.debug("rdflib not installed")
+
+
+##########################################################################
+## public utility functions
+##########################################################################
+class RDFSSchema(object):
+    '''
+    This is a temporary approach that provides partial support of RDF Schema.
+
+    It does the following:
+
+    * Keeps track of subclasses and subproperties used by resource and predicate element name tests.
+    * infers a resource is a rdf:Property or a rdfs:Class if it appears as
+      either a predicate or as the object of a rdf:type statement
+    ** adds rdf:type statements for those resources if no rdf:type statement is present.
+    
+    The schema is only updated when the DOM is first initialized.
+    At that point we add all inferred resources into the DOM,
+    so that resources don't appear to be added non-deterministically
+    based on which nodes in the DOM were accessed. (Doing so would break
+    diffing and merging models, for example).
+    However inferred statements (via findStatements) are only added when
+    examining the resource. This is OK because it is basically deterministic
+    as you always have to navigate through the node to see those statements.
+    
+    Todo: This doesn't support type inference based on rdfs:range or rdfs:domain.
+    Todo: we don't fully support subproperties of rdf:type
+    '''
+    SUBPROPOF = u'http://www.w3.org/2000/01/rdf-schema#subPropertyOf'
+    SUBCLASSOF = u'http://www.w3.org/2000/01/rdf-schema#subClassOf'
+
+    #NTriples version of http://www.w3.org/2000/01/rdf-schema
+    schemaTriples = r'''<http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://www.w3.org/2000/01/rdf-schema#comment> "The subject is a subproperty of a property." .
+<http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
+<http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://www.w3.org/2000/01/rdf-schema#label> "subPropertyOf" .
+<http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/2000/01/rdf-schema#comment> "Further information about the subject resource." .
+<http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
+<http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Resource> .
+<http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#Resource> .
+<http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/2000/01/rdf-schema#label> "seeAlso" .
+<http://www.w3.org/2000/01/rdf-schema#member> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://www.w3.org/2000/01/rdf-schema#member> <http://www.w3.org/2000/01/rdf-schema#comment> "A member of the subject resource." .
+<http://www.w3.org/2000/01/rdf-schema#member> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
+<http://www.w3.org/2000/01/rdf-schema#member> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Resource> .
+<http://www.w3.org/2000/01/rdf-schema#member> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#Resource> .
+<http://www.w3.org/2000/01/rdf-schema#member> <http://www.w3.org/2000/01/rdf-schema#label> "member" .
+<http://www.w3.org/2000/01/rdf-schema#comment> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://www.w3.org/2000/01/rdf-schema#comment> <http://www.w3.org/2000/01/rdf-schema#comment> "A description of the subject resource." .
+<http://www.w3.org/2000/01/rdf-schema#comment> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
+<http://www.w3.org/2000/01/rdf-schema#comment> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Literal> .
+<http://www.w3.org/2000/01/rdf-schema#comment> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#Resource> .
+<http://www.w3.org/2000/01/rdf-schema#comment> <http://www.w3.org/2000/01/rdf-schema#label> "comment" .
+<http://www.w3.org/2000/01/rdf-schema#> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/2000/01/rdf-schema-more> .
+<http://www.w3.org/2000/01/rdf-schema#> <http://purl.org/dc/elements/1.1/title> "The RDF Schema vocabulary (RDFS)" .
+<http://www.w3.org/2000/01/rdf-schema#> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Ontology> .
+<http://www.w3.org/2000/01/rdf-schema#Datatype> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
+<http://www.w3.org/2000/01/rdf-schema#Datatype> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://www.w3.org/2000/01/rdf-schema#Datatype> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://www.w3.org/2000/01/rdf-schema#Datatype> <http://www.w3.org/2000/01/rdf-schema#label> "Datatype" .
+<http://www.w3.org/2000/01/rdf-schema#Datatype> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of RDF datatypes." .
+<http://www.w3.org/2000/01/rdf-schema#ContainerMembershipProperty> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
+<http://www.w3.org/2000/01/rdf-schema#ContainerMembershipProperty> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://www.w3.org/2000/01/rdf-schema#ContainerMembershipProperty> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://www.w3.org/2000/01/rdf-schema#ContainerMembershipProperty> <http://www.w3.org/2000/01/rdf-schema#label> "ContainerMembershipProperty" .
+<http://www.w3.org/2000/01/rdf-schema#ContainerMembershipProperty> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of container membership properties, rdf:_1, rdf:_2, ...,\n                    all of which are sub-properties of 'member'." .
+<http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://www.w3.org/2000/01/rdf-schema#seeAlso> .
+<http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#comment> "The defininition of the subject resource." .
+<http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
+<http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Resource> .
+<http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#Resource> .
+<http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#label> "isDefinedBy" .
+<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#comment> "The subject is a subclass of a class." .
+<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
+<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#label> "subClassOf" .
+<http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
+<http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/2000/01/rdf-schema#label> "Resource" .
+<http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/2000/01/rdf-schema#comment> "The class resource, everything." .
+<http://www.w3.org/2000/01/rdf-schema#Container> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
+<http://www.w3.org/2000/01/rdf-schema#Container> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#Resource> .
+<http://www.w3.org/2000/01/rdf-schema#Container> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://www.w3.org/2000/01/rdf-schema#Container> <http://www.w3.org/2000/01/rdf-schema#label> "Container" .
+<http://www.w3.org/2000/01/rdf-schema#Container> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of RDF containers." .
+<http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#comment> "A range of the subject property." .
+<http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
+<http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#label> "range" .
+<http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#comment> "A domain of the subject property." .
+<http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
+<http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#label> "domain" .
+<http://www.w3.org/2000/01/rdf-schema#label> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
+<http://www.w3.org/2000/01/rdf-schema#label> <http://www.w3.org/2000/01/rdf-schema#comment> "A human-readable name for the subject." .
+<http://www.w3.org/2000/01/rdf-schema#label> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
+<http://www.w3.org/2000/01/rdf-schema#label> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Literal> .
+<http://www.w3.org/2000/01/rdf-schema#label> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#Resource> .
+<http://www.w3.org/2000/01/rdf-schema#label> <http://www.w3.org/2000/01/rdf-schema#label> "label" .
+<http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
+<http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#Resource> .
+<http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/2000/01/rdf-schema#label> "Class" .
+<http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of classes." .
+<http://www.w3.org/2000/01/rdf-schema#Literal> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
+<http://www.w3.org/2000/01/rdf-schema#Literal> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#Resource> .
+<http://www.w3.org/2000/01/rdf-schema#Literal> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> .
+<http://www.w3.org/2000/01/rdf-schema#Literal> <http://www.w3.org/2000/01/rdf-schema#label> "Literal" .
+<http://www.w3.org/2000/01/rdf-schema#Literal> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of literal values, eg. textual strings and integers." .
+'''
+    rdfSchema = [Statement(unicode(stmt[0]), unicode(stmt[1]), unicode(stmt[2]),
+       objectType=unicode(stmt[3])) for stmt in utils.parseTriples(StringIO.StringIO(schemaTriples))]
+    
+    #statements about RDF resources are missing from the RDFS schema
+    rdfAdditions = [Statement(x[0], x[1], x[2], objectType=OBJECT_TYPE_RESOURCE)
+        for x in [
+    (RDF_MS_BASE+u'Alt', SUBCLASSOF, RDF_SCHEMA_BASE+u'Container'),
+    (RDF_MS_BASE+u'Bag', SUBCLASSOF, RDF_SCHEMA_BASE+u'Container'),
+    (RDF_MS_BASE+u'Seq', SUBCLASSOF, RDF_SCHEMA_BASE+u'Container'),
+    (RDF_MS_BASE+u'XMLLiteral', SUBCLASSOF, RDF_SCHEMA_BASE+u'Literal'),]
+    ]
+    
+    requiredProperties = [RDF_MS_BASE+u'type']
+    requiredClasses = [RDF_MS_BASE+u'Property', RDF_SCHEMA_BASE+u'Class']
+
+    inTransaction = False
+    
+    def __init__(self, stmts = None):
+        #dictionary of type : ancestors (including self)
+        self.supertypes = {}
+        self.superproperties = {}
+
+        #dictionary of type : descendants (including self)
+        self.subtypes = {}
+        self.subproperties = {} 
+
+        self.subClassPreds = [self.SUBCLASSOF]
+        self.subPropPreds =  [self.SUBPROPOF]
+        self.typePreds =     [RDF_MS_BASE+u'type']
         
+        for predicate in self.requiredProperties:
+            self.subproperties.setdefault(predicate, [predicate])
+            self.superproperties.setdefault(predicate, [predicate])
+        for subject in self.requiredClasses:
+            self.subtypes.setdefault(subject, [subject]) 
+            self.supertypes.setdefault(subject, [subject])
+
+        self.currentSubProperties = self.subproperties
+        self.currentSubTypes = self.subtypes
+        self.currentSuperProperties = self.superproperties
+        self.currentSuperTypes = self.supertypes
+        
+        self.addToSchema(self.rdfAdditions)
+        self.addToSchema(self.rdfSchema)
+        if stmts:
+            self.addToSchema(stmts)        
+
+    def isCompatibleType(self, testType, wantType):
+        '''
+        Is the given testType resource compatible with (equal to or a subtype of) the specified wantType?
+        wantType can end in a * (to the namespace:* node test in RxPath)
+        '''
+        if wantType == RDF_SCHEMA_BASE+'Resource': 
+            return True
+        return self._testCompatibility(self.currentSubTypes, testType, wantType)
+    
+    def isCompatibleProperty(self, testProp, wantProp):
+        '''
+        Is the given propery compatible with (equal to or a subpropery of) the specified property?
+        wantProp can end in a * (to the namespace:* node test in RxPath)
+        '''
+        return self._testCompatibility(self.currentSubProperties, testProp, wantProp)
+    
+    def _testCompatibility(self, map, testType, wantType):        
+        #do the exact match test first in case we're calling this before we've completed setting up the schema            
+        if testType == wantType:
+            return True
+
+        if wantType[-1] == '*':
+            if testType.startswith(wantType[:-1]):
+                return True
+            for candidate in map:
+                if candidate.startswith(wantType[:-1]):
+                    subTypes = map[candidate]
+                    if testType in subTypes:
+                        return True
+            return False
+        else:            
+            subTypes = map.get(wantType, [wantType])            
+            return testType in subTypes
+            
+    def makeClosure(self, map):
+        #for each sub class, get its subclasses and append them
+        def close(done, super, subs):
+            done[super] = dict([(x,1) for x in subs]) #a set really
+            for sub in subs:                
+                if not sub in done:                    
+                    close(done, sub, map[sub])                
+                done[super].update(done[sub])
+
+        closure = {}           
+        for key, value in map.items():
+            close(closure, key, value)
+        return dict([(x, y.keys()) for x, y in closure.items()])
+
+    def findStatements(self, uri, stmts):
+        stmts = []
+        isProp = uri in self.currentSuperProperties
+        isClass = uri in self.currentSuperTypes        
+        if isProp or isClass:
+            if RDF_MS_BASE+u'type' not in [x.predicate for x in stmts]:
+                #no type statement, so add one now
+                if isProp:
+                    stmts.append( Statement(uri, RDF_MS_BASE+u'type',
+                        RDF_MS_BASE+u'Property', objectType=OBJECT_TYPE_RESOURCE) )
+                if isClass:
+                    #print uri, stmts
+                    stmts.append( Statement(uri, RDF_MS_BASE+u'type',
+                        RDF_SCHEMA_BASE+u'Class', objectType=OBJECT_TYPE_RESOURCE) )
+                    
+        return stmts
+    
+    def addToSchema(self, stmts):
+        propsChanged = False
+        typesChanged = False
+
+        #you can declare subproperties to rdf:type, rdfs:subClassPropOf, rdfs:subPropertyOf
+        #but it will only take effect in the next call to addToSchema
+        #also they can not be removed consistently
+        #thus they should be declared in the initial schemas
+        for stmt in stmts:
+            if stmt.predicate in self.subPropPreds:
+                self.currentSubProperties.setdefault(stmt.object, [stmt.object]).append(stmt.subject)
+                #add this subproperty if this is the only reference to it so far
+                self.currentSubProperties.setdefault(stmt.subject, [stmt.subject])
+
+                self.currentSuperProperties.setdefault(stmt.subject, [stmt.subject]).append(stmt.object)
+                #add this superproperty if this is the only reference to it so far
+                self.currentSuperProperties.setdefault(stmt.object, [stmt.object])
+                
+                propsChanged = True
+            elif stmt.predicate in self.subClassPreds:                
+                self.currentSubTypes.setdefault(stmt.object, [stmt.object]).append(stmt.subject)
+                #add this subclass if this is the only reference to it so far
+                self.currentSubTypes.setdefault(stmt.subject, [stmt.subject])  
+
+                self.currentSuperTypes.setdefault(stmt.subject, [stmt.subject]).append(stmt.object)
+                #add this superclass if this is the only reference to it so far
+                self.currentSuperTypes.setdefault(stmt.object, [stmt.object])
+                
+                typesChanged = True
+            elif stmt.predicate in self.typePreds:
+                self.currentSubTypes.setdefault(stmt.object, [stmt.object])
+                self.currentSuperTypes.setdefault(stmt.object, [stmt.object])
+
+                if self.isCompatibleType(stmt.object, RDF_SCHEMA_BASE+u'Class'):
+                    self.currentSubTypes.setdefault(stmt.subject, [stmt.subject])
+                    self.currentSuperTypes.setdefault(stmt.subject, [stmt.subject])
+                elif self.isCompatibleType(stmt.object, RDF_MS_BASE+u'Property'):
+                    self.currentSubProperties.setdefault(stmt.subject, [stmt.subject])
+                    self.currentSuperProperties.setdefault(stmt.subject, [stmt.subject])
+            else:
+                self.currentSubProperties.setdefault(stmt.predicate, [stmt.predicate])
+                self.currentSuperProperties.setdefault(stmt.predicate, [stmt.predicate])
+
+        if typesChanged:
+            self.currentSubTypes = self.makeClosure(self.currentSubTypes)
+            if not self.inTransaction:
+                self.subtypes = self.currentSubTypes
+            
+        if propsChanged:
+            self.currentSubProperties = self.makeClosure(self.currentSubProperties)
+            if not self.inTransaction:
+                self.subproperties = self.currentSubProperties
+        
+            #just in case a subproperty of any of these were added
+            self.subClassPreds = self.currentSubProperties[self.SUBCLASSOF]
+            self.subPropPreds  = self.currentSubProperties[self.SUBPROPOF]
+            self.typePreds     = self.currentSubProperties[RDF_MS_BASE+u'type']        
+           
+    def removeFromSchema(self, stmts):
+        #todo: we don't remove resources from the properties or type dictionaries
+        #(because its not clear when we can safely do that)
+        #this means a formerly class or property resource can not be safely reused
+        #as another type of resource without reloading the model
+        propsChanged = False
+        typesChanged = False
+
+        for stmt in stmts:
+            if stmt.predicate in self.subPropPreds:
+                try:
+                    self.currentSubProperties[stmt.object].remove(stmt.subject)
+                    self.currentSuperProperties[stmt.subject].remove(stmt.object)
+                except KeyError, ValueError:
+                    pass#todo warn if not found                
+                propsChanged = True
+
+            if stmt.predicate in self.subClassPreds:
+                try: 
+                    self.currentSubTypes[stmt.object].remove(stmt.subject)
+                    self.currentSuperTypes[stmt.subject].remove(stmt.object)
+                except KeyError, ValueError:
+                    pass#todo warn if not found                
+                typesChanged = True            
+
+        if typesChanged:
+            newsubtypes = {}
+            for k, v in self.currentSuperTypes.items():
+                for supertype in v:
+                    newsubtypes.setdefault(supertype, []).append(k)
+
+            self.currentSubTypes = self.makeClosure(newsubtypes)
+            if not self.inTransaction:
+                self.subtypes = self.currentSubTypes
+            
+        if propsChanged:
+            newsubprops = {}
+            for k, v in self.currentSuperProperties.items():
+                for superprop in v:
+                    newsubprops.setdefault(superprop, []).append(k)
+            
+            self.currentSubProperties = self.makeClosure(newsubprops)
+            if not self.inTransaction:
+                self.subproperties = self.currentSubProperties
+
+            #just in case a subproperty of any of these were removed
+            self.subClassPreds = self.currentSubProperties[self.SUBCLASSOF]
+            self.subPropPreds  = self.currentSubProperties[self.SUBPROPOF]
+            self.typePreds     = self.currentSubProperties[RDF_MS_BASE+u'type']        
+        
+    def begin(self):
+        import copy
+        if not self.inTransaction:
+            self.currentSubProperties = copy.deepcopy(self.subproperties)
+            self.currentSubTypes = copy.deepcopy(self.subtypes)
+            self.currentSuperProperties = copy.deepcopy(self.superproperties)
+            self.currentSuperTypes = copy.deepcopy(self.supertypes)
+
+            self.inTransaction = True
+            
+    def commit(self, **kw):
+        if not self.inTransaction:
+            return
+        self.subproperties = self.currentSubProperties        
+        self.subtypes = self.currentSubTypes
+        self.superproperties = self.currentSuperProperties
+        self.supertypes = self.currentSuperTypes 
+        
+        self.inTransaction = False
+        
+    def rollback(self):
+        self.currentSubProperties = self.subproperties
+        self.currentSubTypes = self.subtypes
+        self.currentSuperProperties = self.superproperties
+        self.currentSuperTypes = self.supertypes
+
+        #just in case a subproperty of any of these changed
+        self.subClassPreds = self.currentSubProperties[self.SUBCLASSOF]
+        self.subPropPreds  = self.currentSubProperties[self.SUBPROPOF]
+        self.typePreds     = self.currentSubProperties[RDF_MS_BASE+u'type']        
+        
+        self.inTransaction = False
+
+#_baseSchema = RDFSSchema()            
+    
 def splitUri(uri):
     '''
     Split an URI into a (namespaceURI, name) pair suitable for creating a QName with
@@ -805,7 +1189,7 @@ def addStatements(rdfDom, stmts):
         stmt = containerItems[key]
         listid = stmt.predicate
         head = stmt.subject
-        stmt.predicate = RDF_MS_BASE+'li'
+        stmt.predicate = RDF_SCHEMA_BASE+'member'
         subject = rdfDom.findSubject(stmt.subject) or rdfDom.addResource(stmt.subject)
         subject.addStatement(stmt, listid)
 
@@ -886,13 +1270,13 @@ def diffResources(sourceDom, resourceNodes):
                 #and handle each separately (we can do that the RxPath spec says all non-membership statements will come first)
                 i = 0
                 for p in currentNode.childNodes:
-                    if p.stmt.predicate in [RDF_MS_BASE + 'first', RDF_MS_BASE + 'li']:
+                    if p.stmt.predicate in [RDF_MS_BASE + 'first', RDF_SCHEMA_BASE + 'member']:
                         break
                     i+=1
                 currentChildren = currentNode.childNodes[:i]
                 j = 0
                 for p in resourceNode.childNodes:
-                    if p.stmt.predicate in [RDF_MS_BASE + 'first', RDF_MS_BASE + 'li']:
+                    if p.stmt.predicate in [RDF_MS_BASE + 'first', RDF_SCHEMA_BASE + 'member']:
                         break
                     j+=1                
                 resourceChildren = resourceNode.childNodes[:j]
@@ -964,7 +1348,7 @@ def mergeDOM(sourceDom, updateDOM, resources, authorize=None):
                 removeResources.append(removeNode)
                         
     for resNode in updateDOM.childNodes:
-        #resources in the rxml but not in resources just have their statements added
+        #resources in the dom but not in resources just have their statements added
         if resNode.uri not in resources:                    
             if resNode.isCompound():
                 #if the node is a list or container we want to compare with the list in model
@@ -973,9 +1357,12 @@ def mergeDOM(sourceDom, updateDOM, resources, authorize=None):
                 #print 'list to diff', resNode
                 resourcesToDiff.append(resNode)
             else:
-                if sourceDom.findSubject(resNode.uri):
-                    #not a whole new resource: add each statement
-                    newNodes.extend(resNode.childNodes)
+                sourceResNode  = sourceDom.findSubject(resNode.uri)
+                if sourceResNode:
+                    #not a new resource: add each statement that doesn't already exist in the sourceDOM
+                    for p in resNode.childNodes:
+                        if not sourceResNode.findPredicate(p.stmt):
+                            newNodes.append(p)                    
                 else:
                     #new resource: add the subject node
                     newNodes.append(resNode)
@@ -983,16 +1370,12 @@ def mergeDOM(sourceDom, updateDOM, resources, authorize=None):
             assert resNode in resourcesToDiff #resource in the list will have been added above
                        
     additions, removals, reordered = diffResources(sourceDom, resourcesToDiff)
-    
+
     newNodes.extend( additions )
     removeResources.extend( removals)
     if authorize:
         authorize(newNodes, removeResources, reordered)
 
-    getStatementsFunc = lambda l, p: l.extend(p.getModelStatements()) or l    
-    newStatements = reduce(lambda l, n: l.extend(getattr(n, 'getModelStatements', 
-         lambda: reduce(getStatementsFunc, n.childNodes, []))() )
-            or l, newNodes, [])
     newStatements = reduce(lambda l, n: l.extend(n.getModelStatements()) or l, newNodes, [])
     
     #for modified lists we just remove the all container and collection resource
@@ -1018,12 +1401,12 @@ def addDOM(sourceDom, updateDOM, authorize=None):
     of lists (Statements to add, nodes to remove) that can be used to
     update the DOM in the same manner as mergeDOM.
     '''
-    stmts = updateDOM.model.getStatements()
-    #if the bNode label is used in the sourceDom choose a new bNode label
+    stmts = updateDOM.model.getStatements()    
     bNodes = {}
     replacingListResources = []
     for stmt in stmts:                
         def updateStatement(attrName):
+            '''if the bNode label is used in the sourceDom choose a new bNode label'''
             uri = getattr(stmt, attrName)
             if uri.startswith(BNODE_BASE):
                 if bNodes.has_key(uri):
@@ -1032,6 +1415,8 @@ def addDOM(sourceDom, updateDOM, authorize=None):
                         setattr(stmt, attrName, newbNode)
                 else: #encountered for the first time
                     if sourceDom.findSubject(uri):
+                        #generate a new bNode label
+                           
                         #todo: this check doesn't handle detect inner list bnodes
                         #most of the time this is ok because the whole list will get removed below
                         #but if the bNode is used by a inner list we're not removing this will lead to a bug
@@ -1058,14 +1443,29 @@ def addDOM(sourceDom, updateDOM, authorize=None):
             
     additions, removals, reordered = diffResources(sourceDom,replacingListResources)
     assert [getattr(x, 'stmt') for x in additions] or not len(additions) #should be all predicate nodes
+
+    #now filter out any statements that already exist in the source dom:
+    #(note: won't match statements with bNodes since they have been renamed
+    alreadyExists = []
+    newStmts = []
+    for stmt in stmts:
+        resNode = sourceDom.findSubject(stmt.subject)
+        if resNode and resNode.findPredicate(stmt):
+            alreadyExists.append(stmt)
+        else:
+            newStmts.append(stmt)
+    
     if authorize:
         #get all the predicates in the updatedom except the ones in replacingListResources        
         newResources = [x for x in updateDOM.childNodes if x not in replacingListResources]
-        newPredicates = reduce(lambda l, s: l.extend( s.childNodes) or l,
+        newPredicates = reduce(lambda l, s: l.extend(
+            [p for p in s.childNodes if p.stmt not in alreadyExists]) or l,
                                        newResources, additions)
         authorize(newPredicates, removals, reordered)
-    
-    return stmts, reordered.keys() #statements to add, list resource nodes to remove
+        
+    #return statements to add, list resource nodes to remove
+    #note: additions should contained by stmts, so we don't need to return them
+    return newStmts, reordered.keys() 
 
 ##########################################################################
 ## RxPath extension functions
@@ -1136,6 +1536,32 @@ def getResource(context, nodeset=None):
             return getResourceFromNode(node.parentNode)
     return [getResourceFromNode(node) for node in nodeset \
         if node.nodeType in [Node.ELEMENT_NODE, Node.TEXT_NODE, Node.ATTRIBUTE_NODE] ]
+        
+def isInstanceOf(context, candidate, test):
+    '''
+    This function returns true if the resource specified in the first
+    argument is an instance of the class resource specified in the
+    second argument, where each string is treated as the URI reference
+    of a resource.
+    '''
+    classResource = StringValue(test)    
+    candidate = StringValue(candidate)
+    resource = context.node.ownerDocument.findSubject( candidate )
+    if resource:        
+        return Xbool( resource.matchName(classResource, '') )
+    else:
+        return XFalse        
+               
+def isProperty(context, candidate, test):
+    '''    
+    This function returns true if the property specified in the first
+    argument is a subproperty of the property specified in the second
+    argument, where each string is treated as the URI reference of a
+    property resource.
+    '''
+    propertyURI = StringValue(test)
+    return Xbool(context.node.ownerDocument.schema.isCompatibleProperty
+                            (StringValue(candidate), propertyURI) )
 
 def getQNameFromURI(context, uri=None):
     return _getNamesFromURI(context, uri)[0]
@@ -1190,6 +1616,9 @@ BuiltInExtFunctions = {
 (RFDOM_XPATH_EXT_NS, 'is-resource'): isResource,
 (RFDOM_XPATH_EXT_NS, 'resource'): getResource,
 
+(RFDOM_XPATH_EXT_NS, 'is-instance-of'): isInstanceOf,
+(RFDOM_XPATH_EXT_NS, 'is-subproperty-of'): isProperty,
+
 (RFDOM_XPATH_EXT_NS, 'name-from-uri'): getQNameFromURI,
 (RFDOM_XPATH_EXT_NS, 'prefix-from-uri'): getPrefixFromURI,
 (RFDOM_XPATH_EXT_NS, 'local-name-from-uri'): getLocalNameFromURI,
@@ -1226,9 +1655,9 @@ def Id(context, object):
            
     nodeset = []
     for id in id_list:
-       element = getElementById(id)
-       if element:
-           nodeset.append(element)
+        element = getElementById(id)
+        if element:
+           nodeset.append(element)    
     return nodeset
 
 XPath.CoreFunctions.CoreFunctions[(EMPTY_NAMESPACE, 'id')] = Id
@@ -1516,8 +1945,7 @@ def ExpressionWrapper_evaluate(self,context):
      # intact (original traceback is displayed).
      raise
  except Exception, e:
-     from Ft.Xml.Xslt import MessageSource
-     import StringIO, traceback
+     from Ft.Xml.Xslt import MessageSource     
      tb = StringIO.StringIO()
      tb.write("Lower-level traceback:\n")
      traceback.print_exc(1000, tb)
