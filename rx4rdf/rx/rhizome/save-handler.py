@@ -60,8 +60,10 @@ def _req_default_save(self, **kw):
 
     contentLength = len(contents)            
     if self.MAX_MODEL_LITERAL > -1 and contentLength > self.MAX_MODEL_LITERAL:  #save as file
-        import os.path
+        import os.path                    
         filepath = self.SAVE_DIR + wikiname
+        if wikiname.find('.') == -1 and self.rhizome.exts.get(format):
+            filepath += '.' + self.rhizome.exts[format]
         try: 
            os.makedirs(self.SAVE_DIR)
         except OSError: pass #dir might already exist

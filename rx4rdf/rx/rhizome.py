@@ -70,7 +70,16 @@ class MarkupMapFactory(rhizml.DefaultMarkupMapFactory):
 
 METADATAEXT = '.metarx'
 
-class Rhizome:        
+class Rhizome:
+    exts = { 'http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate': 'xml',
+    'http://rx4rdf.sf.net/ns/wiki#item-format-python' : 'py',
+    'http://www.w3.org/1999/XSL/Transform' : 'xsl',
+    'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt' : 'rxsl',
+    'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' : 'rz',
+    'http://rx4rdf.sf.net/ns/wiki#item-format-text': 'txt',
+    'http://rx4rdf.sf.net/ns/wiki#item-format-xml':'xml',
+    }
+    
     def __init__(self, server):
         self.server = server
 
@@ -129,7 +138,7 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
                   #replace the innermost a:contents with content location
                   #print map(lambda x: x.firstChild, RDFDom.evalXPath(rdfDom, '/*/wiki:revisions/*//a:contents', nsMap = self.server.nsMap))
                   #print map(lambda x: x.firstChild, RDFDom.evalXPath(rdfDom, '(/*/wiki:revisions/*//a:contents)[last()]', nsMap = self.server.nsMap))
-                  wikiname = RDFDom.evalXPath(rdfDom, 'string(/*/wiki:name)', nsMap = self.server.nsMap)
+                  wikiname = rdfDom.evalXPath('string(/*/wiki:name)', nsMap = self.server.nsMap)
                   assert wikiname
                   if self.server.evalXPath("/*[wiki:name='%s']"% wikiname):
                       log.warning('there is already an item named ' + wikiname +', skipping import')
@@ -232,16 +241,9 @@ Options:
              orginalName = name
              format = self.server.evalXPath('string(wiki:revisions/*[last()]//a:contents/a:ContentTransform/a:transformed-by/wiki:ItemFormat)', node = item)
              ext = os.path.splitext(name)[1]
-             if not ext and format:
-                    exts = { 'http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate': 'xml',
-                    'http://rx4rdf.sf.net/ns/wiki#item-format-python' : 'py',
-                    'http://www.w3.org/1999/XSL/Transform' : 'xsl',
-                    'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt' : 'rxsl',
-                    'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' : 'rz',
-                    'http://rx4rdf.sf.net/ns/wiki#item-format-text': 'txt',
-                    }
-                    if exts.get(format):
-                        name += '.' + exts[format]
+             if not ext and format:                 
+                if self.exts.get(format):
+                    name += '.' + self.exts[format]
              content = None
              if static:
                  try:
