@@ -1,0 +1,143 @@
+__ZML__ is a text format that combines 
+[Wiki | http://c2.com/cgi/wiki?WikiWikiWeb]-style formatting with an alternative syntax for XML inspired by [SLiP|http://www.scottsweeney.com/projects/slip]. Like the Wiki and SLiP formats its goal is to be a human-friendly markup language: simple, clear, and concise.
+
+This combination enables you to author XML and HTML documents with (nearly) the same ease as a wiki entry.
+
+ZML is an alternative syntax for XML; you can create any XML construct in ZML (and you can also embed XML markup in a ZML document).
+ZML is line-oriented and relies on indentation to specify the tree structure of the document. 
+Here's an example: 
+p'''
+#?zml0.9 markup
+html 
+ header
+   title: `some raw text here
+ body bgcolor='#CCCCCC' text=black
+'''
+The "markup" declaration in the first line of this example specifies that the document consists entirely of markup. By default, ZML documents can also contain lines of formatted text, which aren't indented and uses special [text formatting rules] to create the XML markup. In this mixed mode, lines of markup must start with a "<". Here the same example again with some added lines of formatted text:
+p'''
+#?zml0.9
+<html 
+<<header
+<<<<title: `some raw text here
+<<body bgcolor='#CCCCCC' text=black
+* A bulleted list with a [link | http://www.w3.org]
+
+A blank line means new paragraph
+'''
+The "<"s are treated as identical to spaces when establishing indentation. This is also useful for those morally opposed to whitespace having semantic meaning.
+
+All the rules that follow only apply to lines of markup. See the [text formatting rules] for lines of formatted text.
+
+!!!!Indentation Rules 
+Any element, text string or comment that is more deeply indented than the element in the previous line is made a child of that element. It is an error to be more deeply indented than the previous line if that line only contained a text string or comment, as comments and text can not have children. If the indentation is the same as the previous line then the current line's element, text string, or comment will be a sibling of the prior line's content. If the indentation is less than the previous line it must line up with some prior line's indentation and will be made a sibling with that prior lines content -- otherwise, it is an error. When dedenting like this, any prior lines' elements that are more deeply or equally deeply indented will be closed.
+
+These rules for indentation are equivalent to [Python's|http://python.org]; for a more precise definition see Python's rules for [indentation|http://www.python.org/doc/current/ref/indentation.html].
+
+You can join two or more physical lines together to be treated as one line of markup by ending a line with a \\ (see Python [line joining|http://www.python.org/doc/current/ref/explicit-joining.html] for a precise definition).
+
+Lines only containing whitespace (including "<"s) are ignored except in the case where the line consists solely of "<"s and the next line is of formatted text -- in that case the line sets the indentation level of the following formatted text (see below).
+
+!!!!Formatted Text
+When in mixed mode, lines that don't begin with a "<" are treated as formatted text, where certain punctuation characters in the text create XML markup. Which elements are created is determined by the ZML processor's //markup map// but the default markup map creates XHTML markup as described by the text formatting rules found [here|TextFormattingRules].
+
+Structurally, the markup created by formatted text can be categorized as follows:
+* inline elements, whose span is within a line, for example: ^^\//italics\//
+* line elements, determined by the first character in the line and wraps the entire contents of the line.
+* paragraph elements, which wraps all formatting text until a blank line, section element or markup line is encountered 
+* section elements, which wraps all elements until another section element or markup line is encountered (for example, "::" -- block quote)
+
+This example illustrates some of this:
+p'''
+* the "*" places this line inside a <LI> element
+  because this next line immediately follows the last 
+  and begins with a space it is logically joined with the previous inside the <LI>
+this line is outside the <LI> but still inside its <P>
+and this line also inside the <P>
+
+but this line is separated by one or more blank lines and so the previous <P> is closed 
+and a new one begun.
+'''
+
+The XML structure created by formatted text is inserted as the child of the last markup element encountered except when the formatted text appears after a line consisting solely of "<"s -- in that case that line sets the indentation level of the formatted text. For example:
+p'''
+<body:
+Some formatted //text//.
+<<note:
+This is an __important__ side note.
+<<
+We want this next paragraph to be a child of <body> not <note>, 
+that's why we set the indentation level here as a sibling of <note>.
+'''
+
+!!!!The ZML Prolog
+ZML documents //should// begin with the ZML Prolog as its first line after any internal comments ("#!" -- see below). Its syntax is:
+p'''#?zml[0.9] [markup] [<markupmap URI>]'''
+
+The optional version number immediately follows the 'zml' (no spaces) and indicates the version number of the ZML specification. It is currently set to "0.9" -- no changes are expected between this and "1.0", except maybe minor changes to the text formatting rules and the handling of different character encodings.
+
+If the "markup" declaration is omitted from the prolog (or the prolog isn't present) the document is assumed to be in mixed mode as described above. You can switch in and out of markup mode throughout a document by interspersing it with ^^#?zml^^ directives with and without the ^^markup^^ declaration.
+
+The optional markup map URI specifies how the formatted text lines should be converted to XML. The default markup map URI is ^^http://rx4rdf.sf.net/zml/mm/default^^ and converts the formatting to its XHTML equivalent. If the markupmap URI is not present the ZML processor is free to either use the default or deduce the appropriate markup map from the content of the document (for example, from its namespace declarations, the root element name, or the document type declaration). But if markup map URI is present it //should// use that markup map or signal an error if it can't.
+
+!!!!Elements and Attributes. 
+As shown in the examples above, elements are created with a line of markup that optionally begins with some whitespace (spaces, tabs, or "<"), followed by an element name, and then (optionally) followed by an attribute list. 
+
+Valid element (and attribute) names is the same as in XML, that is, a name can consist of any number of alphanumeric characters plus ":", ".", "-", and "_", but only alphabetic characters and "_" is allowed as the first letter. 
+
+For example:
+p'''  element attribute="value" attribute2=name, attribute3=3 compact-attribute'''
+
+This example should the syntactic variety of attributes: The "," between attribute name value pairs is optional. An attribute can have as is value either a quoted string (see below), a name or a number as a value. If the attribute doesn't have a value, it is treated like an HTML compact attribute, where its value is equal to the attribute name.
+
+You can optionally wrap the attribute list in parentheses, if so, the attribute list can be broken across multiple lines, for example;
+
+p'''element (attribute="value",
+      attribute2='value')
+'''
+ 
+If you terminate the attribute list with a ":" you can place child text, comments, and elements on the same line as the element, for example:
+
+p'''element attribute="value" attribute2="value": `child text'''
+ 
+p'''element (attribute="value", attribute2="value"): ; a child comment 
+   ; another child comment 
+'''
+
+If the child after the ":" is an element, then parent element will have that element as its only child and all subsequent indented children will be the child of the last child element on that line.
+p'''
+ element att1='value': child-element att="value": ; this comment is a child of <child-element>
+   `this text is a child of <child-element>
+'''
+
+!!!!Text
+There are two ways to create XML text nodes (PCDATA): 
+
+First, when a "`" appears in a line of markup, anything after it until the end of the line is inserted as text as is with no character escaping except for replacing "<" and "&" are replaced with &lt; and &amp; respectively.
+
+Second, you can create quoted strings using the following quote marks: " or ' or """ or '''. The latter two can span across multiple lines. Quoted strings are identical to Python unicode [string literals|http://www.python.org/doc/current/ref/strings.html] except for the following:
+* no 'u' or 'U' string prefix is needed or allowed.
+* "<" and "&" are replaced with &lt; and &amp; respectively unless escaped with a \\ (i.e. \\< or \\&) or the "r" (raw) string prefix is used. Thus you can use raw strings to insert arbitrary XML markup into the resulting XML document.
+* A 'p' (or 'P') string prefix is added which indicates that the spacing in the string should be preserved (e.g. by wrapping it in a ^^<pre>^^ tag in HTML or using the ^^xml:space^^ attribute in XML). 'p' and 'r' string prefixes can be combined.
+
+!!!!Other XML structure
+* Comments. When a ";" appears in a line of markup, anything after it until the end of the line is inserted as a comment. As with XML, it is an error for a comment to contain two dashes in a row ("--"). 
+
+* Internal Comments. Lines that begin with "#!" are treated as internal ZML comments that are not passed to the resulting XML document. On UNIX-style operating systems it maybe useful to put an internal comment on the first line to indicate the program that can process this ZML document, for example: 
+:^^#!python /bin/zml.py
+
+* Processor instructions. Lines that begin with "#?" are treated as XML processor instructions. If the first line of a ZML document (after the ZML prologue and any internal comments ("#!")) starts with "#?xml" than that line will replace the default XML prolog.
+
+* Document Type Declaration. There are no special formatting rules to create a Document Type Declaration, but you can insert one using a raw string. For example:
+p"""
+r'''
+<!DOCTYPE greeting [
+  <!ELEMENT greeting (#PCDATA)>
+]>
+'''
+greeting: `hello
+"""
+
+* Character References. 
+ Any \\U or \\u character escapes that appear in a string are replaced with an XML character reference (e.g. ^^&x0A;^^)
+
+* Entity References. Entity references that appear in ZML text are placed into the resulting XML document as is; so if they are appear inside a regular or formatted (not raw) text string the & needs to be escaped. for example: "\\&nbsp;".

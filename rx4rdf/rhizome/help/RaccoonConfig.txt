@@ -1,0 +1,360 @@
+#Sample Racoon configuration file
+#The config file is just a python script, but knowledge of python is not needed for simple configurations
+
+#################################################
+## basic configuration variables 
+#################################################
+
+#PATH is a platform-specific string listing the directories that will be searched when resolving 'path:' URLs
+#default: -p argument if set, otherwise the RHIZPATH environment variable if set, otherwise the current directory
+PATH = '.;..'
+
+#ROOT_PATH specifies base URL that this application runs on 
+ROOT_PATH = "cgi-bin/rhizome"
+
+#the __include__ function includes another Racoon configuration file
+__include__('../rhizome/rhizome-config.py')
+
+#BASE_MODEL_URI is the base URI reference to be used when creating RDF resources
+#this is made available as the $BASE_MODEL_URI XPath variable
+#default: 'http://' + socket.getfqdn() + '/'
+BASE_MODEL_URI='http://example.com/'
+
+#STORAGE_PATH the location of the RDF model. Usually a file path but the appropriate value depends on 'initModel'
+STORAGE_PATH = 'mywebsite.nt'
+
+#initModel is the function Racoon will call to load the application's RDF model
+#its signature looks like def initModel(location, defaultModel)
+#where location with the value of STORAGE_PATH and defaultModel is a stream containing the NTriples stored in STORAGE_TEMPLATE
+#note that initModel's value is a callable object (e.g. a function) which may need to be imported into the config file
+#default is RxPath.initFileModel
+from rx import RxPath
+initModel = RxPath.initRedlandHashBdbModel
+
+#transactionLog is the path of the transactionLog. The transactionLog records in NTriples format a log 
+#of the statements added and removed from the model along with comments on when and by whom.
+#Note: the default file store uses this format so there is not much reason to use this if you are using the default
+#default is '' (no transactionLog)
+transactionLog=/logs/auditTrail.nt
+
+#SECURE_FILE_ACCESS limits 'file:' URLs access only the directories reachable through the PATH  
+#default is True
+SECURE_FILE_ACCESS = True
+
+#disabledDefaultContentProcessors is a list of content processors to disable.
+#For security reasons, the python content processor is disabled by default.
+#To enable all content processors set this to an empty list.
+#default is ['http://rx4rdf.sf.net/ns/wiki#item-format-python']
+disabledDefaultContentProcessors = []
+
+#nsMap is dictionary of namespace prefixes that may appear in RxPath expressions
+#default is {} but Raccoon will always add 'rdf', 'rdfs', 'owl', 'bnode', 'wf' (for Raccoon XPath Extension functions),
+#'xf' (for 4Suite XPath Extension functions), 'session', 'request-header', 'response-header', 
+#'request-cookie', 'response-cookie', 'previous' (for callActions() )
+nsMap = { 'dc' : 'http://purl.org/dc/elements/1.1/#',
+          'myNs' : 'http://www.example.com/#'
+        }         
+
+#XPATH_CACHE_SIZE sets the maximum number of items to be stored in the XPath processing cache. Set to 0 to disable.
+#default is 1000
+XPATH_CACHE_SIZE=1000
+
+#ACTION_CACHE_SIZE sets the maximum number of items to be stored in the Action cache. Set to 0 to disable.
+#default is 1000
+ACTION_CACHE_SIZE=1000
+
+#XPATH_PARSER_CACHE_SIZE sets the maximum number of items to be stored in the XPath parser cache. Set to 0 to disable.
+#default is 200
+XPATH_PARSER_CACHE_SIZE=200
+
+#STYLESHEET_CACHE_SIZE sets the maximum number of items to be stored in the stylesheet parser cache. Set to 0 to disable.
+#default is 200
+STYLESHEET_CACHE_SIZE=200
+
+#FILE_CACHE_SIZE sets the maximum size (in bytes) of the file cache (used by the file:// and path: URL resolvers). Set to 0 to disable.
+#default is 0 (disabled)
+FILE_CACHE_SIZE=10000000 #~10mb
+
+#MAX_CACHEABLE_FILE_SIZE limits caching files to only those less than the specified size (in bytes). 
+#Use to prevent the cache from being filled up with just a few large files.
+#default is 0 (files of any size may be cached)
+MAX_CACHEABLE_FILE_SIZE=10192  #only cache files under 10K in size
+        
+#if LIVE_ENVIRONMENT is True, the system will not cache XPath expressions or Actions that reference functions (such as document()) 
+#that retrieve URL or interact with the file system. 
+#Also stylesheets with xsl:import, xsl:include, xinclude or external entity references will not be cached.
+#default is True
+LIVE_ENVIRONMENT = True
+
+#if DEFAULT_MIME_TYPE is set then this MIME type will be set on any request that doesn't set its own mimetype 
+#and Racoon can't guess its MIME type
+#default is '' (not set)
+DEFAULT_MIME_TYPE='text/plain'
+
+#MODEL_RESOURCE_URI is the resource that represents the model this instance of the application is running
+#it can be used to assertions about the model itself, e.g its location or which application created it
+#default is the value of BASE_MODEL_URI
+MODEL_RESOURCE_URI = 'http://example.org/rhizomeapp/2/20/2004'
+
+#if useEtags is True, If-None-Match request headers are honors and an etag based 
+#on a MD5 hash of the response content will be set with every response
+#default is True
+useEtags = False #disable
+
+#################################################
+## rhizome-specific configuration variables 
+## this are only used when including rhizome into your config
+#################################################
+
+#MAX_MODEL_LITERAL when saving a page, any content whose length is greater then this will be saved to disk. 
+#default is -1 (disable save to disk) 
+MAX_MODEL_LITERAL = 0 #save any page to disk
+
+#SAVE_DIR is the directory content is saved to. Currently it is must be a relative path rooted in one of the directories on the PATH and end with a '/'
+#default is 'content/.rzvs/'
+SAVE_DIR='content/.rzvs/'
+
+#if ALTSAVE_DIR is specified a copy of the latest revision of an page will be saved there, allowing external changes to page to be made 
+without messing up the revision history. Changes made externally will appear in Rhizome (almost) as if a change was saved with the minor edit flag.
+#Currently it is must be a relative path rooted in one of the directories on the PATH and end with a '/'
+#to disable ALTSAVE logic set ALTSAVE_DIR = ''
+#default is 'content/'
+ALTSAVE_DIR='content/' 
+
+#these following password related settings are referenced by the rhizome config 
+#and so must be set before you include it
+
+#SECURE_HASH_SEED is a string that is combined with plaintext when generating a secure hash of passwords
+#You really should set your own private value. If it is compromised, it will be much
+#easier to mount a dictionary attack on the password hashes.
+#If you change this all previously generated password hashes will no longer work.
+#default is 'YOU REALLY SHOULD CHANGE THIS!' (will cause a warning on start up)
+SECURE_HASH_SEED = 'my secret seed value'
+
+#ADMIN_PASSWORD is the password for the default 'admin' super-user 
+#default password is 'admin' (will cause a warning on start up)
+ADMIN_PASSWORD = 'topsecret'
+
+#ADMIN_PASSWORD_HASH can be set instead of ADMIN_PASSWORD if you don't want to store the password in the config file
+#you can calculate it using sha.sha( 'yourpassword' + secureHashSeed).hexdigest()
+ADMIN_PASSWORD_HASH = '12201fe5e202883bd45fc97e87366ea05183e0e4' 
+
+#passwordHashProperty is the name of RDF property that represents the secure hash of a password
+#There should be a unique property for each extant seed.
+#default is BASE_MODEL_URI+'password-hash'
+passwordHashProperty = http://example.org#password-hash5
+
+#secureHashMap is a dictionary of mapping secure hash properties to seeds.
+#It is used by wf:secure-hash. 
+#You can set this if you need to support multiple seeds (e.g. for backwards compatibility)
+#Otherwise, use the default.
+#default is { passwordHashProperty : SECURE_HASH_SEED }
+secureHashMap = { '#oldHashProperty' : 'oldSeed', passwordHashProperty : SECURE_HASH_SEED }
+
+#unAuthorizedExpr is an RxPath expression that evaluates to True if current user is unauthorized to access the current resource
+#you can these assume these XPath variables are available: $__user, $__authAction, $__authProperty, $__authValue 
+#default: see rhizome-config.py
+unAuthorizedExpr='false()' #disable all authentification
+
+#other Rhizome specific security settings
+
+#authPredicates is list of predicates that the fine-grained authentication 
+#routine inverse transitively follows to find authorizing resources 
+#for statements being added or removed
+#in the future this will be infered from schema looking for subproperties 
+#of auth:requires-authorization-for but for now we rely on this kludge
+#default: see rhizome-config.py
+authPredicates = locals()['authPredicates'] + ['http:example.com/schema#myproperty'] 
+#assuming we've already included rhizome-config.py, the above adds to the list already defined
+
+#the following settings can be turned on to give your site a wiki like look and feel
+
+#if undefinedPageIndicator is True then links to internal pages that haven't been defined will be displayed with ? 
+#(or however path:wiki2html.xsl transforms such links)
+#default is True
+undefinedPageIndicator=True
+
+#if externalLinkIndicator is True then links to external URLs will have an icon next to them
+#(or however path:wiki2html.xsl transforms such links)
+#default is True
+externalLinkIndicator=True
+
+#if interWikiLinkIndicator is True then InterWiki links will have an icon next to them
+#(or however path:wiki2html.xsl transforms such links)
+#default is True
+interWikiLinkIndicator=True
+
+#interWikiMapURL is the URL to the file that defines the supported InterWiki link types
+#to disable InterWiki linking set this to ''
+#default is 'site:///intermap.txt'
+interWikiMapURL=''
+
+#the following settings can be used to customize Rhizome
+
+#globalRequestVars is a list of request metadata variables that should be preserved 
+#when invoking the template actions (see rhizome.processTemplateAction)
+#default is [] (but rhizome-config current sets the following:)
+globalRequestVars = [ '__user', '_static', '_disposition' ]
+
+#below are a few helper function to make it easy to extend or override the rhizome default template
+#they must be called after the rhizome config has been included
+
+#__addItem__ adds a page to STORAGE_TEMPLATE. See rhizome.addItem() for a list of all the keyword parameters
+#if the page's name matches one rhizome's default page it will replace it.
+__addItem__('Todo',loc='path:todo.txt', format='rhizml', doctype='todo')
+
+#__addTriples__ adds arbitrary triples to STORAGE_TEMPLATE given a string in NTriples format
+__addTriples__(
+'''
+_:itemdispositionhandlertemplate <http://rx4rdf.sf.net/ns/wiki#name> "item-disposition-handler-template" .
+_:itemdispositionhandlertemplate <http://rx4rdf.sf.net/ns/wiki#revisions> _:itemdispositionhandlertemplate1List .
+_:itemdispositionhandlertemplate <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+''')
+
+#__addRxML__ adds arbitrary triples to STORAGE_TEMPLATE given a string in RxML format
+__addRxML__(
+'''
+ base:myPage:
+  mySchema:property: `foo
+''')
+
+#__addSiteVars__ is just like __addRxML__ except it replaces a set of triples referenced by rhizome's site-template
+__addSiteVars__(
+'''
+ base:site-template:
+  wiki:header-image: `Rx4RDFlogo.gif
+  wiki:header-text: `  Welcome to Rx4Rdf!
+''')
+
+#################################################
+## advanced configuration variables 
+## these variables are only necessary when developing a new Racoon application
+#################################################
+
+#STORAGE_TEMPLATE is a string containing NTriples that is used when 
+#the file specified by STORAGE_PATH is not found
+STORAGE_TEMPLATE='''
+_:itemdispositionhandlertemplate <http://rx4rdf.sf.net/ns/wiki#name> "item-disposition-handler-template" .
+_:itemdispositionhandlertemplate <http://rx4rdf.sf.net/ns/wiki#revisions> _:itemdispositionhandlertemplate1List .
+_:itemdispositionhandlertemplate <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+'''
+
+##APPLICATION_MODEL is a string containing NTriples that are added to the RDF model
+#but are read-only and not saved to disc. Use for structural components such as the schema.
+APPLICATION_MODEL='''<http://rx4rdf.sf.net/ns/wiki#item-format-rhizml'> <http://www.w3.org/2000/01/rdf-schema#label> "RhizML" .'''
+
+#cmd_usage is string used to display the command-line usage help
+cmd_usage = '''--import [dir] [--recurse] [--format format] [--disposition disposition]
+            --export dir [--static]'''
+
+#configHook is a function called after this config file has been loaded
+#is signature is def configHook(configDict) where configDict is the dictionary of the variables contained in the config file
+#default is None
+configHook = rhizome.configHook
+
+#actions is a dictionary that is the heart of an application running on Racoon 
+# the key is the name of the trigger and the value is list of Actions that are invoked in that order
+# Racoon currently uses these triggers:
+#'handle-request' is invoked by racoon.Root.handleRequest (for http requests) and by the 'site:' URL resolver
+#'load-model' is invoked when a model is loaded
+#'run-cmds' is invoked on start-up to handle command line arguements
+# see Action class for more info
+actions = { 'handle-request' : [Action(['.//myNs:contents/myNs:ContentTransform/myNs:transformed-by/*',], __server__.processContents, matchFirst = False, forEachNode = True)]
+            'run-cmds' : [ Action(["$import", '$i'], lambda result, kw, contextNode, retVal, rhizome=rhizome: rhizome.doImport(result[0], **kw)),
+                           Action(['$export', '$e'], lambda result, kw, contextNode, retVal, rhizome=rhizome: rhizome.doExport(result[0], **kw)),
+                        ]
+          }
+
+#DEFAULT_TRIGGER is used by Requestor objects and the "site:" URL resolver as the trigger to use to invoke a request
+#default is 'http-request'
+DEFAULT_TRIGGER='http-request'
+
+#contentProcessors is a dictionary used by racoon.processContents to specify
+#content processors in addition to the built-in ones (RxSLT, RxUpdate, Python, base64)
+contentProcessors = {     
+    'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
+        lambda result, kw, contextNode, contents, rhizome=rhizome: rhizome.processRhizml(contents, kw)
+}
+
+#contentProcessorCachePredicates is a dictionary used by racoon.getProcessContentsCachePredicate to specify
+#a cache predicate if the results of a content processor can be cached
+contentProcessorCachePredicates = {    
+    'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
+        lambda result, kw, contextNode, contents: contents #the key is just the contents
+}
+
+#contentProcessorSideEffectsPredicates is a dictionary used by racoon.processContents to specify
+#a side effects predicate returns a representation of the side effects of calculating the cacheValue
+#if present, this value is passed to the contentProcessorSideEffectsFunc
+contentProcessorSideEffectsPredicates = { } #none for 'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml'
+
+#contentProcessorSideEffectsFuncs is a dictionary used by racoon.processContents to specify
+#a side effects function that will be called after a value is retrieved from the cache (use to replay side effects)
+contentProcessorSideEffectsFuncs = { } #none for 'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml'
+
+#contentProcessorIsValueCacheablePredicates is a dictionary used by racoon.processContents to specify
+#a predicate that will be called to determine if a new value should be added to the cache 
+#(usually the contentProcessorCachePredicate takes care of this but sometimes you need to look at the value itself)
+contentProcessorIsValueCacheablePredicates = {} #none for 'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml'
+
+#extFunctions is a dictionary of RxPath extension functions to be made available RxPath, RxSLT, RxUpdate, etc.
+extFunctions = {
+('http://example.com/extfuncs', 'reverse'): lambda context, nodeset: nodeset.reverse() or nodeset
+}
+
+#dictionary of XPath functions that may not be cacheable
+#if the value evaluates to False than function is treated as not cachable
+#otherwise the value should be a function with the signature: 
+#def getKey(xpathFunc, context) where xpathFunc is the Ft.Xml.XPath.ParsedExpr.FunctionCall
+#representing the function and context is the XPath context. 
+#getKey should either return a key (any hashable object)
+#or raise MRUCache.NotCacheable.
+#Note that the context may not have all its fields set. If the getKey function relies on one, 
+#it should check that it's not None and raise MRUCache.NotCacheable if it is.
+#default is {} (but the system will always add its own list)
+NOT_CACHEABLE_FUNCTIONS= {('http://example.com/extfuncs', 'delete-everything') : 0 }
+
+#getPrincipleFunc is function that is called to retrieve the 
+#application-specific Principle (in the security sense) object 
+#for the current request context.
+#It takes one argument that is the dictionary of metadata for the current request
+#default: lambda kw: '' 
+getPrincipleFunc = lambda kw: kw.get('__user','')
+
+#authorizeAdditions and authorizeRemovals are functions that are called when 
+#updating the application's model to provide fine-grained authentication of
+#each statement added and removed
+#their signatures looks like:
+#def authorizeAdditions(additions, removals, reordered, user)
+#where the first 3 arguments are the same as the tuple returned by RxPath.diffResources()
+#and the fourth is the principle returned by getPrincipleFunc
+#They should raise racoon.NotAuthorized if the update is unauthorized.
+#default: None
+authorizeAdditions=rhizome.authorizeAdditions
+authorizeRemovals=rhizome.authorizeRemovals
+
+#authorizeMetadata is a function that is called whenever one of Racoon's XXX-metadata 
+#XPath extension functions is called 
+#its signature looks like:
+#def authorizeMetadata(operation, namespace, name, value, kw)
+#where operation is one of 'get', 'has', 'assign', 'remove'
+#return True is the operation authorized or False if it isn't
+#default is lambda *args: True
+authorizeMetadata=rhizome.authorizeMetadata
+
+#MODEL_UPDATE_PREDICATE is the URI reference for the property that will be used 
+#Setting this will result in Raccoon adding a statement like
+#<MODEL_RESOURCE_URI> <MODEL_UPDATE_PREDICATE> "random string".
+#every time a change to model is committed. 
+#(It will also remove the prior statement if it exists.)
+#default: '' (no update statement is added)
+MODEL_UPDATE_PREDICATE = 'http://rx4rdf.sf.net/ns/wiki#model-update-id'
+
+#######################################
+## available read-only variables 
+#######################################
+__server__ #racoon.Root reference
+__argv__   #list of arguments intended for this configuration file
+__configpath__ #stack of configuration file paths, __configpath__[-1] is always the current file
+               #__configpath__[-2], if it exists, would be the config file currently including this one, and so on.
+

@@ -1,9 +1,8 @@
 !Writing text
 
-There's only one rule you need to know about the [RhizML] text formatting rules: don't start a line with space or a tab!  Indented lines create markup and follow the [Markup Formatting Rules]. Otherwise, just write normal text, and then use an empty line to mark a paragraph.
-It's just like writing an email.
+[ZML]'s text formatting rules are designed to be as simple as possible. Just write normal text, and then use an empty line to mark a paragraph. It's just like writing an email. 
 
-You can always [Edit|?action=edit] this page (use the link at the bottom of this page) to see how the different formatting on this page is used.
+You can always [edit|?action=edit] this page (use the link at the bottom of this page) to see how the different formatting on this page is used.
 
 !Hyperlinks
 
@@ -15,12 +14,23 @@ If you want to use brackets in regular text precede the bracket with a backslash
 
 !Adding pictures
 
-If you create a link to an image it will be automatically inlined. For example, this is an inlined PNG image: [example.png]. If you specify link text (\[this one here|example.png]) it becomes
+If you create a link to an image it will be automatically inlined. For example, this link: \[example.png] creates an inlined PNG image: [example.png]. If you specify link text (\[this one here|example.png]) it becomes
 the ALT text for those who either can't or don't want to view images. 
-If you don't want the image to be inlined, used the wiki:xlink-replace link annotation:
+If you don't want the image to be inlined, use the wiki:xlink-replace link annotation:
 \[not inlined|wiki:xlink-replace; example.png]:
 
-[not inlined|wiki:xlink-replace; example.png] (Link annotation is an advanced feature that is not documented yet -- sorry.)
+[not inlined|wiki:xlink-replace; example.png] 
+
+!Link annotations
+
+The above link is an example of an advanced feature called link annotations that let's you add //metadata// about the link, for example to describe what type of link it is or (as in this example) provide a hint as to how it should be displayed. You can even have links that leave out the URL and just have a link annotation -- in this case you are annotating the link text. 
+For example, this annotation:  \[Shouldn't we say more here?|wiki:comment author='johnb';] has no link and appears as regular text:
+
+[Shouldn't we say more here?|wiki:comment author='johnb';]
+
+But if you view source of the generated HTML you'll see the text is wrapped in a ^^<span>^^ element with a ^^class^^ attribute set to "wiki:comment". 
+
+A link can have any number of annotations proceeding the page name or URL, each separated by a ";". Each annotation is treated like a line of ZML [markup|ZML] with the exception that a ";" ends the markup line instead beginning a comment and __`__ strings are not allowed. Each annotation is distinct from the others (e.g. they are not joined to create a document tree).
 
 !Anchors
 
@@ -34,7 +44,7 @@ You may use __bold__ text or //italic// text, by placing two underscores (\__) (
 
 !Bulleted lists
 Use an asterisk (*) in the first column to make bulleted lists. Use more asterisks for deeper indentation. For example:
- pr'''
+pr'''
 * One
 * Two
 * Three
@@ -48,7 +58,7 @@ creates
 
 !Numbered lists
 Just like with bulleted lists, but use a hash (#) instead of the asterisk. Like this:
- r'''<pre class='code'>
+r'''<pre class='code'>
 # One
 # Two
 # Three
@@ -61,12 +71,12 @@ creates
 # Three
 ## Three.One
 
-If you want to write the list item on multiple lines, add a '\\' at the end of the line. If this sounds complicated, edit this page for an example, below.
+If you want to write the list item on multiple lines just start the following lines with a space.
 
 * This is a single-line item.
-* This is actually a multi-line item.\
- We continue the second sentence on a line on a line of its own.\
- We might as well do a third line while we're at it...\
+* This is actually a multi-line item.
+ We continue the second sentence on a line on a line of its own.
+ We might as well do a third line while we're at it...
  Notice, however, as all these sentences get put inside a single item!
 * The third line is again a single-line item for your convinience.
 
@@ -107,7 +117,7 @@ p'''here's
      formatting 
            preserved'''
            
-If you want to turn off markup escaping so you enter HTML or XML markup directly into the document start the quote with r''' or r""". (You can combine both prefixes, e.g. pr""".)  For more info, see [Markup Formatting Rules] or edit this page for an example.
+If you want to turn off markup escaping so you enter HTML or XML markup directly into the document start the quote with r''' or r""". (You can combine both prefixes, e.g. pr""".)  For more info, see [Markup Formatting Rules|ZML] or edit this page for an example.
 
 !Character escaping
 If you want to display any of these formatting characters instead of creating the formatting precede the character with a \\ e.g. here \// is displayed instead starting italics text.
@@ -117,9 +127,9 @@ Occasionally you may want to create a line break without creating a new paragrap
 
 * this item is on ~~ two lines
 
-If you want to continue a line so the next line is combined with the first (for example, to make the "source" text more readable), place a \\ at the end of the line:
+If you want to continue a line so the next line is combined with the first (for example, to make the "source" text more readable), just start the next line with a space.
 
-* this item breaks across\
+* this bullet item breaks across
  two lines in the source text 
 
 !Tables
@@ -130,20 +140,27 @@ write the rows of the table.  End with a line that is not a table.
 
 For example:
 
- r'''<pre class='code'>
+r'''<pre class='code'>
 || Heading 1 || Heading 2
 | ''Gobble'' | Bar
-| [Cocoon home|http://cocoon.apache.org/]     | [SandBox]
+| [Cocoon home|http://cocoon.apache.org/]  
+ | we continue the line here for readability
 </pre>'''
 
 gives you the following table.  Note how you can use links also inside tables.
 
 || Heading 1 || Heading 2
 | ''Gobble'' | Bar
-| [Cocoon home|http://cocoon.apache.org/]     | [SandBox]
+| [Cocoon home|http://cocoon.apache.org/] 
+ | we continue the line here for readability
+
+!XML/HTML Markup 
+You can create arbitrary XML markup using ZML's markup formatting rules. Any line that starts with a "<" is treated like ZML markup that gets translated directly into XML or HTML -- see the [Markup Formatting Rules|ZML] for more information.
 
 ----
 
 \[[&1]] Here's the footnote I mentioned.
 
 [[The other footnote|&2]] The other footnote.  Note how it's name is different?
+
+; Acknowledgements: Much of the content on this pages was based on http://www.jspwiki.org/Wiki.jsp?page=TextFormattingRules
