@@ -34,6 +34,7 @@ class ZMLTestCase(unittest.TestCase):
         for f in glob.glob('z2x-test*.zml'):
             resultpath = os.path.splitext(f)[0]+'.xml'
             self.failUnless(os.path.exists(resultpath), resultpath + ' does not exist')
+            print f
             result = zml.zml2xml(file(f), mmf=TestMarkupMapFactory())
             expected = file(resultpath).read()
             #print repr(result), '\n', repr(expected)
@@ -42,6 +43,13 @@ class ZMLTestCase(unittest.TestCase):
                     repr(difflib.SequenceMatcher(None,result.rstrip(), expected.rstrip()).get_opcodes()))                     
             #self.failUnless(result.rstrip() == expected.rstrip(), f + ' ' +
             #        ''.join(difflib.ndiff(result.rstrip().splitlines(), expected.rstrip().splitlines())) ) 
+
+    def testCopyZML(self):
+        for f in glob.glob('z2x-test*.zml'):                        
+            result = zml.copyZML(file(f,'rb')).rstrip()
+            orginal = open(f,'rb').read().rstrip()
+            print f, len(result), len(orginal)
+            self.failUnless(orginal == result, 'copy does not match orginal: '+f)
 
     def generateX2Z(self):
         for f in glob.glob('x2z-test*.xml'):

@@ -1,9 +1,9 @@
 * bul1
 *** bul3
-##  num2 test : colon
-##  num2 test | pipe 
+11.  num2 test : colon
+11.  num2 test | pipe 
 ** bul2 test [] empty link
-### num3
+111. num3
 **** bul4
 **** bul4
 || th || th 

@@ -1,11 +1,12 @@
+#!unlike most of the other test files, this one uses tabs
 #?zml0.9 markup
 test:
 	rdf:l.i rdf:id='http:': 'line1 ' `asdfasfas
 	foo: `adfadsf
-		bar: ;comment
+		bar: #comment
 			deep:
 	d:
-;c
+#c
 `asdfasfas
 'line2'	
 li:_.: 'another bullet'
