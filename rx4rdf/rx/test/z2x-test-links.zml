@@ -3,5 +3,12 @@
 <hello:
 <<contains-text foo = 2:
 [type; image.gif]
+[not inlined|wiki:xlink-replace; example.png]
+[Shouldn't we say more here?|wiki:comment author='johnb';]
+[wiki:comment author='johnb';]
+[done;]
+[wiki:comment author='johnb';wiki:annotation;]
+#![done; wiki:comment author='johnb';wiki:annotation: 'blah blah'; 'foo';]
+[#foo]
 \[one bracket]
 \[\[two brackets] asdfasdf

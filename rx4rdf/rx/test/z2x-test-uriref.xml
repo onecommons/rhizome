@@ -1,0 +1,1 @@
+<ns1:foo xmlns:ns1='http://sadf#' /><test xmlns:test="http://test/"><test:test1 /></test><test2:test2 xmlns:test2="http://test2/"><foo><bar><baz><bob><fob /></bob><foc /></baz></bar></foo><doo><dar><daz><dob><dob /></dob></daz></dar></doo><doc /></test2:test2>

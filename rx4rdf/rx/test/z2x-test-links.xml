@@ -1,6 +1,12 @@
 <dl><dt>term </dt><dd> def with a <a href="link">link</a>
 </dd><dt><a href="term">linked term</a> </dt><dd> def without a [link]
 </dd></dl><hello><contains-text foo="2"><p><img src="image.gif" alt="image.gif" />
+<a href="example.png">not inlined</a>
+<span class="wiki:comment">Shouldn't we say more here?</span>
+<span class="wiki:comment" />
+<span class="done" />
+<span class="wiki:comment" />
+<a href="#foo">foo</a>
 [one bracket]
 [[two brackets] asdfasdf
 </p></contains-text></hello>

@@ -1,0 +1,11 @@
+<{http://sadf#foo}
+<test xmlns:test='http://test/'
+<<{http://test/test1}
+<{http://test2/test2} xmlns:test2='http://test2/'
+<<foo: bar: baz
+<<<bob
+<<<<fob
+<<<foc
+<<doo: dar: daz
+<<<<dob: dob
+<<doc
