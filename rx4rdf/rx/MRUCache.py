@@ -54,7 +54,8 @@ class MRUCache:
         self.__init()
         
     def __init(self):
-        self.mru = UseNode(`'<unused value>'`, '<*initially unused node*>') # ``for test
+        self.initialNode = UseNode(`'<unused value>'`, '<*initially unused node*>') # ``for test
+        self.mru = self.initialNode 
         self.mru.older = self.mru.newer = self.mru  # init circular list
         self.nodeSize = 1
         self.nodeDict = dict([(self.mru.hkey, self.mru)])
@@ -155,8 +156,10 @@ class MRUCache:
                 self.mru = node
             else:
                 # position of lru node is correct for becoming mru so
-                # jusr replace value and hkey #
-                self.nodeSize -= self.capacityCalc(lru.hkey, lru.value)
+                # just replace value and hkey #
+                if lru is not self.initialNode: 
+                    self.nodeSize -= self.capacityCalc(lru.hkey, lru.value)
+                #print lru.hkey
                 lru.value = value
                 lru.sideEffects = sideEffects
                 # delete invalidated key->node mapping
