@@ -8,16 +8,15 @@
      auth: `http://rx4rdf.sf.net/ns/auth#
      base: `%(base)s
 
- ;creates a new disposition
+ #creates a new disposition
 
- ;the disposition of a page determines which page template is used 
- ;to display the page (determined by the wiki:handles-disposition property)
+ #the disposition of a page determines which page template is used 
+ #to display the page (determined by the wiki:handles-disposition property)
  
- ;(you probably want to rename the resource id to something like base:myDisposition)
+ #(you probably want to rename the resource id to something like base:myDisposition)
  bnode:newItemDisposition: 
      rdf:type: 
          wiki:ItemDisposition
          
-     ;this name shows up in the Item Type drop-down on the edit page
+     #this name shows up in the Item Type drop-down on the edit page
      rdfs:label: `Disposition Name
-     

@@ -8,43 +8,43 @@
      auth: `http://rx4rdf.sf.net/ns/auth#
      base: `%(base)s
 
- ;creates a new access token 
+ #creates a new access token 
 
- ;access tokens guard resources 
- ;assign (auth:has-rights-to) to users or roles to give access
+ #access tokens guard resources 
+ #assign (auth:has-rights-to) to users or roles to give access
  
- ;(you probably want to rename the resource uri to something like base:myRole)
+ #(you probably want to rename the resource uri to something like base:myRole)
  bnode:newaccesstoken:
   rdf:type: auth:AccessToken
-  ; this label shows up in the Sharing drop down when editing new content
+  # this label shows up in the Sharing drop down when editing new content
   rdfs:label: `a name
-  ; auth:priority is required property and must be a number > 0
+  # auth:priority is required property and must be a number > 0
   auth:priority: 1
   
-  ;below are the pre-defined permissions you can choose from
-  ; read permissions
-  ;auth:has-permission: wiki:action-view
-  ;auth:has-permission: wiki:action-view-source
-  ;auth:has-permission: wiki:action-view-metadata
-  ;auth:has-permission: wiki:action-edit
-  ;auth:has-permission: wiki:action-edit-metadata
-  ;auth:has-permission: wiki:action-confirm-delete     
-  ;auth:has-permission: wiki:action-showrevisions
-  ;auth:has-permission: wiki:action-new
+  #below are the pre-defined permissions you can choose from
+  # read permissions
+  #auth:has-permission: wiki:action-view
+  #auth:has-permission: wiki:action-view-source
+  #auth:has-permission: wiki:action-view-metadata
+  #auth:has-permission: wiki:action-edit
+  #auth:has-permission: wiki:action-edit-metadata
+  #auth:has-permission: wiki:action-confirm-delete     
+  #auth:has-permission: wiki:action-showrevisions
+  #auth:has-permission: wiki:action-new
 
-  ; write permissions
-  ;auth:has-permission: wiki:action-delete     
-  ;auth:has-permission: wiki:action-save
-  ;auth:has-permission: wiki:action-save-metadata
-  ;auth:has-permission: wiki:action-creation
+  # write permissions
+  #auth:has-permission: wiki:action-delete     
+  #auth:has-permission: wiki:action-save
+  #auth:has-permission: wiki:action-save-metadata
+  #auth:has-permission: wiki:action-creation
   
-  ; fine-grained permissions authorize which statements can be added or removed
-  ;auth:has-permission: auth:permission-add-statement
-  ;auth:has-permission: auth:permission-remove-statement   
+  # fine-grained permissions authorize which statements can be added or removed
+  #auth:has-permission: auth:permission-add-statement
+  #auth:has-permission: auth:permission-remove-statement   
   
-  ;fine-grained permissions can optionally be refined with these properties:
-  ;access token applies if the statement uses the given property
-  ;auth:with-property: bnode:property-to-apply
+  #fine-grained permissions can optionally be refined with these properties:
+  #access token applies if the statement uses the given property
+  #auth:with-property: bnode:property-to-apply
 
-  ;access token applies if the statement has the given object
-  ;auth:with-value: bnode:object-to-apply
+  #access token applies if the statement has the given object
+  #auth:with-value: bnode:object-to-apply

@@ -8,16 +8,16 @@
      auth: `http://rx4rdf.sf.net/ns/auth#
      base: `%(base)s
 
- ;creates a new label 
+ #creates a new label 
  
- ;(you probably want to rename the resource id to something like base:myLabel)
+ #(you probably want to rename the resource id to something like base:myLabel)
  bnode:newRole: 
      rdf:type: 
          wiki:Label
          
-     ;this name shows up in the Label drop-down on the edit page
+     #this name shows up in the Label drop-down on the edit page
      rdfs:label: `Label Name
      
-     ;if this resource has this property (regardless of its value)
-     ;all resources that have this label will be treated as released
-     ;wiki:is-released: `
+     #if this resource has this property (regardless of its value)
+     #all resources that have this label will be treated as released
+     #wiki:is-released: `

@@ -8,13 +8,12 @@
      auth: `http://rx4rdf.sf.net/ns/auth#
      base: `%(base)s
 
- ;generic new resource template
+ #generic new resource template
 
- ;(you probably want to rename the resource id to something like base:myDocType)
+ #(you probably want to rename the resource id to something like base:myDocType)
  bnode:newResource: 
-     ;you probably want to say what a type of resource it is
-     ;rdf:type: bnode:aClassResource
+     #you probably want to say what a type of resource it is
+     #rdf:type: bnode:aClassResource
      
-     ;if you want to give this a human-readable name 
-     ;rdfs:label: `your resource name
-     
+     #if you want to give this a human-readable name 
+     #rdfs:label: `your resource name

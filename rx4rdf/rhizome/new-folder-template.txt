@@ -8,20 +8,20 @@
      auth: `http://rx4rdf.sf.net/ns/auth#
      base: `%(base)s
 
- ;create a new folder
+ #create a new folder
  
- ;note: folder are created automatically when you create a page with a 
- ;hierarchical name (e.g. myFolder/myPage) 
- ;so you might not need to create them here.
+ #note: folder are created automatically when you create a page with a 
+ #hierarchical name (e.g. myFolder/myPage) 
+ #so you might not need to create them here.
  
- ;(you probably want to rename the resource id to something like base:myFolder)
- bnode:newRole:
+ #(you probably want to rename the resource id to something like base:myFolder)
+ bnode:newFolder:
   rdf:type: wiki:Folder
-  ;wiki:name is required and must be the full path of the folder
-  ;e.g. if the folder is a child of another folder you must include parent path
-  ;in the name. Also the parent folder must be linked to this folder using the 
-  ;wiki:has-child property (again, this happens automatically when you create a page)
+  #wiki:name is required and must be the full path of the folder
+  #e.g. if the folder is a child of another folder you must include parent path
+  #in the name. Also the parent folder must be linked to this folder using the 
+  #wiki:has-child property (again, this happens automatically when you create a page)
   wiki:name `full\path
   
-  ;these are created automatically when you create a page in this folder
-  ;wiki:has-child: base:aPage
+  #these are created automatically when you create a page in this folder
+  #wiki:has-child: base:aPage
