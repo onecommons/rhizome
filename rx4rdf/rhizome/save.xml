@@ -1,0 +1,176 @@
+<xu:modifications version="1.0" xmlns:xu="http://www.xmldb.org/xupdate"
+		    xmlns:a="http://rx4rdf.sf.net/ns/archive#" xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" 
+		    xmlns:f = 'http://xmlns.4suite.org/ext' xmlns:wf='http://rx4rdf.sf.net/ns/racoon/xpath-ext#'
+			xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
+			xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >
+
+    <xu:if test='number($startTime) &lt; /*[wiki:name=$itemname]/a:last-modified/text()'>
+        <xu:message text="Conflict: Item has been modified after you started editing this item!" terminate="yes" />
+    </xu:if>
+
+    <xu:variable name='resource' select='/*[wiki:name=$itemname]' />
+        
+    <xu:variable name = 'contents' select="f:if($file, $file, $contents)" />
+    
+    <!-- if the wikiname does not exist, add it now -->    
+    <xu:if test='not($resource)'>
+        <xu:append select='/'>
+			<a:NamedContent>
+			<xu:attribute name="rdf:about"><xu:value-of select="wf:get-nameURI($itemname)"/></xu:attribute>
+			<wiki:name><xu:value-of select="$itemname" /></wiki:name>
+			<!-- add empty list resource that will be appended to below -->
+			<wiki:revisions><rdf:List/></wiki:revisions>
+			</a:NamedContent>
+        </xu:append>
+        <!-- now that we've created it, rebind the variable -->
+        <xu:variable name='resource' select='/*[wiki:name=$itemname]' />
+    </xu:if>
+    
+    <!-- add or update last modified -->
+    <xu:remove select='$resource/a:last-modified'/> 
+    <xu:append select='$resource'>
+        <a:last-modified><xu:value-of select="wf:current-time()"/></a:last-modified>
+    </xu:append>
+
+    <!-- set access control: remove previous, add selected, if any -->
+    <xu:remove select='$resource/auth:needs-token'/>
+    <xu:if test="$authtoken"> 
+       <xu:append select='$resource'>    
+         <auth:needs-token><xu:attribute name="rdf:resource"><xu:value-of select="$authtoken"/></xu:attribute></auth:needs-token>
+       </xu:append>
+    </xu:if>
+    
+    <xu:variable name="formatTransformURI" select="wf:generate-bnode()"/>                
+    
+    <!-- don't bother saving the last revision if this was just a minor edit
+    todo: this doesn't delete the actual contents if stored in an external file
+
+    we disallow minor edit if the previous revision was edited by a different user 
+    todo: we should still add a minor-edit flag to metadata to mark the revision as minor:
+      <if not($addRevision) and $minor-edit>...
+    -->
+    <xu:variable name='replaceRevision' select="wf:get-metadata('minor_edit') and 
+       (not($resource/wiki:revisions/*) or ($resource/wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by = $_user)" /> 
+        
+    <xu:if test='$replaceRevision'>    
+    
+        <!-- for simplicity's sake we implement this by just removing the last revision 
+        before we add the new revision 
+        We must do this before any possible patching because we may need to re-generate the last patch
+        -->
+        <xu:remove select='($resource/wiki:revisions/*/rdf:first)[last()]'/>
+    </xu:if>
+        
+    <xu:if test='not($replaceRevision)'>
+         <!-- select the raw content of the latest revision by getting the last (deepest) resource with a 'a:contents' predicate -->         
+        <xu:variable name = 'lastContents' select="( ($resource/wiki:revisions/*/rdf:first/*)[last()]//a:contents)[last()]" />
+    
+        <!-- 
+        remove previous revision's wiki:alt-contents
+        otherwise, retrieving a previous revision would get the latest content sitting in wiki:alt-contents        
+        -->
+        <xu:remove select='$lastContents/*/wiki:alt-contents'/>
+                
+        <!-- we create a reverse diff 
+        by replacing the last revision's content with a diff between it and the new revision 
+        note that we need to do this before we add the new revision
+        -->                  
+        
+        <!-- 
+        we want to do diffs on the raw content so if the previous revision stored its content at base64 encoding, 
+        decode it before diffing
+        -->
+        <xu:variable name = 'base64decode' select="$lastContents/../a:transformed-by = 'http://www.w3.org/2000/09/xmldsig#base64'" />
+                
+        <xu:variable name = 'patch' select="wf:generate-patch($contents, $lastContents/.., $base64decode)" />
+        
+        <xu:if test='$patch'>
+            <!-- 
+            if the previous revision stored its content as base64 encoded, we need to replace the base64 decode transform also
+            Likewise if previous revision was a patch (which will be true with a minor edit, since we just removed the latest revision)
+            -->            
+            <xu:variable name = 'isPatch' select="$lastContents/../a:transformed-by = 'http://rx4rdf.sf.net/ns/content#pydiff-patch-transform'" />
+            <xu:variable name = 'replaceContents' select="f:if($base64decode or $isPatch, $lastContents/../../.., $lastContents)" />
+             
+            <xu:replace select='$replaceContents'>
+              <a:contents>
+                <a:ContentTransform>                    
+                    <a:transformed-by rdf:resource='http://rx4rdf.sf.net/ns/content#pydiff-patch-transform' />
+                    <a:contents><xu:copy-of select='$patch'/></a:contents>
+                    <a:pydiff-patch-base>
+                        <!-- this points to the resource that whose contents we will apply the patch to, 
+                        i.e. the contents of the revision we're about to add
+                        At first it will point the resource whose has-contents predicate has raw content as its object
+                        But as we add revisions we replace that raw content with patch transforms, thus creating a chain of patches to apply
+                        -->
+                        <xu:attribute name="rdf:resource">
+                            <xu:value-of select="$formatTransformURI"/> 
+                        </xu:attribute>
+                   </a:pydiff-patch-base>
+                </a:ContentTransform>
+              </a:contents>
+           </xu:replace>           
+        </xu:if>                 
+    </xu:if>
+        
+<!--
+    this is how the above patching logic plays itself out given base64 encoded content:
+    
+    given revision 1 contents:    
+        format -> base64decode A -> content A
+    
+    add revision 2:
+        revision 2 = format -> base64decode B -> content B
+        
+    replace revision 1 base64decode A -> content A with patch + reference to revision 2
+    so revision 1 = 
+        format -> (patch -base-> base64decode B -> content B)
+    
+    add revision 3
+    revision 2 base64decode B -> content B is replaced with 
+    (patch -base-> base64decode C -> content C)
+    
+    thus revision 1 now looks like 
+    format -> (patch -base-> (patch -base-> base64decode C -> content C))    
+-->
+        
+    <!-- add the new revision -->
+    <xu:append select='$resource/wiki:revisions/*'>
+      <rdf:first>
+         <wiki:Item>
+            <xu:variable name="itemURI" select="wf:generate-bnode()"/>
+            <xu:attribute name="rdf:about"><xu:value-of select="$itemURI"/></xu:attribute>
+            <a:contents>
+                <a:ContentTransform>
+                   <xu:attribute name="rdf:about"><xu:value-of select="$formatTransformURI"/></xu:attribute>
+                   <a:transformed-by><xu:attribute name="rdf:resource"><xu:value-of select="$format"/></xu:attribute>
+                   </a:transformed-by>
+                   <a:contents>
+                     <xu:copy-of select="wf:save-contents($itemname, $format, $contents,
+                                                count($resource/wiki:revisions/*/rdf:first)+1 )"/> 
+                   </a:contents>
+               </a:ContentTransform>
+           </a:contents>
+            
+            <wiki:item-disposition>
+                <xu:attribute name="rdf:resource"><xu:value-of select="$disposition"/></xu:attribute>
+            </wiki:item-disposition>
+            
+            <xu:if test='wf:get-metadata("doctype")'>
+                <wiki:doctype><xu:attribute name="rdf:resource"><xu:value-of select="$doctype"/></xu:attribute></wiki:doctype>
+            </xu:if>
+            <xu:if test='$title'>
+                <wiki:title><xu:value-of select="$title"/></wiki:title>
+            </xu:if>
+            <xu:if test='wf:get-metadata("label")'>
+                <wiki:has-label><xu:value-of select="$label"/></wiki:has-label>
+            </xu:if>
+            <a:created-on><xu:value-of select="wf:current-time()"/></a:created-on>
+            <wiki:created-by><xu:attribute name="rdf:resource"><xu:value-of select="$_user"/></xu:attribute></wiki:created-by>
+        </wiki:Item>
+       </rdf:first>
+    </xu:append>
+              
+    <xu:if test="wf:assign-metadata('revision-added', $itemURI)" /> <!-- do nothing - just for the side-effect -->
+    <xu:if test="wf:assign-metadata('_update-trigger', 'revision-added')" /> <!-- do nothing - just for the side-effect -->            
+</xu:modifications>

@@ -1,0 +1,30 @@
+<xu:modifications version="1.0" xmlns:xu="http://www.xmldb.org/xupdate"
+    xmlns:a="http://rx4rdf.sf.net/ns/archive#" xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"
+    xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' 
+    xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
+    >
+<!--
+Use this import script to mark pages as "structural" (only can be modified by an administrator)
+-->     
+    <xu:if test='(/*/wiki:revisions/*//a:contents)[last()][a:ContentTransform]'>         
+    	<xu:message text="order wrong? bug in RDFDOM?" terminate="yes" />
+    </xu:if>
+    <!-- remove all but the last revision and replace its contents with $loc -->
+    <xu:remove select='/*/wiki:revisions/*/rdf:first[not(position()=last())]'/>    
+    <xu:replace select='(/*/wiki:revisions/*/rdf:first/*//a:contents)[last()]'>
+     <a:contents>
+      <a:ContentLocation>
+    	<xu:attribute name="rdf:about"><xu:value-of select="$loc"/></xu:attribute>
+	  </a:ContentLocation>
+	 </a:contents>
+    </xu:replace>
+    
+    <!-- require that that a user needs the structure write access token to modify this -->
+    <xu:append select='/*[wiki:name]'>
+    <auth:needs-token>
+      <xu:attribute name="rdf:resource">
+        <xu:value-of select="concat($base-uri,'write-structure-token')"/>
+      </xu:attribute>
+    </auth:needs-token>
+    </xu:append>     
+</xu:modifications>
