@@ -114,7 +114,7 @@ def makeTokenizer():
     StrLine = r'`[^\r\n]*'
     Ignore = Whitespace + any(r'\\\r?\n' + Whitespace) + maybe(Comment) + maybe(StrLine)
     Name = r'[a-zA-Z_][\w:.-]*' #added _:.-
-    URIRef =  r"\{[a-zA-Z_][\w:.-\]\[;/?@&=+$,!~*'()%#]*\}"
+    URIRef =  r"\{[a-zA-Z_][\w:.\-\]\[;/?@&=+$,!~*'()%#]*\}" #very loose URI match: start with alpha char followed by any number of the acceptable URI characters
     Hexnumber = r'0[xX][\da-fA-F]*[lL]?'
     Octnumber = r'0[0-7]*[lL]?'
     Decnumber = r'[1-9]\d*[lL]?'
@@ -581,25 +581,30 @@ class MarkupMap(object):
     def mapAnnotationsToMarkup(self, annotationsRoot, name):
         #get the first node of the annotation, which can be either an element or a string
         type = getattr(annotationsRoot.children[0], 'name', annotationsRoot.children[0])
-        return self.SPAN, [('class',xmlquote(type) )], name
+        #always None since we never change the text
+        #also don't escape the attribute because the annotation parser already did this
+        return self.SPAN, [('class',xmlquote(type, False) )], None 
 
     def mapLinkToMarkup( self, link, name, annotations, isImage, isAnchorName):
         '''
         return (element, attrib list, text)
-        '''
+        '''        
         if name is None:
             if link.startswith('site:///'):
-                name = link[len('site:///'):]
+                generatedName = link[len('site:///'):]
             elif link.startswith('#'): #anchor link
-                name = link[1:] 
+                generatedName = link[1:] 
             else:
-                name = link
+                generatedName = link
+            generatedName = xmlescape(generatedName)
+        else:
+            generatedName = ''
         #print link, not annotations or [a.name for a in annotations]
         if isImage and (annotations is None or 
                 not [annotation for annotation in annotations.children
                     if getattr(annotation, 'name', None) == 'wiki:xlink-replace']):
-            attribs = [ ('src', xmlquote(link)), ('alt', xmlquote(name)) ]
-            return self.IMG, attribs, ''
+            attribs = [ ('src', xmlquote(link)), ('alt', xmlquote(name or generatedName)) ]
+            return self.IMG, attribs, '' #no link text (IMG is an empty element)
         else:
             if isAnchorName:
                 attribs = [('name', xmlquote(link)) ]
@@ -609,7 +614,10 @@ class MarkupMap(object):
                 first = getattr(annotations.children[0], 'name', annotations.children[0])
                 if first != 'wiki:xlink-replace':                
                     attribs += [ ('rel', xmlquote(first)) ]
-            return self.A, attribs, name
+            if generatedName:
+                return self.A, attribs, generatedName
+            else:
+                return self.A, attribs, None #don't override the link text
 
 #create a MarkupMap subclass with lowercase versions of all the elements names
 class LowerCaseMarkupMap(MarkupMap): pass
@@ -714,7 +722,7 @@ def stripQuotes(strQuoted, checkEscapeXML=True):
 
 def xmlquote(quote, escape=True):
     if escape:
-        quote.replace('&', '&amp;')
+        quote = quote.replace('&', '&amp;').replace('<', '&lt;')
     if quote.find('"') == -1:
         return '"' + quote + '"'
     elif quote.find("'") == -1:
@@ -773,8 +781,7 @@ bold= r'__'
 italics= r'(?<!:)//' #ignore cases like http://
 monospace= r'\^\^'
 brexp= r'\~\~' 
-linkexp = r'\[.*?\]'#any [.*] except when a [ is behind the leading
-#todo linkexp doesn't handle ] in annotation strings or IP6 hostnames in URIs
+linkexp = r'\[.*?\]' #todo linkexp doesn't handle ] in annotation strings or IP6 hostnames in URIs
 #match any of the above unless proceeded by an odd number of \
 inlineprog = re.compile(r'(((?<!\\)(\\\\)+)|[^\\]|^)'+_group(defexp,tableexp,bold,monospace,italics,linkexp,brexp))
 
@@ -837,12 +844,12 @@ class ParseState:
     def inlineTokenMap(st):
         return { '/' : st.mm.I, '_' : st.mm.B, '^' : st.mm.TT}
      
-    def _handleInlineWiki(st, handler, string, wantTokenMap=None, userTextHandler=None):
+    def _handleInlineWiki(st, string, wantTokenMap=None, userTextHandler=None):
         inlineTokens = st.inlineTokenMap()
         if wantTokenMap is None:
             wantTokenMap = inlineTokens
         if userTextHandler is None:
-            userTextHandler = lambda s: handler.text(s)
+            userTextHandler = lambda s: st.handler.text(s)
         textHandler = lambda s: userTextHandler(re.sub(r'\\(.)',r'\1', xmlescape(s)) ) #xmlescape then strip out \ (but not \\) 
         pos = 0
         while 1:
@@ -887,7 +894,7 @@ class ParseState:
                     pos = end
                 elif token == '[': #its a link
                     #print 'link ', string[start:end]
-                    if string[start+1] == ']':  #handle special case of [] -- just print it 
+                    if string[start+1] == ']':  #handle special case of "[]" -- just print it 
                         textHandler( string[pos:start+1] )
                         pos = start+1 
                         continue
@@ -901,8 +908,11 @@ class ParseState:
                         name = None
                     else:
                         name = nameAndLink[0].strip()                    
-                        namechunks = [] #parse any wiki markup in the name
-                        st._handleInlineWiki(handler, name, None, lambda s: namechunks.append(s))
+                        namechunks = [] 
+                        dummyState = ParseState()#parse out any wiki markup in the name (using a dummy handler)
+                        dummyState.handler = Handler()
+                        dummyState.mm = st.mm
+                        dummyState._handleInlineWiki(name, None, lambda s: namechunks.append(s))
                         name = ''.join(namechunks)                    
                     linkinfo = nameAndLink[-1].strip() #the right side of the |
                     
@@ -947,12 +957,14 @@ class ParseState:
                         assert(type)
                         element, attribs, text = st.mm.mapAnnotationsToMarkup(type, name)
                     
-                    handler.startElement(element)
+                    st.handler.startElement(element)
                     for name, value in attribs:
-                        handler.attrib(name, value)
-                    if text:
-                        handler.text( text )
-                    handler.endElement(element)
+                        st.handler.attrib(name, value)                    
+                    if text is not None: 
+                        st.handler.text( text )
+                    else:
+                        st._handleInlineWiki(nameAndLink[0].strip(), None)
+                    st.handler.endElement(element)
                 else:
                     textHandler( string[pos:start+1] )                
                     pos = start+1 #skip one of the brackets                
@@ -988,14 +1000,14 @@ class ParseState:
 
         return cleanAttribs
     
-    def handleInlineWiki(st, handler, string, wantTokenMap ):
+    def handleInlineWiki(st, string, wantTokenMap ):
         #if markup appears on the line following a wiki line (that ends in ::) this markup will be a child of the wiki element
         #nope too complicated!!!
         if 0:#string[-2:] == '::': 
-            return st._handleInlineWiki(handler, string[:-2], wantTokenMap)
+            return st._handleInlineWiki(string[:-2], wantTokenMap)
             st.in_wikicont = 1
         else:
-            return st._handleInlineWiki(handler, string, wantTokenMap)
+            return st._handleInlineWiki(string, wantTokenMap)
             st.in_wikicont = 0
 
     def uriToQName(st, token):
@@ -1207,7 +1219,7 @@ class ParseState:
             wantTokenMap['|'] = cell
             st.pushWikiStack(cell)
             st.toClose += 1
-        st.handleInlineWiki( handler, string[pos:], wantTokenMap) 
+        st.handleInlineWiki(string[pos:], wantTokenMap) 
         if st.in_wikicont:
             return
         while st.toClose: #close the line elements: e.g. LI, H1, DD, TR
