@@ -2285,7 +2285,7 @@ else:
                         raise ValueError
                 except (IndexError, ValueError):
                     debugFileName = 'debug-wiki.pkl'
-                requests = pickle.load(file(debugFileName))        
+                requests = pickle.load(file(debugFileName, 'rb'))        
                 for request in requests:
                     root.handleRequest(request[0], **request[1])
             elif '-x' not in mainArgs: #if -x (execute cmdline and exit) we're done

@@ -442,7 +442,7 @@ if not globals().has_key('hotReload'):
                 print 'KeyboardInterrupt'
                 onError()
                 if requestRecordFilePath and requestsRecord:
-                    requestRecordFile = file(requestRecordFilePath, 'w')
+                    requestRecordFile = file(requestRecordFilePath, 'wb')
                     pickle.dump(requestsRecord, requestRecordFile)
                     requestRecordFile.close()       
         except:

@@ -14,9 +14,14 @@ RHIZOMEDIR = '../../rhizome'
 class RhizomeTestCase(unittest.TestCase):
     '''
     Run test "scripts".
+    
     Our pathetic little scripting environment works like this:
-    The -r option records requests sent Raccoon and then pickles the list
-    The -d plays back those requests
+    
+    The Raccoon's -r option records requests sent to it and then pickles
+    the list when you use Ctrl-C to shutdown.
+    
+    The -d [picklefile] option plays back those requests.
+    
     Our test-config.py adds a page named "assert" that lets us write Python assertions
     that will get executed when played back.
     '''
@@ -50,14 +55,29 @@ class RhizomeTestCase(unittest.TestCase):
     
     def testMinorEdit(self):
         '''
-        This script, logs in as admin, add a page called testminoredit,
-        modifies it several times with and without the minor edit
-        then asserts that the correct number revisions and checks the expected first
+        The script:
+        1. logs in as admin
+        1. add a page called testminoredit,
+        1. modifies it several times with and without the minor edit
+        1. then asserts that the correct number revisions and checks the expected first
         character of the final revision
         '''
         for configpath in glob.glob('test-config*.py'):
             print 'testing ', configpath
-            self.executeScript(configpath, glob.glob('testminoredit.*.pkl'))
+            self.executeScript(configpath, glob.glob('minoredit.*.pkl'))
+
+    def testSmokeTest(self):
+        '''
+        So far this script only does this:
+        1. edit the zmlsandbox
+        1. view it
+        1. create new html page called "sanitize" using illegal html (e.g. javascript)
+        1. view it 
+        '''
+        for configpath in glob.glob('test-config*.py'):
+            print 'testing ', configpath
+            self.executeScript(configpath, glob.glob('smoketest.*.pkl'))
+
 
 SAVE_WORK=False
 DEBUG = False
