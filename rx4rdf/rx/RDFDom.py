@@ -22,6 +22,8 @@ import Ft
 from utils import generateBnode
 from Ft.Xml import XPath
 import types
+from rx import logging #for python 2.2 compatibility
+log = logging.getLogger("rhizome")
 
 #from Ft.Rdf import RDF_MS_BASE -- for some reason we need this to be unicode for the xslt engine:
 RDF_MS_BASE=u'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
@@ -547,7 +549,7 @@ def treeToModel(rootNode, model, scopeFilter=None):
         subject = s.getAttributeNS(RDF_MS_BASE, 'about')
         #for the case where the rdfdom has been manually modified:
         if not subject:
-            print "warning no rdf:about", s
+            log.warning("no rdf:about %s", s)
             subject = generateBnode()
         if not isinstance(s, SubjectElement) and not (s.namespaceURI == RDF_MS_BASE and s.localName == 'Description'):
             implicitType = getURIFromElementName(s)
@@ -826,7 +828,7 @@ def applyXUpdate(rdfdom, xup = None, vars = None, extFunctionMap = None, uri='fi
 def evalXPath(rdfDom, xpath, nsMap = None, vars=None, extFunctionMap = None, node = None):
     node = node or rdfDom
     #print node
-    #print xpath
+    log.debug(xpath)
     if extFunctionMap:
         extFunctionMap.update(BuiltInExtFunctions)
     else:
@@ -843,13 +845,12 @@ def main():
     def doQuery():
         try:
             compExpr = XPath.Compile(query)
-            compExpr.pprint()
+            #compExpr.pprint()
             res = evalXPath(rdfDom, query, vars = vars, nsMap = processorNss)            
             #compExpr = XPath.Compile(query)
             #res = XPath.Evaluate(compExpr, rdfDom, context)
         except:
-            print "Unexpected error:", sys.exc_info()[0]
-            traceback.print_exc(file=sys.stdout)            
+            log.exception("Unexpected error")            
         else:
             print repr(res)
             if res:

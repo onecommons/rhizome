@@ -10,11 +10,16 @@ _outputFile="Server.py"
 _cacheMap={}
 
 import string, time, urllib, sys, getopt, cgi, socket, os, ConfigParser
+from rx import logging #for python 2.2 compatibility
+log = logging.getLogger("server")
+
 
 _lastCacheFlushTime=time.time()
 _stdout=sys.stdout
 
 def debug(debugStr):
+	log.debug(debugStr)
+	#for backwards compatibility:
 	if _debug:
 		f=open(_debugFile, 'a')
 		f.write(debugStr+'\n')
@@ -70,7 +75,9 @@ def onError():
 		response.headerMap['content-type']='text/xml'
 
 def logMessage(message):
-	if logToScreen: print message
+	log.info(message)
+	#for backwards compatibility:
+	if logToScreen: print message	
 	if logFile:
 		f=open(logFile, "a")
 		f.write(message+"\n")
@@ -83,7 +90,7 @@ if not globals().has_key('hotReload'):
 	
 	# Default values for all parameters
 	
-	logToScreen=1 # Should logs be output to screen or not
+	logToScreen=0 # Should logs be output to screen or not
 	logFile="" # Default log file
 	
 	# Parameters used to tell which socket the server should listen on

@@ -24,6 +24,8 @@ try:
     StringIO = cStringIO
 except ImportError:
     import StringIO
+from rx import logging #for python 2.2 compatibility
+log = logging.getLogger("racoon")
 
 #xpath variable namespaces:
 RXIKI_HTTP_REQUEST_HEADER_NS = 'http://rx4rdf.sf.net/ns/racoon/http-request-header#'
@@ -564,7 +566,7 @@ class Root(object):
             return evalXPath(self.rdfDom, xpath, nsMap = self.nsMap, vars=vars, extFunctionMap = extFunctionMap , node = node)
         except (RuntimeException), e:
             if e.errorCode == RuntimeException.UNDEFINED_VARIABLE:
-                print "warning: ", e.message #this is ok
+                log.info("%s", e.message) #this is ok
             else:
                 raise
 
@@ -624,7 +626,7 @@ class Root(object):
         if contents is None:
             return contents        
         formatType = self.getStringFromXPathResult(result)        
-        print 'enc', formatType
+        log.debug('enc %s', formatType)
         if formatType:
             return self.contentProcessors[formatType](self, contents, kw, result,contextNode)
         else:
@@ -686,9 +688,7 @@ class Root(object):
             contents = output.getvalue()
         except:
             sys.stdout = sys_stdout
-            print 'got this far before exception:\n', output.getvalue()
-            import traceback
-            traceback.print_exc()
+            log.exception('got this far before exception %s', output.getvalue())
             raise
         else:   #can't have a finally here
             sys.stdout = sys_stdout
@@ -706,7 +706,7 @@ class Root(object):
         vars, extFunMap = self.mapToXPathVars(kw)
         from Ft.Xml.Xslt.Processor import Processor
         processor = Processor()
-        print 'xslt ', uri
+        #print 'xslt ', uri
         #print 'xslt template:', source
         #print 'xslt source: ', contents
         processor.appendStylesheet( InputSource.DefaultFactory.fromString(source, uri)) 
@@ -813,16 +813,17 @@ class Root(object):
 ##command line handling
 #################################################
     
-DEFAULT_cmd_usage = 'python [racoon.py -r -d [debug.pkl] -x -s server.cfg -p path -m store.nt] -a config.py'
+DEFAULT_cmd_usage = 'python [racoon.py -l [log.config] -r -d [debug.pkl] -x -s server.cfg -p path -m store.nt] -a config.py'
 cmd_usage = '''
 -h this help message
--s server.cfg specify an alternative server.cfg 
+-s server.cfg specify an alternative server.cfg
+-l [log.config] specify a config file for logging
 -r record requests (ctrl-c to stop recording) 
 -d [debug.pkl]: debug mode (replay the requests saved in debug.pkl)
 -x exit after executing config specific cmd arguments
 -p specify the path (overrides RHIZPATH env. variable)
 -m [store.nt] load the RDF model (.rdf, .nt, .mk supported)
-   (if file is type NTriple it will override STORAGE_PATH otherwise it used the template)
+   (if file is type NTriple it will override STORAGE_PATH otherwise it is used as the template)
 -a [config.py] run the application specified
 '''
 
@@ -833,14 +834,30 @@ if __name__ == '__main__':
         if sys.argv[i] == '-a':
             rootArgs += sys.argv[i:]
             break        
-        if sys.argv[i] in ['-d', '-r', '-x', '-s', '-h', '--help'] or (eatNext and sys.argv[i][0] != '-'):
-            eatNext = sys.argv[i] in ['-d', '-s']
+        if sys.argv[i] in ['-d', '-r', '-x', '-s', '-l', '-h', '--help'] or (eatNext and sys.argv[i][0] != '-'):
+            eatNext = sys.argv[i] in ['-d', '-s', '-l']
             mainArgs.append( sys.argv[i] )
         else:
             rootArgs.append( sys.argv[i] )
             
     root = Root(rootArgs)            
 
+    if '-l' in mainArgs:
+        try:
+            logConfig=mainArgs[mainArgs.index("-l")+1]
+            if logConfig[0] == '-':
+                raise ValueError
+        except (IndexError, ValueError):
+            logConfig = 'log.config'        
+        if sys.version_info < (2, 3):
+            import logging22.config as log_config
+        else:
+            import logging.config as log_config          
+        log_config.fileConfig(logConfig) #todo document loggers: rhizome, server, racoon, rdfdom
+    else: #set defaults        
+        logger.BASIC_FORMAT = "%(asctime)s %(levelname)s %(name)s:%(message)s" 
+        logger.basicConfig()
+        
     if '-h' in mainArgs or '--help' in mainArgs:
         print DEFAULT_cmd_usage,'[config specific options]'
         print cmd_usage

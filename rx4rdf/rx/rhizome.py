@@ -22,6 +22,8 @@ try:
     StringIO = cStringIO
 except ImportError:
     import StringIO
+from rx import logging #for python 2.2 compatibility
+log = logging.getLogger("rhizome")
 
 class DocumentMarkupMap(rhizml.LowerCaseMarkupMap):
     TT = 'code'
@@ -125,10 +127,10 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
                   wikiname = RDFDom.evalXPath(rdfDom, 'string(/*/wiki:name)', nsMap = self.server.nsMap)
                   assert wikiname
                   if self.server.evalXPath("/*[wiki:name='%s']"% wikiname):
-                      print 'warning: there is already an item named',wikiname, 'skipping import'
+                      log.warning('there is already an item named ' + wikiname +', skipping import')
                       return #hack for now skip if item already exists
                   else:                    
-                      print 'importing ', filename
+                      log.info('importing ' +filename)
                   moreTriples = StringIO.StringIO()                  
                   self.server.xupdateRDFDom(rdfDom,moreTriples, uri=xupdate,
                                     kw={ 'loc' : loc, 'name' : wikiname,
@@ -139,10 +141,10 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
                   #try to guess the wikiname
                   wikiname = filter(lambda c: c.isalnum() or c in '_-./', os.path.splitext(filename)[0])
                   if self.server.evalXPath("/*[wiki:name='%s']"% wikiname):
-                      print 'warning: there is already an item named', wikiname, 'skipping import'
+                      log.warning('there is already an item named ' + wikiname +', skipping import')
                       return #hack for now skip if item already exists
                   else:
-                      print 'importing ', filename
+                      log.info('importing ' +filename)
                   if not defaultFormat:
                       exts = { '.rz' : 'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml',
                       '.xsl' : 'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt',
@@ -223,7 +225,7 @@ Options:
                      #       (use invokeEx but move default mimetype handling out of handleRequest())
                      #       but adding an extension means fixing up links
                  except AttributeError:
-                     print 'warning: ', name, 'is dynamic, can not do static export'
+                     log.warning('%s is dynamic, can not do static export', name)
                      pass #note: only works with static site (ones with no arguments to pass
              else:                              #just run the revision action and the contentAction
                   content = self.server.doActions([self.getRevisionAction, self.getContentAction], kw.copy(), item)             
@@ -248,9 +250,9 @@ Options:
     def processPatch(self, contents, kw, result):
         #we assume result is a:ContentTransform/a:transformed-by/*, set context to the parent a:ContentTransform
         patchBaseResource =  self.server.evalXPath('../../a:pydiff-patch-base/*', node = result)
-        print 'r', result
-        print 'b', patchBaseResource
-        print 'c', contents
+        #print 'r', result
+        #print 'b', patchBaseResource
+        #print 'c', contents
         #print 'context: ', result
         #print 'pr', patchBaseResource
 
@@ -275,8 +277,7 @@ Options:
        xml = rhizml.rhizmlString2xml(contents)#parse the rxity to rx xml
        self.server.processRxML('<rx:rx>'+ xml+'</rx:rx>', resources)
       except:
-        import traceback
-        traceback.print_exc(None, sys.stderr)
+        log.exception("metadata save failed")
         raise
 
     def addItemTuple(self, name, **kw):

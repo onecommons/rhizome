@@ -1,13 +1,13 @@
                             README
 
                          RxRDF and Rhizome
-                         Version 0.1.2
-                         Oct. 20, 2003
+                         Version 0.1.3
+                         Oct. 30, 2003
  
   Introduction
   ------------
-  This the first public release of Rx4RDF and Rhizome.  It is alpha
-  quality: not many known bugs, but many missing features and not 
+  This is (nearly) the first public release of Rx4RDF and Rhizome.  It is 
+  alpha quality: not many known bugs, but many missing features and not 
   extensively tested. Please send feedback to rx4rdf-discuss@lists.sf.net
 
   What is it?
