@@ -41,11 +41,21 @@ transactionLog=/logs/auditTrail.nt
 #default is True
 SECURE_FILE_ACCESS = True
 
+#authorizePython is a dictionary indicating which code the Python content processor can execute.
+#As a config setting, it adds a level of authorization that only local administrator can set.
+#To disable this authorization check (allowing any Python code to be executed), set authorizePython = None
+#Otherwise, the dictionary contains items with a base64-encoded SHA1 digest of the Python code as the key
+#and a non-zero value. The digest can be calculated using the rx.utils.shaDigestString function
+#and is also reported in the NotAuthorized exception message raised by the Python content processor.
+#It is also the value of a:sha1-digest property set by Rhizome ("Edit Metadata" will display it).
+#default is {} (no Python code can be executed)
+authorizePython = { 'rosyIeJ7Kk+FZRkYPSjcteQi59w=' : 1}
+
 #disabledDefaultContentProcessors is a list of content processors to disable.
 #For security reasons, the python content processor is disabled by default.
 #To enable all content processors set this to an empty list.
-#default is ['http://rx4rdf.sf.net/ns/wiki#item-format-python']
-disabledDefaultContentProcessors = []
+#default is [] (all contentProcessors enabled)
+disabledDefaultContentProcessors = ['http://rx4rdf.sf.net/ns/wiki#item-format-python']
 
 #nsMap is dictionary of namespace prefixes that may appear in RxPath expressions
 #default is {} but Raccoon will always add 'rdf', 'rdfs', 'owl', 'bnode', 'wf' (for Raccoon XPath Extension functions),
