@@ -51,7 +51,7 @@ Raccoon is an application server that runs a given application and is always in 
 ^^<python scrips dir>/run-raccoon -x -a your-app-config.py  --app-specific-arg^^
  
 !!Running with Apache
-Although Raccoon comes with a built-in web server, it can be configured to run behind an Apache web server. There are several different ways to do this. The Raccoon HTTP server is derived from the CherryPy server and a how-to on running with Apache can be found on its website [here|http://www.cherrypy.org/static/html/howto/node3.html].
+Although Raccoon comes with a built-in web server, it can be configured to run behind an Apache web server. There are several different ways to do this. The Raccoon HTTP server is derived from the CherryPy server and a how-to on running with Apache can be found on its website [here|http://cp1.cherrypy.org/static/html/howto/node3.html].
 
 For example, this script kicks off Rhizome when being invoked from a Apache fastcgi script:
 p'''#!/bin/tcsh
@@ -64,7 +64,7 @@ There are two config files Raccoon depends on: the application config file and i
 
 The application config specified using '-a' command line argument. If that is missing, Raccoon tries to load a file called 'Raccoon-default-config.py' in the current directory.  For the application config file settings, see [RaccoonConfig] for complete documentation. The Rhizome config file found at ^^rhizome/rhizome-config.py^^ is also commented.
 
-The http server config specified using '-s' command line argument. If that is missing, Raccoon tries to load a file called 'server.cfg' in the current directory.  The Raccoon HTTP server is derived from the CherryPy server and documentation on its configuration settings can be found on its website [here|http://www.cherrypy.org/static/html/tut/node17.html#SECTION0017200000000000000000]. In addition, Raccoon adds a few settings, they are documented on the sample ^^server.cfg^^ found in the ^^rhizome^^ directory.
+The http server config specified using '-s' command line argument. If that is missing, Raccoon tries to load a file called 'server.cfg' in the current directory.  The Raccoon HTTP server is derived from the CherryPy server and documentation on its configuration settings can be found on its website [here|http://cp1.cherrypy.org/static/html/tut/node17.html#SECTION0017200000000000000000]. In addition, Raccoon adds a few settings, they are documented on the sample ^^server.cfg^^ found in the ^^rhizome^^ directory.
 
 The logging config file is specified using '-l' command line argument. If '-l' isn't followed by a file path, Raccoon tries to load a file called 'log.config' in the current directory.  Raccoon uses the standard log facilities available in Python 2.3 (and uses a back-ported version of the logging library when running on Python 2.2) and the config file format is documented in the Python 2.3 library documentation. The sample log.config file that ships with Raccoon lists the names of the available loggers.
 

@@ -153,10 +153,9 @@
            </xu:append>
        </xu:if>
     </xu:define-template>
-    
-    <xu:if test='wf:get-metadata("keywords")'>
-         <xu:remove select='$resource/wiki:about'/>
         
+    <xu:if test='wf:has-metadata("keywords")'>                
+         <xu:remove select='$resource/wiki:about'/>
          <xu:for-each select='wf:split(wf:get-metadata("keywords"))'>
            <xu:if test='string($current)'>
              <!-- in case the user used commas -->

@@ -69,9 +69,10 @@ contentHandlerQueries= [
 'f:if(self::text(), $STOP)', 
 #if the request has an action associated with it:
 #find the action that handles the most derived subtype of the resource
+#(or of the resource itself (esp. for the case where the context is a class resource))
 #here's simplifed version of the expression: /*[action-for-type = ($__context_subtypes[.= action-for-type])[1] ]
 '''/*[wiki:handles-action=$__authAction][wiki:action-for-type = 
-   (($__context/rdf:type/* | $__context/rdf:type/*//rdfs:subClassOf/*)
+   (($__context | $__context/rdf:type/* | ($__context | $__context/rdf:type/*)//rdfs:subClassOf/*)
     [.= /*[wiki:handles-action=$__authAction]/wiki:action-for-type])[1]]''',
 #get the action default handler (we don't yet support inferencing of rdfs:Resource as the base subtype, so we need this as a separate rule)
 "/*[wiki:handles-action=$__authAction][wiki:action-for-type='http://www.w3.org/2000/01/rdf-schema#Resource']", 
@@ -420,12 +421,12 @@ rhizome._addItemTuple('docbook2document.xsl', loc='path:docbook2document.xsl', f
 #+ rhizome._addItemTuple('todo2document.xsl', loc='path:todo2document.xsl', format='http://www.w3.org/1999/XSL/Transform', disposition='template', doctype='document', handlesDoctype='todo'),
   
 #sample pages
-templateList += [rhizome._addItemTuple('index',loc='path:index.zml', format='zml', 
+templateList += [rhizome._addItemTuple('index',loc='path:index.zml', format='zml', label=None, 
                 title="Home", disposition='entry', accessTokens=None, keywords=None),
-rhizome._addItemTuple('sidebar',loc='path:sidebar.zml', format='zml', accessTokens=None, keywords=None),
-rhizome._addItemTuple('ZMLSandbox', format='zml', label='None', disposition='entry', accessTokens=None, keywords=None,
+rhizome._addItemTuple('sidebar',loc='path:sidebar.zml', format='zml', label=None, accessTokens=None, keywords=None),
+rhizome._addItemTuple('ZMLSandbox', format='zml', label=None, disposition='entry', accessTokens=None, keywords=None,
 	contents="Feel free to [edit|?action=edit] this page to experiment with [ZML]..."),
-rhizome._addItemTuple('RxMLSandbox',loc='path:RxMLSandbox.xsl', format='rxslt', keywords=None,
+rhizome._addItemTuple('RxMLSandbox',loc='path:RxMLSandbox.xsl', format='rxslt', label=None, keywords=None,
                         disposition='entry', title="RxML Sandbox"),               	
 
 #help pages

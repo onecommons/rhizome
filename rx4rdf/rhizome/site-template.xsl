@@ -35,8 +35,8 @@
     <xsl:param name="_url" />		
     <xsl:param name="_path" />		 
     <xsl:param name="_base-url" />
-    <xsl:param name="_originalContext" />		    
-    <xsl:param name="_previousContext" />		        
+    <xsl:param name="_originalContext" /> <!-- this will be the initial revision resource -->
+    <xsl:param name="_previousContext" /> <!-- if multiple templates are chained this will be the previous template, not the initial revision resource -->
     <xsl:param name="session:login" />
     <xsl:param name="session:message" />
     <xsl:param name="response-header:content-type"/>    

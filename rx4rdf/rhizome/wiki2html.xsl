@@ -19,11 +19,10 @@ otherwise
     <a copy-attributes><img>text</a>
 -->
     <x:choose>
-    <x:when test='@undefined and not(wf:has-page(@href))'>
-        <x:apply-templates/>
+    <x:when test='@undefined and not(wf:has-page(@href))'>        
         <a>
         <x:copy-of select="@node()[.!='IgnorableMetadata']" />
-        ?</a>
+        <x:apply-templates/>?</a>
     </x:when>
     
     <x:otherwise>

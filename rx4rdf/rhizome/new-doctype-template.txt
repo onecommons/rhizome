@@ -15,7 +15,7 @@
  #This is set by assigning the wiki:handles-doctype property to
  #the stylesheet page, e.g.:
  #base:myDocType-stylesheet:
- #  wiki:handles-doctype base:myDocType
+ #  wiki:handles-doctype: base:myDocType
 
  #(you probably want to rename the resource id to something like base:myDocType)
  bnode:newDocType: 

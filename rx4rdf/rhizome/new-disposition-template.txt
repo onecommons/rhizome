@@ -15,7 +15,7 @@
  #this is set by assigning the wiki:handles-disposition property to
  #the template page, e.g.:
  #base:mydisposition-template:
- #  wiki:handles-disposition base:myDisposition
+ #  wiki:handles-disposition: base:myDisposition
  
  #(you probably want to rename the resource id to something like base:myDisposition)
  bnode:newItemDisposition: 

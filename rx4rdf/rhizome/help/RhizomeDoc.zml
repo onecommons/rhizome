@@ -101,17 +101,17 @@ This will launch Raccoon's built-in http server, which runs on port 8000 by defa
 That's it! You now have a new instance of Rhizome running. By default, the site will be stored in the current directory in file called "wikistore.nt" and content will be stored in a subdirectory called "content".  Most of the Rhizome's behavior is defined in its pages so you can start customizing your Rhizome instance by editing its pages and metadata from within Rhizome.
 
 !!Initial Configuration
-However, there are few additional things you might want to configure first if you're deploying a live website. First, you should create your own config file to separate your config settings from the stock Rhizome config settings.  For example, the Rx4RDF distribution contains a copy of the rx4rdf.sf.net website;  here's the first couple of lines of its config file (^^site-config.py^^):
+However, there are few additional things you might want to configure first if you're deploying a live website. First, you should create your own config file to separate your config settings from the stock Rhizome config settings.  The easiest way to do this is to copy the files in the ^^blank^^ directory to the directory where you want your site to live and then edit your copy of ^^blank-config.py^^. Look at the two most important settings in that file:
 
-p'''BASE_MODEL_URI='http://rx4rdf.sf.net/site/'
+p'''BASE_MODEL_URI='http://www.example.com/'
 __include__('../rhizome/rhizome-config.py')'''
 
-The first line sets the base URI that will be used for all RDF resources created. Note that this does not have to correspond to any resolvable URL.
+The first line sets the base URI that will be used for creating RDF resources. Note that this does not have to correspond to any resolvable URL.
 The second includes the Rhizome config file.
 
-Next, you probably want to set administrator password and the secure hash seed. Rhizome creates a default administrator super-user that has full access to the system, and its login name and password both default to 'admin'. To set your own password, in your config file set ^^ADMIN_PASSWORD^^ //before// including the Rhizome config. If you don't want to store the password in cleartext in your config file, you can set ^^ADMIN_PASSWORD_HASH^^ instead, which requires SHA1 digest of the concatenation of the password and the secure hash seed. In Python, you can calculate it like this: "import sha; sha.sha( 'yourpassword' + 'your secure hash seed').hexdigest()"
+Next, you probably want to set administrator password and the secure hash seed. Rhizome creates a default administrator super-user that has full access to the system, and its login name and password both default to 'admin'. To set your own password, in your config file set ^^ADMIN_PASSWORD^^ //before// including the Rhizome config. If you don't want to store the password in cleartext in your config file, you can set ^^ADMIN_PASSWORD_HASH^^ instead, which requires a SHA1 digest of the concatenation of the password and the secure hash seed. In Python, you can calculate it like this: "import sha; sha.sha( 'yourpassword' + 'your secure hash seed').hexdigest()"
 
-As illustrated above, the secure hash seed is used to generate a digest that be safely stored in a publically accessible mode. To set your own private seed, set the ^^SECURE_HASH_SEED^^ setting in your config file //before// including the Rhizome config. If you don't set your own private seed, or if it is compromised, it will be much easier to mount a dictionary attack on the password hashes. Note that if you change its value, all previously generated password hashes stored in your model will no longer work.
+As illustrated above, the secure hash seed is used to generate a digest that can be publically displayed. To set your own private seed, set the ^^SECURE_HASH_SEED^^ setting in your config file //before// including the Rhizome config. If you don't set your own private seed, or if it is compromised, it will be much easier to mount a dictionary attack on the password hashes. Note that if you change its value, all previously generated password hashes stored in your model will no longer work.
 
 !!Text Indexing 
 Rhizome has preliminary support for text indexing. If [Lupy|http://www.divmod.org/Home/Projects/Lupy] is installed Rhizome will index content when pages are saved (currently, only the contents and the title). On start-up, Rhizome checks if the directory specified by the ^^INDEX_DIR^^ config setting exists (the default is 'contentindex'); if it doesn't then all the pages will be indexed. Thus, to regenerate the index delete the directory and restart Rhizome.
@@ -189,7 +189,7 @@ The edit metadata page presents the content's resources as editable [RxML]. In a
 
 +wiki:handles-action=This property, along with ^^wiki:action-for-type^^, indicates that this resource should be used to handle the specified action.
 
-+wiki:action-for-type=Used along side ^^wiki:handles-action^^ to specify the types of resources this action handler should apply. Its value should be a resource type or ^^wiki:Any^^ (action handlers with the latter are lower priority than one that specifies a specific type).
++wiki:action-for-type=Used along side ^^wiki:handles-action^^ to specify the types of resources this action handler should apply. Its value should be a resource type or ^^rdfs:Resource^^ (action handlers with the latter have lower priority than ones that specify a specific type).
 
 __Creating and Editing Other Resources__
 
@@ -219,7 +219,7 @@ URLs are mapped to resources through a series of steps:
 1. See if the user is authorized to perform the action associated with this URL on the selected resource. If not, set the resource to ^^auth:Unauthorized^^.
 1. Look for a resource that can handle the action associated with this URL when applied to the selected resource.
 11. If the action is 'view' and resource is of type 'NamedContent', choose the same resource.
-11. Search for a resource with a ^^wiki:handles-action^^ property equal to the action and a ^^wiki:action-for-type^^ property equal to the type of the current resource or 'wiki:Any'.
+11. Search for a resource with a ^^wiki:handles-action^^ property equal to the action and a ^^wiki:action-for-type^^ property equal to the type of the current resource or 'rdfs:Resource'.
 11. Look for a resource that has a ^^wiki:name^^ property named 'default-resource-viewer'. The default view displays the resource as [RxML].
 1. At this point the current resource should alway be of type NamedContent. Now find a revision associated with that resource (through the ^^wiki:revisions^^ property) that contains the resource's content:
 11. If the URL had a revision parameter, choose the revision that matches that number

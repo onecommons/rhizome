@@ -1005,8 +1005,12 @@ else:
         (None, 'document'),
         (RXWIKI_XPATH_EXT_NS, 'openurl'),
         (RXWIKI_XPATH_EXT_NS, 'file-exists') ]])
-
-    def assignVars(self, kw, varlist, default):    
+            
+    def assignVars(self, kw, varlist, default):
+        '''
+        Helper function for assigning variables from the config file.
+        Also used by rhizome.py.
+        '''
         import copy 
         for name in varlist:
             try:
