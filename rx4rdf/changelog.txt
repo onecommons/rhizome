@@ -1,6 +1,43 @@
 Rx4RDF and Rhizome Changelog
 ============================
 
+Changes in Version 0.3.1 (Aug ??, 2004)
+---------------------------------------
+Major changes and bug fixes:
+* Raccoon: added content processing-level authorization
+* Raccoon: added content digest-based authorization 
+  (used by default by the Python content processor)
+* Raccoon: authorization hook for XPath extension functions
+* Rhizome: added RDF/XML output for search and metadata view, 
+* Rhizome: added RxML to RDF/XML page (RxMLSandbox)
+* RxPath:  use "bnode:" as bnode namespace URI
+* RxML:    added support for rx:a, use "bnode:"
+* Rhizome: added revision comments and origin hostname
+* Raccoon: added raccoon-format and raccoon-ignore XML processing instructions 
+* Rhizome: fix IE form bugs
+* Raccoon: added several new XPath extension functions 
+* Rhizome: summary search view
+* Raccoon: 'on-error' request-type 
+* Rhizome: added error handler pages (default and XSLT) 
+* Rhizome: added Keyword resource type
+* Rhizome: added simple UI for editing and browsing keyword metadata
+* Rhizome: added page for executing ad-hoc content (Sandbox)
+* Rhizome: various bug fixes for save-contents and renaming pages
+* Rhizome: change default PATH to prevent information leakage
+* Rhizome: added view-source action
+* ZML:     more user-friendly error reporting
+* Rhizome: added diff view for diffing revisions
+* Rhizome: new defaults and caching for significant performance improvements
+* ZML:     syntax change: # -> 1. and ; -> #
+* ZML:     allow ; to support multiple logical lines on one physical line
+* ZML:     allow {URIRef} to be used in place of QName (simplifies RxML)
+* Rhizome: use FOAF ontology for users
+* Rhizome: full-text indexing using Lupy (optional)
+* Rhizome: now, by default, only administrators can apply the "released" label
+* Rhizome: added XPath function to check if actions on resources are authorized
+* RxUpdate:added for-each element/instruction (use $current for current node)
+* All:     too many minor bug fixes and enhancements to list here
+ 
 Changes in Version 0.3 (May 12, 2004)
 ---------------------------------------
 Major changes and bug fixes:

@@ -4,12 +4,12 @@ import sys, glob, os, os.path, tempfile
 from distutils.core import setup
 #import py2exe
 
-version_string = "0.3.0"
+version_string = "0.3.1"
 
 PACKAGE_NAME = 'rx4rdf'
 
 if sys.version_info[:2] < (2,2):
-	print "Sorry, %s requires version 2.2 or later of python" % PACKAGE_NAME
+	print "Sorry, %s requires version 2.2 or later of Python" % PACKAGE_NAME
 	sys.exit(1)
 
 classifiers = """\

@@ -1,0 +1,554 @@
+<html><head>
+<title>XML:DB Initiative: XUpdate - XML Update Language</title>
+<!-- http://web.archive.org/web/20030621150405/http://www.xmldb.org/xupdate/xupdate-wd.html -->
+</head>
+<body>
+<table><tbody><tr>
+<td align="left" valign="top" width="100%"><table border="0" cellpadding="5" cellspacing="0" width="100%"><tbody><tr><td></td></tr><tr><td></td></tr><tr><td></td></tr><tr><td><div align="center"><table align="center" border="0" cellpadding="0" cellspacing="0" width="60%"><tbody><tr><td bgcolor="#64697c"><table border="0" cellpadding="1" cellspacing="1" width="100%"><tbody><tr><td align="center" bgcolor="#a8add5" valign="center"><font color="#000000" face="arial,helvetica,sanserif" size="-1"><b>Authors</b></font></td></tr><tr><td align="left" bgcolor="#c5cadd" valign="center"><font color="#000000" face="arial,helvetica,sanserif" size="-1"><b>Andreas Laux</b> - andreas@smb-tec.com</font></td></tr><tr><td align="left" bgcolor="#c5cadd" valign="center"><font color="#000000" face="arial,helvetica,sanserif" size="-1"><b>Lars Martin</b> - lars@smb-tec.com</font></td></tr><tr><td align="center" bgcolor="#a8add5" valign="center"><font color="#000000" face="arial,helvetica,sanserif" size="-1"><b>Status</b></font></td></tr><tr><td align="left" bgcolor="#c5cadd" valign="center"><font color="#000000" face="arial,helvetica,sanserif" size="-1"><b>Working Draft - 2000-09-14</b></font></td></tr><tr><td align="center" bgcolor="#a8add5" valign="center"><font color="#000000" face="arial,helvetica,sanserif" size="-1"><b>Notice</b></font></td></tr><tr><td align="left" bgcolor="#c5cadd" valign="center"><font color="#000000" face="arial,helvetica,sanserif" size="-1">
+      <b>[xml-db.org has disappeared. This copy of this working draft was retrieved from <a href='http://web.archive.org/web/20030621150405/http://www.xmldb.org/xupdate/xupdate-wd.html'>http://web.archive.org/web/20030621150405/http://www.xmldb.org/xupdate/xupdate-wd.html</a> on July 7, 2004.]</b>
+      <br/>
+      This is an XML:DB Working Draft for review by all interested parties.
+      It is a draft document and may be updated, replaced, or obsoleted by other
+      documents at any time. It is inappropriate to use Working Drafts as reference 
+      material or to cite them as other than "work in progress". This work
+      is part of the XML:DB Project.
+      </font></td></tr><tr><td align="center" bgcolor="#a8add5" valign="center"><font color="#000000" face="arial,helvetica,sanserif" size="-1"><b>Abstract</b></font></td></tr><tr><td align="left" bgcolor="#c5cadd" valign="center"><font color="#000000" face="arial,helvetica,sanserif" size="-1">
+      This specification defines the syntax and semantics of XUpdate, which is a language for
+      updating XML documents.
+      XUpdate is designed to be used independently of any kinf of implementation.
+      </font></td></tr></tbody></table></td></tr></tbody></table></div><br><div align="right"><table border="0" cellpadding="1" cellspacing="0" width="98%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif" size="+1"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b>Table of Contents</b></i></font></td></tr></tbody></table><br><br><TABLE border="0" cellpadding="0" cellspacing="0" width="98%"><TR><TD><FONT color="#000000" face="arial,helvetica,sanserif">1 <A href="#N53fb57">Introduction</A><BR>2 <A href="#N1a32e0">XUpdate Syntax and Document Type Definition</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;2.1 <A href="#N326484">Namespace</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;2.2 <A href="#N6546ef">Selections</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;2.3 <A href="#N1428ea">Modifications</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;2.4 <A href="#Na49e0">Inserts</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.4.1 <A href="#N110c31">Creating Elements</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.4.2 <A href="#N3785d3">Creating Attributes</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.4.3 <A href="#N32efa7">Creating Text</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.4.4 <A href="#N13f991">Creating Processing Instructions</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.4.5 <A href="#N65a3c2">Creating Comments</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;2.5 <A href="#N782982">Append</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;2.6 <A href="#N6d2633">Update</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;2.7 <A href="#N670e30">Remove</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;2.8 <A href="#N54864a">Rename</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;2.9 <A href="#N3c9217">Variables and Values of Variables</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;2.10 <A href="#N1b42e6">Conditional Processing</A><BR>&nbsp;&nbsp;&nbsp;&nbsp;2.11 <A href="#N4520eb">Document Type Definition for XUpdate</A><BR>3 <A href="#N238f4">Example of Usage</A><BR></FONT><P></P><FONT face="arial,helvetica,sanserif"><B>Appendices</B></FONT><P></P><FONT color="#000000" face="arial,helvetica,sanserif">A <A href="#N22ab57">Open Issues</A><BR>B <A href="#N1eec35">Normative References</A><BR>C <A href="#N25c828">Other References</A><BR></FONT></TD></TR></TABLE><br><br></div>
+      <div align="right"><table border="0" cellpadding="1" cellspacing="0" width="98%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif" size="+1"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N53fb57">Introduction</a></b></i></font></td></tr></tbody></table><br><table border="0" cellpadding="0" cellspacing="0" width="98%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+         <p align="justify">This specification defines the syntax and semantics of the XUpdate update language.
+         An update in the XUpdate language is expressed as a well-formed [<a href="#XML">XML</a>]
+         document.</p>
+         
+         <p align="justify">XUpdate makes extensive use of the expression language defined by [<a href="#XPath">XPath</a>]
+         for selecting elements for updating and for conditional processing.</p>
+
+         <p align="justify">XUpdate is a pure descriptive language which is designed with references to the
+         definition of XSL Transformations [<a href="#XSLT">XSLT</a>].</p>
+
+      </font></td></tr></tbody></table></div><br><!--end s1-->
+
+      <div align="right"><table border="0" cellpadding="1" cellspacing="0" width="98%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif" size="+1"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N1a32e0">XUpdate Syntax and Document Type Definition</a></b></i></font></td></tr></tbody></table><br><table border="0" cellpadding="0" cellspacing="0" width="98%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+      
+         </font><div align="right"><table border="0" cellpadding="1" cellspacing="0" width="95%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N326484">Namespace</a></b></i></font></td></tr></tbody></table><font color="#000000" face="Arial, Helvetica, sans-serif"><br><table border="0" cellpadding="0" cellspacing="0" width="95%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+         
+         <p align="justify">The XUpdate namespace has the URI <code><font face="courier, monospaced">http://www.xmldb.org/xupdate</font></code>.</p>
+
+         </font></td></tr></tbody></table></font></div><font color="#000000" face="Arial, Helvetica, sans-serif"><br><!--end s2-->
+
+         </font><div align="right"><table border="0" cellpadding="1" cellspacing="0" width="95%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N6546ef">Selections</a></b></i></font></td></tr></tbody></table><font color="#000000" face="Arial, Helvetica, sans-serif"><br><table border="0" cellpadding="0" cellspacing="0" width="95%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+            <p align="justify">XUpdate uses the expression language defined by [<a href="#XPath">XPath</a>].
+            Those XPath Expressions are used in XUpdate for selecting nodes for processing
+            afterwards.</p>
+
+         </font></td></tr></tbody></table></font></div><font color="#000000" face="Arial, Helvetica, sans-serif"><br><!--end s2-->
+
+         </font><div align="right"><table border="0" cellpadding="1" cellspacing="0" width="95%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N1428ea">Modifications</a></b></i></font></td></tr></tbody></table><font color="#000000" face="Arial, Helvetica, sans-serif"><br><table border="0" cellpadding="0" cellspacing="0" width="95%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+            <p align="justify">An update is represented by an <code><font face="courier, monospaced">xupdate:modifications</font></code> element in an XML
+            document. An <code><font face="courier, monospaced">xupdate:modifications</font></code> element must have a <code><font face="courier, monospaced">version</font></code>
+            attribute, indicating the version of XUpdate that the update requires. For this
+            version of XUpdate, the value should be <code><font face="courier, monospaced">1.0</font></code>.</p>
+
+            <p align="justify">The <code><font face="courier, monospaced">xupdate:modifications</font></code> element may contain the following types of
+            elements:</p>
+            
+            <blockquote><ul><li><code><font face="courier, monospaced">xupdate:insert-before</font></code></li><li><code><font face="courier, monospaced">xupdate:insert-after</font></code></li><li><code><font face="courier, monospaced">xupdate:append</font></code></li><li><code><font face="courier, monospaced">xupdate:update</font></code></li><li><code><font face="courier, monospaced">xupdate:remove</font></code></li><li><code><font face="courier, monospaced">xupdate:rename</font></code></li><li><code><font face="courier, monospaced">xupdate:variable</font></code></li><li><code><font face="courier, monospaced">xupdate:value-of</font></code></li><li><code><font face="courier, monospaced">xupdate:if</font></code></li></ul></blockquote>
+
+         </font></td></tr></tbody></table></font></div><font color="#000000" face="Arial, Helvetica, sans-serif"><br><!--end s2-->
+
+         </font><div align="right"><table border="0" cellpadding="1" cellspacing="0" width="95%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="Na49e0">Inserts</a></b></i></font></td></tr></tbody></table><font color="#000000" face="Arial, Helvetica, sans-serif"><br><table border="0" cellpadding="0" cellspacing="0" width="95%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+            <p align="justify">This section describes XUpdate instructions that directly inserts nodes in the XML
+            result tree. There are two instructions in XUpdate that support insertion of nodes:
+            <code><font face="courier, monospaced">xupdate:insert-before</font></code> and <code><font face="courier, monospaced">xupdate:insert-after</font></code>. Both elements
+            have a required <code><font face="courier, monospaced">select</font></code> attribute, which specifies the node selected by an
+            XPath expression. This <code><font face="courier, monospaced">select</font></code> expression must evaluate to a node-set.
+            The appendix of <code><font face="courier, monospaced">before</font></code> and <code><font face="courier, monospaced">after</font></code> to the definition of
+            <code><font face="courier, monospaced">insert</font></code> is meant to specify the direction where - in relation to the
+            selected context node - the new node will be inserted.
+            </p>
+            
+            <p align="justify"><code><font face="courier, monospaced">xupdate:insert-before</font></code> inserts the given node as the preceding sibling
+            of the selected context node, where <code><font face="courier, monospaced">xupdate:insert-after</font></code> inserts the given
+            node as the following sibling of the selected context node.</p>
+
+            <p align="justify">The <code><font face="courier, monospaced">xupdate:insert-before</font></code> and <code><font face="courier, monospaced">xupdate:insert-after</font></code> element
+            may contain the following types of elements:</p>
+            
+            <blockquote><ul><li><code><font face="courier, monospaced">xupdate:element</font></code></li><li><code><font face="courier, monospaced">xupdate:attribute</font></code></li><li><code><font face="courier, monospaced">xupdate:text</font></code></li><li><code><font face="courier, monospaced">xupdate:processing-instruction</font></code></li><li><code><font face="courier, monospaced">xupdate:comment</font></code></li></ul></blockquote>
+
+            <p align="justify">These elements are described below.</p>
+
+            <div align="right"><table border="0" cellpadding="1" cellspacing="0" width="90%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif" size="-1"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N110c31">Creating Elements</a></b></i></font></td></tr></tbody></table><br><table border="0" cellpadding="0" cellspacing="0" width="90%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+            
+               <p align="justify">The <code><font face="courier, monospaced">xupdate:element</font></code> element allows an element to be created with a
+               computed name.</p>
+
+               <p align="justify">For example, this</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;xupdate:element name="address"&gt; 
+   &lt;town&gt;San Francisco&lt;/town&gt; 
+ &lt;/xupdate:element&gt;
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+               <p align="justify">would create the element</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;address&gt; 
+   &lt;town&gt;San Francisco&lt;/town&gt; 
+ &lt;/address&gt;
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+            </font></td></tr></tbody></table></div><br><!--end s3-->
+
+            <div align="right"><table border="0" cellpadding="1" cellspacing="0" width="90%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif" size="-1"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N3785d3">Creating Attributes</a></b></i></font></td></tr></tbody></table><br><table border="0" cellpadding="0" cellspacing="0" width="90%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+               <p align="justify">The <code><font face="courier, monospaced">xupdate:attribute</font></code> element can be used to add attributes to result
+               elements.</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;xupdate:element name="address"&gt; 
+   &lt;xupdate:attribute name="id"&gt;2&lt;/xupdate:attribute&gt; 
+ &lt;/xupdate:element&gt;
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+               <p align="justify">would create the element with an attribute</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;address id="2"/&gt; 
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+            </font></td></tr></tbody></table></div><br><!--end s3-->
+            <div align="right"><table border="0" cellpadding="1" cellspacing="0" width="90%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif" size="-1"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N32efa7">Creating Text</a></b></i></font></td></tr></tbody></table><br><table border="0" cellpadding="0" cellspacing="0" width="90%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+               <p align="justify">The <code><font face="courier, monospaced">xupdate:text</font></code> element can be used to create text nodes in the
+               result tree.
+               </p>
+
+            </font></td></tr></tbody></table></div><br><!--end s3-->
+            <div align="right"><table border="0" cellpadding="1" cellspacing="0" width="90%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif" size="-1"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N13f991">Creating Processing Instructions</a></b></i></font></td></tr></tbody></table><br><table border="0" cellpadding="0" cellspacing="0" width="90%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+               <p align="justify">The <code><font face="courier, monospaced">xupdate:processing-instruction</font></code> element is instantiated to create
+               a processing instruction node. The content of the <code><font face="courier, monospaced">xupdate:processing-instruction</font></code>
+               element is a template for the string-value of the processing instruction node. The
+               <code><font face="courier, monospaced">xupdate:processing-instruction</font></code> element has a required <code><font face="courier, monospaced">name</font></code>
+               attribute that specifies the name of the processing instruction node. The value of
+               the name attribute is interpreted as an attribute value template.</p>
+
+               <p align="justify">For example, this</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;xupdate:processing-instruction name="cocoon-process"&gt; 
+   type="xsp" 
+ &lt;/xupdate:processing-instruction&gt;  
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+               <p align="justify">would create the processing instruction</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;?cocoon-process type="xsp"?&gt;  
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+            </font></td></tr></tbody></table></div><br><!--end s3-->
+
+            <div align="right"><table border="0" cellpadding="1" cellspacing="0" width="90%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif" size="-1"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N65a3c2">Creating Comments</a></b></i></font></td></tr></tbody></table><br><table border="0" cellpadding="0" cellspacing="0" width="90%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+               <p align="justify">The <code><font face="courier, monospaced">xupdate:comment</font></code> element is instantiated to create a comment node
+               in the result tree. The content of the <code><font face="courier, monospaced">xupdate:comment</font></code> element is a
+               template for the string-value of the comment node.</p>
+               
+               <p align="justify">For example, this</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;xupdate:comment&gt;
+   This element is automatically generated. Do not edit!
+ &lt;/xupdate:comment&gt;  
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+               <p align="justify">would create the comment</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;!--This element is automatically generated. Do not edit!--&gt; 
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+            </font></td></tr></tbody></table></div><br><!--end s3-->
+
+         </font></td></tr></tbody></table></font></div><font color="#000000" face="Arial, Helvetica, sans-serif"><br><!--end s2-->
+
+         </font><div align="right"><table border="0" cellpadding="1" cellspacing="0" width="95%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N782982">Append</a></b></i></font></td></tr></tbody></table><font color="#000000" face="Arial, Helvetica, sans-serif"><br><table border="0" cellpadding="0" cellspacing="0" width="95%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+            <p align="justify">The <code><font face="courier, monospaced">xupdate:append</font></code> element allows a node to be created and appended as a
+            child of the context node. An <code><font face="courier, monospaced">xupdate:append</font></code> element must have a
+            <code><font face="courier, monospaced">select</font></code> attribute which selects the context node as the parent of the new
+            child node. The <code><font face="courier, monospaced">select</font></code> expression must evaluate to a node-set of element
+            nodes. The optional <code><font face="courier, monospaced">child</font></code> attribute specifies the position of the newly
+            appended child node. The <code><font face="courier, monospaced">child</font></code> expression must evaluate to an Integer
+            value. If this attribute is ommited, the new child is appended as the <i>last</i>
+            child of the selected context node.</p>
+
+            <p align="justify">The <code><font face="courier, monospaced">xupdate:append</font></code> element may contain the following types of
+            elements:</p>
+            
+            <blockquote><ul><li><code><font face="courier, monospaced">xupdate:element</font></code></li><li><code><font face="courier, monospaced">xupdate:attribute</font></code></li><li><code><font face="courier, monospaced">xupdate:text</font></code></li><li><code><font face="courier, monospaced">xupdate:processing-instruction</font></code></li><li><code><font face="courier, monospaced">xupdate:comment</font></code></li></ul></blockquote>
+
+            <p align="justify">The meaning of these elements is described above.</p>
+
+            <p align="justify">For example, this</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;xupdate:append select="/addresses" child="last()"&gt; 
+   &lt;xupdate:element name="address"&gt; 
+     &lt;town&gt;San Francisco&lt;/town&gt; 
+   &lt;/xupdate:element&gt; 
+ &lt;/xupdate:append&gt;  
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+               <p align="justify">would append the new <code><font face="courier, monospaced">address</font></code> element as the last child of
+               <code><font face="courier, monospaced">addresses</font></code></p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;addresses&gt; 
+   &lt;address&gt;
+     &lt;town&gt;Los Angeles&lt;/town&gt; 
+   &lt;/address&gt;
+   &lt;address&gt; 
+     &lt;town&gt;San Francisco&lt;/town&gt; 
+   &lt;/address&gt;
+ &lt;/addresses&gt;
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+         </font></td></tr></tbody></table></font></div><font color="#000000" face="Arial, Helvetica, sans-serif"><br><!--end s2-->
+
+         </font><div align="right"><table border="0" cellpadding="1" cellspacing="0" width="95%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N6d2633">Update</a></b></i></font></td></tr></tbody></table><font color="#000000" face="Arial, Helvetica, sans-serif"><br><table border="0" cellpadding="0" cellspacing="0" width="95%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+            <p align="justify">The <code><font face="courier, monospaced">xupdate:update</font></code> element can be used to update the content of existing
+            nodes. An <code><font face="courier, monospaced">xupdate:update</font></code> element must have a <code><font face="courier, monospaced">select</font></code> attribute,
+            which selects the context node for update. This <code><font face="courier, monospaced">select</font></code> expression must
+            evaluate to a node-set.</p>
+
+            <p align="justify">For example, this</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;xupdate:update select="/addresses/address[2]/town"&gt; 
+   New York 
+ &lt;/xupdate:update&gt; 
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+               <p align="justify">would change the content of the context node to</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;addresses&gt; 
+   &lt;address&gt;
+     &lt;town&gt;Los Angeles&lt;/town&gt; 
+   &lt;/address&gt;
+   &lt;address&gt; 
+     &lt;town&gt;New York&lt;/town&gt; 
+   &lt;/address&gt;
+ &lt;/addresses&gt;
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+         </font></td></tr></tbody></table></font></div><font color="#000000" face="Arial, Helvetica, sans-serif"><br><!--end s2-->
+
+         </font><div align="right"><table border="0" cellpadding="1" cellspacing="0" width="95%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N670e30">Remove</a></b></i></font></td></tr></tbody></table><font color="#000000" face="Arial, Helvetica, sans-serif"><br><table border="0" cellpadding="0" cellspacing="0" width="95%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+           <p align="justify">The <code><font face="courier, monospaced">xupdate:remove</font></code> element allows a node to be removed from the result
+           tree. The <code><font face="courier, monospaced">xupdate:remove</font></code> element has a required <code><font face="courier, monospaced">select</font></code> attribute,
+           which specifies the node selected by an XPath expression. The <code><font face="courier, monospaced">select</font></code>
+           expression must evaluate to a node-set.</p>
+
+           <p align="justify">For example, this</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;xupdate:remove select="/addresses/address[1]"/&gt; 
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+               <p align="justify">would remove the first occurence of <code><font face="courier, monospaced">address</font></code> to</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;addresses&gt;
+   &lt;address&gt; 
+     &lt;town&gt;New York&lt;/town&gt; 
+   &lt;/address&gt;
+ &lt;/addresses&gt;
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+         </font></td></tr></tbody></table></font></div><font color="#000000" face="Arial, Helvetica, sans-serif"><br><!--end s2-->
+
+         </font><div align="right"><table border="0" cellpadding="1" cellspacing="0" width="95%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N54864a">Rename</a></b></i></font></td></tr></tbody></table><font color="#000000" face="Arial, Helvetica, sans-serif"><br><table border="0" cellpadding="0" cellspacing="0" width="95%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+            <p align="justify">The <code><font face="courier, monospaced">xupdate:rename</font></code> element allows an attribute or element node to be
+            renamed after its creation. The <code><font face="courier, monospaced">xupdate:rename</font></code> element has a required
+            <code><font face="courier, monospaced">select</font></code> attribute, which specifies the node selected by an XPath
+            expression. The <code><font face="courier, monospaced">select</font></code> expression must evaluate to a node-set of element
+            or attribute nodes. It is an error if any other node type should be renamed.</p>
+
+            <p align="justify">For example, this</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;xupdate:rename select="/addresses/address/town"&gt; 
+   city 
+ &lt;/xupdate:rename&gt;
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+               <p align="justify">would rename the <code><font face="courier, monospaced">town</font></code> child node of <code><font face="courier, monospaced">address</font></code> to</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;addresses&gt; 
+   &lt;address&gt; 
+     &lt;city&gt;New York&lt;/city&gt; 
+   &lt;/address&gt;
+ &lt;/addresses&gt;
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+         </font></td></tr></tbody></table></font></div><font color="#000000" face="Arial, Helvetica, sans-serif"><br><!--end s2-->
+
+         </font><div align="right"><table border="0" cellpadding="1" cellspacing="0" width="95%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N3c9217">Variables and Values of Variables</a></b></i></font></td></tr></tbody></table><font color="#000000" face="Arial, Helvetica, sans-serif"><br><table border="0" cellpadding="0" cellspacing="0" width="95%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+           <p align="justify">A variable is a name that may be bound to a value. The value to which a variable is
+           bound (the value of the variable) can be an object of any of the types that can be
+           returned by expressions.</p>
+           <p align="justify">The <code><font face="courier, monospaced">xupdate:variable</font></code> element has a required <code><font face="courier, monospaced">name</font></code> attribute,
+           which specifies the name of the variable.</p>
+
+            <p align="justify">For example, this</p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;xupdate:variable name="town" select="/addresses/address[0]/town"/&gt; 
+
+ &lt;xupdate:append select="/addresses"&gt; 
+   &lt;xupdate:element name="address"&gt; 
+     &lt;xupdate:value-of select="$town"/&gt; 
+   &lt;/xupdate:element&gt; 
+ &lt;/xupdate:append&gt;
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+            <p align="justify">binds the selected object to the variable named <code><font face="courier, monospaced">town</font></code> and uses the value
+            of this variable to append a new <code><font face="courier, monospaced">address</font></code> record.</p>
+            
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;xupdate:append select="/addresses"&gt; 
+   &lt;xupdate:element name="address"&gt; 
+     &lt;xupdate:value-of select="/addresses/address[0]/town"/&gt; 
+   &lt;/xupdate:element&gt; 
+ &lt;/xupdate:append&gt;
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+         </font></td></tr></tbody></table></font></div><font color="#000000" face="Arial, Helvetica, sans-serif"><br><!--end s2-->
+
+         </font><div align="right"><table border="0" cellpadding="1" cellspacing="0" width="95%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N1b42e6">Conditional Processing</a></b></i></font></td></tr></tbody></table><font color="#000000" face="Arial, Helvetica, sans-serif"><br><table border="0" cellpadding="0" cellspacing="0" width="95%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+            <p align="justify"></p>
+
+         </font></td></tr></tbody></table></font></div><font color="#000000" face="Arial, Helvetica, sans-serif"><br><!--end s2-->
+
+         </font><div align="right"><table border="0" cellpadding="1" cellspacing="0" width="95%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N4520eb">Document Type Definition for XUpdate</a></b></i></font></td></tr></tbody></table><font color="#000000" face="Arial, Helvetica, sans-serif"><br><table border="0" cellpadding="0" cellspacing="0" width="95%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+            </font><p align="justify"><font color="#000000" face="Arial, Helvetica, sans-serif">The DTD for XUpdate is given below.</font></p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;!ENTITY % commands "
+     xupdate:variable
+   | xupdate:insert-before
+   | xupdate:insert-after
+   | xupdate:append
+   | xupdate:update
+   | xupdate:remove
+   | xupdate:rename
+ "&gt;
+
+ &lt;!ENTITY % instructions "
+     xupdate:element
+   | xupdate:attribute
+   | xupdate:text
+   | xupdate:processing-instruction
+   | xupdate:comment
+ "&gt;
+
+ &lt;!ENTITY % qname "NMTOKEN"&gt; 
+ 
+ &lt;!ENTITY % template " 
+  (#PCDATA 
+   | %instructions;)* 
+ "&gt; 
+
+ &lt;!ELEMENT xupdate:modifications (%commands;)*&gt;
+ &lt;!ATTLIST xupdate:modifications 
+    id          ID      #IMPLIED 
+    version     NMTOKEN #REQUIRED
+    xmlns:xupdate CDATA   #FIXED "http://www.xmldb.org/xupdate" 
+ &gt; 
+
+ &lt;!ELEMENT xupdate:insert-before (%instructions;)*&gt;
+ &lt;!ATTLIST xupdate:insert
+    select      CDATA   #REQUIRED
+ &gt;
+
+ &lt;!ELEMENT xupdate:insert-after (%instructions;)*&gt;
+ &lt;!ATTLIST xupdate:insert
+    select      CDATA   #REQUIRED
+ &gt;
+
+ &lt;!ELEMENT xupdate:append (%instructions;)*&gt;
+ &lt;!ATTLIST xupdate:insert
+    select      CDATA   #REQUIRED
+    child       CDATA   #IMPLIED
+ &gt;
+
+ &lt;!ELEMENT xupdate:element %template;&gt;
+ &lt;!ATTLIST xupdate:element
+    name        %qname; #REQUIRED
+    namespace   CDATA   #IMPLIED
+ &gt;
+
+ &lt;!ELEMENT xupdate:attribute (#PCDATA)&gt;
+ &lt;!ATTLIST xupdate:attribute
+    name        %qname; #REQUIRED
+    namespace   CDATA   #IMPLIED
+ &gt;
+
+ &lt;!ELEMENT xupdate:text (#PCDATA)&gt;
+
+ &lt;!ELEMENT xupdate:processing-instruction (#PCDATA)&gt;
+ &lt;!ATTLIST xupdate:processing-instruction
+    name        NMTOKEN #REQUIRED
+ &gt;
+ 
+ &lt;!ELEMENT xupdate:update (#PCDATA)&gt;
+ &lt;!ATTLIST xupdate:update
+    select      CDATA   #REQUIRED 
+ &gt;
+
+ &lt;!ELEMENT xupdate:remove EMPTY&gt; 
+ &lt;!ATTLIST xupdate:remove 
+    select      CDATA   #REQUIRED 
+ &gt; 
+
+ &lt;!ELEMENT xupdate:rename (#PCDATA)&gt;
+ &lt;!ATTLIST xupdate:rename
+    select      CDATA   #REQUIRED
+ &gt; 
+
+ &lt;!ELEMENT xupdate:variable (#PCDATA)*&gt; 
+ &lt;!ATTLIST xupdate:variable 
+    name        NMTOKEN #REQUIRED 
+    select      CDATA   #IMPLIED 
+ &gt;
+
+ &lt;!ELEMENT xupdate:value-of EMPTY&gt; 
+ &lt;!ATTLIST xupdate:value-of 
+    select      CDATA   #REQUIRED 
+ &gt;
+
+ &lt;!ELEMENT xupdate:if %template;&gt; 
+ &lt;!ATTLIST xupdate:if 
+    test        CDATA   #REQUIRED 
+ &gt;
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+<font color="#000000" face="Arial, Helvetica, sans-serif">         </font></td></tr></tbody></table></font></div><font color="#000000" face="Arial, Helvetica, sans-serif"><br><!--end s2-->
+
+      </font></td></tr></tbody></table></div><br><!--end s1-->
+
+      <div align="right"><table border="0" cellpadding="1" cellspacing="0" width="98%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif" size="+1"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N238f4">Example of Usage</a></b></i></font></td></tr></tbody></table><br><table border="0" cellpadding="0" cellspacing="0" width="98%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+        </font><p align="justify"><font color="#000000" face="Arial, Helvetica, sans-serif">This is an example of updating some data represented in XML using different XUpdate
+        modifications to produce different results of the input data.</font></p>
+
+<font color="#000000" face="Arial, Helvetica, sans-serif">        </font><p align="justify"><font color="#000000" face="Arial, Helvetica, sans-serif">The input data is:</font></p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;?xml version="1.0"?&gt; 
+ &lt;addresses version="1.0"&gt; 
+
+   &lt;address id="1"&gt; 
+     &lt;fullname&gt;Andreas Laux&lt;/fullname&gt; 
+     &lt;born day='1' month='12' year='1978'/&gt; 
+     &lt;town&gt;Leipzig&lt;/town&gt; 
+     &lt;country&gt;Germany&lt;/country&gt; 
+   &lt;/address&gt; 
+
+ &lt;/addresses&gt;
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+<font color="#000000" face="Arial, Helvetica, sans-serif">        </font><p align="justify"><font color="#000000" face="Arial, Helvetica, sans-serif">The following XUpdate update inserts a new address element after the first address.</font></p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;?xml version="1.0"?&gt; 
+ &lt;xupdate:modifications version="1.0"
+                xmlns:xupdate="http://www.xmldb.org/xupdate"&gt; 
+
+   &lt;xupdate:insert-after select="/addresses/address[1]" &gt; 
+
+     &lt;xupdate:element name="address"&gt;
+       &lt;xupdate:attribute name="id"&gt;2&lt;/xupdate:attribute&gt;
+       &lt;fullname&gt;Lars Martin&lt;/fullname&gt; 
+       &lt;born day='2' month='12' year='1974'/&gt; 
+       &lt;town&gt;Leizig&lt;/town&gt; 
+       &lt;country&gt;Germany&lt;/country&gt; 
+     &lt;/xupdate:element&gt; 
+
+   &lt;/xupdate:insert-after&gt; 
+ &lt;/xupdate:modifications&gt; 
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+<font color="#000000" face="Arial, Helvetica, sans-serif">        </font><p align="justify"><font color="#000000" face="Arial, Helvetica, sans-serif">The XML result is</font></p>
+
+<div align="center"><table border="0" cellpadding="0" cellspacing="4"><tbody><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#ffffff"><pre>
+ &lt;?xml version="1.0"?&gt; 
+ &lt;addresses version="1.0"&gt; 
+
+     &lt;address id="1"&gt; 
+       &lt;fullname&gt;Andreas Laux&lt;/fullname&gt; 
+       &lt;born day='1' month='12' year='1978'/&gt; 
+       &lt;town&gt;Leipzig&lt;/town&gt; 
+       &lt;country&gt;Germany&lt;/country&gt; 
+     &lt;/address&gt; 
+
+     &lt;address id="2"&gt; 
+       &lt;fullname&gt;Lars Martin&lt;/fullname&gt; 
+       &lt;born day='2' month='12' year='1974'/&gt; 
+       &lt;town&gt;Leizig&lt;/town&gt; 
+       &lt;country&gt;Germany&lt;/country&gt; 
+     &lt;/address&gt; 
+
+ &lt;/addresses&gt;
+</pre></td><td bgcolor="#aaaaaa" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr><tr><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td><td bgcolor="#aaaaaa" height="1" width="1"><img src="void.gif" border="0" height="1" hspace="0" vspace="0" width="1"></td></tr></tbody></table></div>
+
+
+<font color="#000000" face="Arial, Helvetica, sans-serif">      </font></td></tr></tbody></table></div><br><!--end s1-->
+
+   
+
+      <div align="right"><table border="0" cellpadding="1" cellspacing="0" width="98%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif" size="+1"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N22ab57">Open Issues</a></b></i></font></td></tr></tbody></table><br><table border="0" cellpadding="0" cellspacing="0" width="98%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+           <blockquote><ul><li>conditional processing of update commands</li></ul></blockquote>
+
+      </font></td></tr></tbody></table></div><br><!--end s1-->
+
+      <div align="right"><table border="0" cellpadding="1" cellspacing="0" width="98%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif" size="+1"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N1eec35">Normative References</a></b></i></font></td></tr></tbody></table><br><table border="0" cellpadding="0" cellspacing="0" width="98%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+         <ul>
+            <li><b><a name="XML"></a>[<a href="http://www.w3.org/TR/REC-xml">XML</a>]</b> "Extensible Markup Language (XML) 1.0", Tim Bray, Jean Paoli, C. M. Sperberg-McQueen, 10 February 1998</li>
+            <li><b><a name="XPath"></a>[<a href="http://www.w3.org/TR/xpath">XPath</a>]</b> "XML Path Language (XPath) Version 1.0", James Clark, Steve DeRose, 16 November 1999</li>
+            <li><b><a name="XSLT"></a>[<a href="http://www.w3.org/TR/xslt">XSLT</a>]</b> "XSL Transformations (XSLT) Version 1.0", James Clark, 16 November 1999</li>
+         </ul>
+
+      </font></td></tr></tbody></table></div><br><!--end s1-->
+
+      <div align="right"><table border="0" cellpadding="1" cellspacing="0" width="98%"><tbody><tr><td bgcolor="#c5cadd" width="100%"><font color="#000000" face="Arial, Helvetica, sans-serif" size="+1"><img src="void.gif" border="0" height="5" hspace="0" vspace="0" width="5"><i><b><a name="N25c828">Other References</a></b></i></font></td></tr></tbody></table><br><table border="0" cellpadding="0" cellspacing="0" width="98%"><tbody><tr><td><font color="#000000" face="Arial, Helvetica, sans-serif">
+
+         <ul>
+            <li><b><a name="XEditor"></a>[<a href="http://www.openhealth.org/editor">XEditor</a>]</b> "XML Editing Language (XEditor)", Jonathan Borden, August 2000</li>
+         </ul>
+
+      </font></td></tr></tbody></table></div><br><!--end s1-->
+
+   </td></tr></tbody></table><!--end content panel--></td></tr></tbody></table><br><table border="0" cellpadding="0" cellspacing="0" width="100%"><tbody><tr><td bgcolor="#64697c"><img src="xupdate-wd_files/dot.htm" height="1" width="1"></td></tr><tr><td align="center"><font color="#64697c" face="arial,helvetica,sanserif" size="-1"><i>
+               Copyright © 2000-2003 The XML:DB Initiative.
+               All Rights Reserved.
+             </i></font></td></tr><tr><td></td></tr></tbody></table>
+</body></html>

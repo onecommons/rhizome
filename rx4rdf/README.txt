@@ -1,8 +1,8 @@
                             README
 
                          Rx4RDF and Rhizome
-                         Version 0.3.0
-                         May 12, 2004
+                         Version 0.3.1
+                         Aug XX, 2004
  
   Introduction
   ------------
@@ -21,19 +21,7 @@
   
   What's new in this release?
   ---------------------------  
-  This release is focused on making Rhizome usable for running small-scale 
-  web sites:
-  
-  * Much improved documentation, including manuals for Rhizome, Raccoon and ZML.
-
-  * Many features added to Rhizome -- it now has (nearly) all the functionality 
-  you'd expect in a full-featured Wiki. It also much easier to browse and edit
-  the underlying RDF model (and the default template is less ugly).
-
-  * Raccoon's security has been enhanced by disabling potentially dangerous 
-  settings by default and by the creation of an audit log of changes to the 
-  database. Rhizome now supports fine-grained authorization of the changes 
-  to the RDF model and provides a secure default authorization schema.
+  TODO XXX 
   
   For a listing of all the major changes see changelog.txt for more details.
 
@@ -47,13 +35,10 @@
   * RxSLT doesn't handle xsl:copy-of as specified in the RxPath spec.
   
   Raccoon
-  * The stand-alone http server sometimes throws socket exceptions with the message 
-  "(10053, 'Software caused connection abort')", but this appears to be harmless
-  (I think it only happens when the browser aborts the connection).
   * The global write lock doesn't seem to work correctly on CygWin and is disabled 
   on that platform.
-  * When using file-based sessionsm, the files aren't deleted when the session ends.
-  
+  * When using file-based sessions, the files aren't deleted when the session ends.
+
   Rhizome
   * Dynamic pages might not behave as expected since Rhizome doesn't set headers
     such as Pragma NoCache or Expires -- if you need that you'll have set them 
@@ -63,18 +48,30 @@
     revision of a file will overwrite the initial version. Instead import 
     file into the directory specified by SAVE_DIR (the default is 
     "content/.rzvs").
-    
+  * doesn't handle unicode pages properly  
+      
   Requirements
   ------------
     
-  Rx4RDF requires Python 2.2 or later and 4Suite 1.0a1 or later (4Suite.org).
+  Rx4RDF requires Python 2.2 or later (2.3 recommended) and 4Suite 1.0a1 
+  or later (http://4Suite.org).
    
   Rx4RDF and Rhizome are known to run on Linux and Windows 2000  
   and should work on any platform that supports Python and 4Suite.
   
-  On Windows, the Python Win32 Extensions (python.org/windows/win32all) 
-  must be installed or interprocess file locking will be disabled (which is 
-  only needed if you have multiple Raccoon processes accessing the same model).
+  Optional Packages:
+  
+  If Lupy is installed (http://www.divmod.org/Home/Projects/Lupy), Rhizome will
+  perform full-text indexing of content (requires Python 2.3). 
+  See the Rhizome manual for more info.
+  
+  On Windows, the Python Win32 Extensions (http://python.org/windows/win32all) 
+  must be installed or interprocess file locking will be disabled (You do not 
+  need this unless you have multiple Raccoon processes simultaneously accessing 
+  the same application instance).
+  
+  Redland RDF data stores can be used if Redland (http://www.redland.opensource.ac.uk)
+  is installed. See the Raccoon manual for more info.
   
   Installation
   ------------
