@@ -1,7 +1,0 @@
- todo:
-   title: `all public todos
-   actions priority=showstopper:
-     action dev=adam type=add context=docs:
-* specifications 
-* wiki install and config docs 
-* implementation notes
