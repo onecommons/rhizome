@@ -1254,9 +1254,9 @@ class BlackListHTMLSanitizer(LinkFixer):
         else:
             if tag is not None:
                 tag = tag.split(':')[-1] #we ignore namespace prefixes
-                for tagpattern, contentpatten in self.blacklistedContent.items():
+                for tagpattern, contentpattern in self.blacklistedContent.items():
                     if re.match(tagpattern,tag):
-                        if re.search(self.blacklistedContent[tag], value):
+                        if re.search(contentpattern, value):
                             return self.SANITIZE
         return self.super.needsFixup(self, tag, name, value)
 
@@ -1265,4 +1265,4 @@ class BlackListHTMLSanitizer(LinkFixer):
             self.onStrip(tag, name, value)
             return ''
         else:
-            return self.super.doFixup(self, tag, name, value)
+            return self.super.doFixup(self, tag, name, value, hint)
