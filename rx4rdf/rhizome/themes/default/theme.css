@@ -98,6 +98,7 @@ font-size : 90%;
 #footer {
 	background-color: #EBEBB5;/* #294563 #333333 */
 	color: black;
+	font-size: smaller;
 }
 
 #footer a, #header a {

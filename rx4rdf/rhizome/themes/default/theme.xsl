@@ -80,7 +80,7 @@
 <div style='float: right'>
     <xsl:call-template name='actions-bar' />    
 </div>
-<xsl:call-template name='quicklinks-bar' />    
+&#xa0;<xsl:call-template name='quicklinks-bar' />    
 </p>
 
 <p>    

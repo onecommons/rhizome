@@ -75,7 +75,7 @@ If you want to write the list item on multiple lines just start the following li
 
 * This is a single-line item.
 * This is actually a multi-line item.
- We continue the second sentence on a line on a line of its own.
+ We continue the second sentence on a line of its own.
  We might as well do a third line while we're at it...
  Notice, however, as all these sentences get put inside a single item!
 * The third line is again a single-line item for your convinience.

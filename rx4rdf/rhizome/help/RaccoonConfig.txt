@@ -6,7 +6,7 @@
 #################################################
 
 #PATH is a platform-specific string listing the directories that will be searched when resolving 'path:' URLs
-#default: -p argument if set, otherwise the RHIZPATH environment variable if set, otherwise the current directory
+#default: -p argument if set, otherwise the RACCOONPATH environment variable if set, otherwise the current directory
 PATH = '.;..'
 
 #ROOT_PATH specifies base URL that this application runs on 

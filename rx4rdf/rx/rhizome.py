@@ -156,16 +156,56 @@ class MarkupMapFactory(zml.DefaultMarkupMapFactory):
             return mm
 
 class SanitizeHTML(utils.BlackListHTMLSanitizer, raccoon.RequestProcessor.SiteLinkFixer):
-    super = raccoon.RequestProcessor.SiteLinkFixer
+    _BlackListHTMLSanitizer__super = raccoon.RequestProcessor.SiteLinkFixer
+
+    addRelNofollow = True
+    
+    def handle_starttag(self, tag, attrs):
+        '''
+        Add support for google's anti-comment spam system 
+        see http://www.google.com/googleblog/2005/01/preventing-comment-spam.html
+        since we assume the user is untrusted if we're santizing the html
+        '''
+        if self.addRelNofollow and tag == 'a':
+            needsNoFollow = [name for (name,value) in attrs
+                    if name == 'href' and value.strip().startswith('http')]
+            if needsNoFollow:
+                relValue = [value for name,value in attrs if name=='rel']
+                if relValue:
+                    relValue = relValue[0]
+                    attrs[attrs.index(('rel', relValue))] = ('rel', 'nofollow')                        
+                    #we don't know how the value was quoted but this hack but should work in almost any real world cases:
+                    self._HTMLParser__starttag_text = self._HTMLParser__starttag_text.replace(
+                        '"'+relValue+'"', '"nofollow"').replace("'"+relValue+"'", '"nofollow"')
+                else:
+                    attrs.append(('rel', 'nofollow'))
+                    starttaglist = list(self._HTMLParser__starttag_text)                                                
+                    starttaglist.insert(self._HTMLParser__starttag_text[-2] == '/' and -2 or -1, 
+                                       ' rel="nofollow" ') 
+                    self._HTMLParser__starttag_text = ''.join(starttaglist) 
+        return utils.BlackListHTMLSanitizer.handle_starttag(self, tag, attrs)        
 
     def onStrip(self, tag, name, value):
         #should we raise an exception instead?
         if name:
             log.warning('Stripping dangerous HTML attribute: ' + name + '=' + value)
         elif value:
-            log.warning('Stripping dangerous content from: ' + tag)
-        else:
+            if tag:
+                log.warning('Stripping dangerous content from: ' + tag)
+            else:
+                log.warning('Stripping dangerous PI: ' + value)            
+        elif tag:
             log.warning('Stripping dangerous HTML element: ' + tag)    
+        else:
+            log.warning('Stripping dangerous ??: %s, %s, %s' % tag, name, value)    
+
+
+class TruncateHTML(utils.HTMLTruncator, SanitizeHTML):
+    _HTMLTruncator__super = SanitizeHTML
+    
+    def onStrip(self, tag, name, value):
+        #DoNotHandleException cause we don't the action error handler to catch this
+        raise raccoon.DoNotHandleException('Contains HTML that can not be safely embedded in another HTML page')
     
 METADATAEXT = '.metarx'
 
@@ -333,7 +373,7 @@ class Rhizome(object):
             vars = kw2vars(password = kw['password'], login=value,
                            hashprop = self.passwordHashProperty)
             userResource = self.server.evalXPath(                
-                "/*[wiki:login-name = $login][*[uri(.)=$hashprop] = wf:secure-hash($password)]",
+                "/*[foaf:accountName = $login][*[uri(.)=$hashprop] = wf:secure-hash($password)]",
                 vars=vars)
             if not userResource:
                 return False
@@ -428,7 +468,7 @@ class Rhizome(object):
         #if any of the authresources requires an auth token that the
         #user doesn't have access to, the nodeset will not be empty        
         result = self.server.evalXPath('($nodeset)[%s]'%self.authorizationQuery,
-            kw2vars(__authAction=action, __user=user, nodeset = authorizingResources,
+            kw2vars(__authAction=action, __account=user, nodeset = authorizingResources,
                     __authProperty=predicate, __authValue=object))
         if result and not noraise:
            if action == 'http://rx4rdf.sf.net/ns/auth#permission-add-statement':
@@ -445,9 +485,9 @@ class Rhizome(object):
     def authorizeDynamicContent(self, accesstoken, calldefault, contents, formatType, kw, dynamicFormat):
         if dynamicFormat:
             if not self.server.evalXPath(
-    '''$__user/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser' or
-    /*[.='%s'][.=$__user/auth:has-rights-to/* or .=$__user/auth:has-role/*/auth:has-rights-to/*]'''
-                % accesstoken, kw2vars(__user=kw.get('__user',[]))):
+    '''$__account/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser' or
+    /*[.='%s'][.=$__account/auth:has-rights-to/* or .=$__account/auth:has-role/*/auth:has-rights-to/*]'''
+                % accesstoken, kw2vars(__account=kw.get('__account',[]))):
                raise raccoon.NotAuthorized(
     'You are not authorized to create dynamic content with this format: %s' 
                     % (formatType))
@@ -649,11 +689,13 @@ Their value can be either an URI or a QName.
                           doctype=''
                   else:
                       doctype = defaultDoctype
+                  pathStat = os.stat(path)
                   triples[wikiname] = self.addItem(wikiname,loc=loc,format=format,
                                     disposition=disposition, doctype=doctype,
-                                    contentLength = str(os.stat(path).st_size),
+                                    contentLength = str(pathStat.st_size),
                                     digest = utils.shaDigest(path), keywords=keywords,
-                                    label=label, accessTokens=accessTokens) 
+                                    label=label, accessTokens=accessTokens,
+                                    createdOn='%.3f' % pathStat.st_mtime) 
                   title = ''
                   resourceURI = self.getNameURI(None, wikiname)
                   
@@ -846,33 +888,65 @@ Options:
     'concat("site:///", (/a:NamedContent[wiki:revisions/*/*[.=$__context]]/wiki:name)[1])',
                         node=contextNode) )
                 
-    def linkFixerFactory(self, *args):
+    def linkFixerFactory(self, sanitize, addNoFollow, args):
         fixer = SanitizeHTML(*args)        
+        fixer.addRelNofollow = addNoFollow
+        fixer.blacklistedElements = sanitize and self.blacklistedElements or []
+        fixer.blacklistedContent = sanitize and self.blacklistedContent or {}
+        fixer.blacklistedAttributeNames = sanitize and self.blacklistedAttributes or {}
+        return fixer
+
+    def truncateHTMLFactory(self, maxwords, maxlines, args):
+        fixer = TruncateHTML(*args)        
                                     
         fixer.blacklistedElements = self.blacklistedElements
         fixer.blacklistedContent = self.blacklistedContent
         fixer.blacklistedAttributeNames = self.blacklistedAttributes
+        if maxwords:
+            fixer.maxWordCount = int(maxwords)
+        if maxlines:
+            fixer.maxLineCount = int(maxlines)
         return fixer
-    
-    def processMarkup(self, accesstoken, result, kw, contextNode, contents):
+        
+    def processMarkup(self, result, kw, contextNode, contents,
+                      sanitizeToken=None, nospamToken=None):
         #if the content was not created by an user with the 
         #with the trusted author token we need to strip out any dangerous HTML        
         #because html maybe generated dynamically we need to check this while spitting out the HTML
-        if not self.server.evalXPath(
-    '''$__context/wiki:created-by/*/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser'
-       or /*[.='%s'][.=$__context/wiki:created-by/*/auth:has-rights-to/*
-        or .=$__context/wiki:created-by/*/auth:has-role/*/auth:has-rights-to/*]'''
-                % accesstoken, node=contextNode):
-            linkFixerFactory = self.linkFixerFactory
-        else: #permission to generate any kind of html/xml -- so use the default
-            linkFixerFactory = None
+        maxwords = kw.get('maxwords') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxwords'))
+        maxlines = kw.get('maxlines') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxlines'))
+        if maxwords or maxlines:
+            linkFixerFactory = lambda *args: self.truncateHTMLFactory(maxwords, maxlines, args)
+        else:
+            sanitize = nofollow = True
+            #get the accessTokens granted to the author of the content            
+            result = self.server.evalXPath('''$__context/wiki:created-by/*/auth:has-role/*[.='http://rx4rdf.sf.net/ns/auth#role-superuser']
+            | $__context/wiki:created-by/*/auth:has-rights-to/* | $__context/wiki:created-by/*/auth:has-role/*/auth:has-rights-to/*''',
+                                           node=contextNode)
+            for token in result:                
+                if token.uri == 'http://rx4rdf.sf.net/ns/auth#role-superuser':
+                    #super users can do anything
+                    sanitize = nofollow = False
+                    break
+                elif token.uri == sanitizeToken:
+                    santize = False
+                elif token.uri == nospamToken:
+                    nofollow = False
+
+            if sanitize or nofollow:
+                linkFixerFactory = lambda *args: self.linkFixerFactory(sanitize, nofollow, args)
+            else: #permission to generate any kind of html/xml -- so use the default                        
+                linkFixerFactory = None
         path = kw.get('_docpath', kw.get('_path', getattr(kw.get('_request'),'browserPath', kw.get('_name'))) )
         return self.server.processMarkup(contents,path,linkFixerFactory)
 
     def processMarkupCachePredicate(self, result, kw, contextNode, contents):
         path = kw.get('_docpath', kw.get('_path', getattr(kw.get('_request'),'browserPath', kw.get('_name'))) )
         return (contents, contextNode, id(contextNode.ownerDocument),
-                contextNode.ownerDocument.revision, path)
+                contextNode.ownerDocument.revision, path,
+                kw.get('maxwords') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxwords')),
+                kw.get('maxlines') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxlines'))
+                )
     
     def processZMLSideEffects(self, contextNode, kw):
         #optimization: only set the doctype (which will invoke wiki2html.xsl if we need links to be transformed)
@@ -939,6 +1013,12 @@ Options:
             secureProperty = self.passwordHashProperty
         import sha
         return sha.sha(plaintext + self.secureHashMap[secureProperty] ).hexdigest()    
+
+    def _getContents(self, node, kw=None):
+        kw = kw or {}
+        kw.setdefault('action', 'view-source')
+        #run last 3 actions: findContentAction, processContentAction, templateAction:
+        return self.server.doActions(self.handleRequestSequence[-3:], kw, node)
                 
     def getContents(self, context, node=None):
         '''
@@ -948,9 +1028,36 @@ Options:
             node = context.node
         elif not node:
             return ''#empty nodeset
-        #print 'getc', node
-        return self.server.doActions([self.findContentAction,
-            self.processContentAction], {'action': 'view-source'}, node)
+        return self._getContents(node, {})
+        
+    def truncateContents(self, context, node=None, maxwords=0, maxlines=0):
+        '''
+        Get the contents of the given revision resource, truncating it when maxwords is reached.
+        Returns either a string of the contents or a number if the contents can't be represented in HTML
+        (e.g. if it binary or if it contains HTML that can be embedded).
+        '''
+        #if maxwords is None: #todo
+        #    maxwords = self.maxSummaryWords
+        if node is None:
+            node = context.node
+        elif not node:
+            return ''#empty nodeset
+        
+        kw = {'action':'view',
+              'maxwords':maxwords,
+              'maxlines':maxlines,
+              '_disposition': 'http://rx4rdf.sf.net/ns/wiki#item-disposition-complete'
+              }
+        try:
+            text = self._getContents(node, kw)            
+        except raccoon.DoNotHandleException:
+            return 1
+        if kw['__lastFormat'] == 'http://rx4rdf.sf.net/ns/wiki#item-format-text':            
+            text, wordCount, lineCount, noMore = utils.truncateText(
+                text, maxwords, maxlines or -1)
+        elif kw['__lastFormat'] == 'http://rx4rdf.sf.net/ns/wiki#item-format-binary':
+            return 1 
+        return text
 
     def hasPage(self, context, resultset = None):
         '''
@@ -1336,9 +1443,9 @@ Options:
                 format='binary', doctype='', handlesDoctype='', handlesDisposition='',
                 title=None, label='http://rx4rdf.sf.net/ns/wiki#label-released',
                 handlesAction=None, actionType='http://rx4rdf.sf.net/ns/archive#NamedContent',
-                baseURI=None, owner='http://rx4rdf.sf.net/site/users/admin',
+                baseURI=None, owner='http://rx4rdf.sf.net/site/accounts/admin',
                 accessTokens=None, authorizationGroup='', keywords=None,
-                contentLength = None, digest = None):
+                contentLength = None, digest = None, createdOn = "1057919732.750"):
         '''
         Convenience function for adding an item the model. Returns a string of triples.
         '''
@@ -1406,9 +1513,9 @@ Options:
             nameUriRef['auth:uses-template'] = Res(authorizationGroup)
             
         if owner:
-            if owner == 'http://rx4rdf.sf.net/site/users/admin':
+            if owner == 'http://rx4rdf.sf.net/site/accounts/admin':
                 #fix up to be the admin user for this specific site
-                owner = self.BASE_MODEL_URI + 'users/admin'
+                owner = self.BASE_MODEL_URI + 'accounts/admin'
             itembNode['wiki:created-by'] = Res(owner)
                 
         nameUriRef['wiki:name'] = name
@@ -1422,7 +1529,9 @@ Options:
         listbNode['rdf:rest'] = Res('rdf:nil')
         
         itembNode['rdf:type'] = Res('wiki:Item')
-        itembNode['a:created-on'] = "1057919732.750"
+        
+        itembNode['a:created-on'] = createdOn
+        
         if disposition:
             itembNode['wiki:item-disposition'] = Res(kw2uri(disposition, 'wiki:item-disposition-'))
 
