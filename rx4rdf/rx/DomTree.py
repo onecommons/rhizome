@@ -87,7 +87,10 @@ def findnearestcommonancestors(x, y):
     while nextancx:        
         if nextancx == y: #y is an ancestor-or-self of x
             #print 'fnd', nextancx.parentNode, nextancx, y
-            return y, ancx[-1:] or nextancx, y
+            if ancx:
+                return y, ancx[-1], y
+            else:
+                return y, nextancx, y
         ancx.append(nextancx)
         nextancx = nextancx.parentNode        
         
@@ -121,7 +124,17 @@ class DocIndex:
         #print 'compare', self.node, other.node
         if self.node == other.node:
             return 0
-        
+
+        if (self.node.nodeType == Node.ATTRIBUTE_NODE or other.node.nodeType
+              == Node.ATTRIBUTE_NODE) and self.node.parentNode == other.node.parentNode:
+            if self.node.nodeType == Node.ATTRIBUTE_NODE:
+                if other.node.nodeType == Node.ATTRIBUTE_NODE:
+                    return 0 #attribute nodes are unordered
+                else: #attributes always come before other children
+                    return -1
+            else: #attributes always come before other children
+                return 1
+            
         root, nextancestorx, nextancestory = findnearestcommonancestors(self.node, other.node)
         if not root:
             #they're not part of the same tree
