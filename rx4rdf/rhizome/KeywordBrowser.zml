@@ -12,7 +12,6 @@ x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
     exclude-result-prefixes = "f wf a wiki rdf rdfs auth sets"
     ) 
     x:import href='search.xsl'
-    
     x:param name='__resource'
     #if the disjunction and topics parameters aren't specified, see if this page is handling a Keyword resource
     x:param name='disjunction' select='''f:if($__resource/rdf:type = 'http://rx4rdf.sf.net/ns/wiki#Keyword', 
