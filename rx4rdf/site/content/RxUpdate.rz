@@ -1,3 +1,14 @@
 RxUpdate is a language for updating an RDF model. It is syntactically and semantically very similar to the [XUpdate Working Draft|http://www.xmldb.org/xupdate/xupdate-wd.html]. An RxUpdate processor behaves as if it were an XUpdate processor that evaluated XPath expressions as RxPath expressions and operated on a RDF model.
 
+The XUpdate specification was never completed and so RxUpdate adds several enhancements to XUpdate, including support for the following elements: 
+* ^^if 
+* ^^copy-of^^ (along with an enhanced ^^value-of^^)
+* ^^message 
+* ^^include
+* ^^define-template
+* ^^call-template 
+* ^^replace
+* attribute values in literal elements are treated as attribute value templates
+These element behave very similarly to the XSLT elements of the same name. The RxUpdate implementation also works with regular XML files, so you can use it as an enhanced XUpdate implementation.
+
 The formal definition of RxUpdate can be found at [RxPathSpec].

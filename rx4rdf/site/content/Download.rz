@@ -15,7 +15,7 @@ Once you've installed Rx4RDF, use this guide to quickly start playing with its v
 !!RxPath
 To run a query on an RDF or NTriples file:
 
-^^python RDFDom.py myrdf.rdf \[RxPath expression]
+^^python RxPathDom.py myrdf.rdf \[RxPath expression]
 
 If \[RxPath expression] is omitted it will start in interactive mode.
 
