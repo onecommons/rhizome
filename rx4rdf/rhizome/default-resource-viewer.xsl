@@ -23,6 +23,15 @@
 &#xa0;<a href='site:///search?search=%2F*%2F*%5B.%3D%27{f:escape-url($__resource)}%27%5D&amp;searchType=RxPath&amp;view=html'>Used By</a>
 &#xa0;<a href='site:///search?search=%2F*%5B.%3D%27{f:escape-url($__resource)}%27%5D&amp;searchType=RxPath&amp;view=rdf'>RDF/XML</a>
 <hr />
+<xsl:if test='$__resource/wiki:about'>
+ Keywords:&#xa0; 
+ <xsl:for-each select='$__resource/wiki:about'>
+   <a href='site:///keywords/{local-name-from-uri(.)}?about={f:escape-url(.)}' >
+   <xsl:value-of select='f:if(namespace-uri-from-uri(.)="http://rx4rdf.sf.net/ns/kw#",local-name-from-uri(.), name-from-uri(.))'/>
+   </a>&#xa0;
+ </xsl:for-each>
+ <hr />
+</xsl:if>
 <pre>
     <xsl:variable name='fixup' select="&quot;&lt;a href='site:///.?action=view-metadata&amp;amp;about=%(encodeduri)s'>%(res)s&lt;/a>&quot;" />
     <!-- there's an absurd level of string escaping going on here! -->

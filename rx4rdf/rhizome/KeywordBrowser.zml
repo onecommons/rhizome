@@ -14,7 +14,7 @@ x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
     x:import href='search.xsl'
     
     x:param name='__resource'
-    ;if the disjunction and topics parameters aren't specified, see if this page is handling a Keyword resource
+    #if the disjunction and topics parameters aren't specified, see if this page is handling a Keyword resource
     x:param name='disjunction' select='''f:if($__resource/rdf:type = 'http://rx4rdf.sf.net/ns/wiki#Keyword', 
                concat("[wiki:about='", $__resource, "']"), "[wiki:about]")'''
     x:param name='topics' select='''f:if($__resource/rdf:type = 'http://rx4rdf.sf.net/ns/wiki#Keyword', 
@@ -28,12 +28,12 @@ x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
        tr: 
         td: 
           a href='site:///.?about={.}'
-           ; choose the best name for the resource using this order: title, non-anonymous name, auto-summary, rdfs:label, name-from-uri
+           # choose the best name for the resource using this order: title, non-anonymous name, auto-summary, rdfs:label, name-from-uri
            x:variable name=pagename select='''f:if( (./wiki:revisions/*/rdf:first/*)[last()]/wiki:title, 
                 (./wiki:revisions/*/rdf:first/*)[last()]/wiki:title,
                f:if(./wiki:name-type = uri("wiki:name-type-anonymous")
                  and (./wiki:revisions/*/rdf:first/*)[last()]/wiki:auto-summary, 
-                (./wiki:revisions/*/rdf:first/*)[last()]/wiki:auto-summary, ./wiki:name))''' 
+                (./wiki:revisions/*/rdf:first/*)[last()]/wiki:auto-summary, ./wiki:name))'''            
            x:value-of select='''f:if($pagename, $pagename, f:if(./rdfs:label,
                                         ./rdfs:label, name-from-uri(.)))'''
           x:if test='$othertopics'
@@ -56,18 +56,18 @@ x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
                 x:value-of select='f:if(namespace-uri-from-uri(.)="http://rx4rdf.sf.net/ns/kw#",local-name-from-uri(.), name-from-uri(.))'
             x:text: '\&#xa0;'                
             
-        ;find all the resources that have each of these topics
+        #find all the resources that have each of these topics
         x:variable name='resWithTopics' select='wf:evaluate(concat("/*",$disjunction))'
-        ;find the other topics these resources have
+        #find the other topics these resources have
         x:variable name='subtopicRelations' select='$resWithTopics/wiki:about[not(.=$topicList)]'
         x:variable name='subtopics' select='id($subtopicRelations)'
 
-        ;for-each topic that is assigned to a resource that also has all the current topics:        
+        #for-each topic that is assigned to a resource that also has all the current topics:        
         x:variable name='topics-to-list'
           x:for-each select='$subtopics'
-            ;if there is more than n resources that has the current topics plus the this topic, list the topic
+            #if there is more than n resources that has the current topics plus the this topic, list the topic
             x:variable name=count select='count($resWithTopics[wiki:about=current()])'
-            x:if test='true()' ;'$count > $maxResources' - see comment below
+            x:if test='true()' #'$count > $maxResources' - see comment below
                tr: 
                 td: 
                  a href='''site:///keyword-browser?disjunction={f:escape-url($disjunction)}[wiki:about='{
@@ -83,13 +83,13 @@ x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
            x:copy-of select='$topics-to-list'
           br
                   
-        ;all the resources not covered by one of the 'grouped by' subtopics 
+        #all the resources not covered by one of the 'grouped by' subtopics 
         x:variable name='leftoverResources' select='''sets:difference($resWithTopics, $subtopicRelations/..)'''
-        ; the idea here was to avoid group by keywords with just one resource and instead show the resource - but this is too confusing
-        ; | wf:map($subtopics, "f:if(count($resWithTopics[wiki:about=$wf:current]) <= $maxResources, $resWithTopics[wiki:about=$wf:current])")'''
+        # the idea here was to avoid group by keywords with just one resource and instead show the resource - but this is too confusing
+        # | wf:map($subtopics, "f:if(count($resWithTopics[wiki:about=$wf:current]) <= $maxResources, $resWithTopics[wiki:about=$wf:current])")'''
                    
         x:if test='count($leftoverResources) and string($topics-to-list)'
-           ;only show this table if we displayed the grouped by table           
+           #only show this table if we displayed the grouped by table           
            table:            
             tr: th: `Resources with no more keywords 
               x:for-each select='$leftoverResources'
@@ -120,4 +120,3 @@ x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
           x:otherwise              
            a href='site:///keyword-browser?disjunction={f:escape-url($disjunction)}&topics={f:escape-url($topics)}&summary=1':
               `Summary View
-          
