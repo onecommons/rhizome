@@ -246,7 +246,7 @@ actions = { 'http-request' : [
 
 """
 
-^^__server__^^ is a config variable which references the application's RequestProcessor. ^^processContents^^ assumes that the result of the match expression can be converted to a string that names the Content Processor to be invoked. The RequestProcessor has a dictionary of Content Processors and the application can add its own by setting the ^^contentProcessors^^ config variable. The contentProcessors functions have the same signature as Action functions and act on the return value of the previous Action. They return either a string that is the result of processing or a tuple containing the result and the name of the next Content Processor to be invoked. This allows a content processing pipeline to be dynamically constructed. Raccoon support the following content processors:
+^^__server__^^ is a config variable which references the application's RequestProcessor. ^^processContents^^ assumes that the result of the match expression can be converted to a string that names the Content Processor to be invoked. The RequestProcessor has a dictionary of Content Processors and the application can add its own by setting the ^^contentProcessors^^ config variable. The contentProcessors functions have the same signature as Action functions and act on the return value of the previous Action. They return either a string that is the result of processing or a tuple containing the result and the name of the next Content Processor to be invoked. This allows a content processing pipeline to be dynamically constructed. Raccoon supports the following content processors:
 
 +Python (http://rx4rdf.sf.net/ns/wiki#item-format-python)=The contents is treated as a [Python|www.python.org] script that is executed when the page is requested. Anything the code writes to ^^stdout^^ is captured and sent as the response. The following are exposed as local variables to the script:
 ++^^\__server\__^^=(see Requests above)
@@ -268,13 +268,7 @@ actions = { 'http-request' : [
 
 :This content processor will return the value of the last encountered ^^raccoon-format^^ XML processing instruction, if any, as the next content processor, unless it encountered the ^^raccoon-ignore^^ XML processing instruction, in which case none will be returned.
 
-Raccoon also provides a method, ^^RequestProcessor.processXslt^^, for building a XSLT content processor -- it isn't part of the built-in content processors because it requires some application specific information: Its nearly the same as the RxSLT content processor except it also needs a source document to transform in addition to the stylesheet contents. Here's an example of a content processor that uses the contents as the stylesheet and request metadata parameter as the source to transform:
-
-p'''contentProcessors = {  'http://www.w3.org/1999/XSL/Transform' : 
-        lambda result, kw, contextNode, contents, self=__server__:
-            self.processXslt(contents, kw['_contents'], kw), 
-  }
-'''
+Raccoon also provides a couple of more ContentProcessors that aren't enabled by default; -- these are not included because they requires some application specific information. For example, there's an XSLT content processor which is nearly the same as the RxSLT content processor except it also needs a source document to transform in addition to the stylesheet contents. 
 
 !!Authentication and Authorization
 Raccoon doesn't supply any facilities for authentication. It is expected that the application will provide that, for example, by placing a "user" variable in the session dictionary after authentication has occured or by examining HTTP request headers in the request pipeline.
@@ -294,24 +288,6 @@ Both the Action cache and XPath processing cache are invalidated when the underl
 The Raccoon caching model is a little unusual in that it doesn't rely on explicit or proactive cache invalidation. Instead it works on the principle that each time we do a cache lookup we can generate a key based on the aspects of the current state of the system that uniquely determine the cache value. Thus when the relevant system state changes, the lookup will fail. For example, for the XPath processing cache, the lookup value will be a XPath expression but the key stored in the cache will be a tuple consisting of XPath expression, the values of any variables referenced by the expression, and a revision counter representing the state of the model. When the model is updated the revision counter changes and subsequent cache lookups for that expression will result in a cache miss, as the lookup key will now include the new revision counter. Eventually the old cache entry with the old revision counter as part of its key will be flushed out as the MRU cache fills up.
 
 Raccoon's caches have a mechanism for handling side effects that may occur when generating a value that will be cached. For example, the XPath processing cache and the XSLT/RxSLT processing caches keep track of calls to ^^wf:assign-metadata^^ and ^^wf:remove-metadata^^ so that the changes they make to the request metadata can be repeated when subsequent requests result in the value being retrieved from the cache.
-
-Continuing the above XSLT content processor example, here we add additional config settings to enable the XSLT content processor to be cacheable:
-p'''
-contentProcessorCachePredicates = {
-    'http://www.w3.org/1999/XSL/Transform' : 
-        lambda result, kw, contextNode, contents, self=__server__:
-          self.partialXsltCacheKeyPredicate(
-               contents, kw['_contents'], kw, contextNode),     
-}
-
-contentProcessorSideEffectsFuncs = {
-    'http://www.w3.org/1999/XSL/Transform' : __server__.xsltSideEffectsFunc,  
-}
-    
-contentProcessorSideEffectsPredicates = {
-    'http://www.w3.org/1999/XSL/Transform' :  __server__.xsltSideEffectsCalc 
-}
-'''
 
 !!Loading and updating models 
 

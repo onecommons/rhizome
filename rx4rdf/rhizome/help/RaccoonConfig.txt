@@ -348,39 +348,18 @@ DEFAULT_TRIGGER='http-request'
 #default is [] (but the system will always adds: ['_docpath', '_name', '_noErrorHandling'])
 globalRequestVars = [ '__user', '_static', '_disposition' ] 
 
-#contentProcessors is a dictionary used by RequestProcessor.processContents to specify
-#content processors in addition to the built-in ones (RxSLT, RxUpdate, Python, base64)
-contentProcessors = {     
-    'http://rx4rdf.sf.net/ns/wiki#item-format-zml' :
-        lambda result, kw, contextNode, contents, rhizome=rhizome: rhizome.processZML(contents, kw)
-}
-
-#contentProcessorCachePredicates is a dictionary used by RequestProcessor.getProcessContentsCachePredicate to specify
-#a cache predicate if the results of a content processor can be cached
-contentProcessorCachePredicates = {    
-    'http://rx4rdf.sf.net/ns/wiki#item-format-zml' :
-        lambda result, kw, contextNode, contents: contents #the key is just the contents
-}
-
-#contentProcessorSideEffectsPredicates is a dictionary used by RequestProcessor.processContents to specify
-#a side effects predicate returns a representation of the side effects of calculating the cacheValue
-#if present, this value is passed to the contentProcessorSideEffectsFunc
-contentProcessorSideEffectsPredicates = { } #none for 'http://rx4rdf.sf.net/ns/wiki#item-format-zml'
-
-#contentProcessorSideEffectsFuncs is a dictionary used by RequestProcessor.processContents to specify
-#a side effects function that will be called after a value is retrieved from the cache (use to replay side effects)
-contentProcessorSideEffectsFuncs = { } #none for 'http://rx4rdf.sf.net/ns/wiki#item-format-zml'
-
-#contentProcessorIsValueCacheablePredicates is a dictionary used by RequestProcessor.processContents to specify
-#a predicate that will be called to determine if a new value should be added to the cache 
-#(usually the contentProcessorCachePredicate takes care of this but sometimes you need to look at the value itself)
-contentProcessorIsValueCacheablePredicates = {} #none for 'http://rx4rdf.sf.net/ns/wiki#item-format-zml'
+#contentProcessors is a list used by RequestProcessor.processContents to specify
+#content processors in addition to the built-in ones (RxSLT, RxUpdate, Python, base64, etc.)
+contentProcessors = [    
+    ZMLContentProcessor()
+]
 
 #authorizeContentProcessors is a dictionary used by RequestProcessor.processContents to authorize
 #that the content can be sent to the content processor. 
-#The key is the URI of the content format or 'default'. If the format doesn't exist 'default' is checked.
+#The key is the URI of the content format or 'default'. If the format doesn't exist in the dictionary,
+than 'default' is checked.
 #The value is a function with this signature:
-#def authorizeContent(contents, formatType, kw, dynamicFormat)
+#def authorizeContent(contentProcessor, contents, formatType, kw, dynamicFormat)
 #where is dynamicFormat is a boolean indicated whether format was returned by the previous content processor.
 #default is {'http://rx4rdf.sf.net/ns/wiki#item-format-python': self.authorizeByDigest}
 authorizeContentProcessors = {} #no authorization
@@ -390,11 +369,14 @@ extFunctions = {
 ('http://example.com/extfuncs', 'reverse'): lambda context, nodeset: nodeset.reverse() or nodeset
 }
 
-#dictionary of XPath functions that may not be cacheable
+#dictionary of XPath functions or Xslt Extension elements that may not be cacheable
 #if the value evaluates to False than function is treated as not cachable
 #otherwise the value should be a function with the signature: 
-#def getKey(xpathFunc, context) where xpathFunc is the Ft.Xml.XPath.ParsedExpr.FunctionCall
-#representing the function and context is the XPath context. 
+#def getKey(node, context, notCacheableDict) where 
+#node is either the Ft.Xml.XPath.ParsedExpr.FunctionCall
+#or the Ft.Xml.Xslt.XsltElement node representing the function or extension
+#element, respectively, context is the XPath context,
+#and notCacheableDict is this dictionary.
 #getKey should either return a key (any hashable object)
 #or raise MRUCache.NotCacheable.
 #Note that the context may not have all its fields set. If the getKey function relies on one, 
