@@ -20,25 +20,25 @@ There have been other attempts at mapping RDF to the XPath data model (see refer
      s2 title="RxPath By Example":
 The following examples illustrate RxPath. They are based on the example RDF statements found [RDF Syntax|http://www.w3.org/TR/rdf-syntax-grammar], include the namespace prefixes used in those examples. 
 
-;Example 1:This RxPath expression returns a nodeset of all the resources in the model:
++Example 1=This RxPath expression returns a nodeset of all the resources in the model:
 
 ^^/*
 
-;Example 2:This RxPath expression returns a nodeset of all the predicates in the model (and therefore all the statements):      
++Example 2=This RxPath expression returns a nodeset of all the predicates in the model (and therefore all the statements):      
 
 ^^/*/*
 
 The next 2 examples demonstrate how Name Test matches the type of a resource or the property name of a predicate:
 
-;Example 3:This expression returns all the resource with the rdf:type of class ^^ex:Document^^:
++Example 3=This expression returns all the resource with the rdf:type of class ^^ex:Document^^:
 
 ^^/ex:Document
 
-;Example 4:This expression returns the objects of all the property ^^dc:title^^:
++Example 4=This expression returns the objects of all the property ^^dc:title^^:
 
 ^^/*/dc:title/*
 
-;Example 5:This expression finds the full name of all the people that are editors of a resource:
++Example 5=This expression finds the full name of all the people that are editors of a resource:
 
 ^^/*/ex:editor/*/ex:fullName/*
 
@@ -46,11 +46,11 @@ Note how the expression is evaluated as if object node has the same children as 
 
 RxPath defines resource elements (subject and object) as having a string value equal to the resource's RDF URI reference (i.e. the value of its ^^rdf:about^^ attribute) 
 
-;Example 6:Find all objects of the resource with URI reference "http://example.com/example#foo":
++Example 6=Find all objects of the resource with URI reference "http://example.com/example#foo":
 
 ^^/*[[.="http://example.com/example#foo"]/*/*
 
-;Example 7:Find all the statements with a ^^dc:title^^ predicate and an object which a literal equal to "A marvelous thing"
++Example 7=Find all the statements with a ^^dc:title^^ predicate and an object which a literal equal to "A marvelous thing"
 
 ^^/*/dc:title[[.="A marvelous thing"] 
 
@@ -58,27 +58,27 @@ Here the string value of the predicate element follows the XPath rule, thus matc
 
 Two more similar examples: 
 
-;Example 8:All resources with a property rdfs:label with value "my label":
++Example 8=All resources with a property rdfs:label with value "my label":
 
 ^^/*[[rdfs:label='my label']
 
-;Example 9:Find all the statements with that have the resource "http://example.com/example#bar": as its object:
++Example 9=Find all the statements with that have the resource "http://example.com/example#bar": as its object:
 
 ^^/*/*[[.='http://example.com/example#bar']
 
 RxPath expressions can follow transitive properties by using the descendant axis: 
 
-;Example 10:Find all the decendant files of a folder named "foldername":
++Example 10=Find all the decendant files of a folder named "foldername":
 
 ^^/fs:Folder[[fs:file-name="foldername"]\//fs:has-child/fs:File
 
 Inverse transitive queries can be done the same way: 
 
-;Example 11:Find all the ancestor folder(s) of the file named "filename":
++Example 11=Find all the ancestor folder(s) of the file named "filename":
 
 ^^/fs:Folder[[.\//fs:has-child/fs:File[[fs:file-name="filename]]
 
-;Example 12:A more complicated expression that does the same thing but returns a nodeset ordered by the ancestor relation.
++Example 12=A more complicated expression that does the same thing but returns a nodeset ordered by the ancestor relation.
 
 ^^(\//fs:has-child/fs:File[[fs:file-name="filename])[[last()]/ancestor::fs:has-child/parent::fs:Folder
 
@@ -213,11 +213,11 @@ In addition a RxPath processor MUST support the following additional functions:
 should these function be in extention namespace?
 
 
-;//boolean// isPredicate(//nodeset//?):  Returns true if all the nodes in the argument nodeset are Predicate Elements. If the nodeset is empty it returns false. If the argument is omitted, it defaults to a node-set with the context node as its only member.
++//boolean// isPredicate(//nodeset//?)=  Returns true if all the nodes in the argument nodeset are Predicate Elements. If the nodeset is empty it returns false. If the argument is omitted, it defaults to a node-set with the context node as its only member.
 
-;//boolean// isResource(//nodeset//?):  Returns true if all the nodes in the argument nodeset are Subject or Object Elements. If the nodeset is empty it returns false. If the argument is omitted, it defaults to a node-set with the context node as its only member.       
++//boolean// isResource(//nodeset//?)=  Returns true if all the nodes in the argument nodeset are Subject or Object Elements. If the nodeset is empty it returns false. If the argument is omitted, it defaults to a node-set with the context node as its only member.       
 
-;//boolean// getResource(//nodeset//?):  For each node in the argument nodeset, return the element that is the "nearest resource" to the node. If the node is a Subject or Object Element return self. If it is a Predicate Element return its parent (which will be a Subject Element). If it is a text node then return is grandparent (a Subject Element since a text node will always be a literal). If it is a attribute node, apply the above rules to its owner element. All other node types are removed from the resulting nodeset. If the argument is omitted, it defaults to a node-set with the context node as its only member.  
++//nodeset// getResource(//nodeset//?)=  For each node in the argument nodeset, return the element that is the "nearest resource" to the node. If the node is a Subject or Object Element return self. If it is a Predicate Element return its parent (which will be a Subject Element). If it is a text node then return is grandparent (a Subject Element since a text node will always be a literal). If it is a attribute node, apply the above rules to its owner element. All other node types are removed from the resulting nodeset. If the argument is omitted, it defaults to a node-set with the context node as its only member.  
 
    s1 title="RxSLT":
 RxSLT is a language for transforming RDF to XML. It is syntactically identical to [XSLT 1.0||http://www.w3.org/TR/xslt] and behaves as very similarly. A RxSLT processor behaves indentically to a XSLT 1.0 processor transforming a document whose data model conformed to the Data Model mapping described above; with the following exceptions:

@@ -15,13 +15,13 @@ See the [Rhizome Manual|RhizomeDoc] for general documentation.
 The core behavior of Rhizome is defined in ^^rx/rhizome/rhizome-config.py^^ -- the comments there should be useful to read. 
 
 Files useful for basic customization of Rhizome: 
-;^^rx/rhizome/basestyles.css^^: Most formatting rules are found here.
-;^^rx/rhizome/sitebar.txt^^: This Rhizml document is displayed as the navbar on the left hand column by the site-template.
-;^^rx/rhizome/site-template.xsl^^: This is creates Rhizome's page layout
++^^rx/rhizome/basestyles.css^^= Most formatting rules are found here.
++^^rx/rhizome/sitebar.txt^^= This Rhizml document is displayed as the navbar on the left hand column by the site-template.
++^^rx/rhizome/site-template.xsl^^= This is creates Rhizome's page layout
 
 !Other Features
-;Static website generation: ^^--export --static^^ command-line generates a static set of pages.
-;External Resources: Two kinds of external files are supported: One, a revision can point to a external file instead of a location. (Useful for editing content in external progam.) Two, any file on the Racoon path can be retrieved if it isn't found in the RDF store. (Useful for links to images.)
++Static website generation= ^^--export --static^^ command-line generates a static set of pages.
++External Resources= Two kinds of external files are supported: One, a revision can point to a external file instead of a location. (Useful for editing content in external progam.) Two, any file on the Racoon path can be retrieved if it isn't found in the RDF store. (Useful for links to images.)
 
 !Status
 This is the first alpha release of Rhizome.  See [RhizomeStatus] for more details.

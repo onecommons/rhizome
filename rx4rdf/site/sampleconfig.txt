@@ -8,8 +8,8 @@
 #PATH is a platform-specific string listing the directories that will be searched when resolving 'path:' URLs
 PATH = '.;..'
 
-#ROOT_PATH specifies base of URL that this runs on 
-ROOT_PATH = "cgi-bin/rhizome"
+#ROOT_PATH specifies base of the URL that this runs on (must start with a '/')
+ROOT_PATH = "/cgi-bin/rhizome"
 
 #the __include__ function includes another Racoon configuration file
 __include__('../rx/rhizome/rhizome-config.py')

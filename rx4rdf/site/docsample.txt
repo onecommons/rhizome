@@ -12,10 +12,10 @@ A blank line starts a new paragraph.
 * Here is a simple list item (\<code><li>\</code>).
 * Have you seen the use of the \<code><code>\</code> element in the previous item?
 *We have elements for hyperlinking: 
-;;link:to another document
-;;anchor:to an anchor
-;;fork: equivalent to \<code><a ...target="_top">\</code>
-;;jump: equivalent to \<code><a ...target="_blank">\</code>
+++link=to another document
+++anchor=to an anchor
+++fork= equivalent to \<code><a ...target="_top">\</code>
+++jump= equivalent to \<code><a ...target="_blank">\</code>
 
 paragraph-level elements (note: make sure to indent past the body element above).
      fixme author="SN":
