@@ -39,6 +39,7 @@ if not globals().has_key('hotReload'):
     configFile=ConfigParser.ConfigParser()
     configFile.read(configFileName)
 
+#rhizome changes:
 recordRequests = False
 requestRecordFilePath = ''
 requestsRecord = []
@@ -48,6 +49,12 @@ try:
     pickle = cPickle
 except ImportError:
     import pickle
+    
+def saveRequestHistory():
+    if requestRecordFilePath and requestsRecord:
+        requestRecordFile = file(requestRecordFilePath, 'wb')
+        pickle.dump(requestsRecord, requestRecordFile)
+        requestRecordFile.close()       
 
 def initRequest():
     pass
@@ -439,12 +446,9 @@ if not globals().has_key('hotReload'):
             _handleRequest(_wfile)
         #modified for rhizome:
         except KeyboardInterrupt, e:
-                print 'KeyboardInterrupt'
+                print 'request interrupted with <ctrl-C>'
                 onError()
-                if requestRecordFilePath and requestsRecord:
-                    requestRecordFile = file(requestRecordFilePath, 'wb')
-                    pickle.dump(requestsRecord, requestRecordFile)
-                    requestRecordFile.close()       
+                saveRequestHistory()
         except:
             _err=""
             _exc_info_1=sys.exc_info()[1]
@@ -1343,6 +1347,7 @@ def ramOrFileOrCookieLoadSessionData(sessionId):
                 except: pass
         return None
 
+#rhizome change:
 def start_server(serve, record = False, requestRecordPath = 'debug-wiki.pkl'):
     global root, recordRequests, requestRecordFilePath
     root = serve
@@ -1351,7 +1356,4 @@ def start_server(serve, record = False, requestRecordPath = 'debug-wiki.pkl'):
     try:
         run([]) #todo? integrate better
     finally:
-        if requestRecordFilePath and requestsRecord:            
-            requestRecordFile = file(requestRecordFilePath, 'w')
-            pickle.dump(requestsRecord, requestRecordFile)
-            requestRecordFile.close()
+        saveRequestHistory()
