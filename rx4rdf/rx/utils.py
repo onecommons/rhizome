@@ -234,7 +234,7 @@ def deserializeRDF(modelPath, driver=Memory, dbName='', scope='', modelName='def
     elif modelPath[-3:] == '.nt':
         model, db = DeserializeFromN3File(modelPath,driver, dbName, False, scope, modelName)
     elif modelPath[-4:] == '.rdf':
-        model, db = Util.DeserializeFromUri(modelPath, driver, dbName, False, scope, modelName) 
+        model, db = Util.DeserializeFromUri(modelPath, driver, dbName, False, scope) 
     else: #todo: add support for rxml
         raise 'unknown file type reading RDF: %s, only .rdf, .nt and .mk supported' % os.path.splitext(modelPath)[1]
     return model, db
@@ -363,6 +363,73 @@ def getVolumeInfo(path):
     else:
         assert 0, 'NYI!' #todo
 
+class Res(dict):
+    '''simplify building RDF statements. dict-like object representing a resource with a dict of property/values
+       usage:
+       Res.nsMap = { ... } #global namespace map
+       
+       res = Res(uri, nsMap) #2nd param is optional instance override of global nsMap
+       
+       res['q:name'] = 'adfasdfdf' #assign property with literal
+       
+       #if prefix not found in nsMap treat as an URL
+       res['http://foo'] = Res('http://') #assign a resource
+       
+       #if you want multiple statements with the same property, use a list as the value, e.g.:
+       res.setdefault('q:name', []).append(child)
+       
+       #retrieve the statements as NTriples:
+       res.toTriples()
+    '''
+    
+    nsMap =  { 'owl': 'http://www.w3.org/2002/07/owl#',
+           'rdf' : 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+            'rdfs' : 'http://www.w3.org/2000/01/rdf-schema#' }
+
+    def __init__(self, uri, nsMap = None):
+        self.uri = uri
+        if nsMap is not None:
+            self.nsMap = nsMap
+
+    def __getitem__(self, key):
+        return super(Res, self).__getitem__(self.getURI(key))
+    
+    def __setitem__(self, key, item):    
+        return super(Res, self).__setitem__(self.getURI(key), item)
+
+    def __delitem__(self, key):
+        return super(Res, self).__delitem__(self.getURI(key))
+
+    def __contains__(self, key):
+        return super(Res, self).__contains__(self.getURI(key))
+
+    def getURI(self, key):
+        index = key.find(':')
+        if index == -1: #default ns
+            prefix = ''
+            local = key
+        else:
+            prefix = key[:index]
+            local = key[index+1:]
+        if self.nsMap.get(prefix) is not None:
+            return self.nsMap[prefix] + local 
+        else:#otherwise assume its a uri
+            return key
+        
+    def toTriples(self):
+        s = ''
+        for p, v in self.items():
+            if not isinstance(v, (type(()), type([])) ):
+                v = (v)
+            for o in v:
+                s += '<' + self.uri + '> <' + p + '> '
+                if isinstance(o, Res):
+                    s += '<'+ o.uri + '>. \n'
+                else:
+                    escaped = o.replace('\\', r'\\').replace('\"', r'\"').replace('\n', r'\n').replace('\r', r'\r').replace('\t', r'\t')
+                    s += '"' + escaped.encode('utf8') + '" .\n'
+        return s
+    
 class InterfaceDelegator:
     '''assumes only methods will be called on this object'''
     def __init__(self, handlers):
