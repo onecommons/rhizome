@@ -10,7 +10,7 @@ _outputFile="Server.py"
 _cacheMap={}
 
 import string, time, urllib, sys, getopt, cgi, socket, os, ConfigParser, cStringIO
-from rx import logging #for python 2.2 compatibility
+from rx import logging, __version__ #for python 2.2 compatibility
 log = logging.getLogger("server")
 
 
@@ -256,7 +256,16 @@ if not globals().has_key('hotReload'):
     _usevdomain = False
     try: _usevdomain=int(configFile.get('server', 'useSubDomainAsName'))
     except: pass
-     
+
+    global _serverIdString
+    #put Python version string in HTTP header comment (which can't contain "()" )
+    _serverIdString = "Rhizome/" + __version__ + " (Python " +\
+            sys.version.replace('\n','').replace('\r','').replace('(','[').replace(')',']') +')'
+    try: _serverIdString=configFile.get('server', 'serverIdString')
+    except: pass
+
+    logMessage("  server ID: %s"%_serverIdString)
+    
     if _sessionStorageFileDir:#rhizome change
         try: os.makedirs(_sessionStorageFileDir)
         except: pass
@@ -530,8 +539,7 @@ if not globals().has_key('hotReload'):
         _year, _month, _day, _hh, _mm, _ss, _wd, _y, _z = time.gmtime(_now)
         _date="%s, %02d %3s %4d %02d:%02d:%02d GMT"%(_weekdayname[_wd],_day,_monthname[_month],_year,_hh,_mm,_ss)
         #modified for rhizome:
-        response.headerMap={"status": "200 OK", "server": "Rhizome 0.4.0/Python "
-                            + sys.version.replace('\n','').replace('\r',''),
+        response.headerMap={"status": "200 OK", 'server':_serverIdString,
                             "date": _date, "set-cookie": [], "content-length": 0}
 
         # Two variables used for streaming
