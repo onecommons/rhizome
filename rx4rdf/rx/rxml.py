@@ -8,7 +8,7 @@
 import sys, re, urllib
 from rx import utils, RxPath
 from Ft.Xml import EMPTY_NAMESPACE,InputSource,SplitQName, XML_NAMESPACE
-from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, RDF_MS_BASE, BNODE_BASE
+from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, RDF_MS_BASE, RDF_SCHEMA_BASE, BNODE_BASE
 from Ft.Rdf.Statement import Statement
 try:
     import cStringIO
@@ -396,7 +396,7 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
             if isList: #is the object a list resource?
                 for li in [p.childNodes[0] for p in object.childNodes
                         if RxPath.getURIFromElementName(p) in [
-                            RDF_MS_BASE+'first', RDF_MS_BASE+'li']]:
+                            RDF_MS_BASE+'first', RDF_SCHEMA_BASE+'member']]:
                             
                     if li.nodeType == li.TEXT_NODE: 
                         lang = li.parentNode.getAttributeNS(XML_NAMESPACE, 'lang')
