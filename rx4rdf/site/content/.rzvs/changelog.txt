@@ -1,7 +1,7 @@
 Rx4RDF and Rhizome Changelog
 ============================
 
-Changes in Version 0.3.1 (Aug ??, 2004)
+Changes in Version 0.4 (Aug 30, 2004)
 ---------------------------------------
 Major changes and bug fixes:
 * Raccoon: added content processing-level authorization
@@ -23,6 +23,8 @@ Major changes and bug fixes:
 * Rhizome: added simple UI for editing and browsing keyword metadata
 * Rhizome: added page for executing ad-hoc content (Sandbox)
 * Rhizome: various bug fixes for save-contents and renaming pages
+* Rhizome: conflict detection with externally modified content
+           (logs warning and adds wiki:save-conflict property to revision)
 * Rhizome: change default PATH to prevent information leakage
 * Rhizome: added view-source action
 * ZML:     more user-friendly error reporting
@@ -36,6 +38,11 @@ Major changes and bug fixes:
 * Rhizome: now, by default, only administrators can apply the "released" label
 * Rhizome: added XPath function to check if actions on resources are authorized
 * RxUpdate:added for-each element/instruction (use $current for current node)
+* Rhizome: added a "Save (keep editing)" button to edit page for background saving
+* Raccoon: _name is URL decoded (so now you can have page names with spaces, etc.)
+* Rhizome: improve RSS support on search page; use RSS 2.0
+* Rhizome: reduce memory bloat in caches: removed dump.xml, added robots meta
+           tag with "noindex,nofollow" to many pages
 * All:     too many minor bug fixes and enhancements to list here
  
 Changes in Version 0.3 (May 12, 2004)
