@@ -27,8 +27,10 @@ revisionQueries=[
 ]
 
 #now see if we're authorized to handle this request
-#simple authorization system for now: 'system' owned resources are read-only
+#simple authorization system for now: all 'system' owned resources are read-only
 authorizationQueries=['''xf:if(wiki:item-disposition='http://rx4rdf.sf.net/ns/wiki#item-disposition-handler'
+   and not(wf:has-metadata('itemname')), /*[wiki:name='_not_authorized'])''', #must have itemname defined
+'''xf:if(wiki:item-disposition='http://rx4rdf.sf.net/ns/wiki#item-disposition-handler'
    and /*[wiki:name=$itemname]/wiki:owned_by='http://rx4rdf.sf.net/ns/wiki#owner-system',
    /*[wiki:name='_not_authorized'])''', #if not authorized, set the context to the _not_authorized page
    '.', #if we made it here, we're authorized - don't change the context
