@@ -183,7 +183,7 @@ Or <a href="site:///users/guest?action=new">signup</a>
 &#xa0;<a href="site:///{$path}?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-print{$aboutparam}">Print</a>
 </p>
 <p>       
-<form action='site:///search' method="GET">
+<form action='site:///search' accept-charset='UTF-8' method="GET">
       Search <input type="text" name="search" value="{$previous:search}" size="40" />
 Type<select name="searchType">    
     <option value="Simple">
