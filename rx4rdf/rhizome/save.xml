@@ -5,7 +5,9 @@
 		    xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'		    
 		    xmlns:request-header = 'http://rx4rdf.sf.net/ns/raccoon/http-request-header#'
 			xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
-			xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+			xmlns:dc='http://purl.org/dc/elements/1.1/'
+			xmlns:foaf="http://xmlns.com/foaf/0.1/"
+			xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"			
 			xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >
 
     <xu:if test='$itemname and not(wf:get-metadata("__noConflictDetection")) and 
@@ -13,18 +15,18 @@
         <xu:message text="Conflict: Item has been modified after you started editing this item!" terminate="yes" />
     </xu:if>
 
-    <xu:if test="not($__user/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser')">        
+    <xu:if test="not($__account/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser')">        
         <!-- we don't support fine-grained authentication yet for RxUpdate yet so let's block the most egrarious security holes 
             you can remove this check if you trust your users, etc.
          -->
         <xu:if test="$format = 'http://rx4rdf.sf.net/ns/wiki#item-format-python' and
-             not(/*[.=concat($BASE_MODEL_URI, 'execute-python-token')][.=$__user/auth:has-rights-to/* or .=$__user/auth:has-role/*/auth:has-rights-to/*])">
-            <xu:message text="You ({$__user/wiki:login-name}) don't have permission to create a page with format {$format}" terminate="yes" />
+             not(/*[.=concat($BASE_MODEL_URI, 'execute-python-token')][.=$__account/auth:has-rights-to/* or .=$__account/auth:has-role/*/auth:has-rights-to/*])">
+            <xu:message text="You ({$__account/foaf:accountName}) don't have permission to create a page with format {$format}" terminate="yes" />
         </xu:if>
     
         <xu:if test="$format = 'http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate' and
-             not(/*[.=concat($BASE_MODEL_URI, 'execute-rxupdate-token')][.=$__user/auth:has-rights-to/* or .=$__user/auth:has-role/*/auth:has-rights-to/*])">
-            <xu:message text="You ({$__user/wiki:login-name}) don't have permission to create a page with format {$format}" terminate="yes" />
+             not(/*[.=concat($BASE_MODEL_URI, 'execute-rxupdate-token')][.=$__account/auth:has-rights-to/* or .=$__account/auth:has-role/*/auth:has-rights-to/*])">
+            <xu:message text="You ({$__account/foaf:accountName}) don't have permission to create a page with format {$format}" terminate="yes" />
         </xu:if>
     </xu:if>
     
@@ -50,7 +52,7 @@
     
     <xu:variable name='resource' select='/*[wiki:name=$itemname]' />
         
-    <xu:variable name = 'contents' select="f:if($file, $file, $contents)" />
+    <xu:variable name = 'contents' select="f:if(wf:get-metadata('file'), wf:get-metadata('file'), $contents)" />
 
     <xu:define-template name='getOrCreateFolder'>
     <!--
@@ -117,7 +119,7 @@
     
     <!-- do this check now, before we call a function that might save content or patches to disk -->
     <xu:if test='wf:get-metadata("label")'>
-      <xu:if test='wf:find-unauthorized($__user, "http://rx4rdf.sf.net/ns/auth#permission-add-statement", 
+      <xu:if test='wf:find-unauthorized($__account, "http://rx4rdf.sf.net/ns/auth#permission-add-statement", 
               $resource, "http://rx4rdf.sf.net/ns/wiki#has-label", $label)' >
         <xu:message terminate='yes'
           text='Authorization error: you do not have rights to set this label: "{/*[.=$label]/rdfs:label}" - go back and choose another (or none).' />
@@ -183,8 +185,8 @@
     todo: if the user is guest allow a minor revision if remote-host and remote-host = last revision's remote host 
     -->
     <xu:variable name='replaceRevision' select="wf:get-metadata('minor_edit') and 
-       not($__user/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-guest') and 
-       (not($resource/wiki:revisions/*) or ($resource/wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by = $__user)" /> 
+       not($__account/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-guest') and 
+       (not($resource/wiki:revisions/*) or ($resource/wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by = $__account)" /> 
 
    <!-- check if the label is draft and there was a non-draft previous revision -->   
    <xu:variable name='draftAndPreviousNonDraft' select='wf:get-metadata("label") and /*[.=wf:get-metadata("label")]/wiki:is-draft and     
@@ -272,6 +274,50 @@
            </xu:replace>           
         </xu:if>                 
     </xu:if>
+
+     <xu:variable name='user' select='/foaf:Person[foaf:holdsAccount = $__account]'/>
+     <xu:if test='not($user)'>        
+     <!-- 
+     This change is made by the someone not logged in. If some identifying info was posted 
+     (this can happen on the comments page) find or create a foaf:Person and associate it with this revision
+     -->     
+        <xu:if test='wf:get-metadata("user-name") or wf:get-metadata("email")' >             
+             <xu:variable name='user' select="/foaf:Person[foaf:mbox=concat('mailto:',$email)]"/> 
+             <xu:if test='$user' >                       
+                <!-- update user properties -->                                                          
+                <xu:if test='wf:get-metadata("user-name")' >
+                   <xu:remove select="$user/foaf:name" />
+                   <xu:append select="$user">
+                      <foaf:name rdf:resource='{$user-name}' />
+                   </xu:append>
+                </xu:if>
+                <xu:if test='wf:get-metadata("user-url")' >             
+                   <xu:remove select="$user/foaf:homepage" />
+                   <xu:append select="$user">
+                        <foaf:homepage rdf:resource='{$user-url}' />                            
+                   </xu:append>
+                </xu:if>                                                                         
+             </xu:if> 
+             
+             <xu:if test='not($user)'> 
+                <xu:variable name="guestURI" select="wf:generate-bnode()"/>
+                <xu:append select='/'>
+                   <foaf:Person rdf:about='{$guestURI}'>
+                      <xu:if test='wf:get-metadata("email")' >             
+                        <foaf:mbox rdf:resource="mailto:{$email}" />
+                      </xu:if>                          
+                      <xu:if test='wf:get-metadata("user-name")' >             
+                        <foaf:name rdf:resource='{$user-name}' />                            
+                      </xu:if>
+                      <xu:if test='wf:get-metadata("user-url")' >             
+                        <foaf:homepage rdf:resource='{$user-url}' />                            
+                      </xu:if>                                                     
+                   </foaf:Person>                   
+                </xu:append>
+                <xu:variable name="user" select="/*[.=$guestURI]"/>
+             </xu:if>              
+        </xu:if> 
+     </xu:if> 
         
 <!--
     this is how the above patching logic plays itself out given base64 encoded content:
@@ -323,7 +369,8 @@
             <xu:if test='$title'>
                 <wiki:title><xu:value-of select="$title"/></wiki:title>
             </xu:if>
-            <xu:if test='not($title) and $resource/wiki:name-type = uri("wiki:name-type-anonymous")'>
+            <xu:if test='not($title) and $resource/wiki:name-type = uri("wiki:name-type-anonymous") 
+                                    and $format != "http://rx4rdf.sf.net/ns/wiki#item-format-binary"'>
                 <!-- the user didn't specify a name or title, so select the first line of text so we have something to show  -->
                 <wiki:auto-summary><xu:value-of select="substring($contents, 1, 80)"/></wiki:auto-summary>
             </xu:if>
@@ -337,7 +384,10 @@
             <wiki:created-from><xu:value-of select="wf:if(wf:has-metadata('request-header:remote-host'), 
                                 '$request-header:remote-host','$request-header:remote-addr')"/>
             </wiki:created-from>
-            <wiki:created-by rdf:resource="{$__user}"/>
+            <wiki:created-by rdf:resource="{$__account}"/>
+            <xu:if test='$user'>
+                <dc:creator rdf:resource="{$user}"/>
+            </xu:if>
             <xu:if test='not($replaceRevision) and wf:get-metadata("minor_edit")'>
                 <wiki:minor-edit>1</wiki:minor-edit>
             </xu:if>            
@@ -345,5 +395,22 @@
        </rdf:first>
     </xu:append>
     
+    <xu:if test='wf:has-metadata("metadata")'>
+         <!-- hack for now: replace #this# with the resource -->
+        <xu:variable name='save-metadata' select="wf:save-metadata(f:replace('#this#', concat('{',$resource,'}'), $metadata), $__account)" />
+    </xu:if>
+
+    <xu:if test='wf:has-metadata("revision-metadata")'>
+         <!-- hack for now: replace #this# with the revision -->
+        <xu:variable name='save-metadata' select="wf:save-metadata(f:replace('#this#', concat('{',$revision,'}'), $revision-metadata), $__account)" />
+    </xu:if>
+    
     <xu:variable name='frameid' select="wf:assign-metadata('frameid', $current-time)" /> <!-- used by the iframe-display-handler -->                            
+
+    <xu:if test='$format = "http://rx4rdf.sf.net/ns/wiki#item-format-binary"'>
+       <!-- use this hack until we support binary XPath variables in stylesheets-->
+       <xu:if test="wf:assign-metadata('_disposition', 'http://rx4rdf.sf.net/ns/wiki#item-disposition-complete')" />
+       <xu:message terminate='no' text="Binary content saved." />
+    </xu:if>
+
 </xu:modifications>

@@ -16,27 +16,29 @@
   x:param name="__passwordHashProperty"
    
   x:template match='/':  	    `
-    x:variable name='user' select='f:if($action!="new", $__resource)'
+    x:variable name='account' select='f:if($action!="new", $__resource)'
+    x:variable name='user' select='/foaf:Person[foaf:holdsAccount = $account]'
     x:variable name='title' select='''wf:assign-metadata('title', 
-f:if($user, concat('Edit Profile of ', $user/wiki:login-name), 'Register new user'))'''
+f:if($account, concat('Edit Profile of ', $account/foaf:accountName), 'Register new user'))'''
 
     x:value-of select='$title'    
     hr
-    form action="{concat('site:///users/',f:if($user, $user/wiki:login-name, 'guest'))}" accept-charset='UTF-8' method='post':
+    form (action="site:///accounts/?about={f:escape-url(f:if($account, $account, 'http://xmlns.com/foaf/0.1/OnlineAccount'))}" 
+            accept-charset='UTF-8' method='post'):
      table:         
          x:choose
-          x:when test='not($user)': 
+          x:when test='not($account)': 
            tr: 
              td: `*Login name:     
              td: input type=text name=loginname
           x:otherwise:
-             input type=hidden name=loginname value="{$__resource/wiki:login-name}"
+             input type=hidden name=loginname value="{$account/foaf:accountName}"
          tr:
              td: `Password:     
-             td: input type=password name=password value="{$user/*[uri(.)=$__passwordHashProperty]}"
+             td: input type=password name=password value="{$account/*[uri(.)=$__passwordHashProperty]}"
          tr: 
              td: `Confirm Password:          
-             td: input type=password name=confirm-password value="{$user/*[uri(.)=$__passwordHashProperty]}"         
+             td: input type=password name=confirm-password value="{$account/*[uri(.)=$__passwordHashProperty]}"         
          tr: 
              td: `email:     
              td: input type=text name=email value="{substring-after($user/foaf:mbox,'mailto:')}" 
@@ -45,5 +47,5 @@ f:if($user, concat('Edit Profile of ', $user/wiki:login-name), 'Register new use
              td: input type=text name=fullname value="{$user/foaf:name}"           
          tr:              
              td: 
-               input type="hidden" name="action" value="{f:if($user,'save','creation')}" #fix IE bug
-               button type=submit name=action value="{f:if($user,'save','creation')}": `Signup
+               input type="hidden" name="action" value="{f:if($account,'save','creation')}" #workaround IE bug: value doesn't work with button
+               button type=submit: `Signup

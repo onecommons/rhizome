@@ -5,9 +5,10 @@
         xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
         xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
         xmlns:f='http://xmlns.4suite.org/ext'
-        xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'
+        xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'        
         xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
-        exclude-result-prefixes = "a wiki rdf rdfs f wf" 
+        xmlns:foaf="http://xmlns.com/foaf/0.1/"
+        exclude-result-prefixes = "a wiki foaf rdf rdfs f wf" 
         >
 <xsl:param name="_name" />
 <xsl:param name="__resource" />
@@ -29,11 +30,11 @@
             <td><xsl:value-of select='wf:format-pytime( a:created-on, "%a, %d %b %Y %H:%M")'/></td>
             <td>
             <xsl:choose>
-             <xsl:when test="wiki:created-by/*[wiki:login-name = 'guest'] and wiki:created-from">
+             <xsl:when test="wiki:created-by/*[foaf:accountName = 'guest'] and wiki:created-from">
                 <xsl:value-of select='wiki:created-from'/>
             </xsl:when>
             <xsl:otherwise>
-                <a href='site:///users/{wiki:created-by/*/wiki:login-name}'><xsl:value-of select='wiki:created-by/*/wiki:login-name'/></a>
+                <a href='site:///accounts/{wiki:created-by/*/foaf:accountName}'><xsl:value-of select='wiki:created-by/*/foaf:accountName'/></a>
             </xsl:otherwise>
             </xsl:choose>
             </td>

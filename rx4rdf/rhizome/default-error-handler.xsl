@@ -33,9 +33,9 @@
     <xsl:choose>    
     <xsl:when test='$error:userMsg'>        
     <!--todo: hmm, why did the replace stop working? -->
-    <b><pre>Error: <xsl:value-of disable-output-escaping='yes' 
-        select="f:replace('\n','&lt;br />', f:escape-xml($error:userMsg))"/>
-    </pre></b>
+    <b>Error: <xsl:value-of disable-output-escaping='yes' 
+        select="f:replace('&#10;','&lt;br />', f:escape-xml($error:userMsg))"/>
+    </b>
     </xsl:when>
     <xsl:otherwise>    
     <!-- set 500 internal server error -->

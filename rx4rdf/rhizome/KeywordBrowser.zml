@@ -119,7 +119,7 @@ x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
             x:with-param name='resources' select='$resWithTopics'
 
         x:if test='not($topics)'
-          x:variable name='nokeywords' select='/a:NamedContent[not(wiki:about)]'
+          x:variable name='nokeywords' select='/a:NamedContent[not(wiki:comments-on)][not(wiki:about)]'
           h4:
            `All pages with no keywords (
            x:value-of select='count($nokeywords)'

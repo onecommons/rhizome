@@ -9,7 +9,9 @@
 		xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
 		xmlns:f = 'http://xmlns.4suite.org/ext'
 		xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
-		exclude-result-prefixes = "rdfs f wf a wiki auth rdf response-header" >
+		xmlns:foaf="http://xmlns.com/foaf/0.1/"
+		xmlns:dc='http://purl.org/dc/elements/1.1/'
+		exclude-result-prefixes = "rdfs rdf f wf dc foaf a wiki auth response-header" >
 
 <xsl:param name="search" />
 <xsl:param name="view" />
@@ -64,23 +66,65 @@ function resizeForIframe(iframeWin, iframeId)
 </xsl:template>
 
 <xsl:template name="make-summary" >
+    <xsl:param name='maxwords' select='100' />
+    <xsl:param name='maxlines' select='7' />
+    <xsl:param name='showedit' select='true()' />
+    <xsl:param name='target' select='"_blank"' />
+    
+    <xsl:variable name='revision' select="(./wiki:revisions/*/rdf:first/*)[last()]" />      
+    <xsl:variable name='hasTitle' select="$revision/wiki:title or not(wiki:name-type = uri('wiki:name-type-anonymous'))"/>
+    
+    <xsl:choose>
+        <xsl:when test="$revision/wiki:title or not(wiki:name-type = uri('wiki:name-type-anonymous'))">
     <div id='titlebar' style='line-height: 20px;'>
-      <xsl:value-of select="f:if( (./wiki:revisions/*/rdf:first/*)[last()]/wiki:title, 
-      (./wiki:revisions/*/rdf:first/*)[last()]/wiki:title, f:if(wiki:name, wiki:name, .))" />
-    </div>      
-    <xsl:variable name='frameid' select='generate-id()' />
-    <iframe width='100%' hspace='0' height='100' id='{$frameid}' frameborder='0' scrolling='yes' src="site:///{
-        f:if(wiki:name, concat(wiki:name,'?'), concat('.?about=',f:escape-url(.), '&amp;') )
-        }_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-short-display&amp;frameid={$frameid}">
-        Your browser needs to support iframes!
-        </iframe>    
+      <xsl:value-of select="f:if( $revision/wiki:title, $revision/wiki:title, f:if(wiki:name, wiki:name, .))" />
+    </div>
+        </xsl:when>
+       <xsl:otherwise>       
+          <hr/>
+       </xsl:otherwise>       
+    </xsl:choose>
+        
+    <xsl:variable name='contents' select="wf:truncate-contents($revision, $maxwords, $maxlines)" />      
+    <xsl:choose>
+        <xsl:when test='wf:instance-of($contents,"number")'> <!-- hack to check for failure -->
+        <!-- can't display the contents so view it in an iframe -->
+        <xsl:variable name='frameid' select='generate-id()' />
+        <iframe width='100%' hspace='0' height='100' id='{$frameid}' frameborder='0' scrolling='yes' src="site:///{
+            f:if(wiki:name, concat(wiki:name,'?'), concat('.?about=',f:escape-url(.), '&amp;') )
+            }_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-short-display&amp;frameid={$frameid}">
+            Your browser needs to support iframes!
+        </iframe> 
+       </xsl:when>
+       <xsl:when test="$revision/a:contents/a:ContentTransform/a:transformed-by/* = 'http://rx4rdf.sf.net/ns/wiki#item-format-text'">
+            <!-- note: this doesn't handle dynamically set text format -->
+            <xsl:value-of disable-output-escaping='yes' 
+                select="f:replace('&#10;','&lt;br />', f:escape-xml($contents))"/>      
+       </xsl:when>
+       <xsl:otherwise>       
+          <xsl:value-of disable-output-escaping='yes' select="$contents" />  
+       </xsl:otherwise>       
+    </xsl:choose>
     <br clear='all' />
-    <xsl:value-of select='wf:format-pytime( (./wiki:revisions/*/rdf:first/*)[last()]/a:created-on, "%a, %d %b %Y %H:%M")' />
-    &#xA0;<a href='site:///{wiki:name}'>View</a>&#xA0;<a href='site:///{wiki:name}?action=edit' target='new'>Edit</a>&#xA0;<a href='site:///{wiki:name}?action=edit-metadata' target='new'>Edit Metadata</a>
+    <a href='site:///{wiki:name}' target='{$target}'>More...</a>&#xA0;<xsl:value-of select='wf:format-pytime( $revision/a:created-on, "%a, %d %b %Y %H:%M")' />
+    by
+    <!-- choose creator's url in this order: foaf:homepage, user's account url, email, account url (guest) -->
+    <xsl:variable name='user-url' select='f:if($revision/dc:creator/*/foaf:homepage, $revision/dc:creator/*/foaf:homepage, 
+          f:if($revision/dc:creator/*/foaf:holdsAccount, concat("site:///users/", $revision/dc:creator/*/foaf:holdsAccount/*/foaf:accountName),
+          f:if($revision/dc:creator/*/foaf:mbox, $revision/dc:creator/*/foaf:mbox, concat("site:///accounts/", $revision/wiki:created-by/*/foaf:accountName)) ))' />
+    <a href='{$user-url}' target='{$target}'>
+    <!-- choose creator's name in this order: foaf:name, email, source ip, account name (guest) -->
+    <xsl:value-of select='f:if($revision/dc:creator, 
+                f:if($revision/dc:creator/*/foaf:name, $revision/dc:creator/*/foaf:name, $revision/dc:creator/*/foaf:mbox), 
+                  f:if($revision/wiki:created-from, $revision/wiki:created-from, $revision/wiki:created-by/*/foaf:accountName) )'/>
+    </a>
+    <xsl:if test="$showedit">
+        &#xA0;<a href='site:///{wiki:name}?action=edit' target='{$target}'>Edit</a>&#xA0;<a href='site:///{wiki:name}?action=edit-metadata' target='{$target}'>Edit Metadata</a>
+    </xsl:if>
     <xsl:if test='wiki:about'>
      ( 
      <xsl:for-each select='wiki:about'>
-       <a href='site:///keywords/{local-name-from-uri(.)}?about={f:escape-url(.)}' >
+       <a taget='{$target}' href='site:///keywords/{local-name-from-uri(.)}?about={f:escape-url(.)}' >
        <xsl:value-of select='f:if(namespace-uri-from-uri(.)=concat($BASE_MODEL_URI,"kw#"),local-name-from-uri(.), name-from-uri(.))'/>
        </a>&#xa0;
      </xsl:for-each>
@@ -88,20 +132,6 @@ function resizeForIframe(iframeWin, iframeId)
     </xsl:if>
     
     <br/>
-
-    <!--    
-    <tr><td valign="top" id="maincontent">        
-        
-        <xsl:variable name='contents' select="wf:openurl(concat('site:///',
-         f:if(wiki:name, concat(wiki:name,'?'), concat('.?about=',f:escape-url(.), '&amp;') ),
-        '_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-short-display'))" />
-        <xsl:value-of disable-output-escaping='yes' select='$contents'/>
-            </td></tr>
-    <tr>
-    <td><xsl:value-of select='f:pytime-to-exslt( (./wiki:revisions/*/rdf:first/*)[last()]/a:created-on)' />
-    &#xA0;<a href='site:///{wiki:name}'>View</a>&#xA0;<a href='site:///{wiki:name}?action=edit' target='new'>Edit</a>&#xA0;<a href='site:///{wiki:name}?action=edit-metadata' target='new'>Edit Metadata</a></td>
-    </tr>
-    -->
 </xsl:template>
 
 <xsl:template match="node()|@*" mode="dump">
@@ -238,13 +268,13 @@ No results found.
     <td><xsl:value-of select='wf:format-pytime( (./wiki:revisions/*/rdf:first/*)[last()]/a:created-on, "%a, %d %b %Y %H:%M")' /></td>
     <td>
         <xsl:choose>
-         <xsl:when test="(./wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by/*[wiki:login-name = 'guest']
+         <xsl:when test="(./wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by/*[foaf:accountName = 'guest']
                                                and (./wiki:revisions/*/rdf:first/*)[last()]/wiki:created-from">
             <xsl:value-of select='(./wiki:revisions/*/rdf:first/*)[last()]/wiki:created-from'/>
         </xsl:when>
         <xsl:otherwise>
-            <a href='site:///users/{(./wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by/*/wiki:login-name}'>
-            <xsl:value-of select='(./wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by/*/wiki:login-name'/></a>
+            <a href='site:///accounts/{(./wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by/*/foaf:accountName}'>
+            <xsl:value-of select='(./wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by/*/foaf:accountName'/></a>
         </xsl:otherwise>
         </xsl:choose>
     </td>    

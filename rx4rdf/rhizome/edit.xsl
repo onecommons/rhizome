@@ -13,10 +13,11 @@
 <xsl:output method='html' encoding="UTF-8" indent='no' />
 <xsl:param name="about" />
 <xsl:param name="_name" />
-<xsl:param name="__user" />
+<xsl:param name="__account" />
 <xsl:param name="action" />
 <xsl:param name="BASE_MODEL_URI" />
-<!-- todo: you can used these faults to create a template -->
+<xsl:param name="metadata" />
+<!-- todo: you can used these defaults to create a template -->
 <xsl:param name="nameDefault" />
 <xsl:param name="titleDefault" />
 <xsl:param name="contentsDefault" />
@@ -52,14 +53,130 @@
 	</option>
 </xsl:template>
 
-<xsl:template name="get-keywords">
+<xsl:template name="write-keywords">
 <xsl:param name="topics" />
-    <xsl:value-of select='$topics[1]' />
-    <xsl:if test='$topics[2]'>,
-        <xsl:call-template name="get-keywords">
-        <xsl:with-param name="topics" select="$topics[position()!=1]" />
-        </xsl:call-template>
-    </xsl:if>
+<xsl:param name="width" select='40' />
+<xsl:param name="field-name" select='"keywords"' />
+<xsl:param name="add-script" select='true()' />
+
+<xsl:if test='$add-script'>
+    <script language="JavaScript">
+    <xsl:comment><![CDATA[    
+        function domouseout(e, fromElement){  
+          var toElement = (e && e.relatedTarget) || window.event.toElement;
+          var currElement = toElement;
+          while (currElement != fromElement)
+          {
+             currElement = currElement.parentNode;
+             if (!currElement) {
+                //reached the top, must be outside the div so hide it after a tiny delay
+                var closure = function() { divSetVisible(fromElement, false);};
+                setTimeout(closure, 500);  
+                return true;    
+            }        
+          }  
+        }
+        
+        function updateEditField(e, inputID) {
+          var elem = (e && e.currentTarget ) || window.event.srcElement;
+          var remove = !elem.checked;
+          if (remove) {
+            document.getElementById(inputID).value = document.getElementById(inputID).value.replace(elem.value, '');
+          }
+          else {
+            document.getElementById(inputID).value = document.getElementById(inputID).value + elem.value + ' ';
+          }
+        }
+
+       function getAbsX(elt) { return (elt.x) ? elt.x : getAbsPos(elt,"Left"); }
+       function getAbsY(elt) { return (elt.y) ? elt.y : getAbsPos(elt,"Top"); }
+       function getAbsPos(elt,which) {
+        	iPos = 0;
+        	while (elt != null) {
+        	    iPos += elt["offset" + which];
+        	    elt = elt.offsetParent;
+        	}
+        	return iPos;
+      }
+       
+      function showOrHide(textId, divId) {
+       var selDiv = document.getElementById(divId);
+       if (selDiv.style.display=='none') 
+       {    
+          var selTxt = document.getElementById(textId);         
+          selDiv.style.top = (getAbsY(selTxt)+selTxt.offsetHeight+1) + 'px';
+          selDiv.style.left = getAbsX(selTxt) +'px';
+          selDiv.style.width = selTxt.offsetWidth + 'px';
+          
+          //selDiv.style.display='block';
+          divSetVisible(selDiv, true);
+       }
+       else {
+          //selDiv.style.display='none'; 
+          divSetVisible(selDiv, false);
+       }
+     }
+
+    function divSetVisible(DivRef, state)
+    {
+        var IfrRef = document.all ? document.getElementById('DivShim') : null;
+        if(state) {
+          DivRef.style.display = "block";
+          if (IfrRef) {//IE hack
+            IfrRef.style.width = DivRef.offsetWidth;
+            IfrRef.style.height = DivRef.offsetHeight;
+            IfrRef.style.top = DivRef.style.top;
+            IfrRef.style.left = DivRef.style.left;
+            IfrRef.style.zIndex = DivRef.style.zIndex - 1;
+            IfrRef.style.display = "block";            
+          }
+        }
+        else {
+           DivRef.style.display = "none";
+           if (IfrRef)
+              IfrRef.style.display = "none";
+        }
+    }      
+    ]]> 
+    //</xsl:comment>
+    </script>    
+</xsl:if>
+
+    <xsl:variable name='keywords'>
+         <xsl:for-each select='$topics'>          
+           <xsl:value-of select='f:if(namespace-uri-from-uri(.)=concat($BASE_MODEL_URI,"kw#"),local-name-from-uri(.), name-from-uri(.))'/>
+           <xsl:text> </xsl:text>
+         </xsl:for-each>
+    </xsl:variable>    
+
+	<input TYPE="text" NAME="{$field-name}" VALUE="{$keywords}" SIZE="{$width}" MAXLENGTH="200" id='{$field-name}Txt' />	 
+	<img src="site:///arrow_up.gif" onmousedown="this.src='site:///arrow_down.gif'" style='vertical-align: bottom'
+	    onload="this.height=document.getElementById('{$field-name}Txt').offsetHeight"
+	    onmouseup="this.src='site:///arrow_up.gif'" onmouseout="this.src='site:///arrow_up.gif'"
+	    onclick="showOrHide('{$field-name}Txt', '{$field-name}Div');" />
+
+     <div style='border: solid gray 1px; background-color: #ffffdd; display: none; z-index: 2; position: absolute' 
+       id='{$field-name}Div' onmouseout="domouseout(event, this)" >    
+       
+        <xsl:for-each select='/wiki:Keyword | id(/*/wiki:about/*)' >
+          <xsl:variable name='kwValue' select='f:if(namespace-uri-from-uri(.)=concat($BASE_MODEL_URI,"kw#"),
+                                                        local-name-from-uri(.), name-from-uri(.))' />   
+                                                                                                                       
+          <input type="checkbox" value="{$kwValue}" onclick="updateEditField(event, '{$field-name}Txt')">
+            <xsl:if test="contains($keywords,$kwValue)">
+               <xsl:attribute name='checked'>checked</xsl:attribute>
+            </xsl:if>
+          </input>
+          <a href="site:///keywords/{local-name-from-uri(.)}?about={f:escape-url(.)}" title='{rdfs:comment}' >
+            <xsl:value-of select='$kwValue' />
+          </a>
+          <br/>
+        </xsl:for-each>
+    </div> 
+   <xsl:comment>hack for IE</xsl:comment> 
+   <iframe id="DivShim" src="javascript:false;" scrolling="no" frameborder="0"
+           style="position:absolute; top:0px; left:0px; display:none;">
+   </iframe>       
 </xsl:template>
 	
 <xsl:template match="/" name="edit-main" >
@@ -140,13 +257,17 @@ function OnSubmitEditForm()
     action="site:///{f:if($item,$itemname, 'save')}" enctype="multipart/form-data">    
 	<xsl:if test='string-length($itemname) > 0'>		
 	    <input TYPE="hidden" NAME="itemname" VALUE="{$itemname}" />
-	    <xsl:variable name='title' select="wf:assign-metadata('title', concat('Editing ', $itemname))" />
+	    <xsl:if test="not(wf:has-metadata('title'))">
+	        <xsl:variable name='title' select="wf:assign-metadata('title', concat('Editing ', $itemname))" />
+	    </xsl:if>
 	</xsl:if>	
 	<xsl:if test='string-length($itemname)=0'>
 	    <input TYPE="radio" NAME="anonymous" checked="checked" VALUE="" /> 
 	    <label for="itemname">Name</label><input TYPE="text" NAME="itemname" VALUE="" SIZE="20" MAXLENGTH="100" />	    
 	    <input TYPE="radio" NAME="anonymous" VALUE="on" /><label for="anonymous">Anonymous</label>
-	    <xsl:variable name='title' select="wf:assign-metadata('title', 'New Item')" />
+	    <xsl:if test="not(wf:has-metadata('title'))">
+	        <xsl:variable name='title' select="wf:assign-metadata('title', 'New Item')" />
+	    </xsl:if>
 	    <br/>
     </xsl:if>
     <label for='title'>Title</label> <input TYPE="text" NAME="title" VALUE="{$item/wiki:title}" SIZE="80" MAXLENGTH="100" />
@@ -168,7 +289,8 @@ function OnSubmitEditForm()
 	</xsl:otherwise>
 	</xsl:choose>
 	<br />
-	<br />Source Format:
+	<div style='font-size: smaller'>
+	Source Format:
 	<select name="format" size="1" width="100">
         <xsl:for-each select="/wiki:ItemFormat">
             <xsl:variable name="i" select="." />
@@ -181,7 +303,17 @@ function OnSubmitEditForm()
             </xsl:call-template>
 	</xsl:for-each>
 	</select>
-    &#xa0;Output Document Type: 
+	&#xa0;<label for='keywords'><a href='site:///keywords'>Keywords:</a>&#xa0;</label>
+		
+    <xsl:call-template name='write-keywords'>
+      <xsl:with-param name='topics' select='$namedContent/wiki:about' />
+    </xsl:call-template>        
+    <div id='less' style='border: 1px'><button type='button' onclick="document.getElementById('less').style.display='none'; 
+    document.getElementById('more').style.display='block';">More>></button></div>
+    <div id='more' style='border: 1px; display: none'>    
+    <button type='button' onclick="document.getElementById('more').style.display='none'; 
+    document.getElementById('less').style.display='block';">&lt;&lt;Less</button>
+    Output Type: 
 	<select name="doctype" size="1" width="100">
 	    <xsl:call-template name="add-option" >
 	        <xsl:with-param name="text">N/A</xsl:with-param>
@@ -212,7 +344,7 @@ function OnSubmitEditForm()
 	</select>
 	Sharing:
 	<select name="authtoken" size="1" width="100">	
-	    <xsl:variable name="tokens" select="$__user/auth:has-rights-to/* | $__user/auth:has-role/*/auth:has-rights-to/*" />
+	    <xsl:variable name="tokens" select="$__account/auth:has-rights-to/* | $__account/auth:has-role/*/auth:has-rights-to/*" />
 	    <xsl:call-template name="add-option" >
 	        <xsl:with-param name="text">Public</xsl:with-param>
 	        <xsl:with-param name="value" />
@@ -222,16 +354,22 @@ function OnSubmitEditForm()
                 <xsl:with-param name="text" select="rdfs:label/text()" />
                 <xsl:with-param name="value" select="." />
                 <xsl:with-param name="selected" select=". = ($namedContent/auth:guarded-by/*)" />
+                <xsl:with-param name="selected" select="f:if($namedContent, 
+                    . = ($namedContent/auth:guarded-by/*), 
+                    . = f:if($__account/wiki:default-edit-token, $__account/wiki:default-edit-token, 
+                        $__account/auth:has-role/*/wiki:default-edit-token))" />
+                
             </xsl:call-template>
 	    </xsl:for-each>
 	</select>
-	&#xa0;Label:&#xa0;<select name="label" size="1" width="100">	
+	<br />
+	<label for='change_comment'>Label:&#xa0;</label><select name="label" size="1" width="100">	
 	    <xsl:call-template name="add-option" >
             <xsl:with-param name="text" select="''" />
             <xsl:with-param name="value" select="''" />
 	        <!-- select this only when the item exists and it has no label -->
 	        <xsl:with-param name="selected" select="f:if($item, not($item/wiki:label))" />
-	    </xsl:call-template>		
+	    </xsl:call-template>			    	
         <xsl:for-each select="/wiki:Label">
             <xsl:variable name="i" select="." />
             <xsl:call-template name="add-option" >
@@ -239,26 +377,21 @@ function OnSubmitEditForm()
                 <xsl:with-param name="value" select="$i" />
                 <xsl:with-param name="selected" select="f:if($item, 
                     $i = $item/wiki:has-label, 
-                    $i = f:if($__user/wiki:default-edit-label, $__user/wiki:default-edit-label, 
-                        $__user/auth:has-role/*/wiki:default-edit-label))" />
+                    $i = f:if($__account/wiki:default-edit-label, $__account/wiki:default-edit-label, 
+                        $__account/auth:has-role/*/wiki:default-edit-label))" />
             </xsl:call-template>
     	</xsl:for-each>
 	</select>		
-	<br />
-	<input TYPE="checkbox" NAME="minor_edit" VALUE="on" />This is a minor edit.
 	&#xa0;<label for='change_comment'>Change comment:&#xa0;</label><input TYPE="text" NAME="change_comment" VALUE="" SIZE="60" MAXLENGTH="200" />
-    <br/>
-    <xsl:variable name='keywords'>
-         <xsl:for-each select='$namedContent/wiki:about'>          
-           <xsl:value-of select='f:if(namespace-uri-from-uri(.)=concat($BASE_MODEL_URI,"kw#"),local-name-from-uri(.), name-from-uri(.))'/>
-           <xsl:text> </xsl:text>
-         </xsl:for-each>
-    </xsl:variable>    
-	&#xa0;<label for='keywords'><a href='site:///keywords'>Keywords:</a>&#xa0;</label><input TYPE="text" NAME="keywords" VALUE="{$keywords}" SIZE="80" MAXLENGTH="200" />
-    <br/>
+	</div>
+    </div>	
 	<input TYPE="SUBMIT" name="preview" onClick="document.editFormPressed=this.value" VALUE="Preview" />	
     &#xa0;<input TYPE="SUBMIT" name="save" onClick="document.editFormPressed=this.value" VALUE="Save" />      
     &#xa0;<input TYPE="SUBMIT" name="save" onClick="document.editFormPressed=this.value" VALUE="Save (keep editing)" />      
+    &#xa0;<input TYPE="checkbox" NAME="minor_edit" VALUE="on" /><label for='minor_edit'>This is a minor edit.</label>
+    <xsl:if test="$metadata" >
+        <input TYPE="hidden" NAME="metadata" VALUE="{$metadata}" />
+    </xsl:if>
     </form>
     <iframe src='' name='preview' id='previewFrame' width='100%' height='0'/>
 

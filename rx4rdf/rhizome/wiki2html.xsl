@@ -22,7 +22,7 @@ otherwise
     <x:when test='@undefined and not(wf:has-page(@href))'>        
         <a>
         <x:copy-of select="@node()[.!='IgnorableMetadata']" />
-        <x:apply-templates/>?</a>
+        <x:apply-templates/><sup>?</sup></a>
     </x:when>
     
     <x:otherwise>

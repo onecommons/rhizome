@@ -15,7 +15,10 @@
     <xsl:param name="previous:about" />
     <xsl:param name="previous:redirect" />
     <xsl:param name="previous:_itemHandlerDisposition" />
-    <xsl:param name="_contents" />		
+    <xsl:param name="_contents" />	
+    
+    <xsl:output method="html" encoding="UTF-8" indent='no' />
+    	
 <xsl:template match="/">  
     <div class='message'>
     <xsl:choose>    
@@ -30,6 +33,11 @@
     <xsl:variable name="dummy3" select="wf:assign-metadata('response-header:Location', $previous:redirect)"/>You should be redirected shortly...    
     </xsl:when>
     <xsl:otherwise>    
+    <script>    
+    //if we're in a popup window, close it
+    if (window.name == 'small-action-popup')
+       setTimeout('window.close()', 2000);
+    </script>
     Completed <b><xsl:value-of select='$previous:action'/></b> of <a 
         href="{f:if($previous:about, 
                 concat('site:///',$previous:itemname, '?about=',f:escape-url($previous:about)),

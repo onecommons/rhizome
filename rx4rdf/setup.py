@@ -60,6 +60,7 @@ data_files = [
 		   ('share/rx4rdf',[ 'COPYING', 'README.txt'] ),
 		   #('share/rx4rdf/rdfscribbler',glob.glob('rdfscribbler/*') ),
 		   ('share/rx4rdf/blank',glob.glob('blank/*') ),
+		   ('share/rx4rdf/test',glob.glob('rx/test/*') ),
         ]
 
 #setup doesn't handle directory trees well, e.g. just using glob on each subtree doesn't work
@@ -70,8 +71,13 @@ def _addFiles(data_files, dirname, names):
 
 os.path.walk('site', _addFiles, data_files)
 os.path.walk('rhizome', _addFiles, data_files)
-os.path.walk('doc', _addFiles, data_files)
+os.path.walk('docs', _addFiles, data_files)
 
+packages = ['rx']
+if sys.version_info < (2, 3):
+    #add logging package if < 2.3
+    packages.append('rx/logging22')
+   
 setup(name=PACKAGE_NAME,
 #metadata:
 	  version=version_string,
@@ -89,11 +95,11 @@ and manipulate RDF. Also included are two applications that utilize Rx4RDF:
 Rhizome, a wiki-like content management and delivery system with wiki-like
 markup languages for authoring XML and RDF, and RDFScribbler, for viewing and editing RDF models.""",	  
 #packaging info:	  	  
-      packages = ['rx', 'rx/logging22', 'rx/test'],
+      packages = packages,
 	  data_files = data_files,
 	  scripts = [ createScript('run-raccoon', 'raccoon.py'),
 	              createScript('zml', 'zml.py'),
-	          ]
+	            ]
 	  )
 
 if sys.version_info < (2, 3):

@@ -15,7 +15,7 @@
 <xsl:param name="previous:about" />
 <xsl:param name="previous:frameid" />
 
-<xsl:output method='html' indent='no' />
+<xsl:output method='html' encoding='UTF-8' indent='no' />
     
 <xsl:template name="display-content" >
 <xsl:param name="contents" />

@@ -14,7 +14,7 @@
 <xsl:param name="contents" />
 <xsl:param name="file" />
 <xsl:param name="format" />
-<xsl:param name="__user"/>
+<xsl:param name="__account"/>
 <xsl:param name="_contents" />
 
 <xsl:template match="/" >
@@ -22,12 +22,12 @@
 <xsl:choose>
 <xsl:when test='false()'>
     <xsl:value-of disable-output-escaping='yes' 
-        select="wf:process-contents(f:if($file, $file, $contents), $format,'__user', $__user,'_contents', $_contents)" />
+        select="wf:process-contents(f:if($file, $file, $contents), $format,'__account', $__account,'_contents', $_contents)" />
 </xsl:when>
 
 <xsl:otherwise>
     <xsl:value-of disable-output-escaping='yes' 
-        select="wf:process-contents(f:if($file, $file, $contents), $format,'__user', $__user)" />
+        select="wf:process-contents(f:if($file, $file, $contents), $format,'__account', $__account)" />
 </xsl:otherwise>
 </xsl:choose>
 

@@ -57,9 +57,9 @@ filterTokens = '''auth:guarded-by/auth:AccessToken[auth:has-permission=$__authAc
 findTokens = '''(./%(filterTokens)s  | ./rdf:type/*/%(filterTokens)s | ./rdf:type/*//rdfs:subClassOf/*/%(filterTokens)s)''' % locals()
 
 #note: save.xml and edit.xsl have expressions that you may need to change if you change this expression
-rhizome.authorizationQuery = locals().get('unAuthorizedExpr', '''not($__user/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser') and
+rhizome.authorizationQuery = locals().get('unAuthorizedExpr', '''not($__account/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser') and
   wf:max(%(findTokens)s/auth:priority, 0) > 
-  wf:max(%(findTokens)s[.=$__user/auth:has-rights-to/* or .=$__user/auth:has-role/*/auth:has-rights-to/*]/auth:priority,0)''' % locals())
+  wf:max(%(findTokens)s[.=$__account/auth:has-rights-to/* or .=$__account/auth:has-role/*/auth:has-rights-to/*]/auth:priority,0)''' % locals())
  
 #now find a resource that will be used to display the resource
 contentHandlerQueries= [
@@ -125,9 +125,9 @@ templateQueries=[
 ]
 
 rhizome.findResourceAction = findResourceAction = Action(resourceQueries)
-#we want the first Action to set the $__user variable
-findResourceAction.assign("__user", '/foaf:Person[wiki:login-name=$session:login]',
-                         "/foaf:Person[wiki:login-name='guest']")
+#we want the first Action to set the $__account variable
+findResourceAction.assign("__account", '/*[foaf:accountName=$session:login]',
+                         "/*[foaf:accountName='guest']")
 findResourceAction.assign("__resource", '.', post=True)
 #if we matched a resource via an alias, reassign the _name to the main name not the alias 
 findResourceAction.assign("_name", "string(self::*[wiki:alias=$_name]/wiki:name)", "$_name", post=True)
@@ -210,13 +210,13 @@ actions = { 'http-request' : handleRequestSequence,
           }
 
 #if any of the parameters listed here exist they will preserved during template processing (see rhizome.processTemplateAction)
-globalRequestVars = [ '__user', '_static', '_disposition']
+globalRequestVars = [ '__account', '_static', '_disposition']
 
 ##############################################################################
 ## other config settings
 ##############################################################################
 nsMap = {'a' : 'http://rx4rdf.sf.net/ns/archive#',
-        'dc' : 'http://purl.org/dc/elements/1.1/#',
+        'dc' : 'http://purl.org/dc/elements/1.1/',
          'rdf' : 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
          'rdfs' : 'http://www.w3.org/2000/01/rdf-schema#',
         'wiki' : "http://rx4rdf.sf.net/ns/wiki#",
@@ -249,7 +249,9 @@ contentProcessors = {
     #replace the xml/html processor with one that sanitizes the markup if the user doesn't have the proper access token
     'http://rx4rdf.sf.net/ns/wiki#item-format-xml': 
         lambda result, kw, contextNode, contents, rhizome=rhizome: 
-        rhizome.processMarkup(rhizome.BASE_MODEL_URI+'create-unsanitary-content-token', result, kw, contextNode, contents)
+        rhizome.processMarkup(result, kw, contextNode, contents, 
+              sanitizeToken=rhizome.BASE_MODEL_URI+'create-unsanitary-content-token',
+              nospamToken=rhizome.BASE_MODEL_URI+'create-nospam-token')
 }
 
 contentProcessorCachePredicates = {
@@ -295,6 +297,7 @@ authorizeContentProcessors = {
 extFunctions = {
 (RXWIKI_XPATH_EXT_NS, 'get-rdf-as-rxml'): rhizome.getRxML,
 (RXWIKI_XPATH_EXT_NS, 'get-contents'): rhizome.getContents,
+(RXWIKI_XPATH_EXT_NS, 'truncate-contents'): rhizome.truncateContents,
 (RXWIKI_XPATH_EXT_NS, 'save-metadata'): __server__.saveRxML,
 (RXWIKI_XPATH_EXT_NS, 'generate-patch'): rhizome.generatePatch,
 (RXWIKI_XPATH_EXT_NS, 'save-contents'): rhizome.saveContents,
@@ -323,7 +326,7 @@ MODEL_RESOURCE_URI = rhizome.BASE_MODEL_URI
 MODEL_UPDATE_PREDICATE = 'http://rx4rdf.sf.net/ns/wiki#model-update-id'
 
 configHook = rhizome.configHook
-getPrincipleFunc = lambda kw: kw.get('__user', '')
+getPrincipleFunc = lambda kw: kw.get('__account', '')
 authorizeMetadata=rhizome.authorizeMetadata
 validateExternalRequest=rhizome.validateExternalRequest
 authorizeAdditions=rhizome.authorizeAdditions
@@ -357,9 +360,9 @@ rhizome._addItemTuple('search', format='rxslt', disposition='entry', loc='path:s
 rhizome._addItemTuple('login', format='zml', disposition='complete', loc='path:login.zml'),
 rhizome._addItemTuple('logout', format='rxslt', disposition='complete', loc='path:logout.xsl'),
 rhizome._addItemTuple('signup', format='zml', disposition='entry', loc='path:signup.zml',
-                      handlesAction=['edit', 'new'], actionType='http://xmlns.com/foaf/0.1/Person'),
+                      handlesAction=['edit', 'new'], actionType='http://xmlns.com/foaf/0.1/OnlineAccount'),
 rhizome._addItemTuple('save-user', format='rxupdate', disposition='handler', loc='path:signup-handler.xml',
-                      handlesAction=['save', 'creation'], actionType='http://xmlns.com/foaf/0.1/Person'),
+                      handlesAction=['save', 'creation'], actionType='http://xmlns.com/foaf/0.1/OnlineAccount'),
 rhizome._addItemTuple('default-resource-viewer',format='rxslt', disposition='entry', loc='path:default-resource-viewer.xsl',
                     handlesAction=['view-metadata'], actionType='rdfs:Resource'),
 rhizome._addItemTuple('preview', loc='path:preview.xsl', disposition='short-display', format='rxslt'),
@@ -381,6 +384,7 @@ rhizome._addItemTuple('keyword-browser', loc='path:KeywordBrowser.zml', disposit
 rhizome._addItemTuple('keywords', loc='path:keywords.zml', disposition='entry', format='zml', 
     title="Show All Keywords"),                         
 rhizome._addItemTuple('diff-revisions',loc='path:diff-revisions.py', format='python', disposition='entry'),
+rhizome._addItemTuple('comments',loc='path:comments.xsl', format='rxslt', disposition='complete'),
 
 #administration pages
 rhizome._addItemTuple('administration', loc='path:administer.xsl', disposition='entry', format='rxslt', title="Administration"), 
@@ -536,24 +540,30 @@ authStructure =\
  rx:resource id='%(base)susers/':
   rdf:type: wiki:Folder
   wiki:name: `users
+  auth:guarded-by: base:write-structure-token
+
+ rx:resource id='%(base)saccounts/':
+  rdf:type: wiki:Folder
+  wiki:name: `accounts
   wiki:has-child: 
-    rx:resource id='%(base)susers/admin'
+    rx:resource id='%(base)saccounts/admin'
   wiki:has-child: 
-    rx:resource id='%(base)susers/guest'
+    rx:resource id='%(base)saccounts/guest'
   auth:guarded-by: base:write-structure-token
      
- #define two built-in users and their corresponding roles
- rx:resource id='%(base)susers/guest':
-  rdf:type: foaf:Person
-  wiki:login-name: `guest
-  wiki:name: `users/guest
+ #define two built-in accounts and their corresponding roles
+ rx:resource id='%(base)saccounts/guest':
+  rdf:type: foaf:OnlineAccount
+  foaf:accountName: `guest
+  wiki:name: `accounts/guest
   auth:has-role: auth:role-guest
   auth:guarded-by: base:write-structure-token
+  rdfs:comment: `this account is used before the user signs in
   
- rx:resource id='%(base)susers/admin':
-  rdf:type: foaf:Person
-  wiki:login-name: `admin
-  wiki:name: `users/admin
+ rx:resource id='%(base)saccounts/admin':
+  rdf:type: foaf:OnlineAccount
+  foaf:accountName: `admin
+  wiki:name: `accounts/admin
   auth:has-role: auth:role-superuser
   #note: we set the password in the application model below so its not hardcoded into the datastore
   #and can be set in the config file
@@ -566,14 +576,21 @@ authStructure =\
  auth:role-superuser:
   rdfs:comment: `the superuser role is a special case that always has permission to do anything
   rdf:type: auth:Role
-  rdfs:label: `Super User
-    
+  rdfs:label: `Super User   
   # even though the super-user role doesn't need these tokens for authentication 
   # we add these here so they shows up in the Sharing dropdown on the edit page
   auth:has-rights-to: base:write-structure-token 
   auth:has-rights-to: base:save-only-token
-  #if you want to release labels it is convenient to set this next property:
+  #if you want to use release labels it is convenient to add this next property
+  #which is user by edit.xsl
   #wiki:default-edit-label: wiki:label-released  
+    
+ auth:role-default:
+  rdfs:comment: `this role automatically assigned to new users (see signup-handler.xml)
+  rdf:type: auth:Role
+  rdfs:label: `Default User
+  #remove this property if you don't want this 
+  auth:has-rights-to: base:create-nospam-token 
     
  #access token to protect structural resources from modification
  #(assign (auth:has-rights-to) to adminstrator users or roles to give access)
@@ -654,6 +671,11 @@ authStructure =\
   rdfs:comment: `If the content creator has this token, rhizome.processMarkup() will not try to sanitize the HTML or XML.
   rdf:type: auth:AccessToken  
   auth:priority: 100
+
+ base:create-nospam-token:
+  rdfs:comment: `If the content creator has this token, she is trusted not to be a spammer and rhizome.processMarkup() will not add rel='nofollow' to links.
+  rdf:type: auth:AccessToken  
+  auth:priority: 100
   
  auth:Role:
   auth:guarded-by: base:role-guard
@@ -666,11 +688,22 @@ authStructure =\
    auth:priority: 100
 
  foaf:Person:
-  auth:guarded-by: base:user-guard
+   auth:guarded-by: base:user-guard
 
  base:user-guard:
    rdf:type: auth:AccessToken   
-   rdfs:comment: `protects all Users from having their roles and access tokens changed
+   rdfs:comment: `protects all Users from having their association with their account changed
+   auth:has-permission: auth:permission-add-statement
+   auth:has-permission: auth:permission-remove-statement  
+   auth:with-property:  foaf:holdsAccount
+   auth:priority: 100
+
+ foaf:OnlineAccount:
+   auth:guarded-by: base:account-guard
+
+ base:account-guard:
+   rdf:type: auth:AccessToken   
+   rdfs:comment: `protects all OnlineAccounts from having their roles and access tokens changed
    auth:has-permission: auth:permission-add-statement
    auth:has-permission: auth:permission-remove-statement  
    auth:with-property:  auth:has-rights-to
@@ -769,7 +802,9 @@ def addStructure(type, structure, extraProps=[], name2uri=name2uri):
     return n3
 
 #give readable names and descriptions to user-visible classes
-userClasses = [ ('foaf:Person', 'User', ''), ('wiki:Folder', 'Folder', ''), 
+userClasses = [ ('foaf:OnlineAccount', 'Account', ''),
+   ('foaf:Person', 'User', ''), 
+   ('wiki:Folder', 'Folder', ''), 
    ('auth:Role', 'Role', ''), ('auth:AccessToken', 'Access Token', ''),
    ('wiki:Label', 'Label', ''), ('wiki:DocType', 'Doc Type', ''), ('wiki:Keyword', 'Keyword', ''),
    ('wiki:ItemDisposition', 'Disposition', ''), ('a:NamedContent', 'Named Content', ''),
@@ -806,19 +841,16 @@ templateList.append( ('@labels', addStructure('http://rx4rdf.sf.net/ns/wiki#Labe
 '''<http://rx4rdf.sf.net/ns/wiki#label-released> <http://rx4rdf.sf.net/ns/wiki#is-released> "" .\n''') )
 
 templateList.append( ('@keywords', rxml.zml2nt(nsMap=nsMap, contents='''
- wiki:structure:
-  rdf:type: wiki:Keyword  
-  rdfs:label: `structure
-  wiki:name: `keywords/structure
-
  wiki:built-in:
   rdf:type: wiki:Keyword  
   rdfs:label: `built-in
+  rdfs:comment: `for resources that are part of the Rhizome application
   wiki:name: `keywords/built-in
 
  wiki:help:
   rdf:type: wiki:Keyword  
   rdfs:label: `help
+  rdfs:comment: `Rhizome help resources
   wiki:name: `keywords/help
 ''')) )
 
@@ -839,7 +871,7 @@ itemFormats = [ ('http://rx4rdf.sf.net/ns/wiki#item-format-binary', 'Binary', 'a
 #define the APPLICATION_MODEL (static, read-only statements in the 'application' scope)
 APPLICATION_MODEL= addStructure('http://rx4rdf.sf.net/ns/wiki#ItemFormat', itemFormats,
     ['http://rx4rdf.sf.net/ns/archive#content-type'])\
-   + '''<%susers/admin> <%s> "%s" .\n''' % (rhizome.BASE_MODEL_URI, passwordHashProperty, adminShaPassword)
+   + '''<%saccounts/admin> <%s> "%s" .\n''' % (rhizome.BASE_MODEL_URI, passwordHashProperty, adminShaPassword)
 
 #add the schema to APPLICATION_MODEL
 import os.path
@@ -849,6 +881,16 @@ schema = utils.convertToNTriples(os.path.split(_rhizomeConfigPath)[0]+'/archive-
 #to regenerate: change above to end in .rdf and uncomment this line:
 #file(os.path.split(_rhizomeConfigPath)[0]+'/archive-schema.nt', 'w').write(schema)
 APPLICATION_MODEL += schema
+
+#add the wiki namespace schema -- not much here right now
+wikiSchema ='''
+  #wiki:appendage-to is a property that indicates that a resource doesn't stand on its own
+  #but rather is subordinate to the object of statement
+  #we define the following content relationships as subproperties of this:
+  wiki:comments-on:   rdfs:subPropertyOf: wiki:appendage-to
+  wiki:attachment-of: rdfs:subPropertyOf: wiki:appendage-to
+'''
+APPLICATION_MODEL += rxml.zml2nt(contents=wikiSchema, nsMap=nsMap)
 
 #we add these functions to the config namespace so that config files that include this can access them
 #making it easy to extend or override the rhizome default template

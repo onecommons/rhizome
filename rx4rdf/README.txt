@@ -2,7 +2,7 @@
 
                          Rx4RDF and Rhizome
                          Version 0.4.3
-                         Dec 27, 2004
+                         Jan 25, 2005
  
   Introduction
   ------------
@@ -24,8 +24,9 @@
   Major changes since last announced release (0.4.1):
   
   Support for RDF Schema (subclasses and subproperties)
+  New UI for adding comments and several other UI improvements
   Added a notion of themes to ease customization of look and feel.
-  More security enhancements including sanitizing HTML. 
+  More security enhancements including sanitizing HTML and adding rel="nofollow"
   Smoother installation and command line handling.
   Compatibility with 4Suite 1.0a4 (enables OS X support).
   Many other bug fixes.

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="ISO-8859-1"?>
+<?xml version="1.0" encoding="ISO-8859-1"?>
 <xsl:stylesheet version="1.0"
         xmlns:a="http://rx4rdf.sf.net/ns/archive#"
         xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"
@@ -49,6 +49,7 @@
     <xsl:param name="previous:_robots" />
     <xsl:param name="previous:action" />        
     <xsl:param name="previous:_template" />
+    <xsl:param name="previous:__resource" />
     
 <xsl:output method='html' encoding="UTF-8" indent='no' />
 
@@ -103,10 +104,14 @@
   href='site:///{$_name}?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-complete{$aboutparam}' />
      </xsl:when>           
     -->         
-     <xsl:otherwise>             
+     <xsl:otherwise>       
+     <xsl:value-of disable-output-escaping='yes' 
+        select="f:replace('&#10;','&lt;br />', f:escape-xml($contents))"/>      
+      <!--
         <pre>
         <xsl:value-of disable-output-escaping='no' select="$contents" />
         </pre>
+      -->
      </xsl:otherwise>
     </xsl:choose>    
   </div>
@@ -117,7 +122,7 @@
          <xsl:choose>
             <xsl:when test="$session:login">
 <form action='site:///logout' method='POST' accept-charset='UTF-8' >
-Welcome <a href="site:///users/{$session:login}?action=edit"><xsl:value-of select="$session:login" /></a>
+Welcome <a href="site:///accounts/{$session:login}?action=edit"><xsl:value-of select="$session:login" /></a>
 <input TYPE="hidden" NAME="redirect" value="{$_url}" />
 <input type="submit" value="logout" name="logout"/>  
 <br/><xsl:value-of select="$session:message" disable-output-escaping='yes' />  
@@ -129,7 +134,7 @@ Name<input TYPE="text" NAME="loginname" SIZE="10" />
 Password<input TYPE="password" NAME="password" SIZE="10" />
 <input TYPE="hidden" NAME="redirect" value="{$_url}" />
 <input type="submit" value="login" name="login"/>    
-Or <a href="site:///users/guest?action=new">signup</a>
+Or <a href="site:///accounts/?about={f:escape-url('http://xmlns.com/foaf/0.1/OnlineAccount')}&amp;action=new">signup</a>
 <br/><xsl:value-of select="$session:message" disable-output-escaping='yes' />
 </form>            
            </xsl:otherwise>
@@ -138,7 +143,7 @@ Or <a href="site:///users/guest?action=new">signup</a>
 </xsl:template>
 
 <xsl:template name="search-form" >
-<xsl:param name="edit-width" select="30" />
+<xsl:param name="edit-width" select="40" />
 <form action='site:///search' accept-charset='UTF-8' method="GET">
 <label for="search">Search</label><input type="text" name="search" value="{$previous:search}" size="$edit-width" />
 <label for="searchType">Type</label><select name="searchType">    
@@ -172,9 +177,14 @@ Or <a href="site:///users/guest?action=new">signup</a>
 </xsl:template>
 
 <xsl:template name="quicklinks-bar" >
+    <!-- note: keep in sync with the recent-items template below -->
+    <xsl:variable name="recent-pages-query" select=
+"&quot;wf:sort(/a:NamedContent[not(wiki:appendage-to)][(wiki:revisions/*/rdf:first/*)[last()]/a:created-on != 1057919732.750],'(wiki:revisions/*/rdf:first/*)[last()]/a:created-on','number','descending')&quot;"
+    />
+
     <a href="site:///edit">New</a>
     &#xa0;<a href="site:///keyword-browser">Browse</a>
-    &#xa0;<a href="site:///search?search=wf%3Asort%28%2Fa%3ANamedContent%2C%27%28wiki%3Arevisions%2F*%2Frdf%3Afirst%2F*%29%5Blast%28%29%5D%2Fa%3Acreated-on%27%2C%27number%27%2C%27descending%27%29&amp;searchType=RxPath&amp;view=list&amp;title=Recently%20Changed%20Pages">Recent</a>
+    &#xa0;<a href="site:///search?search={f:escape-url($recent-pages-query)}&amp;searchType=RxPath&amp;view=list&amp;title=Recently%20Changed%20Pages">Recent</a>
     &#xa0;<a href="site:///administration">Admin</a>
     &#xa0;<a href="site:///help">Help</a>
 </xsl:template>
@@ -183,19 +193,22 @@ Or <a href="site:///users/guest?action=new">signup</a>
     <xsl:variable name='aboutparam' select="f:if($previous:about, concat('&amp;about=', f:escape-url($previous:about)), '')" />
     <xsl:variable name='path' select="f:if($previous:itemname, $previous:itemname, $_name)" />
     <a href="site:///{$path}?{$aboutparam}">View</a>
-    &#xa0;<a href="site:///{$path}?action=edit{$aboutparam}">Edit</a>
+    &#xa0;<a href="site:///comments?parent={f:escape-url($previous:__resource)}"
+    onclick="window.open(this.href,'small-action-popup','directories=0,height=450,width=550,location=0,resizable=1,scrollbars=1,toolbar=0');return false;">
+    Comments (<xsl:value-of select='count(/*[wiki:comments-on = $previous:__resource])'/>)</a>
+    &#xa0;<a rel='nofollow' href="site:///{$path}?action=edit{$aboutparam}">Edit</a>
     &#xa0;<a href="site:///{$path}?action=showrevisions">Revisions</a>
     &#xa0;<a href="site:///{$path}?action=view-metadata{$aboutparam}">Metadata</a>
-    &#xa0;<a href="site:///{$path}?action=confirm-delete{$aboutparam}">Delete</a>
+    &#xa0;<a rel='nofollow' href="site:///{$path}?action=confirm-delete{$aboutparam}">Delete</a>
     &#xa0;<a href="site:///{$path}?action=view-source{$aboutparam}">Source</a>
-    &#xa0;<a href="site:///{$path}?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-print{$aboutparam}">Print</a>
+    &#xa0;<a rel='nofollow' href="site:///{$path}?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-print{$aboutparam}">Print</a>
 </xsl:template>
 
 <xsl:template name="recent-items" >
 <xsl:param name="max" select="21" />
 <ul>
-<xsl:for-each select="wf:sort(/a:NamedContent[not(wiki:about='http://rx4rdf.sf.net/ns/wiki#built-in')],
-'(wiki:revisions/*/rdf:first/*)[last()]/a:created-on','number','descending')[position()&lt;$max]" >
+<xsl:for-each select="wf:sort(/a:NamedContent[not(wiki:appendage-to)][(wiki:revisions/*/rdf:first/*)[last()]/a:created-on != 1057919732.750],
+'(wiki:revisions/*/rdf:first/*)[last()]/a:created-on[.!=1057919732.750]','number','descending')[position()&lt;$max]" >
 <li>
 <a href="{$_base-url}site:///{./wiki:name}">
 <xsl:value-of select='f:if( (./wiki:revisions/*/rdf:first/*)[last()]/wiki:title, 

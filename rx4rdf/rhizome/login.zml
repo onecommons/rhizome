@@ -8,6 +8,7 @@
      xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#",
      xmlns:response-header='http://rx4rdf.sf.net/ns/raccoon/http-response-header#',
      xmlns:session = 'http://rx4rdf.sf.net/ns/raccoon/session#',    
+     xmlns:foaf="http://xmlns.com/foaf/0.1/"
      exclude-result-prefixes = "f wf a wiki rdf"
      ) 
   x:param name="redirect"
@@ -16,7 +17,7 @@
   x:param name="__passwordHashProperty"
    
   x:template match='/':  	    
-    x:variable name=dummy select='''wf:if(wf:secure-hash($password) = /*[wiki:login-name = $loginname]/*[uri(.)=$__passwordHashProperty], 
+    x:variable name=dummy select='''wf:if(wf:secure-hash($password) = /*[foaf:accountName = $loginname]/*[uri(.)=$__passwordHashProperty], 
 "wf:assign-metadata('session:login', $loginname) and wf:assign-metadata('session:message', '')", 
 "wf:assign-metadata('session:message', 'login attempt failed!')")'''
     x:variable name=dummy2 select="wf:assign-metadata('response-header:status', 302)"
