@@ -7,7 +7,7 @@
 """
 
 from rx import raccoon, utils, logging
-import unittest
+import unittest, glob, os, os.path
 
 class RaccoonTestCase(unittest.TestCase):
     def setUp(self):
@@ -15,6 +15,20 @@ class RaccoonTestCase(unittest.TestCase):
         logging.root.setLevel(logging.INFO)
         logging.basicConfig()
 
+    def testFileCache(self):        
+        raccoon.fileCache.capacity = 20000
+        #raccoon.fileCache.maxFileSize = 2000
+        #raccoon.fileCache.hashValue = lambda path: getFileCacheKey(path, fileCache.maxFileSize)
+        fileList = [path for path in glob.glob('*') if os.path.isfile(path)]
+        #make sure we'll exceed the cache
+        assert sum( [os.stat(x).st_size for x in fileList] ) > raccoon.fileCache.capacity
+        #add them to the cache
+        for path in fileList:
+            raccoon.fileCache.getValue(path)
+        #retrieve them from the cache
+        for path in fileList:        
+            raccoon.fileCache.getValue(path)        
+        
     def testAuth(self):
         root = raccoon.RequestProcessor(a='testAuthAction.py')
         unauthorized = root.rdfDom.findSubject( 'http://rx4rdf.sf.net/ns/auth#Unauthorized' )

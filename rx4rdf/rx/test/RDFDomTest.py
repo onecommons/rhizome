@@ -80,7 +80,8 @@ class RDFDomTestCase(unittest.TestCase):
 
     def loadFtModel(self, source, type='nt'):
         if type == 'rdf':
-            model, self.db = Util.DeserializeFromUri(source)
+            #assume relative file
+            model, self.db = Util.DeserializeFromUri('file:'+source)
         else:
             model, self.db = utils.DeserializeFromN3File( source )
         return FtModel(model)
@@ -197,9 +198,11 @@ class RDFDomTestCase(unittest.TestCase):
         res4 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless(len(res4)==5) 
 
-        self.rdfDom.globalRecurseCheck = 1
-        PrettyPrint(self.rdfDom) #Xml.Lib.Print.Nss.seek() causes infinite regress
-        self.rdfDom.globalRecurseCheck = 0
+        #self.rdfDom.globalRecurseCheck = 1
+        #Xml.Lib.Print.Nss.seek() causes infinite regress, plus C implementation in CVS trunk doesn't work
+        #todo: add a RxPath.PrettyPrint
+        #PrettyPrint(self.rdfDom) 
+        #self.rdfDom.globalRecurseCheck = 0
             
     def testDocIndex(self):
         self.rdfDom = self.getModel("about.rx.nt")

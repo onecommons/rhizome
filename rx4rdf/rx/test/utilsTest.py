@@ -16,7 +16,7 @@ class TestLinkFixer(utils.LinkFixer):
     def needsFixup(self, tag, name, value):
         return value and value.startswith('foo')
 
-    def doFixup(self, tag, name, value):
+    def doFixup(self, tag, name, value, hint):
         return 'bar'
     
 class utilsTestCase(unittest.TestCase):
@@ -38,7 +38,7 @@ class utilsTestCase(unittest.TestCase):
         for term in parseExpr:
             pass#print term
 
-    def testNtiples(self):
+    def testNtriples(self):
         #test character escaping 
         s1 = r'''bug: File "g:\_dev\rx4rdf\rx\Server.py", '''
         n1 = r'''_:x1f6051811c7546e0a91a09aacb664f56x142 <http://rx4rdf.sf.net/ns/archive#contents> "bug: File \"g:\\_dev\\rx4rdf\\rx\\Server.py\", ".'''

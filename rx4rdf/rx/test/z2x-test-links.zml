@@ -12,3 +12,6 @@
 [#foo]
 \[one bracket]
 \[\[two brackets] asdfasdf
+[http://needs-xml-escaping?foo=1&bar=2]
+[one & //two// \&amp; three | http://needs-xml-escaping?foo=1&bar=2]
+[one & //two// \&amp; three | 'test & test some more';]

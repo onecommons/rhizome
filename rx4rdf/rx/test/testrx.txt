@@ -12,7 +12,7 @@
 	   owl:  `http://owl
 	   dc: `http://dc
 	   myns: `urn:y
-	 rx:resource id="http://4suite.org/rdf/anonymous/badaf0a7b-8d0d-43b1-8bd2-4bce4b272d50_1": ;(this item)
+	 rx:resource id="http://4suite.org/rdf/anonymous/badaf0a7b-8d0d-43b1-8bd2-4bce4b272d50_1": #(this item)
 	     predicate1: `safadf
 	     predicate2 
 	     	myns:res45     		
@@ -23,7 +23,4 @@
 	        '1'
 	        myns:res45:     
 	 rx:resource id="http://adsfasdf": 
-	 myontology:myclass rx:id="http://myresources/foo":
-	 myontology:myclass rx:id: ; 'id' designates this a resource, bNodeID is generated for the id
-	 rx:res-query select='\*': ; child properties are applied to each node in the nodeset returned by the xpath expression
 
