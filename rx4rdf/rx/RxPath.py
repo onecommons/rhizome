@@ -68,6 +68,35 @@ class Model(object):
     def removeStatement(self, statement ):
         '''removes the statement'''
 
+    reifiedIDs = None
+    def findStatementID(self, stmt):        
+        if self.reifiedIDs is None:
+           self.reifiedIDs = getReifiedStatements(self.getStatements())
+        triple = (stmt.subject, stmt.predicate, stmt.object, stmt.objectType)
+        return self.reifiedIDs.get(triple)
+   
+def getReifiedStatements(stmts):
+    '''
+    Find statements created by reification and return a list of the statements being reified 
+    '''
+    reifyPreds = { RDF_MS_BASE+'subject':0, RDF_MS_BASE+'predicate':1, RDF_MS_BASE+'object':2}
+    reifiedStmts = {}
+    for stmt in stmts:
+        index = reifyPreds.get(stmt.predicate)
+        if index is not None:
+            reifiedStmts.setdefault(stmt.subject, ['','',None, ''])[index] = stmt.object
+            if index == 2:
+                reifiedStmts[stmt.subject][3] = stmt.objectType
+    reifiedDict = {}
+    #make a new dict, with the triple as key, while ignoring any incomplete statements
+    for stmtUri, triple in reifiedStmts.items():
+        if triple[0] and triple[1] and triple[2] is not None:
+            #reifiedStmt = Statement(triple[0], triple[1], triple[2],
+            #            objectType=triple[3], statementUri=stmtUri)
+            reifiedDict[tuple(triple)] = stmtUri
+        #else: log.warning('incomplete reified statement')
+    return reifiedDict
+
 def removeDupStatementsFromSortedList(aList):       
     def removeDups(x, y):
         if not x or x[-1] != y:            
@@ -84,7 +113,6 @@ def getResourcesFromStatements(stmts):
     except for non-head list resources.
     '''
     resourceDict = {}
-    propertyDict = {} #just a set really
     lists = {}
     for stmt in stmts:
         if stmt.predicate == RDF_MS_BASE+'rest':
