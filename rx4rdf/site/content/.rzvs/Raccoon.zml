@@ -1,12 +1,12 @@
 __[Raccoon]__ is a simple application server that uses an [RDF] model for its data store, roughly analogous to RDF as [Apache Cocoon|http://cocoon.apache.org/] is to XML.
 
 An application built for Raccoon specifies a series of [RxPath] expressions that serve as rules to map an abstract request to an application-specified action. These rules are chained together application-specific way, but typically would follow basic steps such as:
-# specify rules that map the request to a RDF resource
-# specify rules that match the RDF resource to an action
+1. specify rules that map the request to a RDF resource
+1. specify rules that match the RDF resource to an action
 Or
-# specify rules that map the request to a RDF resource
-# specify rules that map the RDF resource to some content
-# specify rules that apply an action to the content given the RDF resource
+1. specify rules that map the request to a RDF resource
+1. specify rules that map the RDF resource to some content
+1. specify rules that apply an action to the content given the RDF resource
 
 A request is just a dictionary of name/value properties that are mapped to XPath variables. These variables are used in the XPath context when RxPath rules are evaluated. The result of the rule processing is treated as the response. Currently Raccoon supports the following request types:
 +HTTP request= the URL name, query parameters or form variables, HTTP headers and cookies are mapped.

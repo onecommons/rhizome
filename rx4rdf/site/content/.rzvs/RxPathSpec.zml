@@ -93,11 +93,11 @@ The uses of "SHOULD", "MAY", and "MUST" are defined in accordance with [RFC 2119
 
 <  s1 title="Requirements":
 The following requirement drove the design described here:
-# MUST be syntactically identical to XPath.
-# MUST place no constraints on the underlying RDF Model
-# All information from the RDF Model MUST be available in the RxPath Data Model
-# SHOULD enable efficient processing, in particular SQL 
-# SHOULD be conform closely to ones expectations of how a XPath expressions behave and also follow an intuitive picture of navigating an RDF model visualized as a graph.
+1. MUST be syntactically identical to XPath.
+1. MUST place no constraints on the underlying RDF Model
+1. All information from the RDF Model MUST be available in the RxPath Data Model
+1. SHOULD enable efficient processing, in particular SQL 
+1. SHOULD be conform closely to ones expectations of how a XPath expressions behave and also follow an intuitive picture of navigating an RDF model visualized as a graph.
 
 <  s1 title="Data Model":
 This section describes how to map a given an RDF Model to a representation as an abstract XML document as defined by the [XPath Data Model|http://www.w3.org/TR/xpath#data-model]. 
@@ -113,9 +113,9 @@ Each distinct [blank node|http://www.w3.org/TR/2003/WD-rdf-concepts/#section-bla
 For each Subject Element one child element is created for each statement in the RDF model that has the Subject Element's RDF URI reference as the statement's subject. This child element is referred to here as a "Predicate Element". The name of the child element will be QName based on the statement's predicate URI reference (i.e. the property URI). (See section QName mapping).  The predicate URI reference will also appear as the value of an attribute named "uri". 
 
 The follow attributes may also appear:
-#If the statement has been reified the element will have an "rdf:ID" attribute whose value is the URI reference of the reification statements. 
-#If the object of the statement is a literal the Predicate Element may have ^^rdf:datatype^^ and/or ^^xml:lang^^ attributes.
-#If the Predicate Element is named ^^rdf:first^^ or ^^rdf:li^^, it will have a ^^listID^^ (no namespace URI) attribute whose value is described in the list section below.
+1.If the statement has been reified the element will have an "rdf:ID" attribute whose value is the URI reference of the reification statements. 
+1.If the object of the statement is a literal the Predicate Element may have ^^rdf:datatype^^ and/or ^^xml:lang^^ attributes.
+1.If the Predicate Element is named ^^rdf:first^^ or ^^rdf:li^^, it will have a ^^listID^^ (no namespace URI) attribute whose value is described in the list section below.
 <        note: 
 put listID in a namespace? renamed is to memberID?
 <        note: 
@@ -126,8 +126,8 @@ The sibling order of the predicate element is determined by sorting the tuple (e
 <    s2 title="Object Nodes"
 
 Each predicate element will have children nodes based on the object of its corresponding statement:
-# If the object of the statement is a literal text node, the child will be a text node. If the literal is xml (i.e. its ^^rdf:datatype^^ is ^^http://www.w3.org/2000/01/rdf-schema#XMLLiteral^^) the [string-value|http://www.w3.org/TR/xpath#dt-string-value] of the text node will be within the lexical space defined in RDF Abstract Syntax (see [section 5|http://www.w3.org/TR/rdf-concepts/#section-XMLLiteral]).
-# If the object of the statement is a resource, the child will be an Recursive Node equivalent to its corresponding [Subject Element] (see section below). 
+1. If the object of the statement is a literal text node, the child will be a text node. If the literal is xml (i.e. its ^^rdf:datatype^^ is ^^http://www.w3.org/2000/01/rdf-schema#XMLLiteral^^) the [string-value|http://www.w3.org/TR/xpath#dt-string-value] of the text node will be within the lexical space defined in RDF Abstract Syntax (see [section 5|http://www.w3.org/TR/rdf-concepts/#section-XMLLiteral]).
+1. If the object of the statement is a resource, the child will be an Recursive Node equivalent to its corresponding [Subject Element] (see section below). 
 
 <    s2 title="Recursive Nodes"
 Each [Object Element] is almost completely equivalent its corresponding [Subject Element] -- thus if the resource is the subject of a statement, the [Object Element] will have [Predicate Element]s as children, which in turn may have [Object Element] as its children and so on.  The only attributes that will be differ are its parent and in the case Object Nodes, its siblings (it will not have any). See the section on "Circular References" below on how to handle circular references of recursive nodes.
@@ -302,7 +302,7 @@ Should we specify anything how inferences and entailments appear in the model? F
                 authors="S. Bradner"
                 date="March 1997"/>
          </bl>
-"""   
+""""""   
 <  s1 title="Other References": r"""<bl>
             <bi name="Syntactic-Web"
                 href="http://www.idealliance.org/papers/xml2001/papers/html/03-01-04.html"
@@ -315,7 +315,7 @@ Should we specify anything how inferences and entailments appear in the model? F
                 authors="Peter Patel-Schneider, Jerome Simeon"
                 date="2002"/>
          </bl>
-""" 
+"""""" 
 <  s1 title="Commentary":
 This section contain informal comments on the why certain approaches were taken. 
 <    s2 title="deviation from XPath behavior":             

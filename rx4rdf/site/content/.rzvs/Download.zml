@@ -12,8 +12,8 @@ If you're just interested in ZML you just need this one Python [file|http://cvs.
 
 !Install
 This is a standard Python source distribution. To install:
-# Unzip
-# Run ^^python <unzip dir>/setup.py install^^
+1. Unzip
+1. Run ^^python <unzip dir>/setup.py install^^
 
 This installs:
 * a package named "rx" in the Python ^^site-packages^^ directory
@@ -33,16 +33,16 @@ If \[RxPath expression] is omitted it will start in interactive mode.
 !!Raccoon and Rhizome
 Run a local copy of this site:
 
-#^^cd <unzip dir>/site
-#either:
-##^^<python script dir>/run-raccoon -a site-config.py^^ or
-##^^python <python lib dir>/site-packages/rx/raccoon.py -a site-config.py
-#Browse to [http://localhost:8000] (edit server.cfg to change the port).
+1.^^cd <unzip dir>/site
+1.either:
+11.^^<python script dir>/run-raccoon -a site-config.py^^ or
+11.^^python <python lib dir>/site-packages/rx/raccoon.py -a site-config.py
+1.Browse to [http://localhost:8000] (edit server.cfg to change the port).
 
 To start a fresh Rhizome site, just run Rhizome from the directory where you want the site to live:
 
-#^^cd <directory of the new site>
-#^^<python script dir>/run-raccoon -a <python share dir>/rx4rdf/rhizome/rhizome-config.py
+1.^^cd <directory of the new site>
+1.^^<python script dir>/run-raccoon -a <python share dir>/rx4rdf/rhizome/rhizome-config.py
 
 !!RxSLT, RxUpdate, ZML
 To experiment with RxSLT, RxUpdate, or ZML run an instance of Rhizome and create or edit pages with this format.  Or see RxPath.py or zml.py for programmatic interfaces.
