@@ -879,10 +879,10 @@ class ParseState:
                         if len(words) > 1:
                             #must be a link like [this is also a link]
                             if name is not None:                                
-                                raise ZMLParseError(st, 'link URL can not contain spaces: ' + ''.join(words))
+                                raise ZMLParseError('link URL can not contain spaces: ' + ''.join(words))
                             if [word for word in words if not word.isalnum()]:
                                 #error: one of the words has punctuation, etc.
-                                raise ZMLParseError(st, 'invalid link: ' + linkToken)
+                                raise ZMLParseError('invalid link: ' + linkToken)
                             link = ''
                             #[this is also a link] creates a hyperlink to an internal WikiPage called 'ThisIsAlsoALink'.
                             for word in words:
@@ -1320,7 +1320,7 @@ class ParseState:
                     value = ''
                 handler.pi(name, value)                
         elif type == ENDMARKER:
-            while st.wikiStack: popWikiStack()
+            while st.wikiStack: st.popWikiStack()
             while st.elementStack:
                 handler.endElement( st.elementStack.pop() )
             while st.namespaceStack:
