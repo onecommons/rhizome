@@ -1,13 +1,14 @@
+#?zml0.9 markup
 test:
 	rdf:l.i rdf:id='http:': 'line1 ' `asdfasfas
 	foo: `adfadsf
-		bar: #comment
+		bar: ;comment
 			deep:
 	d:
-#c
+;c
 `asdfasfas
 'line2'	
-li:.: 'another bullet'
+li:_.: 'another bullet'
 	inner1: 
 		inner2: 
 		
@@ -15,3 +16,4 @@ li:.: 'another bullet'
 	inner2: inner3:
 		eeeee:
 	aadf 
+

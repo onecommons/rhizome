@@ -1,0 +1,6 @@
+<dl><dt>term </dt><dd> def with a <a href="link">link</a>
+</dd><dt><a href="term">linked term</a> </dt><dd> def without a [link]
+</dd></dl><hello><contains-text foo="2"><p><img src="image.gif" alt="image.gif" />
+[one bracket]
+[[two brackets] asdfasdf
+</p></contains-text></hello>

@@ -1,3 +1,4 @@
+#?zml0.9 markup
 specification:
                              header:
                                title: "XML:DB Initiative: XUpdate - XML Update Language"
@@ -5,7 +6,8 @@ specification:
                                   type: `Working Draft
                             
                              body:
-                              s1(title="Introduction"): 'sum text till the end of the line??'
+                              s1(title="Introduction" attribute 
+                                    = 'across line breaks'): 'sum text till the end of the line??'
                               s2(title="DOM"):
 
 todo: 
@@ -26,5 +28,3 @@ todo:
 entry(rdf:ID='' entry-type='undefined'): 
 	contents: ''' my comments here go here
 '''
-
-

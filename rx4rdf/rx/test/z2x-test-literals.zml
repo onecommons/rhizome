@@ -1,5 +1,5 @@
- test:
-  child:
+<test:
+<<child:
 below is a text literal but since it has no indention it should not close the child element or the <p>  
 '''   text literal 
 '''

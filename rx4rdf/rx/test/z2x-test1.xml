@@ -1,0 +1,3 @@
+<e1><e2><p>some text
+</p></e2><p>paragraph child of e1 not e2
+</p><auth:has-token><rdf:Description><xu:attribute name="rdf:about"><xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname,'/private-rw')" /></xu:attribute></rdf:Description></auth:has-token><auth:has-token><rdf:Description><xu:attribute name="rdf:about"><xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname,'/private-w')" /></xu:attribute></rdf:Description></auth:has-token><auth:has-token><rdf:Description><xu:attribute name="rdf:about"><xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname,'/group-rw')" /></xu:attribute></rdf:Description></auth:has-token></e1>

@@ -2,24 +2,23 @@
 
 another paragaph
 !!! a heading 
- ; another comment
- html: 
-	header a='ddd' b='aa' c=1 selected: `any old text 		
-		meta name='dfdf' type=l:
-	body:
+; another comment
+<html: 
+<	header a='ddd' b='aa' c=1 selected: `any old text 		
+<		meta name='dfdf' type=l:
+<	body:
 inline mixed content here lots of text 
 and here *wiki* <regular-xml> etc.
-	footer: `leading indicates we're back to slip
-	
- ; note: this text is in the rxity-ml (pronounced "rikity ml") format
+<	footer: `leading < indicates we're back to slip
+
+#?zml0.9 markup   		
+; note: this text is in the rxity-ml (pronounced "rikity ml") format
  rx(xmlns = "fg"
     xmlns:rdf = 'rdfafasdf'
  	): ; add more namespace prefixes there - they can apply to the item markup as well
    this-item:
    	
-  	
  ; arbitrary rdf assertion goes here
- 
  rx:prefixes:
    rx: `http://rx4rdf.sf.net/namespaces/rxml
    rx:meta-default-ns: `http://myontologyinstance
@@ -41,3 +40,4 @@ and here *wiki* <regular-xml> etc.
  myontology:myclass id: ; 'id' designates this a resource, bNodeID is generated for the id
  rx:res-query select='\*': ; child properties are applied to each node in the nodeset returned by the xpath expression
  
+

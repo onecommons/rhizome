@@ -1,0 +1,7 @@
++term = def with a [link]
++[linked term | term] = def without a \[link]
+<hello:
+<<contains-text foo = 2:
+[type; image.gif]
+\[one bracket]
+\[\[two brackets] asdfasdf

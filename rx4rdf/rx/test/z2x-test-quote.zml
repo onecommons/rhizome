@@ -1,0 +1,22 @@
+ZML is an alternative syntax for XML; you can create any XML construct in ZML (and you can also embed XML markup in a ZML document).
+ZML is line-oriented and relies on indentation to specify the tree structure of the document. 
+Here's an example: 
+p'''
+#?zml0.9 markup
+html 
+ header
+   title: `some raw text here
+ body bgcolor='#CCCCCC' text=black
+'''
+The "markup" in the first line of this example specifies that the document consists entirely of markup. By default, ZML documents can also contain lines of text formatting, which aren't indented and uses special [text formatting rules] to create the XML markup. In this mixed mode, lines of markup must start with a "<". Here the same example again with an added line of formatted text:
+p'''
+#?zml0.9
+<html 
+<<header
+<<<<title: `some raw text here
+<<body bgcolor='#CCCCCC' text=black
+This text follows //all// the [text formatting rules].
+'''
+The "<"s are treated as identical to spaces when establishing indentation. This is also useful for those morally opposed to whitespace having semantic meaning.
+
+All the rules that follow only apply to lines of markup. See the [text formatting rules] for lines of formatted text.

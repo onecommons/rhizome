@@ -1,0 +1,5 @@
+<test><child><p>below is a text literal but since it has no indention it should not close the child element or the &lt;p>  
+   text literal 
+below is a text literal but since it has no indention it should not cause a dedent. Because there is a line break this text and literal the &lt;p> element is closed.
+</p>   text literal 
+</child></test>

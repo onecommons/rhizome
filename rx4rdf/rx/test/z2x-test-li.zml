@@ -11,9 +11,11 @@
 another table:
 | td | td 
 | td | td
-;term:defintion
-;term: def w/ : colon
++term=defintion
++term= def w/ : colon
 :indention
 __dont__ //worry//
 __//error__// adafdaf
+ onto next line
+__//correct//__ adafdaf
 aaafafsafsaf

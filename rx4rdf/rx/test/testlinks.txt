@@ -1,7 +1,0 @@
-; term : def with a [link]
-; [linked term | term] : def without a [[link]
- hello:
-  whitespace foo = 2:
-[type: image.gif]
-[[one bracket]
-[[[two brackets] asdfasdf

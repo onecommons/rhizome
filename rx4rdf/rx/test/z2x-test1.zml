@@ -1,0 +1,12 @@
+<e1
+<<<e2
+some text
+<<<
+paragraph child of e1 not e2
+#?zml0.9 markup        
+    auth:has-token: rdf:Description:
+        xu:attribute name="rdf:about": xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname,'/private-rw')"
+    auth:has-token: rdf:Description:
+        xu:attribute name="rdf:about": xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname,'/private-w')"
+    auth:has-token: rdf:Description:
+        xu:attribute name="rdf:about": xu:value-of select="concat($BASE_MODEL_URI,'users-',$loginname,'/group-rw')"

@@ -1,0 +1,21 @@
+#?zml0.9 markup
+#?xml version="1.0" encoding="ISO-8859-1"
+xsl:stylesheet version='1.0' xmlns:a='http://rx4rdf.sf.net/ns/archive#' xmlns:wiki='http://rx4rdf.sf.net/ns/wiki#' xmlns:xsl='http://www.w3.org/1999/XSL/Transform' xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' xmlns:wf='http://rx4rdf.sf.net/ns/racoon/xpath-ext#' xmlns:rdfs='http://www.w3.org/2000/01/rdf-schema#' xmlns:f='http://xmlns.4suite.org/ext' xmlns:response-header='http://rx4rdf.sf.net/ns/racoon/http-response-header#' exclude-result-prefixes='rdfs f wf a wiki rdf response-header':
+    xsl:output omit-xml-declaration='yes' indent='no':
+    xsl:param name='__resource':
+    xsl:param name='_name':
+    xsl:template match='/':
+        ; this page is always html, not the content's mimetype 
+        xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')":
+        ; note: the same template is used in search.xsl for the rxml output 
+        a href='site:///{$_name}?action=edit-metadata&about={f:escape-url($__resource)}':
+            `Edit Metadata
+        "\U000000a0"
+        a href='site:///search?search=%2F*%2F*%5B.%3D%27{f:escape-url($__resource)}%27%5D&searchType=RxPath&view=html':
+            `Used By
+        hr:
+        pre:
+            xsl:variable name='fixup' select='"<a href=\'site:///.?action=view-metadata&amp;about=%(encodeduri)s\'>%(res)s</a>"':
+            ; there's an absurd level of string escaping going on here! 
+            xsl:variable name='fixupPredicate' select='"<a href=\'site:///search?search=%%2F*%%2F*%%5B%%40uri%%3D%%27%(encodeduri)s%%27%%5D&amp;searchType=RxPath&amp;view=html&amp;title=Property%%20Usage\'>%(predicate)s</a>"':
+            xsl:value-of disable-output-escaping='yes' select="wf:get-rdf-as-rhizml($__resource, '', $fixup, $fixupPredicate)":

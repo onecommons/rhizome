@@ -20,9 +20,9 @@ these can appear in predicate elements:
 :rx:xml equivalent to rdf:parsetype=literal (not supported)
 :rx:stmt equivalent to rdf:ID (on a predicate)
 
-<b>example:</b>
+\<b>example:\</b>
 
- '''
+p'''
  prefixes:
    rx: `http:rxwiki.sf.net
    rx:meta-default-ns: `http:rxwiki.sf.net
