@@ -9,7 +9,7 @@
 #see docs/RaccoonConfig for documentation on config file settings
 
 import rx.rhizome
-from rx import rxml
+from rx import rxml, __version__
 
 if not hasattr(__server__, 'rhizome') or not __server__.rhizome: #make executing this config file idempotent
     rhizome = rx.rhizome.Rhizome(__server__)
@@ -17,13 +17,13 @@ if not hasattr(__server__, 'rhizome') or not __server__.rhizome: #make executing
 else:
     rhizome = __server__.rhizome
 
-RHIZOME_APP_ID = "Rhizome 0.4.0" #don't change this unless you have a good reason
+RHIZOME_APP_ID = "Rhizome " + __version__ #don't change this unless you have a good reason
 
 rhizome.BASE_MODEL_URI = locals().get('BASE_MODEL_URI', __server__.BASE_MODEL_URI)
 MAX_MODEL_LITERAL = 0 #will save all content to disk
 
 #Raccoon performance settings:
-FILE_CACHE_SIZE=5000000
+FILE_CACHE_SIZE=1000000
 MAX_CACHEABLE_FILE_SIZE=10000
 LIVE_ENVIRONMENT=0
 
