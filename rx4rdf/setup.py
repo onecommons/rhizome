@@ -51,11 +51,10 @@ and manipulate RDF. Also included are two applications that utilize Rx4RDF:
 Rhizome, a wiki-like content management and delivery system with wiki-like
 markup languages for authoring XML and RDF, and RDFScribbler, for viewing and editing RDF models.""",	  
 #packaging info:	  	  
-      packages = ['rx', 'rx/logging22'],
+      packages = ['rx', 'rx/logging22', 'rx/test'],
 	  data_files = [
-		    ('rx',[  'COPYING', 'README.txt'] ),
+		    ('rx',[ 'changelog.txt', 'COPYING', 'README.txt'] ),
 		   ('rx/rhizome',glob.glob('rx/rhizome/*.*') ),
 		   ('rx/rdfscribbler',glob.glob('rx/rdfscribbler/*.*') ),
-		   ('rx/test',glob.glob('rx/test/*.*') ),
         ],
 	  )

@@ -1,0 +1,21 @@
+Rx4RDF and Rhizome Changelog
+============================
+Changes in Version 0.1.3 (???)
+---------------------------------------
+* RxUpdate: changed meaning of xupdate:valueof to align with xslt's valueof
+* Rhizome: implemented search, results in HTML or RSS
+* Racoon:  exposed $url, $_base-url, and $_path variables
+* Racoon:  Added support for sessions, improve cookie support
+* Racoon:  Upgrade http server to based on CherryPy-0.9-gamma (from 0.8)
+* Racoon:  Support for python 2.3
+* Rhizml:  link annotations
+* Rhizml:  added syntax for <br>, <pre> and <blockquote>
+* Rhizome: authorization fix()
+* Rx4RDF:  fixed loading .rdf files from the rdfdom.py command line
+* Rx4RDF:  fixed exceptions with circular reference
+* all:     added logging (includes support for Python 2.2)
+
+Changes in version 0.1.2 (Oct. 30, 2003)
+----------------------------------------
+Everything. (initial public release)
+

@@ -4,8 +4,10 @@ recursive-include rx/rdfscribbler *
 recursive-include rx/test *
 recursive-include rx/logging22 *
 include site/*
+include src/*
 recursive-include docs *
 global-exclude *.bak *.bk? *.nt *.metarx *.pyc *.log
 global-include site/wikistore.nt
 global-exclude */CVS/*
+global-exclude */sessions/*
 include COPYING
