@@ -191,15 +191,6 @@ unAuthorizedExpr='false()' #disable all authentification
 
 #other Rhizome specific security settings
 
-#authPredicates is list of predicates that the fine-grained authentication 
-#routine inverse transitively follows to find authorizing resources 
-#for statements being added or removed
-#in the future this will be infered from schema looking for subproperties 
-#of auth:requires-authorization-for but for now we rely on this kludge
-#default: see rhizome-config.py
-authPredicates = locals()['authPredicates'] + ['http:example.com/schema#myproperty'] 
-#assuming we've already included rhizome-config.py, the above adds to the list already defined
-
 #Authors that don't own the "base:create-unsanitary-content-token" access token 
 #will have their content filtered to prevent them from writing dangerous HTML constructs
 #(basically from executing javascript or embedding objects). You can customize which elements
