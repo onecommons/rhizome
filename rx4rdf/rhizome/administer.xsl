@@ -16,10 +16,11 @@ exclude-result-prefixes="f wf a wiki rdf rdfs auth" version="1.0">
         <tr>
           <td><x:value-of select='$resName' /></td>
           <td>
-            <a href="site:///search?search=%2F{f:escape-url(name-from-uri(.))}&amp;searchType=RxPath&amp;view=html">List </a>
+             <!-- /*[.='uri'] -->
+            <a href="site:///search?search=%2F*%5B.%3D%27{f:escape-url(string(.))}%27%5D&amp;searchType=RxPath&amp;view=list">List </a>
           </td>
           <td>
-            <a href="site:///search?search=%2F{f:escape-url(name-from-uri(.))}&amp;searchType=RxPath&amp;view=edit">Edit All </a>
+            <a href="site:///search?search=%2F*%5B.%3D%27{f:escape-url(string(.))}%27%5D&amp;searchType=RxPath&amp;view=edit">Edit All </a>
           </td>
           <x:if test='$shownew'>
           <td>
@@ -36,6 +37,10 @@ exclude-result-prefixes="f wf a wiki rdf rdfs auth" version="1.0">
     To create new resources of any type, click <a href='site:///generic-new-template'>here</a>.<br/> 
     To delete resources, choose the appropriate "Edit All" link and delete the offending resources from the results.
     </p>
+    <p>To execute arbitrary scripts or stylesheets, use the <a href='site:///Sandbox'>Sandbox</a>.<br/>
+       To evaluate an arbitrary RxPath expression, use the search bar at the footer of this page.
+    </p>   
+       
       <b>Manageable Resources by Type</b>
       <table>   
       <!--       
@@ -52,7 +57,7 @@ exclude-result-prefixes="f wf a wiki rdf rdfs auth" version="1.0">
         <x:with-param name='search' select="id(/*/rdf:type/*)[not(. = /*/wiki:action-for-type)]"/>
       </x:call-template> 
       </table>  
-      <b>List all <a href='site:///search?search=%2F*%5Bnot%28rdf%3Atype%29%5D&amp;searchType=RxPath&amp;view=html'>un-typed resources</a></b>
+      <b>List all <a href='site:///search?search=%2F*%5Bnot%28rdf%3Atype%29%5D&amp;searchType=RxPath&amp;view=list'>un-typed resources</a></b>
   </x:template>
 </x:stylesheet>
 
