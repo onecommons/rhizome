@@ -28,9 +28,9 @@ nsMap = { 'config' : 'http://rx4rdf.sf.net/ns/raccoon/config#' }
 #   config:hostname: 'foo.net'
 #   config:disabled: '' #not disabled
 #''')
-
+import sys
 def delegateRequest(result, kw, contextNode, retVal): 
-    if retVal:                
+    if retVal:  
         result = retVal.handleHTTPRequest(kw['_name'], kw['_request'].paramMap)
         kw['_APP_BASE'] = retVal.appBase
         #response cookies must have their path at least equal to the appBase  
@@ -50,7 +50,7 @@ actions = { 'http-request' : [
             "/*[config:default-app][not(config:disabled)]",            
             ],   
             action = lambda result, kw, contextNode, retVal, __argv__=__argv__: 
-               RequestProcessor(a= kw['__server__'].evalXPath('string(config:config-path)', node=result[0]), 
+               HTTPRequestProcessor(a= kw['__server__'].evalXPath('string(config:config-path)', node=result[0]), 
                      p= os.path.abspath(kw['__server__'].evalXPath('string(config:path)', node=result[0])),
                      appBase = kw['__server__'].evalXPath('string(config:appBase)', node=result[0]),
                      appName=kw['__server__'].evalXPath('string(config:appName)', node=result[0]),

@@ -39,7 +39,7 @@ resourceQueries=[
 '/*[wiki:alias=$_name]',  #view the resource
 #name not found, see if there's an external file on the Raccoon path with this name:
 #if it matches, the context will be a text node
-'''wf:if(wf:file-exists($_name), "wf:assign-metadata('externalfile', wf:string-to-nodeset($_name))")''',
+'''f:if(wf:file-exists($_name), /*[.='http://rx4rdf.sf.net/ns/wiki#ExternalResource'])''',
 #by treating not found as an error, we prevent an endless loop from happening when the not found page includes a resource that is not found
 "wf:error(concat('page not found: ', $_name), 404)", #invoke the not found page 
 ]
@@ -54,7 +54,8 @@ filterTokens = '''auth:guarded-by/auth:AccessToken[auth:has-permission=$__authAc
   [not($__authProperty) or not(auth:with-property) or is-subproperty-of($__authProperty,auth:with-property)]
   [not($__authValue) or not(auth:with-value) or auth:with-value=$__authValue]'''
 
-findTokens = '''(./%(filterTokens)s  | ./rdf:type/*/%(filterTokens)s | ./rdf:type/*//rdfs:subClassOf/*/%(filterTokens)s)''' % locals()
+findTokens = '( (.| $__authCommonChecks | ./rdf:type/* | ./rdf:type/*//rdfs:subClassOf/*)/%(filterTokens)s)'% locals()
+#findTokens = '''(./%(filterTokens)s  | ./rdf:type/*/%(filterTokens)s | ./rdf:type/*//rdfs:subClassOf/*/%(filterTokens)s)''' % locals()
 
 #note: save.xml and edit.xsl have expressions that you may need to change if you change this expression
 rhizome.authorizationQuery = locals().get('unAuthorizedExpr', '''not($__account/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser') and
@@ -64,9 +65,9 @@ rhizome.authorizationQuery = locals().get('unAuthorizedExpr', '''not($__account/
 #now find a resource that will be used to display the resource
 contentHandlerQueries= [
 #if the resource is set to the Unauthorized resource select the unauthorized page
-"f:if(self::auth:Unauthorized, /a:NamedContent[wiki:name='_not_authorized'])",
+"f:if(self::*='http://rx4rdf.sf.net/ns/auth#Unauthorized', /a:NamedContent[wiki:name='_not_authorized'])",
 #don't do anything with external files:
-'f:if(self::text(), $STOP)', 
+"f:if(self::*='http://rx4rdf.sf.net/ns/wiki#ExternalResource', $STOP)", 
 #if the request has an action associated with it:
 #find the action that handles the most derived subtype of the resource
 #(or of the resource itself (esp. for the case where the context is a class resource))
@@ -131,24 +132,30 @@ findResourceAction.assign("__account", '/*[foaf:accountName=$session:login]',
 findResourceAction.assign("__resource", '.', post=True)
 #if we matched a resource via an alias, reassign the _name to the main name not the alias 
 findResourceAction.assign("_name", "string(self::*[wiki:alias=$_name]/wiki:name)", "$_name", post=True)
+findResourceAction.assign("externalfile", "f:if(self::* = 'http://rx4rdf.sf.net/ns/wiki#ExternalResource', $_name)", post=True, assignEmpty=False)
 
 #if we're not authorized, the resource context will be set to _not_authorized
-rhizome.resourceAuthorizationAction = Action( ['''f:if (%s, /auth:Unauthorized)''' % rhizome.authorizationQuery] )
+rhizome.resourceAuthorizationAction = Action( ['''f:if (%s, /*[.='http://rx4rdf.sf.net/ns/auth#Unauthorized'])''' % rhizome.authorizationQuery] )
 #default to 'view' if not specified
 rhizome.resourceAuthorizationAction.assign("__authAction", 
     'concat("http://rx4rdf.sf.net/ns/wiki#action-",$action)', 
      "'http://rx4rdf.sf.net/ns/wiki#action-view'") 
 rhizome.resourceAuthorizationAction.assign("__authProperty", '0')
 rhizome.resourceAuthorizationAction.assign("__authValue", '0')
+#__authCommonChecks is a minor optimization: by breaking this out of the auth expression it will cached much more often
+rhizome.resourceAuthorizationAction.assign("__authCommonChecks", "/*[.='http://www.w3.org/2000/01/rdf-schema#Resource']")
 #revisionAuthorizationAction = Action( [authorizationQuery % "/*[wiki:name='_not_authorized']/wiki:revisions/*[last()]"] )
 
 rhizome.findRevisionAction = Action(revisionQueries)
 rhizome.findRevisionAction.assign("_label", '$label', '$session:label', "'Released'")
 
-rhizome.findContentAction = Action(contentQueries, lambda result, kw, contextNode, retVal, self=__server__:\
-                                  self.getStringFromXPathResult(result), requiresContext = True) #get its content
+#get the content
+rhizome.findContentAction = Action(contentQueries, lambda result, kw, contextNode,
+                             retVal, StringValue = rx.rhizome.raccoon.StringValue:
+                             isinstance(result, str) and result or StringValue(result), requiresContext = True) 
+#process the content                                   
 rhizome.processContentAction = Action(encodingQueries, __server__.processContents,
-                                      matchFirst = False, forEachNode = True) #process the content 
+                   canReceiveStreams=True, matchFirst = False, forEachNode = True) 
 
 templateAction = Action(templateQueries, rhizome.processTemplateAction)
 
@@ -236,64 +243,30 @@ cmd_usage = '''\n\nrhizome-config.py specific:
 
 # we define a couple of content processors here instead of in Raccoon because
 # they make assumptions about the underlying schema 
-from rx import zml
-contentProcessors = {
-    'http://rx4rdf.sf.net/ns/content#pydiff-patch-transform':
-        lambda result, kw, contextNode, contents, rhizome=rhizome: 
-                            rhizome.processPatch(contents, kw, result),
-    #this stylesheet processor transforms kw['_contents'] not the rdf model:    
-    'http://www.w3.org/1999/XSL/Transform' : rhizome.processXSLT, 
-    'http://rx4rdf.sf.net/ns/wiki#item-format-zml':
-        lambda result, kw, contextNode, contents, rhizome=rhizome: 
-                         rhizome.processZML(contextNode, contents, kw),
-    #replace the xml/html processor with one that sanitizes the markup if the user doesn't have the proper access token
-    'http://rx4rdf.sf.net/ns/wiki#item-format-xml': 
-        lambda result, kw, contextNode, contents, rhizome=rhizome: 
-        rhizome.processMarkup(result, kw, contextNode, contents, 
-              sanitizeToken=rhizome.BASE_MODEL_URI+'create-unsanitary-content-token',
-              nospamToken=rhizome.BASE_MODEL_URI+'create-nospam-token')
-}
-
-contentProcessorCachePredicates = {
-    'http://www.w3.org/1999/XSL/Transform' : lambda result, kw, contextNode, contents, self=__server__:
-          self.partialXsltCacheKeyPredicate(contents, kw['_contents'], kw, 
-            contextNode, kw.get('_contentsURI') or self.evalXPath( 
-            'concat("site:///", (/a:NamedContent[wiki:revisions/*/*[.=$__context]]/wiki:name)[1])',
-            node=contextNode)), 
-    'http://rx4rdf.sf.net/ns/wiki#item-format-xml' : rhizome.processMarkupCachePredicate,
-    'http://rx4rdf.sf.net/ns/wiki#item-format-zml' :
-        lambda result, kw, contextNode, contents: contents #the key is just the contents
-}
-
-contentProcessorSideEffectsFuncs = {
-    'http://www.w3.org/1999/XSL/Transform' : __server__.xsltSideEffectsFunc,  
-    'http://rx4rdf.sf.net/ns/wiki#item-format-zml' :
-    lambda cacheValue, sideEffects, resultNodeset, kw, contextNode, contents, \
-        rhizome=rhizome: rhizome.processZMLSideEffects(contextNode, kw)
-    }
-    
-contentProcessorSideEffectsPredicates = {
-    'http://www.w3.org/1999/XSL/Transform' :  __server__.xsltSideEffectsCalc }
+contentProcessors = [
+    rx.rhizome.RhizomeXMLContentProcessor(sanitizeToken=rhizome.BASE_MODEL_URI+'create-unsanitary-content-token',
+              nospamToken=rhizome.BASE_MODEL_URI+'create-nospam-token'),
+    rx.rhizome.raccoon.ContentProcessors.XSLTContentProcessor(),
+    rhizome.zmlContentProcessor,
+    rx.rhizome.PatchContentProcessor(rhizome),   
+]
 
 authorizeContentProcessors = {
     #when content is being created dynamically (e.g. via the raccoon-format XML processing instruction)
     #make sure the user has same access tokens that she would need when creating the content (see save.xml)
     'http://rx4rdf.sf.net/ns/wiki#item-format-python': 
-            lambda contents, formatType, kw, dynamicFormat, rhizome=rhizome: 
-         rhizome.authorizeDynamicContent(rhizome.BASE_MODEL_URI+'execute-python-token', True,
-         contents, formatType, kw, dynamicFormat),
+        lambda self, contents, formatType, kw, dynamicFormat, rhizome=rx.rhizome, 
+                    accessToken=rhizome.BASE_MODEL_URI+'execute-python-token': 
+        rhizome.authorizeDynamicContent(self, contents, formatType, kw, 
+                                       dynamicFormat, accessToken=accessToken),
 
     'http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate': 
-      lambda contents, formatType, kw, dynamicFormat, rhizome=rhizome: 
-         rhizome.authorizeDynamicContent(rhizome.BASE_MODEL_URI+'execute-rxupdate-token', True,
-         contents, formatType, kw, dynamicFormat),
-         
-     #otherwise use the default authorization
-     'default': lambda contents, formatType, kw, dynamicFormat, server=__server__: 
-         server.authorizeContentProcessing(
-         server.DefaultAuthorizeContentProcessors, contents, formatType, kw, dynamicFormat)
+        lambda self, contents, formatType, kw, dynamicFormat, rhizome=rx.rhizome, 
+                accessToken=rhizome.BASE_MODEL_URI+'execute-rxupdate-token': 
+        rhizome.authorizeDynamicContent(self, contents, formatType, kw, 
+                                      dynamicFormat, accessToken=accessToken)
 }
-
+                  
 extFunctions = {
 (RXWIKI_XPATH_EXT_NS, 'get-rdf-as-rxml'): rhizome.getRxML,
 (RXWIKI_XPATH_EXT_NS, 'get-contents'): rhizome.getContents,
@@ -483,7 +456,7 @@ siteVars =\
 '''
  base:site-template:
   wiki:header-image: `underconstruction.gif
-  wiki:header-text: `Header, site title goes here: edit the <a href="site-template?action=edit-metadata">site template's metadata</a>
+  wiki:header-text: `Header, site title goes here: edit the <a href="site:///site-template?action=edit-metadata">site template's metadata</a>
   wiki:uses-theme: base:default-theme
   
  #unfortunately we also have to add this alias in addition to setting wiki:uses-theme
@@ -499,7 +472,7 @@ templateList.append( ('@sitevars', rxml.zml2nt(contents=siteVars, nsMap=nsMap)) 
 #You really should set your own private value. If it is compromised, it will be much
 #easier to mount a dictionary attack on the password hashes.
 #If you change this all previously generated password hashes will no longer work.
-secureHashSeed = locals().get('SECURE_HASH_SEED', 'YOU REALLY SHOULD CHANGE THIS!')
+secureHashSeed = locals().get('SECURE_HASH_SEED', rhizome.defaultSecureHashSeed)
 
 passwordHashProperty  = locals().get('passwordHashProperty', rhizome.BASE_MODEL_URI+'password-hash')
 
@@ -509,7 +482,7 @@ passwordHashProperty  = locals().get('passwordHashProperty', rhizome.BASE_MODEL_
 adminShaPassword = locals().get('ADMIN_PASSWORD_HASH') #hex encoding of the sha1 digest
 if not adminShaPassword:
     import sha
-    adminShaPassword = sha.sha( locals().get('ADMIN_PASSWORD','admin')+ secureHashSeed ).hexdigest()    
+    adminShaPassword = sha.sha( locals().get('ADMIN_PASSWORD',rhizome.defaultPassword)+ secureHashSeed ).hexdigest()    
 
 authorizationDigests = { 
     'My4pn2M3AXwU9vro1UIoBnELsS0=' : 1, #for diff-revisions.py
@@ -520,8 +493,11 @@ authorizationDigests = {
 authStructure =\
 '''
  auth:Unauthorized:
-  rdf:type: auth:Unauthorized
+  rdf:type: rdfs:Resource
 
+ wiki:ExternalResource:
+  rdf:type: rdfs:Resource
+  
  #we make these properties subproperties of "auth:requires-authorization-for"
  #for Rhizome's fine-grained authentication routine which
  #inverse transitively follows those relations to find authorizing resources 
@@ -537,22 +513,22 @@ authStructure =\
  auth:permission-add-statement
   rdf:type: auth:Permission
  
- rx:resource id='%(base)susers/':
+ {%(base)susers/}:
   rdf:type: wiki:Folder
   wiki:name: `users
   auth:guarded-by: base:write-structure-token
 
- rx:resource id='%(base)saccounts/':
+ {%(base)saccounts/}:
   rdf:type: wiki:Folder
   wiki:name: `accounts
   wiki:has-child: 
-    rx:resource id='%(base)saccounts/admin'
+    {%(base)saccounts/admin}
   wiki:has-child: 
-    rx:resource id='%(base)saccounts/guest'
+    {%(base)saccounts/guest}
   auth:guarded-by: base:write-structure-token
      
  #define two built-in accounts and their corresponding roles
- rx:resource id='%(base)saccounts/guest':
+ {%(base)saccounts/guest}:
   rdf:type: foaf:OnlineAccount
   foaf:accountName: `guest
   wiki:name: `accounts/guest
@@ -560,7 +536,7 @@ authStructure =\
   auth:guarded-by: base:write-structure-token
   rdfs:comment: `this account is used before the user signs in
   
- rx:resource id='%(base)saccounts/admin':
+ {%(base)saccounts/admin}:
   rdf:type: foaf:OnlineAccount
   foaf:accountName: `admin
   wiki:name: `accounts/admin
@@ -568,7 +544,7 @@ authStructure =\
   #note: we set the password in the application model below so its not hardcoded into the datastore
   #and can be set in the config file
   auth:guarded-by: base:write-structure-token
-
+  
  auth:role-guest:
   rdf:type: auth:Role
   rdfs:label: `Guest
@@ -611,7 +587,7 @@ authStructure =\
   auth:has-permission: auth:permission-add-statement
   auth:has-permission: auth:permission-remove-statement   
   auth:priority: 100
-  rdfs:comment:  """this token let's resources be modified through the edit/save UI
+  rdfs:comment:  """this token lets resources be modified through the edit/save UI
  but prevents users from modifying the metadata directly or deleting the resource
  (useful for resources you want to let users to edit in a controlled fashion)"""
   
@@ -722,12 +698,11 @@ authStructure =\
 
  # access tokens guards common to all resources
  # (currently only fine-grained authentication checks this)
- # if we fully supported rdfs we could have rdfs:Resource as the subject instead
- # or if we supported owl, the subject could be owl:Thing
+ # if we supported owl, the subject could be owl:Thing
  # and we wouldn't need a seperate check in the authorizationQuery
- base:common-access-checks:
-  auth:guarded-by: base:all-resources-guard 
-  auth:guarded-by: base:change-schema-token
+ rdfs:Resource:
+   auth:guarded-by: base:all-resources-guard 
+   auth:guarded-by: base:change-schema-token   
   
  base:all-resources-guard:
    rdf:type: auth:AccessToken   
@@ -750,6 +725,129 @@ authStructure =\
   auth:priority: 100
 ''' % {'base' : rhizome.BASE_MODEL_URI }
 
+#add this if you want to protect all content from modification unless the user has logged-in
+#to unprotect particular resources, guard them with the base:override-general-write-token
+writeProtectAll =\
+''' 
+ rdfs:Resource:
+   auth:guarded-by: base:general-write-token
+   
+ base:general-write-token:
+    auth:has-permission: 
+        wiki:action-confirm-delete
+    auth:has-permission: 
+        wiki:action-creation
+    auth:has-permission: 
+        wiki:action-delete
+    auth:has-permission: 
+        wiki:action-edit
+    auth:has-permission: 
+        wiki:action-edit-metadata
+    auth:has-permission: 
+        wiki:action-new
+    auth:has-permission: 
+        wiki:action-save
+    auth:has-permission: 
+        wiki:action-save-metadata
+    auth:priority: `1
+    a: 
+        auth:AccessToken
+
+ base:override-general-write-token:
+    auth:has-permission: 
+        wiki:action-confirm-delete
+    auth:has-permission: 
+        wiki:action-creation
+    auth:has-permission: 
+        wiki:action-delete
+    auth:has-permission: 
+        wiki:action-edit
+    auth:has-permission: 
+        wiki:action-edit-metadata
+    auth:has-permission: 
+        wiki:action-new
+    auth:has-permission: 
+        wiki:action-save
+    auth:has-permission: 
+        wiki:action-save-metadata
+    auth:priority: `10
+    a: 
+        auth:AccessToken
+
+ #this enables any non-guest user to modify resources (unless otherwise guarded)
+ auth:role-default:
+    auth:has-rights-to: base:general-write-token
+    auth:has-rights-to: base:override-general-write-token 
+    
+ #everyone, even guests, needs this token
+ auth:role-guest:
+   auth:has-rights-to: base:override-general-write-token
+'''
+
+#to enable guest users to signup for an account even when all resources are write protected
+createAccountOverride =\
+'''
+ #we need to keep foaf:OnlineAccount resources writable
+ foaf:OnlineAccount:
+   auth:guarded-by: base:override-general-write-token   
+'''
+
+#add this if you want to protect all resources (except the home page) from being read unless the user has logged-in
+#to unprotect particular resources, guard them with the base:override-general-read-token
+#you probably want to combine this with writeProtectAll
+readProtectAll =\
+''' 
+ rdfs:Resource:
+   auth:guarded-by: base:general-read-token
+   
+ base:general-read-token:
+    auth:has-permission: 
+        wiki:action-showrevisions
+    auth:has-permission: 
+        wiki:action-view
+    auth:has-permission: 
+        wiki:action-view-metadata
+    auth:has-permission: 
+        wiki:action-view-source
+    auth:priority: `1
+    a: 
+        auth:AccessToken
+
+ base:override-general-read-token:
+    auth:has-permission: 
+        wiki:action-showrevisions
+    auth:has-permission: 
+        wiki:action-view
+    auth:has-permission: 
+        wiki:action-view-metadata
+    auth:has-permission: 
+        wiki:action-view-source
+    auth:priority: `10
+    a: 
+        auth:AccessToken
+
+ #this enables any non-guest user to modify resources (unless otherwise guarded)
+ auth:role-default:
+    auth:has-rights-to: base:general-read-token    
+    auth:has-rights-to: base:override-general-read-token 
+    
+ #everyone, even guests, needs this token
+ auth:role-guest:
+   auth:has-rights-to: base:override-general-read-token
+
+ #overrides to enable the display the default index page and related structural pages
+ wiki:ExternalResource: auth:guarded-by: base:override-general-read-token 
+ base:index: auth:guarded-by: base:override-general-read-token 
+ base:login: auth:guarded-by: base:override-general-read-token 
+ base:sidebar: auth:guarded-by: base:override-general-read-token 
+ base:intermap.txt: auth:guarded-by: base:override-general-read-token  
+ base:basestyle.css: auth:guarded-by: base:override-general-read-token 
+ {%(base)smovabletype/theme.css}: auth:guarded-by: base:override-general-read-token 
+ {%(base)smovabletype/theme.xsl}: auth:guarded-by: base:override-general-read-token 
+ {%(base)sdefault/theme.css}: auth:guarded-by: base:override-general-read-token 
+ {%(base)sdefault/theme.xsl}: auth:guarded-by: base:override-general-read-token 
+''' % {'base' : rhizome.BASE_MODEL_URI }
+ 
 #add actions:
 for action in ['view', 'edit', 'new', 'creation', 'save', 'delete', 'confirm-delete',
                'showrevisions', 'edit-metadata', 'save-metadata', 'view-metadata', 'view-source']:
@@ -858,15 +956,9 @@ templateList.append( ('@keywords', rxml.zml2nt(nsMap=nsMap, contents='''
 templateMap = dict(templateList) #create a map so derived sites can replace pages: for example, see site-config.py
 STORAGE_TEMPLATE = "".join(templateMap.values()) #create a NTriples string
 
-itemFormats = [ ('http://rx4rdf.sf.net/ns/wiki#item-format-binary', 'Binary', 'application/octet-stream'),
-                ('http://rx4rdf.sf.net/ns/wiki#item-format-text', 'Text', 'text/plain'),
-                ('http://rx4rdf.sf.net/ns/wiki#item-format-xml', 'XML/XHTML', 'text/html'),
-                ('http://rx4rdf.sf.net/ns/wiki#item-format-rxslt', 'RxSLT'),
-                ('http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate', 'RxUpdate'),
-                ('http://rx4rdf.sf.net/ns/wiki#item-format-python', 'Python'),
-                ('http://www.w3.org/1999/XSL/Transform', 'XSLT'),
-                ('http://rx4rdf.sf.net/ns/wiki#item-format-zml', 'ZML'),
-              ]
+itemFormats = [cp.mimetype and (cp.uri, cp.label, cp.mimetype) or (cp.uri, cp.label) 
+     for cp in contentProcessors + rx.rhizome.raccoon.ContentProcessors.DefaultContentProcessors 
+                 if cp.label]
 
 #define the APPLICATION_MODEL (static, read-only statements in the 'application' scope)
 APPLICATION_MODEL= addStructure('http://rx4rdf.sf.net/ns/wiki#ItemFormat', itemFormats,
