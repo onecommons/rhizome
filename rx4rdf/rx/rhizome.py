@@ -12,7 +12,7 @@ import Ft
 from Ft.Lib import Uri
 from Ft.Rdf import RDF_MS_BASE,OBJECT_TYPE_RESOURCE
 from Ft.Xml import InputSource
-import os, os.path, sys, types, base64, fnmatch, traceback
+import os, os.path, sys, types, base64, fnmatch, traceback, re
 try:
     import cPickle
     pickle = cPickle
@@ -154,7 +154,19 @@ class MarkupMapFactory(zml.DefaultMarkupMapFactory):
             return zml.DefaultMarkupMapFactory(self, uri)
         else:
             return mm
-        
+
+class SanitizeHTML(utils.BlackListHTMLSanitizer, raccoon.RequestProcessor.SiteLinkFixer):
+    super = raccoon.RequestProcessor.SiteLinkFixer
+
+    def onStrip(self, tag, name, value):
+        #should we raise an exception instead?
+        if name:
+            log.warning('Stripping dangerous HTML attribute: ' + name + '=' + value)
+        elif value:
+            log.warning('Stripping dangerous content from: ' + tag)
+        else:
+            log.warning('Stripping dangerous HTML element: ' + tag)    
+    
 METADATAEXT = '.metarx'
 
 def kw2vars(**kw):
@@ -186,7 +198,21 @@ class Rhizome(object):
             server.getStringFromXPathResult(result), requiresContext = True) #get its content
         self.mmf = MarkupMapFactory(self)
         self.interWikiMap = None
-
+      
+    def _configSanitizer(self, kw, name, function):
+        setting = kw.get(name)
+        if setting is not None:
+            isdict = isinstance(setting, dict)
+            if isdict:
+                setting = setting.items()
+            result = map(function, setting)
+            if isdict:
+                result = dict(result)
+        else:
+            result = getattr(SanitizeHTML, name)
+        setattr(self, name, result)
+            
+        
     def configHook(self, kw):
         def initConstants(varlist, default):
             return raccoon.assignVars(self, kw, varlist, default)
@@ -198,13 +224,25 @@ class Rhizome(object):
             self.ALTSAVE_DIR = os.path.abspath( altsaveSetting )
         else:
             self.ALTSAVE_DIR = ''
+        self.THEME_DIR = kw.get('THEME_DIR', 'themes/default')
             
         if not kw.has_key('PATH'):
-            #set the path to be ALT_SAVE_DIR followed by the directory
-            #that rhizome-config.py lives in (i.e. probably 'rhizome')
-            #we assume that SAVE_DIR is a subdirectory of one of these
-            #if not, you need to set the PATH manually            
-            self.server.PATH = os.path.split(kw['_rhizomeConfigPath'])[0] #set in rhizome-config.py
+            #theme path : rhizome path 
+            #if PATH hasn't been set in the config, set the path to be:
+            #ALT_SAVE_DIR: THEME_DIR : RhizomeDir
+            #where RhizomeDir is directory that rhizome-config.py lives in
+            #(i.e. probably 'rhizome')
+            #we check that SAVE_DIR is a subdirectory of one of these directories
+            #if not, you'll need to set the PATH manually
+            rhizomeDir = os.path.split(kw['_rhizomeConfigPath'])[0] #set in rhizome-config.py
+            if self.THEME_DIR:
+                if not os.path.isabs(self.THEME_DIR):
+                    themeDir = os.path.join(rhizomeDir, self.THEME_DIR)
+                else:
+                    themeDir = self.THEME_DIR
+                self.server.PATH = themeDir + os.pathsep + rhizomeDir
+            else:
+                self.server.PATH = rhizomeDir
             if self.ALTSAVE_DIR:
                 self.server.PATH = self.ALTSAVE_DIR + os.pathsep + self.server.PATH
         log.debug('path is %s' % self.server.PATH)
@@ -232,7 +270,7 @@ class Rhizome(object):
         self.secureHashSeed = kw.get('SECURE_HASH_SEED',
                                           'YOU REALLY SHOULD CHANGE THIS!')
         if self.secureHashSeed == 'YOU REALLY SHOULD CHANGE THIS!':
-            log.warning("secureHashSeed using default seed -- set your own private value!")
+            log.warning("SECURE_HASH_SEED using default seed -- set your own private value!")
         self.secureHashMap = kw.get('secureHashMap',        
             { self.passwordHashProperty :  self.secureHashSeed })
         #make this available as an XPath variable
@@ -248,9 +286,15 @@ class Rhizome(object):
         self.indexDir = kw.get('INDEX_DIR', 'contentindex')
         self.indexableFormats = kw.get('indexableFormats', self.defaultIndexableFormats)
 
+        for args in [ ('blacklistedContent', lambda x,y: (re.compile(x), re.compile(y)) ),
+          ('blacklistedElements',lambda x: x),
+          ('blacklistedAttributes', lambda x,y: (re.compile(x), re.compile(y)) )
+            ]:
+            self._configSanitizer(kw, *args)
+
         self.uninitialized = False
         
-    def getInterWikiMap(self):        
+    def getInterWikiMap(self):
         if self.interWikiMap is not None:
             return self.interWikiMap
         interWikiMapURL = getattr(self, 'interWikiMapURL', None) #in case this is call before configuration is completed
@@ -259,6 +303,15 @@ class Rhizome(object):
            return self.interWikiMap
         return {}
 
+    def validateExternalRequest(self, kw):
+        '''
+        Disallow (form variables, etc.) from starting with '__' 
+        '''        
+        for name in kw:
+            if name.startswith('__'):
+               raise raccoon.NotAuthorized(
+    '%s: form variable names can not start with "__"' % (name))        
+                
     def authorizeMetadata(self, operation, namespace, name, value, kw):
         ''' Because XPath functions may be made available in contexts
         where little access control is desired, we provide a simple
@@ -422,8 +475,8 @@ class Rhizome(object):
     def doImport(self, path, recurse=False, r=False, disposition='',
                  filenameonly=False, xupdate="path:import.xml",
                  doctype='', format='', dest=None, folder=None, token = None,
-                 label=None, keepext=False, noindex=False, save=True,
-                 fixedBaseURI=None, **kw):
+                 label=None, keyword=None, keepext=False, noindex=False,
+                 save=True, fixedBaseURI=None, **kw):
           '''Import command line option
 Import the file in a directory into the site.
 If, for each file, there exists a matching file with ".metarx" appended, 
@@ -448,7 +501,7 @@ The following options only apply when no metarx file is present:
 Each of these set the equivalent metadata property:
 -disposition (wiki:item-disposition), -doctype (wiki:doctype),
 -format (wiki:item-format), -token (auth:guarded-by),
--label  (wiki:has-label)
+-label  (wiki:has-label), -keyword (wiki:about)
 Their value can be either an URI or a QName.
 '''
           defaultFormat=format
@@ -460,6 +513,10 @@ Their value can be either an URI or a QName.
               accessTokens = [ token ]
           else:
               accessTokens = []
+          if keyword:
+              keywords = [ keyword ]
+          else:
+              keywords = []
               
           if '*' in os.path.split(path)[1] or '?' in os.path.split(path)[1]:
               path,filePattern = os.path.split(path)
@@ -596,8 +653,8 @@ Their value can be either an URI or a QName.
                   triples[wikiname] = self.addItem(wikiname,loc=loc,format=format,
                                     disposition=disposition, doctype=doctype,
                                     contentLength = str(os.stat(path).st_size),
-                                    digest = utils.shaDigest(path),
-                                    accessTokens=accessTokens) 
+                                    digest = utils.shaDigest(path), keywords=keywords,
+                                    label=label, accessTokens=accessTokens) 
                   title = ''
                   resourceURI = self.getNameURI(None, wikiname)
                   
@@ -658,21 +715,22 @@ Options:
              log.info('attempting to export %s ' % name)
              if static:                 
                  try:
+                     #we need this to store the mimetype:
                      class _dummyRequest:
                          def __init__(self):
                              self.headerMap = {}
                              self.simpleCookie = {}
 
                      rc = { '_static' : static,
-                            '_noErrorHandling': 1,
-                            '_response': _dummyRequest() #we need this for the mimetype
+                            '_noErrorHandling': 1,                            
                             }
                      
-                     if kw.get('label'): rc['label'] = kw['label']
+                     if kw.get('label'):
+                         rc['label'] = kw['label']
                      #todo: what about adding user context (default to administrator?)
                      #add these to the requestContext so invocation know its intent
                      self.server.requestContext.append(rc)
-                     content = self.server.requestDispatcher.invoke__(orginalName) 
+                     content = self.server.requestDispatcher.invoke__(orginalName, _response=_dummyRequest() ) 
                      #todo: change rootpath
                      #todo: handle aliases 
                      #todo: what about external files (e.g. images)
@@ -763,6 +821,7 @@ Options:
                          else:
                              stmts.append(stmt)                 
              else:
+                 #create a .metarx file along side the exported one
                  lastrevision = self.server.evalXPath(
                      '''(wiki:revisions/*/rdf:first)[last()]/wiki:Item |
                        (wiki:revisions/*/rdf:first)[last()]/wiki:Item//a:contents/*''',
@@ -772,13 +831,50 @@ Options:
                  metadatafile = file(path + METADATAEXT, 'w+b')
                  metadatafile.write( metadata)
                  metadatafile.close()
+                 
          if astriples:             
              stream = file(astriples, 'w+b')
-             #apologies, write triples sucks
              utils.writeTriples(stmts,stream)
              stream.close()
                  
     ######content processing####
+    def processXSLT(self, result, kw, contextNode, contents):
+        '''
+        Invoke the transformation on the _contents metadata 
+        '''
+        return self.server.processXslt(contents, kw['_contents'], kw,
+                uri=kw.get('_contentsURI') or self.server.evalXPath( 
+    'concat("site:///", (/a:NamedContent[wiki:revisions/*/*[.=$__context]]/wiki:name)[1])',
+                        node=contextNode) )
+                
+    def linkFixerFactory(self, *args):
+        fixer = SanitizeHTML(*args)        
+                                    
+        fixer.blacklistedElements = self.blacklistedElements
+        fixer.blacklistedContent = self.blacklistedContent
+        fixer.blacklistedAttributeNames = self.blacklistedAttributes
+        return fixer
+    
+    def processMarkup(self, accesstoken, result, kw, contextNode, contents):
+        #if the content was not created by an user with the 
+        #with the trusted author token we need to strip out any dangerous HTML        
+        #because html maybe generated dynamically we need to check this while spitting out the HTML
+        if not self.server.evalXPath(
+    '''$__context/wiki:created-by/*/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser'
+       or /*[.='%s'][.=$__context/wiki:created-by/*/auth:has-rights-to/*
+        or .=$__context/wiki:created-by/*/auth:has-role/*/auth:has-rights-to/*]'''
+                % accesstoken, node=contextNode):
+            linkFixerFactory = self.linkFixerFactory
+        else: #permission to generate any kind of html/xml -- so use the default
+            linkFixerFactory = None
+        path = kw.get('_docpath', kw.get('_path', getattr(kw.get('_request'),'browserPath', kw.get('_name'))) )
+        return self.server.processMarkup(contents,path,linkFixerFactory)
+
+    def processMarkupCachePredicate(self, result, kw, contextNode, contents):
+        path = kw.get('_docpath', kw.get('_path', getattr(kw.get('_request'),'browserPath', kw.get('_name'))) )
+        return (contents, contextNode, id(contextNode.ownerDocument),
+                contextNode.ownerDocument.revision, path)
+    
     def processZMLSideEffects(self, contextNode, kw):
         #optimization: only set the doctype (which will invoke wiki2html.xsl if we need links to be transformed)
         if self.undefinedPageIndicator or self.externalLinkIndicator or self.interWikiLinkIndicator:
@@ -799,7 +895,7 @@ Options:
         actions = self.handleRequestSequence[3:]
 
         #so we can reference the template resource (will be placed in the the 'previous' namespace)
-        #print 'template resource', resultNodeset
+        log.debug('calling template resource: %s' % resultNodeset)
         kw["_template"] = resultNodeset
         
         return self.server.callActions(actions, self.server.globalRequestVars,
@@ -1225,12 +1321,16 @@ Options:
             parent = folder
         return rootFolder, folder
 
-    def _addItemTuple(self, name, keywords=None,
+    def _addItemTuple(self, name, keywords=('built-in',),
                         accessTokens=['base:save-only-token'], **kw):
-        keywordlist=['built-in']
+        #this function is a confusing hack -- don't use it
         if keywords:
-           keywordlist.extend(keywords)
-        return (name, self.addItem(name, keywords=keywordlist,
+            #only add 'built-in' when other keywords are specified
+            if 'built-in' not in keywords:
+                keywords = keywords + ['built-in']
+        else:
+            keywords = ()
+        return (name, self.addItem(name, keywords=keywords,
                                    accessTokens=accessTokens, **kw))
 
     def addItem(self, name, loc=None, contents=None, disposition = 'complete', 

@@ -21,13 +21,19 @@ else:
     from xml.dom import Node as _Node
 
     from Ft.Rdf.Drivers import Memory
-    import os, time, cStringIO, sys, base64, mimetypes, types
+    import os, time, cStringIO, sys, base64, mimetypes, types, traceback
+    import urllib
     from Ft.Xml.Lib.Print import PrettyPrint
     from Ft.Xml.XPath.Conversions import StringValue, NumberValue
     from Ft.Xml import SplitQName, XPath, InputSource, EMPTY_NAMESPACE
     from Ft.Xml.XPath import RuntimeException,FT_EXT_NAMESPACE
     from Ft.Xml.Xslt import XSL_NAMESPACE
-    from Ft.Lib import Uri, UriException, number
+    from Ft.Lib import Uri, UriException, number, Time
+    try:
+        #needed for 4Suite versions > 1.0a3
+        import Ft.Lib.Resolvers
+    except ImportError:
+        pass
     from RxPath import XFalse, XTrue, Xbool
     try:
         import cPickle
@@ -44,6 +50,8 @@ else:
     log = logging.getLogger("raccoon")
     _defexception = utils.DynaExceptionFactory(__name__)
 
+    _defexception('CmdArgError')
+    
     #xpath variable namespaces:
     RXIKI_HTTP_REQUEST_HEADER_NS = 'http://rx4rdf.sf.net/ns/raccoon/http-request-header#'
     RXIKI_HTTP_RESPONSE_HEADER_NS = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
@@ -68,6 +76,14 @@ else:
             del functionDict[(FT_EXT_NAMESPACE, 'spawnv')]
             del functionDict[(FT_EXT_NAMESPACE, 'system')]
             del functionDict[(FT_EXT_NAMESPACE, 'env-var')]
+            #1.0a4 version of 4Suite deleted deprecated functions, so re-add it
+            #todo: we should stop using this -- but exslt:string's encode-uri is practically undocumented!
+            functionDict[(FT_EXT_NAMESPACE, 'escape-url')] = lambda context, uri: urllib.quote(StringValue(uri))
+            #4Suite 1.0a4's pytime-to-exslt is broken, reimplement it:
+            functionDict[(FT_EXT_NAMESPACE, 'pytime-to-exslt')] = lambda context, t=None:\
+                t and unicode(Time.FromPythonTime(NumberValue(t))) or unicode(Time.FromPythonTime())
+
+             
     def SystemProperty(context, qname):
         '''
         disable the 'http://xmlns.4suite.org/xslt/env-system-property'
@@ -113,11 +129,17 @@ else:
             nodset = [ nodeset ]
         return reduce(f, map(NumberValue, nodeset), nanvalue)
 
-    def DocumentAsText(content, url):
+    def DocumentAsText(context, url):
         '''
-        if the url resolves to a file that contains bytes sequences that are not ascii or utf-8 (e.g. a binary file) this function can not be used in contexts such as xsl:value-of
-        however, an raw xpath expression will return a non-unicode string and thus will work in those contexts
+        Return the contents of url as a string or an empty nodeset
+        if url is an zero length string. If the url resolves to a file
+        thCat contains bytes sequences that are not ascii or utf-8
+        (e.g. a binary file) this function can not be used in contexts
+        such as xsl:value-of however, an raw xpath expression will
+        return a non-unicode string and thus will work in those
+        contexts.
         '''
+
         urlString = StringValue( url )
         if not urlString:
             return [] #return an empty nodeset    
@@ -226,7 +248,7 @@ else:
         import Ft.Xml.Xslt.SortElement
         
         se = Xslt.SortElement.SortElement(None, '','','')
-        se._select = XPath.Compile(key)
+        se._select = RequestProcessor.expCache.getValue(key)
         se._comparer = se.makeComparer(order,dataType, caseOrder)
         return Xslt.XPathExtensions.SortedExpression(
             DummyExpression(nodeset), [se]).evaluate(context)
@@ -237,15 +259,22 @@ else:
         but the then and else parameters are strings that evaluated dynamically 
         thus supporting the short circuit logic you expect from if expressions
         """
-        from Ft.Xml.XPath import parser
         from Ft.Xml.XPath import Conversions
-        #todo: could use caches if available
-        if Conversions.BooleanValue(cond):
-            return parser.new().parse(Conversions.StringValue(v1)).evaluate(context)
+        queryCache=getattr(context.node.ownerDocument, 'queryCache', None)
+        if Conversions.BooleanValue(cond):            
+            compExpr = RequestProcessor.expCache.getValue(Conversions.StringValue(v1))
+            if queryCache:
+                return queryCache.getValue(compExpr, context)         
+            else:
+                return compExpr.evaluate(context)    
         elif v2 is None:
             return []
         else:
-            return parser.new().parse(Conversions.StringValue(v2)).evaluate(context)
+            compExpr = RequestProcessor.expCache.getValue(Conversions.StringValue(v2))
+            if queryCache:
+                return queryCache.getValue(compExpr, context)         
+            else:
+                return compExpr.evaluate(context)    
 
     def Map(context, nodeset, string):
         if type(nodeset) != type([]):
@@ -255,12 +284,17 @@ else:
         mapContext.size = len(nodeset)
         mapContext.position = 1
         #note: exslt-dyn:map implies that parse exception should be caught and an empty nodeset returned
-        exp = parser.new().parse(StringValue(string))
+        exp = RequestProcessor.expCache.getValue(StringValue(string))
+        queryCache=getattr(context.node.ownerDocument, 'queryCache', None)
+
         def eval(l, node):
             mapContext.node = node
             mapContext.position += 1
             mapContext.varBindings[(RXWIKI_XPATH_EXT_NS, 'current')] = node
-            result = exp.evaluate(mapContext)
+            if queryCache:
+                result = queryCache.getValue(exp, mapContext)         
+            else:
+                result = exp.evaluate(mapContext)            
             if type(result) != type([]):
                 if not isinstance(result, unicode):
                     result = unicode(str(result), 'utf8')                
@@ -291,6 +325,15 @@ else:
       #from Ft.Xml.Lib.Print import PrettyPrint
       #PrettyPrint(outdoc, stream=prettyOutput)
       #return prettyOutput.getvalue()    
+
+    import Ft
+    class XPathUserError(XPath.RuntimeException):
+        def __init__(self, message, errorCode, *args):
+            messages = { errorCode : message }
+            Ft.FtException.__init__(self, errorCode, messages, args)
+
+    def Error(context, message, code=0):
+        raise XPathUserError(message, code)
         
     def HasMetaData(kw, context, name):
         def _test(local, dict):
@@ -460,6 +503,7 @@ else:
     (RXWIKI_XPATH_EXT_NS, 'max'): Max,
     (RXWIKI_XPATH_EXT_NS, 'get-rdf-as-xml'): GetRDFXML,
     (RXWIKI_XPATH_EXT_NS, 'instance-of'): instanceof,
+    (RXWIKI_XPATH_EXT_NS, 'error'): Error,
     }
 
     DefaultNsMap = { 'owl': 'http://www.w3.org/2002/07/owl#',
@@ -499,8 +543,10 @@ else:
         def invokeEx__(self, name, kw):        
             kw.update( self.server.requestContext[-1] )
             kw['_name']=name
+            if not kw.has_key('_path'):
+                kw['_path'] = name
             #print 'invoke', kw
-            #defaultTriggerName let's have different trigger type per thread
+            #defaultTriggerName let's us have different trigger type per thread
             #allowing site:/// urls to rely on the defaultTriggerName
             triggerName = self.triggerName or self.server.currentRequestTrigger        
             result = self.server.runActions(triggerName, kw)
@@ -632,6 +678,7 @@ else:
             raise UriException(UriException.RESOURCE_ERROR, uri, 'Not Found')
 
         def resolveSiteScheme(self, uri, base=None):
+            log.debug('resolving uri: ' + uri)
             if base:
                 uri = self.normalize(uri, base) 
             paramMap = {}
@@ -647,7 +694,6 @@ else:
                         _sp=_paramStr.split('=')
                         if len(_sp)==2:
                             _key, _value=_sp
-                            import urllib
                             _value=urllib.unquote_plus(_value)
                             if paramMap.has_key(_key):
                                 # Already has a value: make a list out of it
@@ -660,7 +706,12 @@ else:
                             else:
                                 paramMap[_key]=_value
                 path = path[:i]
-            if path and path[-1]=='/': path=path[:-1] # Remove trailing '/' if any
+            if path and path[-1]=='/':
+                path=path[:-1] # Remove trailing '/' if any
+                trailingSlash = True
+            else:
+                trailingSlash = False
+                
             if path.startswith('site://'):
                 #print 'path', path
                 name = path[len('site://'):] #assume we only get requests inside our home path
@@ -668,7 +719,9 @@ else:
                 name = path
             while name and name[0]=='/':
                 name=name[1:] # Remove starting '/' if any e.g. from site:///
-                            
+
+            if trailingSlash:
+                paramMap['_path'] = name+'/'
             try:
                 #print 'to resolve!', name, ' ', uri, paramMap
                 contents = self.server.requestDispatcher.invoke__(name, **paramMap)
@@ -686,7 +739,7 @@ else:
         if maxSize > 0 and stats.st_size > maxSize:
             raise MRUCache.NotCacheable
         return os.path.abspath(path), stats.st_mtime, stats.st_size
-
+        
     fileCache = MRUCache.MRUCache(0, hashCalc = getFileCacheKey,
                     capacityCalc = lambda k, v: k[2],
                     valueCalc = lambda path: SiteUriResolver._resolveFile(path).read() )
@@ -698,7 +751,8 @@ else:
         At the very least it must bind the action instance with the cacheKeyPredicate to disambiguate keys from different actions.
         '''
         actionid = id(action) #do this to avoid memory leaks
-        return lambda resultNodeset, kw, contextNode, retVal: (actionid, cacheKeyPredicate(resultNodeset, kw, contextNode, retVal) )
+        return lambda resultNodeset, kw, contextNode, retVal: (
+            actionid, cacheKeyPredicate(resultNodeset, kw, contextNode, retVal) )
         
     def notCacheableKeyPredicate(*args, **kw):
         raise MRUCache.NotCacheable
@@ -776,32 +830,35 @@ else:
         The key consists of:
             expr, context.node, (var1, value1), (var2, value2), etc. for each var referenced in the expression
         '''
-
         key = [ repr(compExpr) ]
         DomDependent = False
         for field in compExpr:
-            if isinstance(field, XPath.ParsedExpr.ParsedVariableReferenceExpr):
-               value = field.evaluate(context) #may raise RuntimeException.UNDEFINED_VARIABLE
-               expanded = _splitKey(field._key, context)
-               if type(value) is type([]):
+            if context.node and isinstance(field, XPath.ParsedExpr.ParsedVariableReferenceExpr):
+                #when getting the key for a stylesheet we don't have
+                #the variables available for examination                
+                #(nor the context.node and that's easier to test for)
+                #and in this case we don't want them in the key since we add the stylesheet's params instead
+                value = field.evaluate(context) #may raise RuntimeException.UNDEFINED_VARIABLE
+                expanded = _splitKey(field._key, context)
+                if type(value) is type([]):
                     value = tuple(value)
                     DomDependent = True
-               elif isinstance(value, _Node):
+                elif isinstance(value, _Node):
                     DomDependent = True                
-               key.append( (expanded, value) )
+                key.append( (expanded, value) )
             elif isinstance(field, XPath.ParsedExpr.FunctionCall):
-               DomDependent = True #we could check if its a 'static' function that isn't domdendent
-               expandedKey = _splitKey(field._key, context)
-               if expandedKey in notCacheableXPathFunctions:
-                   keyfunc = notCacheableXPathFunctions[expandedKey]
-                   if keyfunc:
-                       key += keyfunc(field, context)
-                   else:
+                DomDependent = True #todo: we could check if its a 'static' function that isn't domdendent
+                expandedKey = _splitKey(field._key, context)
+                if expandedKey in notCacheableXPathFunctions:
+                    keyfunc = notCacheableXPathFunctions[expandedKey]
+                    if keyfunc:
+                       key += keyfunc(field, context, notCacheableXPathFunctions)
+                    else:
                        raise MRUCache.NotCacheable
-               #else: log.debug("%s cacheable! not in %s" % (str(expandedKey), str(notCacheableXPathFunctions) ) )
-            else:
+                #else: log.debug("%s cacheable! not in %s" % (str(expandedKey), str(notCacheableXPathFunctions) ) )
+            elif not isinstance(field, XPath.ParsedExpr.ParsedLiteralExpr):            
                 DomDependent = True
-        if DomDependent:
+        if DomDependent and context.node:
             key += [context.node, id(context.node.ownerDocument), getattr(context.node.ownerDocument, 'revision', None)]
         #print 'returning key', tuple(key)
         return tuple(key)
@@ -831,8 +888,7 @@ else:
            in order to guard against the function map values changing.
         '''
         for field in compiledExp:
-            if isinstance(field, XPath.ParsedExpr.FunctionCall):
-                print 'clearing ', field._name
+            if isinstance(field, XPath.ParsedExpr.FunctionCall):                
                 field._func = None
 
     import Ft.Xml.Xslt.StylesheetReader 
@@ -859,26 +915,94 @@ else:
             source = source.encode('utf8')
         iSrc = InputSource.DefaultFactory.fromString(source, uri)      
         _styReader = StylesheetReader()
-        return _styReader.fromSrc(iSrc) #todo: support extElements=self.extElements
+        stylesheetElement = _styReader.fromSrc(iSrc) #todo: support extElements=self.extElements
+        stylesheetElement.standAlone = _styReader.standAlone
+        return stylesheetElement
 
     def isStyleSheetCacheable(key, styleSheet, source, uri):
-        return getattr(styleSheet, 'standAlone', True)
+        return styleSheet.standAlone
+
+    def evaluateKey(paramNums, field, context, notCacheableXPathFunctions):
+        key = []
+        notCacheableXPathFunctions = dict(notCacheableXPathFunctions) #copy dict
+        #too complicated to deal with sideeffects now so mark uncacheable
+        notCacheableXPathFunctions[(RXWIKI_XPATH_EXT_NS, 'remove-metadata')] = 0
+        notCacheableXPathFunctions[(RXWIKI_XPATH_EXT_NS, 'assign-metadata')] = 0
+
+        for arg in xrange(len(field._args)):
+            if arg in paramNums:
+                if isinstance(field._args[arg], XPath.ParsedExpr.ParsedLiteralExpr):
+                    literal = field._args[arg].evaluate(context) #returns field._literal                    
+                    try:
+                        compExpr = RequestProcessor.expCache.getValue(literal)
+                        key.append( _getKeyFromXPathExp(compExpr, context,
+                                            notCacheableXPathFunctions) )
+                    #except XPath.RuntimeException: if e.code = XPath.RuntimeException.UNDEFINED_VARIABLE:
+                    except:
+                        raise MRUCache.NotCacheable
+                else:
+                    raise MRUCache.NotCacheable
+        return tuple(key)
         
-    DefaultNotCacheableFunctions = dict([(x, None) for x in [(RXWIKI_XPATH_EXT_NS, 'get-metadata'),
-            (RXWIKI_XPATH_EXT_NS, 'has-metadata'),
+    def getHasMetadataCacheKey(field, context, *args):
+        '''
+        for has-metadata() XPath function
+        Handles the most common case where the first argument is a literal
+        '''
+        if isinstance(field._args[0], XPath.ParsedExpr.ParsedLiteralExpr):
+            literal = field._args[0].evaluate(context) #returns field._literal
+            varRef = _splitKey(SplitQName(literal), context)#may raise RuntimeException.UNDEFINED_PREFIX
+            if not context.node:
+                #when getting the key for a stylesheet we don't have
+                #the variables available for examination
+                #(nor the contextNode and that's easier to test for)
+                raise MRUCache.NotCacheable
+            return (varRef, context.varBindings.has_key(varRef))
+        else:
+            raise MRUCache.NotCacheable
+
+    def getGetMetadataCacheKey(field, context, *args):
+        '''
+        for get-metadata() XPath function
+        Handles the most common case where the first argument is a literal
+        '''
+        if isinstance(field._args[0], XPath.ParsedExpr.ParsedLiteralExpr):            
+            literal = field._args[0].evaluate(context) #returns field._literal
+            varRef =  XPath.ParsedExpr.ParsedVariableReferenceExpr('$'+literal)
+            try:
+                value = varRef.evaluate(context)
+            #except XPath.RuntimeException: if e.code = XPath.RuntimeException.UNDEFINED_VARIABLE:
+            except:
+                raise MRUCache.NotCacheable
+            return (varRef, value)
+        else:
+            raise MRUCache.NotCacheable
+        
+    DefaultNotCacheableFunctions = dict([(x, None) for x in [                                    
             (FT_EXT_NAMESPACE, 'iso-time'),        
             (RXWIKI_XPATH_EXT_NS, 'current-time'),
-            ('http://exslt.org/dates-and-times', 'date-time'), #todo: other exslt date-and-times functions but only if no arguments
+            ('http://exslt.org/dates-and-times', 'date-time'),
+            #todo: other exslt and wf date-and-times functions but only if no arguments
             (RXWIKI_XPATH_EXT_NS, 'generate-bnode'),
             (FT_EXT_NAMESPACE, 'generate-uuid'),
-            #functions that dynamically evaluate expression may have hidden dependencies so they aren't cacheable
-            (RXWIKI_XPATH_EXT_NS, 'sort'),
-            (RXWIKI_XPATH_EXT_NS, 'if'),
-            (FT_EXT_NAMESPACE, 'evaluate'),
-            ('http://exslt.org/dynamic', 'evaluate'), ]])
-        #what about random? (ftext and exslt) 
+            (FT_EXT_NAMESPACE, 'random'),
+            ("http://exslt.org/math", 'random'),
+            (RXWIKI_XPATH_EXT_NS, 'error'),
+            ]])
     
-    EnvironmentDependentFunctions = dict([(x, None) for x in [ (None, 'document'),
+    DefaultNotCacheableFunctions[(RXWIKI_XPATH_EXT_NS, 'get-metadata')] = getGetMetadataCacheKey
+    DefaultNotCacheableFunctions[(RXWIKI_XPATH_EXT_NS, 'has-metadata')] = getHasMetadataCacheKey
+    #note: assign/remove-metadata are handle by the side-effect capturing functions
+    #functions that dynamically evaluate expressions: 
+    DefaultNotCacheableFunctions[(RXWIKI_XPATH_EXT_NS, 'if')] = lambda *args: evaluateKey( (1,2), *args)
+    DefaultNotCacheableFunctions[(RXWIKI_XPATH_EXT_NS, 'sort')] = lambda *args: evaluateKey( (1,), *args)
+    DefaultNotCacheableFunctions[(RXWIKI_XPATH_EXT_NS, 'evaluate')] = lambda *args: evaluateKey( (0,), *args)
+    DefaultNotCacheableFunctions[(FT_EXT_NAMESPACE, 'evaluate')] = lambda *args: evaluateKey( (0,), *args)
+    DefaultNotCacheableFunctions[('http://exslt.org/dynamic', 'evaluate')] = lambda *args: evaluateKey( (0,), *args)
+    DefaultNotCacheableFunctions[(RXWIKI_XPATH_EXT_NS, 'map')] = lambda *args: evaluateKey( (1,), *args)    
+    
+    EnvironmentDependentFunctions = dict([(x, None) for x in [
+        (None, 'document'),
         (RXWIKI_XPATH_EXT_NS, 'openurl'),
         (RXWIKI_XPATH_EXT_NS, 'file-exists') ]])
 
@@ -901,14 +1025,14 @@ else:
     class RequestProcessor(object):
         '''        
         '''
-        DEFAULT_CONFIG_PATH = 'raccoon-default-config.py'
+        DEFAULT_CONFIG_PATH = ''#'raccoon-default-config.py'
         lock = None
         DefaultDisabledContentProcessors = []        
                     
         requestContext = utils.createThreadLocalProperty('__requestContext',
             doc='variables you want made available to anyone during this request (e.g. the session)')
 
-        inErrorHandler = utils.createThreadLocalProperty('__inErrorHandler', initAttr=True)
+        inErrorHandler = utils.createThreadLocalProperty('__inErrorHandler', initAttr=True, initValue=0)
         
         expCache = MRUCache.MRUCache(0, XPath.Compile)#, sideEffectsFunc=_resetFunctions)
 
@@ -920,7 +1044,10 @@ else:
             'http://rx4rdf.sf.net/ns/wiki#item-format-text' : lambda result, kw, contextNode, contents: contents,
             'http://rx4rdf.sf.net/ns/wiki#item-format-binary' : lambda result, kw, contextNode, contents: contents,
             'http://rx4rdf.sf.net/ns/wiki#item-format-xml':
-                lambda result, kw, contextNode, contents: self.processMarkup(contents,kw.get('_docpath', kw.get('_name'))),
+                lambda result, kw, contextNode, contents: self.processMarkup(
+                        contents,kw.get('_docpath',
+                        kw.get('_path', getattr(kw.get('_request'),'browserPath', kw.get('_name')))
+                                       )                                    ),
             'http://www.w3.org/2000/09/xmldsig#base64' :
                 lambda result, kw, contextNode, contents: base64.decodestring(contents),
             'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt':
@@ -973,8 +1100,10 @@ else:
             self.runActions('run-cmds', kw)        
                 
         def loadConfig(self, path, argsForConfig=None):
+            if not path:
+                raise CmdArgError('you must specify a config file using -a') #path = self.DEFAULT_CONFIG_PATH
             if not os.path.exists(path):
-                raise 'you must specify a config file using -a' #path = self.DEFAULT_CONFIG_PATH
+                raise CmdArgError('%s not found' % path) 
 
             kw = {}
             import socket
@@ -994,10 +1123,8 @@ else:
             def initConstants(varlist, default):
                 return assignVars(self, kw, varlist, default)
                             
-            initConstants( [ 'nsMap', 'extFunctions', 'actions', 'contentProcessors', 'authorizationDigests',
-                             'NOT_CACHEABLE_FUNCTIONS', 'contentProcessorCachePredicates',
-                             'contentProcessorSideEffectsFuncs','contentProcessorSideEffectsPredicates',
-                             'contentProcessorIsValueCacheablePredicates'], {} )
+            initConstants( [ 'nsMap', 'extFunctions', 'actions',  'authorizationDigests',
+                             'NOT_CACHEABLE_FUNCTIONS', ], {} )
             initConstants( [ 'STORAGE_PATH', 'STORAGE_TEMPLATE', 'APPLICATION_MODEL',
                              'DEFAULT_MIME_TYPE', 'transactionLog'], '')
             setattr(self, 'initModel', kw.get('initModel', RxPath.initFileModel))            
@@ -1027,8 +1154,9 @@ else:
             self.SECURE_FILE_ACCESS= kw.get('SECURE_FILE_ACCESS', True)
             self.disabledContentProcessors = kw.get('disabledContentProcessors',
                                                 self.DefaultDisabledContentProcessors)            
-            initConstants(['authorizeAdditions', 'authorizeRemovals'],None)
-            self.authorizeMetadata = kw.get('authorizeMetadata', lambda *args: True)            
+            initConstants(['authorizeAdditions', 'authorizeRemovals'],None)            
+            self.authorizeMetadata = kw.get('authorizeMetadata', lambda *args: True)
+            self.validateExternalRequest = kw.get('validateExternalRequest', lambda *args: True)            
             self.getPrincipleFunc = kw.get('getPrincipleFunc', lambda kw: '')
             self.authorizeXPathFuncs = kw.get('authorizeXPathFuncs', lambda self, funcMap, kw: funcMap)
             self.authorizeContentProcessors = kw.get('authorizeContentProcessors',
@@ -1044,18 +1172,30 @@ else:
             if self.LIVE_ENVIRONMENT:
                 self.NOT_CACHEABLE_FUNCTIONS.update( EnvironmentDependentFunctions )
                 styleSheetCache.isValueCacheableCalc = isStyleSheetCacheable
+            else:
+                styleSheetCache.sideEffectsFunc = self.styleSheetParserSideEffectsFunc
+                styleSheetCache.sideEffectsCalc = self.styleSheetParserSideEffectsCalc
                 
             self.nsMap.update(DefaultNsMap)
+            
+            contentProcessorSettings = [ ('contentProcessors', self.DefaultContentProcessors),
+                             ('contentProcessorCachePredicates', self.DefaultContentProcessorCachePredicates),
+                             ('contentProcessorSideEffectsFuncs',self.DefaultContentProcessorSideEffectsFuncs),
+                             ('contentProcessorSideEffectsPredicates',self.DefaultContentProcessorSideEffectsPredicates),
+                             ('contentProcessorIsValueCacheablePredicates',self.DefaultContentProcessorIsValueCacheablePredicates),
+                            ]
+            for name, default in contentProcessorSettings:
+                setattr(self, name, default.copy())
+                value = kw.get(name, {})
+                if not isinstance(value, dict):
+                    raise 'config variable %s (of type %s) must be compatible with a dict' % (name, type(value))                               
+                getattr(self, name).update( value )
 
-            self.contentProcessors.update(self.DefaultContentProcessors)
-            self.contentProcessorCachePredicates.update(self.DefaultContentProcessorCachePredicates)
-            self.contentProcessorSideEffectsFuncs.update(self.DefaultContentProcessorSideEffectsFuncs)
-            self.contentProcessorSideEffectsPredicates.update(self.DefaultContentProcessorSideEffectsPredicates)
-            self.contentProcessorIsValueCacheablePredicates.update(self.DefaultContentProcessorIsValueCacheablePredicates)
             for disable in self.disabledContentProcessors:
                 for cpDict in [self.contentProcessors, self.contentProcessorCachePredicates,
                                self.contentProcessorSideEffectsFuncs,
-                               self.contentProcessorSideEffectsPredicates]:
+                               self.contentProcessorSideEffectsPredicates,
+                               self.contentProcessorIsValueCacheablePredicates]:
                     if cpDict.get(disable):
                         del cpDict[disable]
             
@@ -1102,10 +1242,6 @@ else:
                     lambda compExpr, context: _getKeyFromXPathExp(compExpr, context, self.NOT_CACHEABLE_FUNCTIONS),
                     _processXPathExpSideEffects, _calcXPathSideEffects)
             self.rdfDom.actionCache = MRUCache.MRUCache(self.ACTION_CACHE_SIZE)
-            global styleSheetCache 
-            if not styleSheetCache.isValueCacheableCalc:
-                #invalidate this cache if we weren't checking for external dependencies
-                styleSheetCache = MRUCache.MRUCache(self.STYLESHEET_CACHE_SIZE, styleSheetValueCalc)
             lock.release()
     ##        outputfile = file('debug.xml', "w+", -1)
     ##        from Ft.Xml.Domlette import Print, PrettyPrint
@@ -1164,6 +1300,7 @@ else:
                 vars[(None, '_url')] = request.browserUrl
                 vars[(None, '_base-url')] = request.browserBase            
                 vars[(None, '_path')] = request.browserPath
+                vars[(None, '_url-query')] = request.browserQuery
                 vars[(None, '_method')] = request.method
                 #print kw['_name'], request.browserUrl, request.browserBase, request.browserPath
                 vars.update( dict(map(lambda x: ((RXIKI_HTTP_REQUEST_HEADER_NS, x[0]), x[1]), request.headerMap.items()) ) )
@@ -1225,13 +1362,13 @@ else:
             for name, exps, assignEmpty in actionvars:
                 vars, extFunMap = self.mapToXPathVars(kw)            
                 for exp in exps:
-                    result = self.evalXPath(exp, vars=vars, extFunctionMap = extFunMap, node = contextNode)
-                    #print name, exp; print result
+                    result = self.evalXPath(exp, vars=vars, extFunctionMap = extFunMap, node = contextNode)                    
                     if result:
                         break
                 #print name, exp; print result
                 if assignEmpty or result:
                     AssignMetaData(kw, context, name, result, authorize=False)
+                    #print name, result, contextNode
                 
         def doActions(self, sequence, kw = None, contextNode = None, retVal = None):
             if kw is None: kw = {}
@@ -1297,7 +1434,7 @@ else:
                 if self.inErrorHandler or kw.get('_noErrorHandling'):#avoid endless loops
                     raise
                 else:
-                    self.inErrorHandler = True
+                    self.inErrorHandler += 1
                 try:
                     errorSequence = self.actions.get('on-error')
                     if errorSequence and sequence is not errorSequence:
@@ -1329,7 +1466,7 @@ else:
                     else:
                         raise
                 finally:
-                    self.inErrorHandler = False
+                    self.inErrorHandler -= 1
             return retVal
 
         def callActions(self, actions, globalVars, resultNodeset, kw, contextNode, retVal):
@@ -1374,7 +1511,7 @@ else:
             xpath = StringValue(expr)
             #use if caches available
             compExpr = self.expCache.getValue(xpath) #todo: nsMap should be part of the key -- until then clear the cache if you change that!        
-            queryCache=getattr(context.node.ownerDocument, 'queryCache', None)
+            queryCache= getattr(context.node.ownerDocument, 'queryCache', None)
             if queryCache:
                 res = queryCache.getValue(compExpr, context)         
             else:
@@ -1488,7 +1625,7 @@ else:
                 utils.LinkFixer.__init__(self, out)
                 self.nextFormat = None
                 self.ignorePIs = not enableFormatPI
-                if url:                
+                if url is not None:                
                     index = url.find('?')
                     if index > -1:
                         url = url[:index]
@@ -1496,9 +1633,11 @@ else:
                         index = url.find('#')
                         if index > -1:
                             url = url[:index]
-                    self.rootpath = '../'* url.count('/')
+                    dirCount = url.count('/')                    
+                    self.rootpath = '../' * dirCount
                 else:
                     self.rootpath = baseurl
+                #print 'rootpath', repr(url), self.rootpath
 
             def handle_pi(self, data):
                 if data.startswith('raccoon-ignore'):
@@ -1520,7 +1659,7 @@ else:
                 else:
                     return False
 
-            def doFixup(self, tag, name, value):
+            def doFixup(self, tag, name, value, hint):
                 '''
                 replaces an absolute site reference with relative path to the root
                 '''
@@ -1532,13 +1671,15 @@ else:
                 #for any other site: URLs we assume they're relative and just strip out the 'site:'
                 return value.replace('site:', '')
 
-        def processMarkup(self, contents, docpath):
+        def processMarkup(self, contents, docpath, linkFixerFactory=None):
             ''' HTML/XML content processors. Fixes up any 'site:' URLs
             that appear in the XML or HTML content and handle
             <?raccoon-format contentprocessURI ?> processor
             instruction. '''
             out = StringIO.StringIO()
-            fixlinks = self.SiteLinkFixer(out, docpath, self.ROOT_PATH)
+            if not linkFixerFactory:
+                linkFixerFactory = self.SiteLinkFixer
+            fixlinks = linkFixerFactory(out, docpath, self.ROOT_PATH)
             fixlinks.feed(contents)
             fixlinks.close()
             if fixlinks.nextFormat:
@@ -1570,6 +1711,9 @@ else:
             This is a bit of hack right now, just generates a random value.
             '''
             modelNode = rdfDom.findSubject(self.MODEL_RESOURCE_URI)
+            if not modelNode:
+                log.warning("model resource not found: %s" % self.MODEL_RESOURCE_URI)
+                return
             for p in modelNode.childNodes:
                 if p.stmt.predicate == self.MODEL_UPDATE_PREDICATE:
                     modelNode.removeChild(p)
@@ -1684,9 +1828,12 @@ else:
             except Ft.Xml.Xslt.XsltException:
                 #if Error.SOURCE_PARSE_ERROR
                 #probably because there's no root element, try wrapping in a <div>
-                contents = '<div>'+contents+'</div>'
+                if contents[:5] == '<?xml':
+                    contents = '<div>'+contents[contents.find('?>')+2:]+'</div>'
+                else:
+                    contents = '<div>'+contents+'</div>'
                 contents = processor.run(InputSource.DefaultFactory.fromString(contents, uri),
-                                     topLevelParams = vars)
+                                 topLevelParams = vars)
             format = kw.get('_nextFormat')
             if format is None:
                 format = self._getFormatFromStyleSheet(styleSheet)
@@ -1846,6 +1993,30 @@ else:
                 RemoveMetaData(kw, context, change)
           return cacheValue
 
+        def styleSheetParserSideEffectsCalc(self, cacheValue, *args):
+            '''
+            We use sideEffects here to store a key based on the value
+            (we can't store this in the key because the key has to be calculated before the value)
+            SideEffectsFunc will raise KeyError if current key doesn't match
+            '''
+            if not cacheValue.standAlone: #should be a StylesheetElement created in raccoon.styleSheetValueCalc
+                #if the stylesheet relies on other files (e.g. through xsl:import)
+                #we want to include the state of the store so that when it changes we invalidate this key
+                #and recalculate the value -- just in case one of those referenced files have changed                
+                key = [id(self.rdfDom), getattr(self.rdfDom, 'revision', None)]
+            else:
+                key = None
+            return key
+
+        def styleSheetParserSideEffectsFunc(self, cacheValue, sideEffects, *args):                    
+            if sideEffects:
+                key = [id(self.rdfDom), getattr(self.rdfDom, 'revision', None)]
+                if sideEffects != key:
+                    #if the model has changed, raise a KeyError so we reparse the stylesheet
+                    raise KeyError
+            else:
+                assert cacheValue.standAlone
+
     ###########################################
     ## http request handling
     ###########################################
@@ -1875,12 +2046,14 @@ else:
                 if contentType:
                     kw['_response'].headerMap['content-type']=contentType
 
-            try:
+            try:                
                 rc = {}
+                #requestContext is used by all Requestor objects in the current thread 
                 rc['_session']=kw['_session']
                 #todo: probably should put request.simpleCookie in the requestContext somehow too
                 self.requestContext.append(rc)
-
+                
+                self.validateExternalRequest(kw)
                 result = self.runActions('http-request', kw)
                 if result is not None: #'cause '' is OK
                     #if mimetype is not set, make another attempt
@@ -1966,7 +2139,7 @@ else:
               if expanded in notCacheableXPathFunctions:
                    keyfunc = notCacheableXPathFunctions[expanded]
                    if keyfunc:
-                       key.append( keyfunc(field, context) ) #may raise MRUCache.NotCacheable
+                       key.append( keyfunc(field, context, notCacheableXPathFunctions) ) #may raise MRUCache.NotCacheable
                    else:
                        raise MRUCache.NotCacheable    
 
@@ -1983,7 +2156,7 @@ else:
                 if attrDict is not None:
                     for name, value in attrDict.items():
                         if isinstance(value, (AttributeInfo.Expression, AttributeInfo.Avt)):
-                            #this attribute may have an expression expression in it
+                            #this attribute may have an expression in it
                             attributeName = '_' + SplitQName(name)[1].replace('-', '_') #see Ft.Xml.Xslt.StylesheetHandler
                             attributeValue = getattr(node, attributeName, None)
                             if isinstance(attributeValue, AttributeInfo.ExpressionWrapper):
@@ -2025,7 +2198,7 @@ else:
             arg = i.next()
             while 1:
                 if arg[0] != '-':
-                    raise 'usage: '+ cmd_usage
+                    raise CmdArgError('missing arg')
                 name = arg.lstrip('-')                
                 kw[name] = True
                 arg = i.next()
@@ -2036,8 +2209,8 @@ else:
         #print 'args', kw
         return kw
 
-    DEFAULT_cmd_usage = 'python raccoon.py -l [log.config] -r -d [debug.pkl] -x -s server.cfg -p path -m store.nt -a config.py [config specific options]'
-    cmd_usage = '''\nusage:
+    DEFAULT_cmd_usage = 'python raccoon.py -l [log.config] -r -d [debug.pkl] -x -s server.cfg -p path -m store.nt -a config.py '
+    cmd_usage = '''
     -h this help message
     -s server.cfg specify an alternative server.cfg
     -l [log.config] specify a config file for logging
@@ -2047,67 +2220,89 @@ else:
     -p specify the path (overrides RACCOONPATH env. variable)
     -m [store.nt] load the RDF model
        (default model supports .rdf, .nt, .mk)
-    -a [config.py] run the application specified
+    -a config.py run the application specified
     '''
 
-    def main(argv):
-        eatNext = False
-        mainArgs, rootArgs, configArgs = [], [], []
-        for i in range(len(argv)):
-            if argv[i] == '-a':
-                rootArgs += argv[i:i+2]
-                configArgs += argv[i+2:] 
-                break        
-            if argv[i] in ['-d', '-r', '-x', '-s', '-l', '-h', '--help'] or (eatNext and argv[i][0] != '-'):
-                eatNext = argv[i] in ['-d', '-s', '-l']
-                mainArgs.append( argv[i] )
-            else:
-                rootArgs.append( argv[i] )
-                
-        if '-l' in mainArgs:
-            try:
-                logConfig=mainArgs[mainArgs.index("-l")+1]
-                if logConfig[0] == '-':
-                    raise ValueError
-            except (IndexError, ValueError):
-                logConfig = 'log.config'        
-            if sys.version_info < (2, 3):
-                import logging22.config as log_config
-            else:
-                import logging.config as log_config          
-            log_config.fileConfig(logConfig) #todo document loggers: rhizome, server, raccoon, rdfdom
-            #any logger already created and not explicitly specified in the log config file is disabled
-            #this seems like a bad design -- certainly took me a while to why understand things weren't getting logged
-            #so re-enable the loggers
-            for logger in logging.Logger.manager.loggerDict.itervalues():
-                logger.disabled = 0        
-        else: #set defaults        
-            logging.BASIC_FORMAT = "%(asctime)s %(levelname)s %(name)s:%(message)s"
-            logging.root.setLevel(logging.INFO)
-            logging.basicConfig()
+    DEFAULT_LOGLEVEL = logging.INFO
 
-        kw = argsToKw(rootArgs, DEFAULT_cmd_usage)
-        kw['argsForConfig'] = configArgs
-        root = RequestProcessor(**kw)
-        #print 'ma', mainArgs  
-        if '-h' in mainArgs or '--help' in mainArgs:
-            #print DEFAULT_cmd_usage,'[config specific options]'
-            print root.cmd_usage
-            print cmd_usage
-        elif '-d' in mainArgs: 
+    def main(argv, out=sys.stdout):
+        root = None
+        try:
+            eatNext = False
+            mainArgs, rootArgs, configArgs = [], [], []
+            for i in range(len(argv)):
+                if argv[i] == '-a':
+                    rootArgs += argv[i:i+2]
+                    configArgs += argv[i+2:] 
+                    break        
+                if argv[i] in ['-d', '-r', '-x', '-s', '-l', '-h', '--help'] or (eatNext and argv[i][0] != '-'):
+                    eatNext = argv[i] in ['-d', '-s', '-l']
+                    mainArgs.append( argv[i] )
+                else:
+                    rootArgs.append( argv[i] )
+                    
+            if '-l' in mainArgs:
+                try:
+                    logConfig=mainArgs[mainArgs.index("-l")+1]
+                    if logConfig[0] == '-':
+                        raise ValueError
+                except (IndexError, ValueError):
+                    logConfig = 'log.config'        
+                if sys.version_info < (2, 3):
+                    import logging22.config as log_config
+                else:
+                    import logging.config as log_config
+                if not os.path.exists(logConfig):
+                    raise CmdArgError("%s not found" % logConfig)
+                log_config.fileConfig(logConfig) #todo document loggers: rhizome, server, raccoon, rdfdom
+                #any logger already created and not explicitly specified in the log config file is disabled
+                #this seems like a bad design -- certainly took me a while to why understand things weren't getting logged
+                #so re-enable the loggers
+                for logger in logging.Logger.manager.loggerDict.itervalues():
+                    logger.disabled = 0        
+            else: #set defaults        
+                logging.BASIC_FORMAT = "%(asctime)s %(levelname)s %(name)s:%(message)s"
+                logging.root.setLevel(DEFAULT_LOGLEVEL)
+                logging.basicConfig()
+
+            kw = argsToKw(rootArgs, DEFAULT_cmd_usage)
+            kw['argsForConfig'] = configArgs        
+            #print 'ma', mainArgs
+            if '-h' in mainArgs or '--help' in mainArgs:
+                raise CmdArgError('')
             try:
-                debugFileName=mainArgs[mainArgs.index("-d")+1]
-                if debugFileName[0] == '-':
-                    raise ValueError
-            except (IndexError, ValueError):
-                debugFileName = 'debug-wiki.pkl'
-            requests = pickle.load(file(debugFileName))        
-            for request in requests:
-                root.handleRequest(request[0], **request[1])
-        elif '-x' not in mainArgs: #if -x (execute cmdline and exit) we're done
-            sys.argv = mainArgs #hack for Server
-            from rx import Server
-            debug = '-r' in mainArgs
-            #print 'starting server!'
-            Server.start_server(root, debug) #kicks off the whole process
-            #print 'dying!'
+                root = RequestProcessor(**kw)
+            except (TypeError), e:
+                index = str(e).find('argument') #bad keyword arguement
+                if index > -1:                    
+                    raise CmdArgError('invalid ' +str(e)[index:])
+                else:
+                    raise
+            if '-d' in mainArgs: 
+                try:
+                    debugFileName=mainArgs[mainArgs.index("-d")+1]
+                    if debugFileName[0] == '-':
+                        raise ValueError
+                except (IndexError, ValueError):
+                    debugFileName = 'debug-wiki.pkl'
+                requests = pickle.load(file(debugFileName))        
+                for request in requests:
+                    root.handleRequest(request[0], **request[1])
+            elif '-x' not in mainArgs: #if -x (execute cmdline and exit) we're done
+                sys.argv = mainArgs #hack for Server
+                from rx import Server
+                debug = '-r' in mainArgs
+                #print 'starting server!'
+                Server.start_server(root, debug) #kicks off the whole process
+                #print 'dying!'
+        except (CmdArgError), e:
+            print>>out, e
+            if root:
+                cmd_line = root.cmd_usage
+            else:
+                cmd_line = DEFAULT_cmd_usage +'[config specific options]'
+            print>>out, 'usage:'
+            print>>out, cmd_line
+            print>>out, cmd_usage
+
+            

@@ -1,8 +1,5 @@
 """
     RxML Processor
-
-    todo:
-    * support for rdf:dataType and xml:lang on literals
     
     Copyright (c) 2003 by Adam Souzis <asouzis@users.sf.net>
     All rights reserved, see COPYING for details.
@@ -10,7 +7,7 @@
 """
 import sys, re, urllib
 from rx import utils, RxPath
-from Ft.Xml import EMPTY_NAMESPACE,InputSource,SplitQName
+from Ft.Xml import EMPTY_NAMESPACE,InputSource,SplitQName, XML_NAMESPACE
 from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, RDF_MS_BASE, BNODE_BASE
 from Ft.Rdf.Statement import Statement
 try:
@@ -18,6 +15,8 @@ try:
     StringIO = cStringIO
 except ImportError:
     import StringIO
+
+class RxMLError(Exception): pass
     
 RX_NS = 'http://rx4rdf.sf.net/ns/rxml#'
 RX_META_DEFAULT = 'default-ns'
@@ -40,18 +39,29 @@ def getAttributefromQName(elem, prefixes, local):
 
 def getURIFromElementName(elem, nsMap):
     if elem.prefix is None:
-        prefix, localName = SplitQName(elem.localName)
+        prefix, localName = SplitQName(elem.nodeName)
     else:
         prefix, localName = elem.prefix, elem.localName
-    #print 'pf', prefix
-    #print nsMap
+
     if elem.namespaceURI: #namespace aware node
         u = elem.namespaceURI
         #comment out this assertion because ZML will add namespaces with the {URIRef} tokens
         #assert u == nsMap.get(prefix, u), ('namespace URI for ' + prefix + 
         # ' mismatch xmlns declaration ' + u + ' with rx:prefix ' + nsMap[prefix])
     else:
-        u = nsMap[prefix]
+        if nsMap.has_key(prefix):
+            u = nsMap[prefix]
+        else:
+            u = None
+            for name, value in elem.attributes.items():            
+                attrPrefix, attrLocal = SplitQName(name)
+                if attrPrefix == 'xmlns' and attrLocal == prefix:
+                    u = value
+                    #this will never go out of scope but the zml auto-generated prefixes always increment
+                    nsMap[prefix] = u 
+                    break
+            if not u:
+                raise RxMLError('prefix ' + repr(prefix) + ' not found')
         
     if not localName.lstrip('_'): #if empty, must be all '_'s
         localName = localName[:-1] #strip last '_'
@@ -71,10 +81,9 @@ def quoteString(string):
     
 def matchName(node, prefixes, local):
     #if node.namespaceURI: #namespace aware node 
-    #    return node.namespaceURI in prefixes.values() and node.localName == local
-    
+    #    return node.namespaceURI in prefixes.values() and node.localName == local    
     if node.prefix is None:
-        prefix, localName = SplitQName(node.localName)
+        prefix, localName = SplitQName(node.nodeName)
     else:
         prefix, localName = node.prefix, node.localName
     return prefix in prefixes and localName == local
@@ -105,13 +114,20 @@ def getObject(elem, rxNSPrefix,nsMap, thisResource):
     if elem.nodeType == elem.TEXT_NODE:       
         return elem.nodeValue, OBJECT_TYPE_LITERAL
     elif matchName(elem, rxNSPrefix, RX_LITERALELEM):
-        if elem.childNodes:
-            literal = elem.childNodes[0].nodeValue
+        childNodes = [child for child in elem.childNodes
+                       if child.nodeType != child.COMMENT_NODE]
+        if childNodes:
+            assert len(childNodes) == 1 and childNodes[0].nodeType == elem.TEXT_NODE
+            literal = childNodes[0].nodeValue
         else:
             literal = ""#if no child we assume its an empty literal
-        #todo: support for xml:lang and rdf:datatype
-        return literal, OBJECT_TYPE_LITERAL
-    elif matchName(elem, rxNSPrefix, RX_XMLLITERALELEM): #xmlliteral #todo: test and fix!!        
+        
+        lang = getAttributefromQName(elem, {'xml': XML_NAMESPACE}, 'lang'
+                                 ) or elem.getAttributeNS(XML_NAMESPACE, 'lang')
+        datatype = getAttributefromQName(elem, {'rdf': RDF_MS_BASE}, 'datatype'
+                                ) or elem.getAttributeNS(RDF_MS_BASE, 'datatype')
+        return literal, lang or datatype or OBJECT_TYPE_LITERAL
+    elif matchName(elem, rxNSPrefix, RX_XMLLITERALELEM): #xmlliteral #todo: test some more        
         docFrag = elem.ownerDocument.createDocumentFragment()
         docFrag.childNodes = elem.childNodes
         prettyOutput = StringIO.StringIO()
@@ -137,7 +153,7 @@ def addList2Model(model, subject, p, listID, scope, getObject = getObject):
     model.add( Statement( listID, RDF_MS_BASE+'rest', RDF_MS_BASE+'nil', '', scope, OBJECT_TYPE_RESOURCE))
 
 def addContainer2Model(model, subject, p, listID, scope, getObject, listType):
-    assert listType.startsWith('rdf:')
+    assert listType.startswith('rdf:')
     model.add( Statement( listID, RDF_MS_BASE+'type', RDF_MS_BASE+listType[4:], '', scope, OBJECT_TYPE_RESOURCE))
     ordinal = 1
     for child in p.childNodes:
@@ -147,25 +163,29 @@ def addContainer2Model(model, subject, p, listID, scope, getObject, listType):
         model.add( Statement( listID, RDF_MS_BASE+'_' + str(ordinal), object, '', scope, objectType))
         ordinal += 1
     
-def addResource(model, scope, resource, resourceElem, rxNSPrefix,nsMap, thisResource, noStmtIds=False):
+def addResource(model, scope, resource, resourceElem, rxNSPrefix,nsMap,
+                thisResource, noStmtIds=False):
     '''
     add the children of a RXML resource element to the model
     '''
     for p in resourceElem.childNodes:
         if p.nodeType != p.ELEMENT_NODE:
             continue        
+
         if matchName(p, rxNSPrefix, 'resource'):
             predicate = p.getAttributeNS(EMPTY_NAMESPACE, 'id')
         elif matchName(p, rxNSPrefix, 'a'): #alias for rdf:type
             predicate = RDF_MS_BASE + 'type'
         else:
             predicate = getURIFromElementName(p, nsMap)
+            
         id = getAttributefromQName(p, rxNSPrefix, RX_STMTID_ATTRIB)
         if not id: id = p.getAttributeNS(EMPTY_NAMESPACE, RX_STMTID_ATTRIB)
         if id and noStmtIds:
-            raise RX_STMTID_ATTRIB + ' attribute found at illegal location'
+            raise RxMLError(RX_STMTID_ATTRIB + ' attribute found at illegal location')
         if not id: id = ''
-        object = getAttributefromQName(p, rxNSPrefix, 'res') #this is depreciated
+
+        object = getAttributefromQName(p, rxNSPrefix, 'res') #this is deprecated
         if object:
             objectType = OBJECT_TYPE_RESOURCE
         elif getAttributefromQName(p, rxNSPrefix, 'list') is not None\
@@ -189,31 +209,46 @@ def addResource(model, scope, resource, resourceElem, rxNSPrefix,nsMap, thisReso
                 addList2Model(model, resource, p, listID, scope, getObjectFunc)
             else:
                 addContainer2Model(model, resource, p, listID, scope, getObjectFunc, listType)
-            continue
-        elif not p.childNodes: #if no child we assume its an empty literal
-            object, objectType = "", OBJECT_TYPE_LITERAL            
-        else: #object is a a literal 
-            object, objectType = getObject(p.childNodes[0],rxNSPrefix,nsMap, thisResource)
+            continue        
+        else: #object is a a literal or resource
+            childNodes = [child for child in p.childNodes
+                              if child.nodeType != child.COMMENT_NODE]
+            if not childNodes: #if predicate has no child we assume its an empty literal
+                #this could be the result of the common error with ZML where the ':' was missing after the predicate
+                invalidAttrLocalNames = [attName[1] for attName in p.attributes.keys()
+                               if attName[1] not in [RX_STMTID_ATTRIB, 'id'] ]                               
+                if invalidAttrLocalNames:
+                    #there's an attribute that not either 'stmtid' or 'rdf:id'
+                    raise RxMLError('invalid attribute ' + invalidAttrLocalNames[0] +
+                                    ' on predicate element ' + p.localName + ' -- did you forget a ":"?')
+                object, objectType = "", OBJECT_TYPE_LITERAL
+            else:
+                assert len(childNodes) == 1, p
+                object, objectType = getObject(childNodes[0],rxNSPrefix,nsMap, thisResource)
         #print >>sys.stderr, 'adding ', repr(resource), repr(predicate), object, 
         model.add( Statement( resource, predicate, object, id, scope, objectType))
         #for o, oElem in objectResources: #add striping? ok, except for typename -- will add over and over
         #    addResources(model, scope, o, oElem, rxNSPrefix,nsMap,thisResource)
 
 #todo special handling for bNode prefix (either in or out or both)
-def addRxdom2Model(rootNode, model, nsMap = None, rdfdom = None, thisResource = None,  scope = ''):
+def addRxdom2Model(rootNode, model, rdfdom = None, thisResource = None,  scope = ''):
     '''given a DOM of a RXML document, iterate through it, adding its statements to the specified 4Suite model    
     Note: no checks if the statement is already in the model
-    '''
-    if nsMap is None:
-        nsMap = { None : RX_NS, 'rx' : RX_NS }
+    '''    
+    nsMap = { None : RX_NS, 'rx' : RX_NS }
     #todo: bug! revNsMap doesn't work with 2 prefixes one ns
     #revNsMap = dict(map(lambda x: (x[1], x[0]), nsMap.items()) )#reverse namespace map
     #rxNSPrefix = revNsMap[RX_NS]
     rxNSPrefix = [x[0] for x in nsMap.items() if x[1] == RX_NS]
     if not rxNSPrefix: #if RX_NS is missing from the nsMap add the 'rx' prefix if not already specified
+        rxNSPrefix = []
         if not nsMap.get('rx'):
             nsMap['rx'] = RX_NS
-            rxNSPrefix = ['rx']
+            rxNSPrefix.append('rx')
+        #if no default prefix was set, also make RX_NS the default 
+        if None not in nsMap:
+            nsMap[None] = RX_NS
+            rxNSPrefix.append(None)
     if not nsMap.get('rdf'):
         nsMap['rdf'] = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
     if not nsMap.get('rdfs'):
@@ -226,11 +261,12 @@ def addRxdom2Model(rootNode, model, nsMap = None, rdfdom = None, thisResource = 
             rootNode = s
         else:
             break
-        
+
     for s in rootNode.childNodes:
         if s.nodeType != s.ELEMENT_NODE:
             continue
-        if matchName(s, rxNSPrefix, 'prefixes'):
+        
+        if matchName(s, rxNSPrefix, 'prefixes'):            
             for nsElem in s.childNodes:
                 if nsElem.nodeType != nsElem.ELEMENT_NODE:
                     continue                
@@ -264,7 +300,7 @@ def addRxdom2Model(rootNode, model, nsMap = None, rdfdom = None, thisResource = 
 def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
                          INDENT = '    ', NL = '\n', INITINDENT='', rescomment='',
                           fixUp=None, fixUpPredicate=None):
-    '''given a nodeset of RxPathDom nodes, return RXML serialization in ZML markup format'''    
+    '''given a nodeset of RxPathDom nodes, return RxML serialization in ZML markup format'''    
     def getResourceNameFromURI(resNode):
         namespaceURI = resNode.getAttributeNS(RDF_MS_BASE, 'about')
         assert namespaceURI
@@ -285,7 +321,10 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
             
         if not printResourceElem: 
             prefix = revNsMap[prefixURI]
-            retVal = prefix + ':' + rest
+            if prefix:
+                retVal = prefix + ':' + rest
+            else:
+                retVal = rest
             if fixUp:
                 retVal = fixUp % utils.kw2dict(uri=namespaceURI,
                     encodeduri=urllib.quote(namespaceURI), res=retVal)
@@ -307,8 +346,10 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
 
         if predNode.namespaceURI == RDF_MS_BASE and predNode.localName == 'type':
             predicateString = rxPrefix + 'a' #use rx:a instead rdf:type
-        else:
+        elif prefix:            
             predicateString = prefix+':'+predNode.localName
+        else:
+            predicateString = predNode.localName
 
         if fixUpPredicate:
             predURI = RxPath.getURIFromElementName(predNode)
@@ -324,8 +365,20 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
         
         assert len(predNode.childNodes) == 1        
         if  predNode.childNodes[0].nodeType == predNode.TEXT_NODE:
+            lang = predNode.getAttributeNS(XML_NAMESPACE, 'lang')
+            datatype = predNode.getAttributeNS(RDF_MS_BASE, 'datatype')
+            if lang or datatype:
+                line += ': '
+                line += NL
+                indent += INDENT
+                line += indent + rxPrefix + RX_LITERALELEM
+                if lang:
+                    line += ' xml:lang="'+lang+'"'
+                if datatype:
+                    #note we don't bother to check if its xml literal and parse and output as zml
+                    line += ' rdf:datatype="'+datatype+'"'                
             line += ': '
-            line += doQuote(predNode.childNodes[0].nodeValue) + NL #todo: datatype, xml literal
+            line += doQuote(predNode.childNodes[0].nodeValue) + NL 
         else:
             object = predNode.childNodes[0]
             isList = object.isCompound()
@@ -341,11 +394,21 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
             indent += INDENT
 
             if isList: #is the object a list resource?
-                for li in [p.childNodes[0] for p in object.childNodes\
+                for li in [p.childNodes[0] for p in object.childNodes
                         if RxPath.getURIFromElementName(p) in [
-                            RDF_MS_BASE+'first', RDF_MS_BASE+'li']]:   
-                    if li.nodeType == li.TEXT_NODE: #todo: datatype, xml literal
-                        line += indent + rxPrefix + RX_LITERALELEM + ':'+ doQuote(li.nodeValue) + NL
+                            RDF_MS_BASE+'first', RDF_MS_BASE+'li']]:
+                            
+                    if li.nodeType == li.TEXT_NODE: 
+                        lang = li.parentNode.getAttributeNS(XML_NAMESPACE, 'lang')
+                        datatype = li.parentNode.getAttributeNS(RDF_MS_BASE, 'datatype')
+                        if lang:
+                            attr = ' xml:lang="'+lang+'"'
+                        elif datatype:
+                            #note we don't bother to check if its xml literal and parse and output as zml
+                            attr = ' rdf:datatype="'+datatype+'"'
+                        else:
+                            attr = ''
+                        line += indent + rxPrefix + RX_LITERALELEM + attr + ':'+ doQuote(li.nodeValue) + NL
                     elif li.nodeType == li.ELEMENT_NODE: 
                         line += indent + getResourceNameFromURI(li) + NL
             else:
@@ -396,54 +459,52 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
 
     return root + prefixes + line
 
-def rxml2RxPathDOM(path, url=None, debug=0, nsMap = None):
-    outputModel, db, nsMap = rx2model(path, url, debug, nsMap)
-    #todo: bug! revNsMap doesn't work with 2 prefixes one ns
-    revNsMap = dict(map(lambda x: (x[1], x[0]), nsMap.items()) )#uri to prefix namespace map    
-    return RxPath.createDOM(RxPath.FtModel(outputModel), revNsMap)
-
-def rx2model(path, url=None, debug=0, nsMap = None):
+def rx2model(path, url=None, debug=0, namespaceAware=0):
     '''
     Parse the RxML and returns a 4Suite model containing its statements.
     '''
-    from Ft.Lib import Uri
-    from Ft.Xml import Domlette
+    from xml.dom import expatbuilder    
 
     if url:
-        isrc = InputSource.DefaultFactory.fromUri(url)    
-    elif isinstance(path, ( type(''), type(u'') )):
-        isrc = InputSource.DefaultFactory.fromUri(Uri.OsPathToUri(path))    
+        isrc = InputSource.DefaultFactory.fromUri(url)
+        src = isrc.stream
     else:
-        isrc = InputSource.DefaultFactory.fromStream(path, 'file:')    
-    doc = Domlette.NonvalidatingReader.parse(isrc)
+        src = path    
+    doc = expatbuilder.parse(src, namespaces=namespaceAware)
 
     from Ft.Rdf.Drivers import Memory    
     db = Memory.CreateDb('', 'default')
     import Ft.Rdf.Model
     outputModel = Ft.Rdf.Model.Model(db)
     
-    nsMap = addRxdom2Model(doc, outputModel, nsMap = nsMap, thisResource='wikiwiki:')
+    nsMap = addRxdom2Model(doc, outputModel, thisResource='wikiwiki:')
     return outputModel, db, nsMap
 
-def rx2statements(path, url=None, debug=0, nsMap = None):
+def rxml2RxPathDOM(path, url=None, debug=0, namespaceAware=0):
+    outputModel, db, nsMap = rx2model(path, url, debug, namespaceAware)
+    #todo: bug! revNsMap doesn't work with 2 prefixes one ns
+    revNsMap = dict(map(lambda x: (x[1], x[0]), nsMap.items()) )#uri to prefix namespace map    
+    return RxPath.createDOM(RxPath.FtModel(outputModel), revNsMap)
+
+def rx2statements(path, url=None, debug=0, namespaceAware=0):
     '''
     Given a rxml file return a list of tuples like (subject, predicate, object, statement id, scope, objectType)
     '''
-    model, db, nsMap = rx2model(path, url, debug, nsMap)
+    model, db, nsMap = rx2model(path, url, debug, namespaceAware)
     stmts = db._statements['default'] #get statements directly, avoid copying list
     return stmts
     
-def rx2nt(path, url=None, debug=0, nsMap = None):
+def rx2nt(path, url=None, debug=0, namespaceAware=0):
     '''
     given a rxml file return a string of N-triples
     path is either a stream-like object or a string that is file path
     '''
-    stmts = rx2statements(path, url, debug,nsMap)
+    stmts = rx2statements(path, url, debug, namespaceAware)
     outputfile = StringIO.StringIO()
     utils.writeTriples(stmts, outputfile)
     return outputfile.getvalue()
 
-def zml2nt(stream=None, contents=None, debug=0, nsMap = None, addRootElement=True):
+def getXMLFromZML(stream=None, contents=None, nsMap = None, addRootElement=True):
     from rx import zml
     #parse the zml to rx xml
     if stream is not None:
@@ -451,47 +512,63 @@ def zml2nt(stream=None, contents=None, debug=0, nsMap = None, addRootElement=Tru
     else:
         xml = zml.zmlString2xml(contents, mixed=False, URIAdjust = True)
     if addRootElement:
-        xml = '<rx:rx>'+ xml+'</rx:rx>'
-    return rx2nt(StringIO.StringIO(xml), debug=debug, nsMap = nsMap)
+        root =  '<rx:rx xmlns:rx="%s" ' % RX_NS
+        if nsMap:
+            assert 'rx' not in nsMap            
+            root += ''.join([ (prefix and 'xmlns:'+prefix or 'xmlns')
+                      +' = "'+uri +'" ' for prefix, uri in nsMap.items()])
+        root += '>'
+        xml = root + xml+'</rx:rx>'
+    else:
+        assert not nsMap, 'you can not specify a nsMap and have addRootElement == False'
+    return xml
+
+def zml2nt(stream=None, contents=None, debug=0, nsMap = None, addRootElement=True):
+    xml = getXMLFromZML(stream, contents, nsMap, addRootElement)
+    if nsMap:
+        namespaceAware = True
+    else:
+        namespaceAware = False
+    return rx2nt(StringIO.StringIO(xml), debug=debug,namespaceAware=namespaceAware)
 
 def zml2RDF_XML(stream=None, contents=None, debug=0, nsMap = None, addRootElement=True):
-    from rx import zml
-    #parse the zml to rx xml
-    if stream is not None:
-        xml = zml.zml2xml(stream, mixed=False, URIAdjust = True)
+    xml = getXMLFromZML(stream, contents, nsMap, addRootElement)
+    if nsMap:
+        namespaceAware = True
     else:
-        xml = zml.zmlString2xml(contents, mixed=False, URIAdjust = True)
-    if addRootElement:
-        xml = '<rx:rx>'+ xml+'</rx:rx>'
-
-    model, db, nsMap = rx2model(StringIO.StringIO(xml), debug=debug, nsMap = nsMap)
+        namespaceAware = False
+    model, db, nsMap = rx2model(StringIO.StringIO(xml), debug=debug,namespaceAware=namespaceAware)
 
     from Ft.Rdf.Serializers.Dom import Serializer as DomSerializer
     serializer = DomSerializer()
     outdoc = serializer.serialize(model, nsMap = nsMap)
     return outdoc
 
-if __name__ == '__main__':                     
-    if '-n' in sys.argv:
-        print rx2nt(sys.argv[2])
-    elif '-z' in sys.argv:
-        print zml2RDF_XML(file(sys.argv[2]))        
-    elif '-r' in sys.argv:
-        model, db = utils.deserializeRDF( sys.argv[2] )
+def main(argv=sys.argv, out=sys.stdout):
+    if '-n' in argv:
+        print >>out, rx2nt(argv[2])
+    elif '-z' in argv:
+        outdoc = zml2RDF_XML(file(argv[2]), addRootElement=False)
+        from Ft.Xml.Lib.Print import PrettyPrint
+        import sys
+        PrettyPrint(outdoc, stream=out)
+    elif '-r' in argv:
+        model, db = utils.deserializeRDF( argv[2] )
         nsMap = {
                 'bnode': BNODE_BASE,   
                'rx': RX_NS              
             }
         revNsMap = dict( [ (x[1], x[0]) for x in nsMap.items() if x[0] and ':' not in x[0] ])
         rdfDom = RxPath.createDOM(RxPath.FtModel(model), revNsMap)        
-        print getRXAsZMLFromNode(rdfDom.childNodes, nsMap)
+        print >>out, getRXAsZMLFromNode(rdfDom.childNodes, nsMap)
     else:
-        print '''        
+        print >>out, '''        
 usage:
    -n|-r|-z filepath
    -n given an RxML/XML file output RDF in NTriples format
    -z given an RxML/ZML file output RDF in RDF/XML format   
    -r given an RDF file (.rdf, .nt or .mk) convert to RxML/ZML
 '''
-        sys.exit()
 
+if __name__ == '__main__':
+    main()
