@@ -27,10 +27,12 @@ class RDFDomTestCase(unittest.TestCase):
         tests models with:
             bNodes
             literals: empty (done for xupdate), xml, text with invalid xml characters, binary
-            advanced rdf: rdf:list, datatypes, xml:lang
+            advanced rdf: rdf:list, containers, datatypes, xml:lang
             circularity 
             empty element names (_)
             multiple rdf:type
+            RDF Schema support
+        diffing and merging models
     '''
 
     model1 = r'''#test
@@ -67,16 +69,23 @@ class RDFDomTestCase(unittest.TestCase):
 <http://4suite.org/rdf/banonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://rx4rdf.sf.net/ns/archive#last-modified> "1057802436.437" .
 <http://4suite.org/rdf/banonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://rx4rdf.sf.net/ns/wiki#summary> "ppp" .'''
 
-    loopModel = r'''<http://loop.com> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://loop.com>.
-<http://loop.com#2> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://loop.com#3>.
-<http://loop.com#3> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://loop.com#2>.'''
+    loopModel = r'''<http://loop.com#r1> <http://loop.com#prop> <http://loop.com#r1>.
+<http://loop.com#r2> <http://loop.com#prop> <http://loop.com#r3>.
+<http://loop.com#r3> <http://loop.com#prop> <http://loop.com#r2>.'''
     
-    model1NsMap = {  'rdf' : RDF_MS_BASE, 
+    model1NsMap = { 'rdf' : RDF_MS_BASE, 
+                    'rdfs' : RDF_SCHEMA_BASE,
+                    'bnode' : "bnode:",
                     'wiki' : "http://rx4rdf.sf.net/ns/wiki#",
                     'a' : "http://rx4rdf.sf.net/ns/archive#" }
 
     def setUp(self):
-        pass
+        if DRIVER == '4Suite':
+            self.loadModel = self.loadFtModel
+        elif DRIVER == 'RDFLib':
+            self.loadModel = self.loadRdflibModel
+        elif DRIVER == 'Redland':
+            self.loadModel = self.loadRedlandModel
 
     def loadFtModel(self, source, type='nt'):
         if type == 'rdf':
@@ -102,9 +111,7 @@ class RDFDomTestCase(unittest.TestCase):
         return initRDFLibModel(dest, source, type)
 
     def getModel(self, source, type='nt'):
-        model = self.loadFtModel(source, type)
-        #model = self.loadRdflibModel(source, type)
-        #self.model = self.loadRedlandModel(source, type)
+        model = self.loadModel(source, type)
         self.nsMap = {u'http://rx4rdf.sf.net/ns/archive#':u'arc',
                u'http://www.w3.org/2002/07/owl#':u'owl',
                u'http://purl.org/dc/elements/1.1/#':u'dc',
@@ -121,9 +128,10 @@ class RDFDomTestCase(unittest.TestCase):
         #print self.rdfDom
 
         #test model -> dom (correct resources created)
-        xpath = '/*'
+        xpath = '/*[not(starts-with(., "http://www.w3.org/"))]'
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-        self.failUnless(len(res1)==6)
+        #pprint( ( len(res1), res1 ) )
+        self.failUnless(len(res1)==14) #6 resource + 8 properties
         
         #test predicate stringvalue         
         xpath = "string(/*[wiki:name/text()='HomePage']/a:has-expression)"
@@ -163,6 +171,129 @@ class RDFDomTestCase(unittest.TestCase):
 
         self.failUnless(res4 == res5 and res4 and not res6)
         
+    def testSubtype(self):        
+        model = '''_:C <http://www.w3.org/2000/01/rdf-schema#subClassOf> _:D.
+_:C <http://www.w3.org/2000/01/rdf-schema#subClassOf> _:F.
+_:B <http://www.w3.org/2000/01/rdf-schema#subClassOf> _:D.
+_:B <http://www.w3.org/2000/01/rdf-schema#subClassOf> _:E.
+_:A <http://www.w3.org/2000/01/rdf-schema#subClassOf> _:B.
+_:A <http://www.w3.org/2000/01/rdf-schema#subClassOf> _:C.
+_:O1 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> _:C.
+_:O2 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> _:B.
+_:O2 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> _:F.
+_:O3 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> _:B.
+_:O4 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> _:A.
+_:O4 <http://rx4rdf.sf.net/ns/archive#contents> "".
+'''
+        self.rdfDom = self.getModel(cStringIO.StringIO(model) )
+
+        xpath = "/bnode:A" 
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless(len(res1) == 1)
+
+        xpath = "/bnode:D" 
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless(len(res1) == 4)
+
+        xpath = "/bnode:F" 
+        res2 = self.rdfDom.evalXPath(xpath,  self.model1NsMap)
+        self.failUnless(len(res2) == 3)
+
+        xpath = "is-instance-of(/bnode:A, uri('bnode:B'))"
+        xpath = "/bnode:A/rdf:type/*//rdfs:subClassOf[.=uri('bnode:B')]"
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless(res1 )
+
+        xpath = "is-instance-of(/bnode:nomatch, uri('bnode:B'))"        
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless(not res1)
+
+        xpath = "is-instance-of(/*/*/bnode:D, uri('bnode:A'))"
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless(not res1)
+
+        xpath = "/bnode:D/rdf:type/*//rdfs:subClassOf[.=uri('bnode:A')]"
+        #only some nodes match, return false
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless(not res1)
+
+        #xpath = "is-instance-of(/*/*/text(), uri('rdfs:Literal'))" 
+        #res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        #self.failUnless(not res1 )
+            
+        #find all the statements with a property
+        xpath='/*/rdf:type'
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+                
+        xpath = "/*/*[is-subproperty-of(@uri,'http://www.w3.org/1999/02/22-rdf-syntax-ns#type')]"        
+        res2 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless(res1 == res2)
+        
+        
+    def testSubproperty(self):        
+        model = '''<http://rx4rdf.sf.net/ns/archive#C> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://rx4rdf.sf.net/ns/archive#D>.
+<http://rx4rdf.sf.net/ns/archive#C> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://rx4rdf.sf.net/ns/archive#F>.
+<http://rx4rdf.sf.net/ns/archive#B> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://rx4rdf.sf.net/ns/archive#D>.
+<http://rx4rdf.sf.net/ns/archive#B> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://rx4rdf.sf.net/ns/archive#E>.
+<http://rx4rdf.sf.net/ns/archive#A> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://rx4rdf.sf.net/ns/archive#B>.
+<http://rx4rdf.sf.net/ns/archive#A> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://rx4rdf.sf.net/ns/archive#C>.
+_:O1 <http://rx4rdf.sf.net/ns/archive#C> "".
+_:O2 <http://rx4rdf.sf.net/ns/archive#B> "".
+_:O2 <http://rx4rdf.sf.net/ns/archive#F> "".
+_:O3 <http://rx4rdf.sf.net/ns/archive#B> "".
+_:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
+'''
+        self.rdfDom = self.getModel(cStringIO.StringIO(model) )
+
+        xpath = "/*/a:A" 
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless(len(res1) == 1)
+
+        xpath = "/*/a:D" 
+        res2 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless(len(res2) == 4)
+
+        xpath3 = "/*/a:F" 
+        res3 = self.rdfDom.evalXPath(xpath3,  self.model1NsMap)
+        self.failUnless(len(res3) == 3)        
+
+        xpath = "is-subproperty-of(/*/a:A/@uri, uri('a:B'))" 
+        res4 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless(res4 )
+
+        xpath = "is-subproperty-of(/*/a:nomatch, uri('a:B'))" 
+        res5 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless(not res5)
+
+        xpath = "is-subproperty-of(/*/a:D/@uri, uri('a:A'))"
+        #only some nodes match, return false
+        res6 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless(not res6)
+
+        #modify the DOM and make sure the schema is updated properly        
+        self.rdfDom.begin()        
+        xpath = "/*/rdfs:subPropertyOf[.=uri('a:C')]"
+        res7 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        #remove the statement that A is a subproperty of C
+        res7[0].parentNode.removeChild(res7[0])
+
+        res8 = self.rdfDom.evalXPath(xpath3,  self.model1NsMap)
+        self.failUnless(len(res8) == 2)        
+
+        stmt = Statement("http://rx4rdf.sf.net/ns/archive#E", "http://www.w3.org/2000/01/rdf-schema#subPropertyOf",
+                         "http://rx4rdf.sf.net/ns/archive#F", objectType=OBJECT_TYPE_RESOURCE)
+        addStatements(self.rdfDom, [stmt])
+
+        res9 = self.rdfDom.evalXPath(xpath3,  self.model1NsMap)
+        self.failUnless(len(res9) == 5)        
+        
+        #now let rollback those changes and redo the queries --
+        #the results should now be the same as the first time we ran them
+        self.rdfDom.rollback()
+        
+        res10 = self.rdfDom.evalXPath(xpath3,  self.model1NsMap)
+        self.failUnless(res10 == res3)                
+        
     def timeXPath(self):
         self.rdfDom = self.getModel(cStringIO.StringIO(self.model1) )
         start = time.time()
@@ -172,32 +303,51 @@ class RDFDomTestCase(unittest.TestCase):
         print time.time() - start
 
     def testLoop(self):
+        loopNsMap = {'loop': 'http://loop.com#'}
+        loopNsMap.update(self.model1NsMap)
         self.rdfDom = self.getModel(cStringIO.StringIO(self.loopModel) )
         
-        xpath = '/*'
-        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-        #print res1
-        self.failUnless(len(res1)==3)
+        xpath = '/*[starts-with(.,"http://loop.com#r")]'
+        res1 = self.rdfDom.evalXPath( xpath,  loopNsMap)
+        #print len(res1), res1
+        self.failUnless(res1)
                 
-        xpath = "/*/*/*"        
-        res2 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-        #print res2
-        self.failUnless(len(res2)==3)
-
+        xpath = "/*/loop:*/*"        
+        res2 = self.rdfDom.evalXPath( xpath,  loopNsMap)
+        #print len(res2), [ x.parentNode for x in res2]
+        self.failUnless(len(res2)==len(res1))
+        
         #circularity checking only on with descendant axes
-        xpath = "/*/*/*/*/*"        
-        res3 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-        #print res3        
+        xpath = "/*/loop:*/*/*/*"        
+        res3 = self.rdfDom.evalXPath( xpath,  loopNsMap)
+        
         c1 = [x.stringValue for x in res2]
         c1.sort()
         c2 = [x.stringValue for x in res3]
         c2.sort()
         self.failUnless(c1 == c2) #order will be different but should be same resources
-                
-        xpath = "//rdf:type"        
-        res4 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-        self.failUnless(len(res4)==5) 
 
+        xpath = "//loop:*"        
+        res4 = self.rdfDom.evalXPath( xpath,  loopNsMap)
+        #print len(res4), res4
+        self.failUnless(len(res4)==5)
+        
+        xpath = "//loop:*/*"        
+        res5 = self.rdfDom.evalXPath( xpath,  loopNsMap)        
+        #print len(res4), res4
+        #results should be r1; r3, r2; r2, r3
+        self.failUnless(len(res5)==5) 
+
+        xpath = "/*[.=uri('loop:r1')]//loop:*/*"         
+        res4 = self.rdfDom.evalXPath( xpath,  loopNsMap)
+        #print len(res4), res4
+        self.failUnless(len(res4)==2) 
+
+        xpath = "/*[.=uri('loop:r2')]//loop:*/*"         
+        res4 = self.rdfDom.evalXPath( xpath,  loopNsMap)
+        #print len(res4), res4
+        self.failUnless(len(res4)==3) 
+        
         #self.rdfDom.globalRecurseCheck = 1
         #Xml.Lib.Print.Nss.seek() causes infinite regress, plus C implementation in CVS trunk doesn't work
         #todo: add a RxPath.PrettyPrint
@@ -244,15 +394,15 @@ class RDFDomTestCase(unittest.TestCase):
 
     def testContainers(self):
         self.rdfDom = self.getModel("about.containertest.nt")
-        xpath = "*/wiki:revisions/*/rdf:li/@listID='http://www.w3.org/1999/02/22-rdf-syntax-ns#_1'"
+        xpath = "*/wiki:revisions/*/rdfs:member/@listID='http://www.w3.org/1999/02/22-rdf-syntax-ns#_1'"
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)        
         self.failUnless( res1 )
 
-        xpath = "*[wiki:name='about']/wiki:revisions/*/rdf:li"
+        xpath = "*[wiki:name='about']/wiki:revisions/*/rdfs:member"
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless( len(res1)==2 )
 
-        xpath = "*[wiki:name='about']/wiki:revisions/rdf:Seq/rdf:li/*"
+        xpath = "*[wiki:name='about']/wiki:revisions/rdf:Seq/rdfs:member/*"
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless( len(res1)==2 )
 
@@ -260,11 +410,11 @@ class RDFDomTestCase(unittest.TestCase):
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless( len(res1)==0 )
 
-        xpath = "*[wiki:name='about']/wiki:revisions/*/rdf:li[1]='http://4suite.org/rdf/anonymous/xc52aaabe-6b72-42d1-8772-fcb90303c24b_4'"
+        xpath = "*[wiki:name='about']/wiki:revisions/*/rdfs:member[1]='http://4suite.org/rdf/anonymous/xc52aaabe-6b72-42d1-8772-fcb90303c24b_4'"
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless( res1 )
 
-        xpath = "*[wiki:name='about']/wiki:revisions/*/rdf:li[2]='http://4suite.org/rdf/anonymous/x467ce421-1a30-4a2f-9208-0a4b01cd0da1_9'"
+        xpath = "*[wiki:name='about']/wiki:revisions/*/rdfs:member[2]='http://4suite.org/rdf/anonymous/x467ce421-1a30-4a2f-9208-0a4b01cd0da1_9'"
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless( res1 )
 
@@ -272,9 +422,11 @@ class RDFDomTestCase(unittest.TestCase):
         #use this one because all resources appear as an object at least once
         self.rdfDom = self.getModel(cStringIO.StringIO(self.loopModel) )
         #we need to add the predicate filter to force the nodeset in doc order so we can compare it
-        xpath = "(id(/*/*/*))[true()]"  
+        xpath = "(id(/*/*/*))[true()]"
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-        res2 = self.rdfDom.evalXPath( '/*',  self.model1NsMap)
+        #the property resources don't appear as the objects of any statements so exclude them
+        res2 = self.rdfDom.evalXPath( '/*[not(is-instance-of(.,uri("rdf:Property")))]',  self.model1NsMap)
+        #pprint(( len(res1), len(res2), res1, '2', res2 ))
         self.failUnless(res1 == res2)
         
     def testDiff(self):
@@ -319,6 +471,7 @@ class RDFDomTestCase(unittest.TestCase):
         statements, nodesToRemove = mergeDOM(self.rdfDom, updateDom ,
             ['http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2'])                
         #nothing should have changed
+        #pprint((statements, nodesToRemove))
         self.failUnless( not statements and not nodesToRemove )
 
         self.rdfDom = self.getModel("about.rx.nt")
@@ -342,8 +495,7 @@ class RDFDomTestCase(unittest.TestCase):
         statements, nodesToRemove = self._mergeAndUpdate(updateDom ,
             ['http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2'])
         self.failUnless( not statements and not nodesToRemove )
-        
-        
+                
     def testXUpdate(self):       
         '''test xupdate'''
         self.rdfDom = self.getModel("rdfdomtest1.rdf",'rdf')
@@ -472,19 +624,28 @@ class RDFDomTestCase(unittest.TestCase):
         '''
 
         result = applyXslt(self.rdfDom, xslStylesheet)
-        #open('testXslt1.xml', 'wb').write(result)
+        #open('testXslt1new.xml', 'wb').write(result)
         #d = difflib.Differ()
-        #print list(d.compare(result,outputXml)) #list of characters, not lines!
+        #print list(d.compare(result,file('testXslt1.xml').read())) #list of characters, not lines!
         self.failUnless( result == file('testXslt1.xml').read(),'xml output does not match')
-    
+
+DRIVER = '4Suite'
+
 if __name__ == '__main__':
     import sys    
     #import os, os.path
-    #os.chdir(os.path.basename(sys.modules[__name__ ].__file__))
+    #os.chdir(os.path.basename(sys.modules[__name__ ].__file__))    
+    if sys.argv.count('--driver'):
+        DRIVER = sys.argv[sys.argv.index('--driver')]
+        del sys.argv[sys.argv.index('--driver')]    
+
     try:
         test=sys.argv[sys.argv.index("-r")+1]
-        tc = RDFDomTestCase(test)
-        getattr(tc, test)() #run test
     except (IndexError, ValueError):
         unittest.main()
+    else:
+        tc = RDFDomTestCase(test)
+        tc.setUp()
+        getattr(tc, test)() #run test
+
 
