@@ -6,12 +6,14 @@
     <html>
       <link href="site:///basestyles.css" rel="stylesheet" type="text/css" />
       <body onload="parent.document.getElementById('previewFrame').height=document.body.scrollHeight+20">
+        <div id="maincontent">
         <x:choose>
           <x:when test="$format='http://rx4rdf.sf.net/ns/wiki#item-format-zml'">
             <x:value-of disable-output-escaping="yes" select="wf:get-zml($contents)"/>
           </x:when>
           <x:otherwise>You can only preview content in the ZML format </x:otherwise>
         </x:choose>
+        </div>
       </body>
     </html>
   </x:template>
