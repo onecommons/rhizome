@@ -35,14 +35,12 @@ class ZMLTestCase(unittest.TestCase):
             resultpath = os.path.splitext(f)[0]+'.xml'
             self.failUnless(os.path.exists(resultpath), resultpath + ' does not exist')
             print f
-            result = zml.zml2xml(file(f), mmf=TestMarkupMapFactory())
-            expected = file(resultpath).read()
+            result = zml.zml2xml(file(f,'rU'), mmf=TestMarkupMapFactory())
+            expected = file(resultpath,'rU').read()
             #print repr(result), '\n', repr(expected)
             #strip trailing LFs
-            self.failUnless(result.rstrip() == expected.rstrip(), f + ' ' + 
-                    repr(difflib.SequenceMatcher(None,result.rstrip(), expected.rstrip()).get_opcodes()))                     
-            #self.failUnless(result.rstrip() == expected.rstrip(), f + ' ' +
-            #        ''.join(difflib.ndiff(result.rstrip().splitlines(), expected.rstrip().splitlines())) ) 
+            self.failUnless(result.rstrip() == expected.rstrip(), f + ':\n' +
+                    '\n'.join(difflib.ndiff(result.rstrip().splitlines(), expected.rstrip().splitlines())) ) 
 
     def testCopyZML(self):
         for f in glob.glob('z2x-test*.zml'):                        
@@ -67,11 +65,11 @@ class ZMLTestCase(unittest.TestCase):
             zml.xml2zml(file(f).read(), out, '\n')
             result = out.getvalue()
             #print repr(result)
-            expected = file(resultpath).read()
+            expected = file(resultpath,'rU').read()
             #print repr(expected)
             #print difflib.SequenceMatcher(None,result, expected).get_opcodes()
-            self.failUnless(result.rstrip() == expected.rstrip(), f + ' ' + 
-                    repr(difflib.SequenceMatcher(None,result.rstrip(), expected.rstrip()).get_opcodes())) 
+            self.failUnless(result.rstrip() == expected.rstrip(), f + ':\n' + 
+                    '\n'.join(difflib.ndiff(result.rstrip().splitlines(), expected.rstrip().splitlines())) ) 
 
     def testEscaping(self):
         self.failUnless(zml.xmlescape(r'<<<<')=='&lt;&lt;&lt;&lt;')
