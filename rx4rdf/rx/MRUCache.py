@@ -1,11 +1,12 @@
-# mrucache.py -- defines class MRUCache
-# Takes capacity, a valueCalc function, and an optional hashCalc function
-# to make an MRU/LRU cache instance with a getValue method that either retrieves
-# cached value or calculates a new one. Either way, makes the value MRU.
-# Alpha version. NO WARRANTY. Use at your own risk
-# Copyright (c) 2002 Bengt Richter 2001-10-05. All rights reserved.
-# Use per Python Software Foundation (PSF) license.
-# 
+'''
+An MRU cache implemented as a circular list. Items are not explicitly
+added to the cache, instead requests are made and if a requested key
+isn't in the cache, the value is calculated and added to the cache.
+
+Heavily modified by Adam Souzis, based on this version:
+Copyright (c) 2002 Bengt Richter 2001-10-05. All rights reserved.
+Use per Python Software Foundation (PSF) license.
+'''
 
 from rx import utils
 _defexception = utils.DynaExceptionFactory(__name__)
@@ -28,8 +29,6 @@ class MRUCache:
     Uses user-supplied valueCalc function when it can't find value in cache.
     Uses optional user-supplied hashCalc function to make key for finding
     cached values or uses valueCalc arg tuple as key.
-    MRU/LRU list is initialized with a dummy node to a circular list of length one.
-    This node becomes LRU and gets overwritten when the list fills to capacity.
     """
     debug = False
     
@@ -41,9 +40,15 @@ class MRUCache:
         sideEffectsFunc=None, #execute the sideEffectsFunc when we return retrieve the value from the cache
         sideEffectsCalc=None, #calculate the sideEffects when we calculate the value
         isValueCacheableCalc=None, #calculate if the value should be cached
-        capacityCalc = lambda k, v: 1 #calculate the capacity of the value
+        capacityCalc = lambda k, v: 1, #calculate the capacity of the value
+        maxValueSize=None
     ):
-        """ """
+        '''
+        Takes capacity, a valueCalc function, and an optional hashCalc
+        function to make an MRU/LRU cache instance with a getValue method that
+        either retrieves cached value or calculates a new one. Either way,
+        makes the value MRU.
+        '''
         self.capacity = capacity
         self.hashCalc = hashCalc
         self.valueCalc = valueCalc
@@ -51,15 +56,14 @@ class MRUCache:
         self.sideEffectsFunc = sideEffectsFunc
         self.isValueCacheableCalc = isValueCacheableCalc
         self.capacityCalc = capacityCalc
-        self.__init()
+        self.mru = None
+        self.nodeSize = 0
+        self.nodeDict = dict()
+        if maxValueSize is None:
+            self.maxValueSize = capacity
+        else:
+            self.maxValueSize = maxValueSize
         
-    def __init(self):
-        self.initialNode = UseNode(`'<unused value>'`, '<*initially unused node*>') # ``for test
-        self.mru = self.initialNode 
-        self.mru.older = self.mru.newer = self.mru  # init circular list
-        self.nodeSize = 1
-        self.nodeDict = dict([(self.mru.hkey, self.mru)])
-
     def getValue(self, *args, **kw):  # magically hidden whether lookup or calc
         """
         Get value from cache or calcuate a new value using user function.
@@ -129,7 +133,8 @@ class MRUCache:
             # calculate new value
             value = valueCalc(*args, **kw)
 
-            if self.capacityCalc(hkey, value) > self.capacity:
+            newValueSize = self.capacityCalc(hkey, value)
+            if newValueSize > self.maxValueSize:
                 return value #too big to be cached
             #note this check doesn't take into account the current
             #nodeSize so the cache can grow to just less than double the capacity
@@ -142,23 +147,31 @@ class MRUCache:
             else:
                 sideEffects = None
 
-            # get mru use node if cache is full, else make new node
-            lru = self.mru.newer    # newer than mru circularly goes to lru node
-            if self.nodeSize<self.capacity:
-                # put new node between existing lru and mru
-                node = UseNode(value, hkey, self.mru, lru)
-                node.sideEffects = sideEffects
-                self.nodeSize +=self.capacityCalc(hkey, value)
-                # update links on both sides
-                self.mru.newer = node     # newer from old mru is new mru
-                lru.older = node    # older than lru poits circularly to mru
-                # make new node the mru
-                self.mru = node
+            # get mru use node if cache is full, else make new node            
+            if self.nodeSize + newValueSize <= self.capacity:
+                if self.mru is None:
+                    self.mru = UseNode(value, hkey)
+                    self.mru.sideEffects = sideEffects
+                    self.nodeSize += newValueSize
+                    self.mru.older = self.mru.newer = self.mru  # init circular list
+                else:                    
+                    # put new node between existing lru and mru
+                    lru = self.mru.newer # newer than mru circularly goes to lru node
+                    node = UseNode(value, hkey, self.mru, lru)
+                    node.sideEffects = sideEffects
+                    self.nodeSize +=self.capacityCalc(hkey, value)
+                    # update links on both sides
+                    self.mru.newer = node     # newer from old mru is new mru
+                    lru.older = node    # older than lru poits circularly to mru
+                    # make new node the mru
+                    self.mru = node
             else:
+                #cache full, replace the lru node
+                lru = self.mru.newer; #newer than mru circularly goes to lru node
+                lruValueSize = self.capacityCalc(lru.hkey, lru.value)                
                 # position of lru node is correct for becoming mru so
-                # just replace value and hkey #
-                if lru is not self.initialNode: 
-                    self.nodeSize -= self.capacityCalc(lru.hkey, lru.value)
+                # just replace value and hkey #                
+                self.nodeSize -= self.capacityCalc(lru.hkey, lru.value)
                 #print lru.hkey
                 lru.value = value
                 lru.sideEffects = sideEffects
@@ -204,6 +217,11 @@ class MRUCache:
         for posssible continued use.
         """
         this = self.mru
+        if this is None:
+            #already empty
+            assert self.nodeSize == 0
+            assert not self.nodeDict
+            return
         lru = this.newer
         while 1:
             next = this.older
@@ -214,53 +232,8 @@ class MRUCache:
         this.older = this.newer = None
         del this
         self.nodeDict.clear()
-        # re-init with previous parameters
-        self.__init()
+        # re-init
+        self.mru = None
+        self.nodeSize = 0
 
-####################
-# test stuff follows 
 
-def testcalc(*args):    # plays role of user valueCalc
-    return '<V:%s>' % `args`
-    
-def testhash(*args):    # plays role of user hashCalc
-    return '<H:%s>' % `args`
-    
-def test():
-    cache = MRUCache(5, testcalc, testhash)
-
-    def mrustr(mru):
-        node = mru; s=[]
-        while 1:
-            s.append(node.value.split("'")[1])
-            node = node.older
-            if node is mru: break
-        return ''.join(s)
-            
-    def dosome(s):
-        sbef = mrustr(cache.mru)
-        for calcArg in s:
-            v = cache.getValue(calcArg)
-            print '\n--- getValue(%s) ---\n' % calcArg
-            mru = node = cache.mru
-            while 1:
-                print node.hkey, node.value, '(older:%s, newer:%s)'%(
-                    node.older.hkey, node.newer.hkey)
-                node = node.older
-                if node is mru: break
-        saft = mrustr(cache.mru)
-        print 'MRU %s +refs %s => %s' %(sbef,s,saft)
-    dosome('aabcdef')   # leaves mru..lru = fedcb
-    dosome('fb')        # bfedc
-    dosome('f')         # fbedc
-    dosome('d')         # dfbec
-    cache.clear()
-    for k,v in vars(cache).items():
-        print '%12s = %s' % (`k`,`v`)
-    dosome(')-;? ')
-    cache.clear()
-    for k,v in vars(cache).items():
-        print '%12s = %s' % (`k`,`v`)
-
-if __name__ == '__main__':
-    test()
