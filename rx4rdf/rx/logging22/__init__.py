@@ -871,7 +871,7 @@ class Logger(Filterer):
         if INFO >= self.getEffectiveLevel():
             apply(self._log, (INFO, msg, args), kwargs)
 
-    def warn(self, msg, *args, **kwargs):
+    def warning(self, msg, *args, **kwargs):
         """
         Log 'msg % args' with severity 'WARN'.
 
