@@ -3,5 +3,19 @@
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
-__all__ = ['glockTest.py', 'raccoonTest.py', 'RDFDomTest.py',
-           'testmodpatching.py', 'utilsTest.py', 'zmlTest.py']
+__all__ = ['glockTest', 'testmodpatching','raccoonTest', 'RDFDomTest', 
+            'rhizomeTest', 'utilsTest', 'zmlTest']
+
+import unittest
+class TestProgram(unittest.TestProgram):
+    def runTests(self):
+        if self.testRunner is None:
+            self.testRunner = unittest.TextTestRunner(verbosity=self.verbosity)
+        result = self.testRunner.run(self.test)                
+        #sys.exit(not result.wasSuccessful()) #we don't want to exit!
+    
+if __name__ == '__main__':    
+    for modname in __all__:
+        print 'testing', modname
+        TestProgram(modname)
+
