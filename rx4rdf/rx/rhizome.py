@@ -7,8 +7,7 @@
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
-import rhizml, rxml, racoon
-import utils, RxPath
+from rx import rhizml, rxml, racoon, utils, RxPath
 import Ft
 from Ft.Lib import Uri
 from Ft.Rdf import RDF_MS_BASE,OBJECT_TYPE_RESOURCE
@@ -80,19 +79,27 @@ class Rhizome:
     'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' : 'rz',
     'http://rx4rdf.sf.net/ns/wiki#item-format-text': 'txt',
     'http://rx4rdf.sf.net/ns/wiki#item-format-xml':'xml',
+    'http://rx4rdf.sf.net/ns/content#pydiff-patch-transform':'pkl'
     }
     
     def __init__(self, server):
         self.server = server
+        #this is just like findContentAction except we don't want to try to retrieve alt-contents' ContentLocation        
+        self.findPatchContentAction = racoon.Action(['.//a:contents/text()', 
+        'wf:openurl(.//a:contents/a:ContentLocation)', #contents stored externally
+        ], lambda result, kw, contextNode, retVal:\
+            server.getStringFromXPathResult(result), requiresContext = True) #get its content
 
-    def processTemplateAction(self, resultNodeset, kw, contextNode, retVal):
-        #the resultNodeset is the template resource
-        #so skip the first few steps that find the page resource
-        actions = self.handleRequestSequence[3:]
-        return self.server.callActions(actions, [ '_user', '_name' ],
-                                       resultNodeset, kw, contextNode, retVal)
-    
-    def doImport(self, path, recurse=False, r=False, disposition='', xupdate="path:import.xml", format='', dest=None, **kw):
+    def configHook(self, kw):
+        def initConstants(varlist, default):
+            return racoon.assignVars(self, kw, varlist, default)
+        
+        initConstants( ['MAX_MODEL_LITERAL'], -1)        
+        self.SAVE_DIR = kw.get('SAVE_DIR', 'content/.rzvs/')
+        self.ALTSAVE_DIR = kw.get('ALTSAVE_DIR', 'content/')
+        
+    def doImport(self, path, recurse=False, r=False, disposition='',
+                 xupdate="path:import.xml", doctype='', format='', dest=None, **kw):
           '''Import command line option
 Import the file in a directory into the site.
 If, for each file, there exists a matching file with ".metarx" appended, 
@@ -108,6 +115,7 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
 '''
           defaultFormat=format
           defaultDisposition=disposition
+          defaultDoctype=doctype
           path = path or '.'
           triples = []
           if dest:
@@ -186,11 +194,14 @@ Default: "path:import.xml". This disgards previous revisions and points the cont
                           disposition = 'entry'
                   else:
                       disposition = defaultDisposition
-                  if format == 'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml':
-                      mm = rhizml.rhizml2xml(file(path), mmf=MarkupMapFactory(), getMM=True)
-                      doctype = mm.docType
+                  if not defaultDoctype:
+                      if format == 'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml':
+                          mm = rhizml.rhizml2xml(file(path), mmf=MarkupMapFactory(), getMM=True)
+                          doctype = mm.docType
+                      else:
+                          doctype=''
                   else:
-                      doctype=''
+                      doctype = defaultDoctype
                   triples.append( self.addItem(wikiname,loc=loc,format=format,
                                     disposition=disposition, doctype=doctype) )
               if dest:
@@ -222,6 +233,7 @@ Options:
 -name  Name of item to export (for exporting one item) (no effect if -xpath is specified)
 -static Have export attempt to render the content as html. Dynamic pages 
         (those that require parameters) are skipped.
+-label Name of revision label
 '''
          assert not (xpath and name), self.server.cmd_usage
          if not xpath and name: xpath = '/*[wiki:name="%s"]' % name
@@ -234,8 +246,10 @@ Options:
              content = None
              log.info('attempting to export %s ' % name)
              if static:
-                 try:
-                     rc = { '_static' : static} 
+                 try:                     
+                     rc = { '_static' : static}
+                     if kw.get('label'): rc['label'] = kw['label']
+                     #todo: what about adding user context (default to administrator?)
                      #add these to the requestContext so invocation know its intent
                      self.server.requestContext.append(rc)
                      content = self.server.requestDispatcher.invoke__(orginalName) 
@@ -280,18 +294,26 @@ Options:
                  metadatafile.write( metadata)
                  metadatafile.close()             
 
+    def processTemplateAction(self, resultNodeset, kw, contextNode, retVal):
+        #the resultNodeset is the template resource
+        #so skip the first few steps that find the page resource
+        actions = self.handleRequestSequence[3:]
+        return self.server.callActions(actions, [ '_user', '_name' ],
+                                       resultNodeset, kw, contextNode, retVal)
+
     def processPatch(self, contents, kw, result):
         #we assume result is a:ContentTransform/a:transformed-by/*, set context to the parent a:ContentTransform
         patchBaseResource =  self.server.evalXPath('../../a:pydiff-patch-base/*', node = result)
         #print 'b', patchBaseResource
         #print 'context: ', result, result.parentNode, result.parentNode.parentNode
+        #print 'type c', type(contents)
         #print 'c', contents
         
         #get the contents of the resource which this patch will use as the base to run its patch against
         #todo: issue kw.copy() is not a deep copy -- what to do?
-        base = self.server.doActions([self.findContentAction, self.processContentAction], kw.copy(), patchBaseResource)
+        base = self.server.doActions([self.findPatchContentAction, self.processContentAction], kw.copy(), patchBaseResource)
         assert base, "patch failed: couldn't find contents for %s" % repr(base)
-        patch = pickle.loads(str(contents))        
+        patch = pickle.loads(str(contents)) 
         return utils.patch(base,patch)
 
     def metadata_save(self, about, contents):
@@ -305,6 +327,98 @@ Options:
         log.exception("metadata save failed")
         raise
 
+    def getContents(self, context, node=None):
+        if node is None:
+            node = context.node
+        elif not node:
+            return ''#empty nodeset
+        return self.server.doActions([self.findContentAction], {}, node)
+        
+    def getNameURI(self, context, wikiname):
+        #note filter: URI fragment might not match wikiname
+        return self.server.BASE_MODEL_URI + \
+               filter(lambda c: c.isalnum() or c in '_-./', wikiname)
+
+    def generatePatch(self, context, contents, oldcontentsNode, base64decode):
+        patch = ''
+        if oldcontentsNode:
+            if isinstance(oldcontentsNode, type([])):
+                oldcontentsNode = oldcontentsNode[0]                
+            oldContents = self.server.doActions([self.findPatchContentAction], {}, oldcontentsNode)
+            if oldContents:
+                if base64decode:
+                    #we want to base64 decode the old content before attempting the diff
+                    import base64
+                    oldContents = base64.decodestring(oldContents)
+                patchTupleList = utils.diff(contents, oldContents) #compare  
+                if patchTupleList is not None:
+                    patch = pickle.dumps(patchTupleList)                    
+                    #todo: if save patch to disk: return saveContents()
+        return patch
+              
+    def saveContents(self, context, wikiname, format, contents, revisionCount):
+        '''        
+        this is kind of ugly; doesn't have XUpdate an eval() function, so we
+        build up a string of xml and then parse it and then return the doc as
+        a nodeset and use xupdate:copy-of on the nodeset
+        '''
+        #todo at some point add sha = utils.shaDigestString(contents)
+        #print >>sys.stderr, 'sc', wikiname, format, contents, revisionCount
+        ns = '''xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'
+            xmlns:a="http://rx4rdf.sf.net/ns/archive#"
+            xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"'''
+        contentLength = len(contents)        
+        if self.MAX_MODEL_LITERAL > -1 and contentLength > self.MAX_MODEL_LITERAL:            
+            #save as file
+            filename = wikiname
+            if filename.find('.') == -1 and self.exts.get(format):
+                filename += '.' + self.exts[format]
+
+            filepath = self.SAVE_DIR + filename + '.' + str(int(revisionCount))
+            try: 
+               os.makedirs(self.SAVE_DIR) 
+            except OSError: pass #dir might already exist
+            f = file(filepath, 'wb')
+            f.write(contents)
+            f.close()
+
+            if self.ALTSAVE_DIR:
+                #we save another copy of the last revision in order that minor edit
+                #or external changes don't effect diffs etc.                
+                altfilepath = self.ALTSAVE_DIR + filename
+                try:  os.makedirs(self.ALTSAVE_DIR) 
+                except OSError: pass #dir might already exist
+                f = file(altfilepath, 'wb')
+                f.write(contents)
+                f.close()                
+                altContents = "<wiki:alt-contents><a:ContentLocation rdf:about='path:%s' /></wiki:alt-contents>" % altfilepath
+            else:
+                altContents = ''
+
+            #todo:
+            #we assume SAVE_DIR and ALTSAVE_DIR is a relative path rooted in one of the directories on the RHIZOME_PATH
+            xml = '''<a:ContentLocation %(ns)s rdf:about='path:%(filepath)s'>%(altContents)s</a:ContentLocation>''' % locals()            
+        else: #save the contents inside the model
+            try:
+                contents.encode('ascii') #test to see if is just ascii (all <128)
+                return contents
+            except UnicodeError:
+                #base64 encode
+                encodedURI = utils.generateBnode()
+                contents = base64.encodestring(contents)                        
+                xml = '''<a:ContentTransform %(ns)s rdf:about='%(encodedURI)s'>
+                    <a:transformed-by><rdf:Description rdf:about='http://www.w3.org/2000/09/xmldsig#base64'/></a:transformed-by>
+                    <a:contents>%(contents)s</a:contents>
+                   </a:ContentTransform>''' % locals()
+
+        #print >>sys.stderr, 'sc', xml
+        from Ft.Xml import Domlette
+        isrc = InputSource.DefaultFactory.fromString(xml, 'file:')
+        xmlDoc = Domlette.NonvalidatingReader.parse(isrc)
+        #return a nodeset containing the root element of the doc
+        #print >>sys.stderr, 'sc', xmlDoc.documentElement
+        return [ xmlDoc.documentElement ]
+                
     def addItemTuple(self, name, **kw):
         return [(name, self.addItem(name, **kw))]
 
@@ -317,7 +431,7 @@ Options:
         '''
         Convenience function for adding an item the model. Returns a string of triples.
         '''
-        from utils import Res
+        from rx.utils import Res
         Res.nsMap = self.nsMap
         
         if not baseURI:

@@ -111,15 +111,15 @@ def createThreadLocalProperty(name, fget=True, fset=True, fdel=True, doc=None, i
 def htmlQuote(data):
     return data.replace('&','&amp').replace('<','&lt;').replace('>','&gt;')
 
-def diff(new, old, cutoffOffset = -100):
+def diff(new, old, cutoffOffset = -100, sep = '\n'):
     '''
     returns a list of changes needed to transform new to old unless the length
     of the list of changes is greater the length of the old content itself plus 
     the cutoffOffset, in which case None is returned.
     '''
     maxlen = len(old) + cutoffOffset
-    old = old.splitlines()
-    new = new.splitlines()
+    old = old.split(sep) 
+    new = new.split(sep) 
     changes = []
     import difflib
     cruncher = difflib.SequenceMatcher(None, new, old)
@@ -139,7 +139,7 @@ def diff(new, old, cutoffOffset = -100):
     return changes
 
 def patch(base, patch, sep = '\n'):
-    base = base.splitlines()
+    base = base.split(sep) 
     for op in patch:
         if op[0] == 'r':
             base[op[1]:op[2]] = op[3]
@@ -272,7 +272,7 @@ def DeserializeFromN3File(n3filepath, driver=Memory, dbName='', create=0, scope=
 
 def deserializeRDF(modelPath, driver=Memory, dbName='', scope='', modelName='default'):
     if modelPath[-3:] == '.mk':
-        import metakitdriver
+        from rx import metakitdriver
         db =  metakitdriver.GetDb(modelPath, modelName)
         model = Model.Model(db)            
     elif modelPath[-3:] == '.nt':
@@ -624,6 +624,8 @@ class DynaExceptionFactory(object):
             #create a new class derived from the base Exception type
             msg = msg or name            
             dynaexception = type(self.base)(classname, (self.base,), { 'msg': msg })
+            #print 'setting', classname, 'on', self.module, 'with', dynaexception
+            #import traceback; print traceback.print_stack(file=sys.stderr)
             setattr(self.module, classname, dynaexception)
         return dynaexception
 

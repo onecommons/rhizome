@@ -2,7 +2,9 @@
 ## 
 # $Header$
 """
-Code below is based on Ft/Xml/XUpdate.py with a few bug fixes and support for the "message" element
+Code below is based on Ft/Xml/XUpdate.py with a few bug fixes
+and added support for the following elements/instructions:
+"message", "variable", "replace", "copy-of", and "value-of"
 
 Handles XUpdate requests (see http://xmldb.org/xupdate/xupdate-wd.html)
 
@@ -33,6 +35,7 @@ class XUpdateException(FtException):
     UNABLE_TO_RENAME = 5
     NO_TEST = 6
     NO_TARGET = 7
+    STYLESHEET_REQUESTED_TERMINATION=8
 
     def __init__(self, code, *args):
         FtException.__init__(self, code, g_errorMessages, args)
@@ -45,6 +48,7 @@ g_errorMessages = {
     XUpdateException.UNABLE_TO_RENAME : 'unable to rename element',
     XUpdateException.NO_TEST : 'missing required test attribute',
     XUpdateException.NO_TARGET : 'missing required target attribute',
+    XUpdateException.STYLESHEET_REQUESTED_TERMINATION: 'A message instruction in the Stylesheet requested termination of processing:\n%s',
     }
 
 class StringWriter(NullWriter.NullWriter):
@@ -62,6 +66,7 @@ class StringWriter(NullWriter.NullWriter):
 class Processor:
     def __init__(self, reader=None):
         self.writers = [NullWriter.NullWriter(None)]
+        self._suppressMsgs = 0
         return
 
     def pushDomResult(self, ownerDocument):
@@ -113,6 +118,8 @@ class Processor:
                     self.visit(context, n, preserveSpace)
             elif node.localName == 'remove':
                 select = node.getAttributeNS(EMPTY_NAMESPACE, u'select')
+                #import sys
+                #print >>sys.stderr, 'removing', select
                 if not select:
                     raise XUpdateException(XUpdateException.NO_SELECT)
                 _select = self.parseExpression(select)
@@ -425,6 +432,37 @@ class Processor:
                         self.visit(context, n, preserveSpace)
 
                 context.processorNss = oldNss
+            elif node.localName == 'variable':
+                name = node.getAttributeNS(EMPTY_NAMESPACE, 'name')
+                if not name:
+                    raise XUpdateException(XUpdateException.NO_NAME)
+                _name = self.parseAVT(name)
+
+                oldNss = context.processorNss
+                context.processorNss = Domlette.GetAllNs(node)
+                name = _name.evaluate(context)
+
+                (prefix, local) = SplitQName(name)                
+                if prefix:
+                    namespace = context.processorNss[prefix]
+                else:
+                    namespace = EMPTY_NAMESPACE
+
+                select = node.getAttributeNS(EMPTY_NAMESPACE, u'select')
+                if select:                                        
+                    _select = self.parseExpression(select)
+                    result = _select.evaluate(context)                    
+                else:
+                    self.pushDomResult(context.node.ownerDocument)
+                    try:
+                        for child in node.childNodes:
+                            context = self.visit(context, child, preserveSpace)
+                    finally:
+                        result = self.popResult()
+                        
+                context.varBindings[(namespace, local)] = result
+                
+                context.processorNss = oldNss                
             elif node.localName == 'message':                
                 msg = node.getAttributeNS(EMPTY_NAMESPACE, u'text')
                 if msg:
@@ -436,10 +474,11 @@ class Processor:
                 else:
                     msg = "encountered <xupdate:message> (no message)"
                 isError = node.getAttributeNS(EMPTY_NAMESPACE, u'terminate')
-                if isError == 'yes':                
-                    raise 'XUpdate aborted. Reason: ' + str(msg) #todo
+                if isError == 'yes':
+                    raise XUpdateException(
+                        XUpdateException.STYLESHEET_REQUESTED_TERMINATION, msg) 
                 else:
-                    print msg #todo
+                    self.xupdateMessage(msg)
             else:
                 raise Exception("Unknown xupdate element: %s.  This may just be an implementation gap" % node.localName)
         elif node.nodeType == Node.DOCUMENT_NODE:
@@ -455,12 +494,27 @@ class Processor:
 
     def parseExpression(self, expression):
         if expression is None: return None
+        #import sys; print >>sys.stderr, 'exp', expression
         return parser.new().parse(expression)
 
     def parseAVT(self, avt):
         if avt is None: return None
         return AttributeValueTemplate.AttributeValueTemplate(avt)
 
+    #next 2 functions copied from Xslt.Processor
+    # FIXME: l10n
+    def xupdateMessage(self, msg):
+        if not self._suppressMsgs:
+            import sys
+            sys.stderr.write("XUPDATE MESSAGE:\n")
+            sys.stderr.write(msg)
+            sys.stderr.write("\nEND XUPDATE MESSAGE\n")
+        return
+
+    def messageControl(self, suppress):
+        self._suppressMsgs = suppress
+        return
+    
 class Reader(Domlette.NonvalidatingReaderBase):
     fromSrc = Domlette.NonvalidatingReaderBase.parse
 

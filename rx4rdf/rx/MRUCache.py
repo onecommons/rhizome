@@ -7,7 +7,7 @@
 # Use per Python Software Foundation (PSF) license.
 # 
 
-import utils
+from rx import utils
 _defexception = utils.DynaExceptionFactory(__name__)
 _defexception('not cacheable')
 

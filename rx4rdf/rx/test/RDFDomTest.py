@@ -5,15 +5,22 @@
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
-import unittest
+import unittest, os, os.path, glob
 from Ft.Xml import XPath, InputSource
 from Ft.Rdf import Util
 import cStringIO
 from Ft.Xml.Lib.Print import PrettyPrint
-
-from rx.RDFDom import *
+from pprint import *
+        
+newRDFDom = 1
+if not newRDFDom:
+    from rx.RDFDom import *
+else:
+    from rx.RxPath import *
+    RDFDoc = lambda model, nsMap: createDOM(model, nsMap)
+    
 from rx import utils
-import difflib
+import difflib, time
 
 class RDFDomTestCase(unittest.TestCase):
     ''' tests rdfdom, rxpath, rxslt, and xupdate on a rdfdom
@@ -27,22 +34,22 @@ class RDFDomTestCase(unittest.TestCase):
     '''
 
     model1 = r'''#test
-<http://4suite.org/rdf/anonymous/5c79e155-5688-4059-9627-7fee524b7bdf> <http://rx4rdf.sf.net/ns/archive#created-on> "1057790527.921" .
-<http://4suite.org/rdf/anonymous/5c79e155-5688-4059-9627-7fee524b7bdf> <http://rx4rdf.sf.net/ns/archive#has-expression> <urn:sha:XPmK/UXVwPzgKryx1EwoHtTMe34=> .
-<http://4suite.org/rdf/anonymous/5c79e155-5688-4059-9627-7fee524b7bdf> <http://rx4rdf.sf.net/ns/archive#last-modified> "1057790527.921" .
-<http://4suite.org/rdf/anonymous/5c79e155-5688-4059-9627-7fee524b7bdf> <http://rx4rdf.sf.net/ns/wiki#name> "HomePage" .
-<http://4suite.org/rdf/anonymous/5c79e155-5688-4059-9627-7fee524b7bdf> <http://rx4rdf.sf.net/ns/wiki#summary> "l" .
-<http://4suite.org/rdf/anonymous/5c79e155-5688-4059-9627-7fee524b7bdf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://4suite.org/rdf/banonymous/5c79e155-5688-4059-9627-7fee524b7bdf> <http://rx4rdf.sf.net/ns/archive#created-on> "1057790527.921" .
+<http://4suite.org/rdf/banonymous/5c79e155-5688-4059-9627-7fee524b7bdf> <http://rx4rdf.sf.net/ns/archive#has-expression> <urn:sha:XPmK/UXVwPzgKryx1EwoHtTMe34=> .
+<http://4suite.org/rdf/banonymous/5c79e155-5688-4059-9627-7fee524b7bdf> <http://rx4rdf.sf.net/ns/archive#last-modified> "1057790527.921" .
+<http://4suite.org/rdf/banonymous/5c79e155-5688-4059-9627-7fee524b7bdf> <http://rx4rdf.sf.net/ns/wiki#name> "HomePage" .
+<http://4suite.org/rdf/banonymous/5c79e155-5688-4059-9627-7fee524b7bdf> <http://rx4rdf.sf.net/ns/wiki#summary> "l" .
+<http://4suite.org/rdf/banonymous/5c79e155-5688-4059-9627-7fee524b7bdf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 <urn:sha:XPmK/UXVwPzgKryx1EwoHtTMe34=> <http://rx4rdf.sf.net/ns/archive#content-length> "13" .
 <urn:sha:XPmK/UXVwPzgKryx1EwoHtTMe34=> <http://rx4rdf.sf.net/ns/archive#hasContent> "            kkk &nbsp;" .
 <urn:sha:XPmK/UXVwPzgKryx1EwoHtTMe34=> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "XPmK/UXVwPzgKryx1EwoHtTMe34=" .
 <urn:sha:XPmK/UXVwPzgKryx1EwoHtTMe34=> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#Contents> .
-<http://4suite.org/rdf/anonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-<http://4suite.org/rdf/anonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6> <http://rx4rdf.sf.net/ns/wiki#name> "test" .
-<http://4suite.org/rdf/anonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6> <http://rx4rdf.sf.net/ns/archive#created-on> "1057790874.703" .
-<http://4suite.org/rdf/anonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6> <http://rx4rdf.sf.net/ns/archive#has-expression> <urn:sha:jERppQrIlaay2cQJsz36xVNyQUs=> .
-<http://4suite.org/rdf/anonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6> <http://rx4rdf.sf.net/ns/archive#last-modified> "1057790874.703" .
-<http://4suite.org/rdf/anonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6> <http://rx4rdf.sf.net/ns/wiki#summary> "lll" .
+<http://4suite.org/rdf/banonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://4suite.org/rdf/banonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6> <http://rx4rdf.sf.net/ns/wiki#name> "test" .
+<http://4suite.org/rdf/banonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6> <http://rx4rdf.sf.net/ns/archive#created-on> "1057790874.703" .
+<http://4suite.org/rdf/banonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6> <http://rx4rdf.sf.net/ns/archive#has-expression> <urn:sha:jERppQrIlaay2cQJsz36xVNyQUs=> .
+<http://4suite.org/rdf/banonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6> <http://rx4rdf.sf.net/ns/archive#last-modified> "1057790874.703" .
+<http://4suite.org/rdf/banonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6> <http://rx4rdf.sf.net/ns/wiki#summary> "lll" .
 <urn:sha:jERppQrIlaay2cQJsz36xVNyQUs=> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#Contents> .
 <urn:sha:jERppQrIlaay2cQJsz36xVNyQUs=> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "jERppQrIlaay2cQJsz36xVNyQUs=" .
 <urn:sha:jERppQrIlaay2cQJsz36xVNyQUs=> <http://rx4rdf.sf.net/ns/archive#hasContent> "        kkkk    &nbsp;" .
@@ -53,23 +60,43 @@ class RDFDomTestCase(unittest.TestCase):
 <urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "ndKxl8RGTmr3uomnJxVdGnWgXuA=" .
 <urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> <http://rx4rdf.sf.net/ns/archive#hasContent> " llll" .
 <urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> <http://rx4rdf.sf.net/ns/archive#content-length> "5" .
-<http://4suite.org/rdf/anonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-<http://4suite.org/rdf/anonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://rx4rdf.sf.net/ns/wiki#name> "HomePage" .
-<http://4suite.org/rdf/anonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://rx4rdf.sf.net/ns/archive#created-on> "1057802436.437" .
-<http://4suite.org/rdf/anonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://rx4rdf.sf.net/ns/archive#has-expression> <urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> .
-<http://4suite.org/rdf/anonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://rx4rdf.sf.net/ns/archive#last-modified> "1057802436.437" .
-<http://4suite.org/rdf/anonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://rx4rdf.sf.net/ns/wiki#summary> "ppp" .'''
+<http://4suite.org/rdf/banonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://4suite.org/rdf/banonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://rx4rdf.sf.net/ns/wiki#name> "HomePage" .
+<http://4suite.org/rdf/banonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://rx4rdf.sf.net/ns/archive#created-on> "1057802436.437" .
+<http://4suite.org/rdf/banonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://rx4rdf.sf.net/ns/archive#has-expression> <urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> .
+<http://4suite.org/rdf/banonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://rx4rdf.sf.net/ns/archive#last-modified> "1057802436.437" .
+<http://4suite.org/rdf/banonymous/cc0c6ff3-e8a7-4327-8cf1-5e84fc4d1198> <http://rx4rdf.sf.net/ns/wiki#summary> "ppp" .'''
+
+    loopModel = r'''<http://loop.com> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://loop.com>.
+<http://loop.com#2> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://loop.com#3>.
+<http://loop.com#3> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://loop.com#2>.'''
     
-    model1NsMap = { 'wiki' : "http://rx4rdf.sf.net/ns/wiki#", 'a' : "http://rx4rdf.sf.net/ns/archive#" }
+    model1NsMap = {  'rdf' : RDF_MS_BASE, 
+                    'wiki' : "http://rx4rdf.sf.net/ns/wiki#",
+                    'a' : "http://rx4rdf.sf.net/ns/archive#" }
 
     def setUp(self):
         pass
 
-    def loadModel(self, source, type='nt'):
+    def loadFtModel(self, source, type='nt'):
         if type == 'rdf':
-            self.model, self.db = Util.DeserializeFromUri(source)
+            model, self.db = Util.DeserializeFromUri(source)
         else:
-            self.model, self.db = utils.DeserializeFromN3File( source ) 
+            model, self.db = utils.DeserializeFromN3File( source )
+        return FtModel(model)
+
+    def loadRedlandModel(self, source, type='nt'):        
+        if type == 'rdf':
+            assert 'Not Supported'
+        else:            
+            for f in glob.glob('RDFDomTest*.db'):
+                if os.path.exists(f):
+                    os.unlink(f)            
+            return initRedlandHashBdbModel("RDFDomTest", source)
+            
+    def loadModel(self, source, type='nt'):
+        self.model = self.loadFtModel(source, type)
+        #self.model = self.loadRedlandModel(source, type)
         self.nsMap = {u'http://rx4rdf.sf.net/ns/archive#':u'arc',
                u'http://www.w3.org/2002/07/owl#':u'owl',
                u'http://purl.org/dc/elements/1.1/#':u'dc',
@@ -82,14 +109,14 @@ class RDFDomTestCase(unittest.TestCase):
     def testDom(self):
         self.loadModel(cStringIO.StringIO(self.model1) )
 
-        #print self.db._statements
+        #print self.model.getResources()
         #print self.rdfDom
 
         #test model -> dom (correct resources created)
         xpath = '/*'
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless(len(res1)==6)
-
+        
         #test predicate stringvalue         
         xpath = "string(/*[wiki:name/text()='HomePage']/a:has-expression)"
         res2 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)        
@@ -98,28 +125,95 @@ class RDFDomTestCase(unittest.TestCase):
         res3 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless(res2 and res2 == res3)
 
-        #test virtual reference elements
+        #test recursive elements        
         xpath = "/*[wiki:name/text()='HomePage']/a:has-expression/*/a:hasContent/text()"
         res4 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-
+        
+        start = time.time()        
         xpath = "/*[.='urn:sha:XPmK/UXVwPzgKryx1EwoHtTMe34=']/a:hasContent/text()"
-        res5 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)                
+        res5 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        print time.time() - start
         self.failUnless(res4 == res5)
 
+    def timeXPath(self):
+        self.loadModel(cStringIO.StringIO(self.model1) )
+        start = time.time()
+        for i in xrange(100):        
+            xpath = "/*[wiki:name/text()='HomePage']/a:has-expression/*/a:hasContent/text()"
+            self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        print time.time() - start
+
+    def testLoop(self):
+        self.loadModel(cStringIO.StringIO(self.loopModel) )
+        
+        xpath = '/*'
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        #print res1
+        self.failUnless(len(res1)==3)
+                
+        xpath = "/*/*/*"        
+        res2 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        #print res2
+        self.failUnless(len(res2)==3)
+
+        #circularity checking only on with descendant axes
+        xpath = "/*/*/*/*/*"        
+        res3 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        #print res3        
+        c1 = [x.stringValue for x in res2]
+        c1.sort()
+        c2 = [x.stringValue for x in res3]
+        c2.sort()
+        self.failUnless(c1 == c2) #order will be different but should be same resources
+                
+        xpath = "//rdf:type"        
+        res4 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        #print res4
+        self.failUnless(len(res4)==8) #todo: why 8?
+
+        self.rdfDom.globalRecurseCheck = 1
+        PrettyPrint(self.rdfDom) #Xml.Lib.Print.Nss.seek() causes infinite regress
+        self.rdfDom.globalRecurseCheck = 0
+            
     def testDocIndex(self):
         self.loadModel("about.rx.nt")
         xpath = "*/wiki:revisions/*"
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        
         xpath = "(*/wiki:revisions/*//a:contents)[last()]"
         res2 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         
         xpath = "(*/wiki:revisions/*//a:contents)"
         res3 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        print res2
+        print res3
         self.failUnless(res2[-1] == res3[-1])        
 
         #print 'cmp test', res1[0], res2[0]
         self.failUnless(res1[0].docIndex < res2[0].docIndex)
 
+    def testLists(self):
+        self.loadModel("about.rx.nt")
+        xpath = "*/wiki:revisions/*/rdf:first/@listID='http://4suite.org/rdf/banonymous/xc52aaabe-6b72-42d1-8772-fcb90303c24b_5'"
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)        
+        self.failUnless( res1 )
+
+        xpath = "*[wiki:name='about']/wiki:revisions/*/rdf:first"
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless( len(res1)==2 )
+
+        xpath = "*[wiki:name='about']/wiki:revisions/*/rdf:first/*"
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless( len(res1)==2 )
+
+        xpath = "*[wiki:name='about']/wiki:revisions/*/rdf:rest"
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless( len(res1)==0 )
+
+        xpath = "*[wiki:name='about']/wiki:revisions/*/rdf:first[2]='http://4suite.org/rdf/banonymous/x467ce421-1a30-4a2f-9208-0a4b01cd0da1_9'"
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless( res1 )
+        
     def testXUpdate(self):       
         '''test xupdate'''
         self.loadModel("rdfdomtest1.rdf",'rdf')
@@ -138,11 +232,14 @@ class RDFDomTestCase(unittest.TestCase):
         </xupdate:modifications>
         '''               
         applyXUpdate(self.rdfDom,xupdate)
-        from Ft.Rdf.Drivers import Memory
-        db = Memory.CreateDb('', 'default')
-        outputModel = Ft.Rdf.Model.Model(db)
-        treeToModel(self.rdfDom, outputModel)
-        #print 'XUPDATE ', db._statements        
+        if newRDFDom:
+            db = self.db
+        else:
+            from Ft.Rdf.Drivers import Memory
+            db = Memory.CreateDb('', 'default')
+            import Ft.Rdf.Model
+            outputModel = Ft.Rdf.Model.Model(db)
+            treeToModel(self.rdfDom, outputModel)        
         statements = {'default': [(u'http://rx4rdf.sf.net/ns/archive/archive-example.rdf', u'http://purl.org/dc/elements/1.1/creator', u'Adam Souzis', u'', u'', u'L'),
                                   (u'http://rx4rdf.sf.net/ns/archive/archive-example.rdf', u'http://purl.org/dc/elements/1.1/date', u'2003-04-10', u'', u'', u'L'),
                                   (u'http://rx4rdf.sf.net/ns/archive/archive-example.rdf', u'http://purl.org/dc/elements/1.1/identifier', u'http://rx4rdf.sf.net/ns/archive', u'', u'', u'L'),
@@ -154,8 +251,13 @@ class RDFDomTestCase(unittest.TestCase):
                                   (u'urn:sha:2jmj7l5rSw0yVb/vlWAYkK/YBwk=', u'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', u'http://rx4rdf.sf.net/ns/archive#Contents', u'', u'', u'R'),
                                   (u'urn:sha:2jmj7l5rSw0yVb/vlWAYkK/YBwk=', u'http://rx4rdf.sf.net/ns/archive#content-length', u'0', u'', u'', u'L'),
                                   (u'urn:sha:2jmj7l5rSw0yVb/vlWAYkK/YBwk=', u'http://rx4rdf.sf.net/ns/archive#hasContent', u'', u'', u'', u'L')]}
-        d = difflib.SequenceMatcher(None,db._statements['default'], statements['default'])         
-        self.failUnless( db._statements == statements, 'statements differ: '+`d.get_opcodes()` )
+        currentStmts = db._statements['default']
+        currentStmts.sort()
+        #print 'XUPDATE ', pprint( currentStmts) 
+        expectedStmts = statements['default']
+        expectedStmts.sort()
+        d = difflib.SequenceMatcher(None,currentStmts, expectedStmts )         
+        self.failUnless( currentStmts == expectedStmts , 'statements differ: '+`d.get_opcodes()` )
 
     def testXslt2(self):
         self.loadModel(cStringIO.StringIO(self.model2) )
@@ -181,19 +283,27 @@ class RDFDomTestCase(unittest.TestCase):
                     <x:template match="text()|@*" />
                     </x:stylesheet>'''
 
-        xslStylesheet2=r'''<?xml version="1.0" ?>        
-        <xsl:stylesheet version="1.0"
-                xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
-            <xsl:template match="node()|@*">
-	    <xsl:copy>
-	        <xsl:apply-templates select="node()|@*"/>
-	    </xsl:copy>
-	    </xsl:template>         
-        </xsl:stylesheet>'''
         result = applyXslt(self.rdfDom, xslStylesheet)
         #todo assert something!
         #print 'XLST2 ', result
         #PrettyPrint(self.rdfDom)
+
+    def timeXslt(self):
+        self.loadModel(cStringIO.StringIO(self.model2) )
+        start = time.time()
+        for i in xrange(40):
+            #'identity stylesheet'
+            xslStylesheet=r'''<?xml version="1.0" ?>        
+            <xsl:stylesheet version="1.0"
+                    xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+                <xsl:template match="node()|@*">
+            <xsl:copy>
+                <xsl:apply-templates select="node()|@*"/>
+            </xsl:copy>
+            </xsl:template>         
+            </xsl:stylesheet>'''
+            result = applyXslt(self.rdfDom, xslStylesheet)
+        print time.time() - start
     
     def testXslt(self):       
         '''test rxslt'''
@@ -234,9 +344,11 @@ class RDFDomTestCase(unittest.TestCase):
         #d = difflib.Differ()
         #print list(d.compare(result,outputXml)) #list of characters, not lines!
         self.failUnless( result == file('testXslt1.xml').read(),'xml output does not match')
-       
+    
 if __name__ == '__main__':
-    import sys
+    import sys    
+    #import os, os.path
+    #os.chdir(os.path.basename(sys.modules[__name__ ].__file__))
     try:
         test=sys.argv[sys.argv.index("-r")+1]
         tc = RDFDomTestCase(test)

@@ -3,8 +3,8 @@ from __future__ import generators
 from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, Util, BNODE_BASE, BNODE_BASE_LEN,RDF_MS_BASE
 from Ft.Xml import XPath, InputSource
 from Ft.Rdf.Statement import Statement
-import utils
-from utils import generateBnode
+from rx import utils
+from rx.utils import generateBnode
 import os.path, sys
 
 from rx import logging #for python 2.2 compatibility
@@ -15,7 +15,7 @@ RDF_MS_BASE=u'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
 OBJECT_TYPE_XMLLITERAL='http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral'
 
 def createDOM(model, nsRevMap = None):
-    import RxPathDom
+    from rx import RxPathDom
     return RxPathDom.Document(model, nsRevMap)
 
 class Model(object):
@@ -481,7 +481,7 @@ def applyXUpdate(rdfdom, xup = None, vars = None, extFunctionMap = None, uri='fi
     contained as a string in the xup parameter or as an URL specified in the uri parameter.
     """
     #from Ft.Xml import XUpdate #buggy -- use our patched version
-    import XUpdate
+    from rx import XUpdate
     xureader = XUpdate.Reader()
     processor = XUpdate.Processor()
     if xup is None:

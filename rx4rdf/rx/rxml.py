@@ -10,8 +10,7 @@
     http://rx4rdf.sf.net    
 """
 import sys, re
-import utils
-import RxPath
+from rx import utils, RxPath
 from Ft.Xml import EMPTY_NAMESPACE,InputSource,SplitQName
 from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, RDF_MS_BASE, BNODE_BASE
 from Ft.Rdf.Statement import Statement
@@ -379,7 +378,7 @@ def rx2nt(path, url=None, debug=0, nsMap = None):
     return outputfile.getvalue()
 
 def rhizml2nt(stream=None, contents=None, debug=0, nsMap = None, addRootElement=True):
-    import rhizml
+    from rx import rhizml
     if stream is not None:
         xml = rhizml.rhizml2xml(stream)
     else:

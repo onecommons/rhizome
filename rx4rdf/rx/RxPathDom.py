@@ -35,8 +35,8 @@ from xml.dom import NotSupportedErr, HierarchyRequestErr, NotFoundErr
 from xml.dom import IndexSizeErr
 from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL
 from Ft.Xml import SplitQName, XMLNS_NAMESPACE
-import RxPath, utils
-from RxPath import RDF_MS_BASE
+from rx import RxPath, utils
+from rx.RxPath import RDF_MS_BASE
 import sys
 from rx import logging #for python 2.2 compatibility
 log = logging.getLogger("RxPath")
@@ -226,11 +226,11 @@ def looksLikeObject(node):
     return False
 
 def looksLikeResource(node):
-    if node.nodeType == Node.ELEMENT_NODE and\
-        len(node.attributes) <= 1:
-        if node.attributes and not node.hasAttributeNS(RDF_MS_BASE, 'about'):
-            return False #the one attribute it has is not rdf:about
-        else:
+    if node.nodeType == Node.ELEMENT_NODE :#and\
+        #len(node.attributes) <= 1:
+        #if node.attributes and not node.hasAttributeNS(RDF_MS_BASE, 'about'):
+        #    return False #the one attribute it has is not rdf:about
+        #else:
             return reduce(lambda x, y: x and looksLikePredicate(y), node.childNodes, True)
     else:
         return False
@@ -489,7 +489,7 @@ class Subject(Resource):
         
         newChild.normalize()
         if not looksLikePredicate(newChild):
-            raise HierarchyRequestErr("can't add to this resource: the child doesn't look like a predicate")        
+            raise HierarchyRequestErr("can't add to this resource: the child %s doesn't look like a predicate" % newChild)        
         predicateURI = RxPath.getURIFromElementName(newChild)
             #append and insertbefore establish order, if rdf:_n need to (add and remove) each following statement
             #rewrite predicate based on rdf:_n or listID or bNode
@@ -1355,7 +1355,7 @@ def main():
         modelPath = "./test/rdfdomtest1.rdf"
 
     #model = RxPath.initRedlandHashBdbModel('test-bdb', file(modelPath))    
-    import utils
+    from rx import utils
     model, db = utils.deserializeRDF( modelPath )
     model = RxPath.FtModel(model)
     

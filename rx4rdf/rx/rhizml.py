@@ -5,9 +5,8 @@
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
-from rhizmltokenize import *
-import rhizmltokenize    
-import utils
+from rx.rhizmltokenize import *
+from rx import rhizmltokenize, utils
 import re
 try:
     import cStringIO
