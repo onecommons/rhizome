@@ -6,8 +6,19 @@
     http://rx4rdf.sf.net    
 """
 import unittest
+from rx import utils
 from rx.utils import *
 
+class TestLinkFixer(utils.LinkFixer):
+    def __init__(self, out):
+        utils.LinkFixer.__init__(self, out)
+                    
+    def needsFixup(self, tag, name, value):
+        return value and value.startswith('foo')
+
+    def doFixup(self, tag, name, value):
+        return 'bar'
+    
 class utilsTestCase(unittest.TestCase):
     def testSingleton(self):
         class single: __metaclass__=Singleton
@@ -18,15 +29,15 @@ class utilsTestCase(unittest.TestCase):
     def testVisitExpr(self):
         expr='/*/foo:bar[. = 1 + baz] | "dsfdf"'
         parseExpr = XPath.Compile(expr)
-        def test(node): print node        
+        def test(node): pass#print node        
         parseExpr.visit(test)
         
     def testIterExpr(self):        
         expr='/*/foo:bar[. = 1 + baz] | "dsfdf"'
         parseExpr = XPath.Compile(expr)        
         for term in parseExpr:
-            print term
-            
+            pass#print term
+
     def testDynException(self):
         _defexception = DynaExceptionFactory(__name__)
         _defexception('test dyn error') #defines exception NotFoundError
@@ -39,7 +50,91 @@ class utilsTestCase(unittest.TestCase):
             raise TestDynError("another msg")
         except (TestDynError), e:
             self.failUnless(e.msg == "another msg")
-            
+
+    def testLinkFixer(self):
+        contents='''<?xml version=1.0 standalone=true ?>
+        <!doctype asdf>
+        <test link='foo' t='1'>        
+        <!-- comment -->        
+        some content&#233;more content&amp;dsf<a href='foo'/>
+        </test>'''
+        result = '''<?xml version=1.0 standalone=true ?>
+        <!doctype asdf>
+        <test link='bar' t='1'>        
+        <!-- comment -->        
+        some content&#233;more content&amp;dsf<a href='bar'/>
+        </test>'''
+        import StringIO
+        out = StringIO.StringIO()
+        fixlinks = TestLinkFixer(out)
+        fixlinks.feed(contents)
+        fixlinks.close()
+        self.failUnless(result == out.getvalue())
+        
+    def testDiffPatch(self):
+        orig = "A B C D E"
+        new = "A C E D"
+        self.failUnless(new == patch(orig, diff(orig, new, 0, ' '), ' ') )
+
+        orig = "A B B B E"
+        new = "A C C C"
+        self.failUnless(new == patch(orig, diff(orig, new, 0, ' '), ' ') )
+
+        orig = ""
+        new = "A C C C"
+        self.failUnless(new == patch(orig, diff(orig, new, 0, ' '), ' ') )
+
+        orig = "A B B B E"
+        new = ""
+        self.failUnless(new == patch(orig, diff(orig, new, 0, ' '), ' ') )
+
+        orig = ""
+        new = ""
+        self.failUnless(new == patch(orig, diff(orig, new, 0, ' '), ' ') )
+
+        orig = "A B B B E"
+        new = "A B B B E"
+        self.failUnless(new == patch(orig, diff(orig, new, 0, ' '), ' ') )
+
+    def _testSortedDiff(self, old, new):
+        #print old, 'to', new
+        changes = diffSortedList(old, new)
+        #print changes
+        patch = opcodes2Patch(old, new, changes)        
+        #print patch
+        patchList(old, patch)
+        #print old
+        self.failUnless(new == old)        
+
+    def testSortedDiff(self):
+        old = [1, 2, 6]
+        new = [0, 2, 4, 9]
+        self._testSortedDiff(old,new)
+
+        old = []
+        new = [0, 2, 4, 9]
+        self._testSortedDiff(old,new)
+        
+        old = [1, 2, 6]
+        new = []
+        self._testSortedDiff(old,new)
+        
+        old = [1, 2, 6]
+        new = [0, 2]
+        self._testSortedDiff(old,new)
+        
+        old = [1, 2]
+        new = [0, 2, 3]
+        self._testSortedDiff(old,new)
+        
+        old = []
+        new = []
+        self._testSortedDiff(old,new)
+
+        old = [0, 2, 3]
+        new = [0, 2, 3]
+        self._testSortedDiff(old,new)
+        
 if __name__ == '__main__':
     import sys
     try:

@@ -3,8 +3,9 @@
   <x:param name="redirect"/>
   <x:param name="password"/>
   <x:param name="loginname"/>
+  <x:param name="__passwordHashProperty"/>
   <x:template match="/">
-    <x:variable name="dummy" select="wf:if(f:sha-hash($password) = /*[wiki:login-name = $loginname]/wiki:sha1-password,  &quot;wf:assign-metadata('session:login', $loginname) and wf:assign-metadata('session:message', '')&quot;,  &quot;wf:assign-metadata('session:message', 'login attempt failed!')&quot;)"/>
+    <x:variable name="dummy" select="wf:if(wf:secure-hash($password) = /*[wiki:login-name = $loginname]/*[uri(.)=$__passwordHashProperty],  &quot;wf:assign-metadata('session:login', $loginname) and wf:assign-metadata('session:message', '')&quot;,  &quot;wf:assign-metadata('session:message', 'login attempt failed!')&quot;)"/>
     <x:variable name="dummy2" select="wf:assign-metadata('response-header:status', 302)"/>
     <x:variable name="dummy3" select="wf:assign-metadata('response-header:Location', $redirect)"/>You should be redirected shortly... </x:template>
 </x:stylesheet>

@@ -2,14 +2,13 @@
     RxML Processor
 
     todo:
-    * support for lists other than rdf:List
     * support for rdf:dataType and xml:lang on literals
     
     Copyright (c) 2003 by Adam Souzis <asouzis@users.sf.net>
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
-import sys, re
+import sys, re, urllib
 from rx import utils, RxPath
 from Ft.Xml import EMPTY_NAMESPACE,InputSource,SplitQName
 from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, RDF_MS_BASE, BNODE_BASE
@@ -120,7 +119,7 @@ def getObject(elem, rxNSPrefix,nsMap, thisResource):
     else:
         return getResource(elem, rxNSPrefix,nsMap, thisResource)[0], OBJECT_TYPE_RESOURCE
 
-def addList2Model(model, subject, p, listID, id, scope, getObject = getObject):    
+def addList2Model(model, subject, p, listID, scope, getObject = getObject):    
     prevListID = None                
     for child in p.childNodes:
         if child.nodeType == p.COMMENT_NODE:
@@ -134,6 +133,17 @@ def addList2Model(model, subject, p, listID, id, scope, getObject = getObject):
         prevListID = listID
     model.add( Statement( listID, RDF_MS_BASE+'type', RDF_MS_BASE+'List', '', scope, OBJECT_TYPE_RESOURCE))                
     model.add( Statement( listID, RDF_MS_BASE+'rest', RDF_MS_BASE+'nil', '', scope, OBJECT_TYPE_RESOURCE))
+
+def addContainer2Model(model, subject, p, listID, scope, getObject, listType):
+    assert listType.startsWith('rdf:')
+    model.add( Statement( listID, RDF_MS_BASE+'type', RDF_MS_BASE+listType[4:], '', scope, OBJECT_TYPE_RESOURCE))
+    ordinal = 1
+    for child in p.childNodes:
+        if child.nodeType == p.COMMENT_NODE:
+            continue
+        object, objectType = getObject(child)
+        model.add( Statement( listID, RDF_MS_BASE+'_' + str(ordinal), object, '', scope, objectType))
+        ordinal += 1
     
 def addResource(model, scope, resource, resourceElem, rxNSPrefix,nsMap, thisResource, noStmtIds=False):
     '''
@@ -147,7 +157,7 @@ def addResource(model, scope, resource, resourceElem, rxNSPrefix,nsMap, thisReso
         else:
             predicate = getURIFromElementName(p, nsMap)
         id = getAttributefromQName(p, rxNSPrefix, RX_STMTID_ATTRIB)
-        if not id: id = getAttributefromQName(p, rxNSPrefix, RX_STMTID_ATTRIB)
+        if not id: id = p.getAttributeNS(EMPTY_NAMESPACE, RX_STMTID_ATTRIB)
         if id and noStmtIds:
             raise RX_STMTID_ATTRIB + ' attribute found at illegal location'
         if not id: id = ''
@@ -167,9 +177,14 @@ def addResource(model, scope, resource, resourceElem, rxNSPrefix,nsMap, thisReso
             if not listID:
                 listID = RxPath.generateBnode()
             model.add( Statement(resource, predicate, listID, id, scope, OBJECT_TYPE_RESOURCE))
-            addList2Model(model, resource, p, listID, id, scope,
-                          lambda elem: getObject(elem, rxNSPrefix,nsMap,thisResource))
-            #todo support container listTypes (bag, etc.)
+            listType = getAttributefromQName(p, rxNSPrefix, 'listType')
+            if not listID:
+                listType = p.getAttributeNS(EMPTY_NAMESPACE, 'listType')
+            getObjectFunc = lambda elem: getObject(elem, rxNSPrefix,nsMap,thisResource)
+            if not listType or listType == 'rdf:List':
+                addList2Model(model, resource, p, listID, scope, getObjectFunc)
+            else:
+                addContainer2Model(model, resource, p, listID, scope, getObjectFunc, listType)
             continue
         elif not p.childNodes: #if no child we assume its an empty literal
             object, objectType = "", OBJECT_TYPE_LITERAL            
@@ -182,7 +197,7 @@ def addResource(model, scope, resource, resourceElem, rxNSPrefix,nsMap, thisReso
 
 #todo special handling for bNode prefix (either in or out or both)
 def addRxdom2Model(rootNode, model, nsMap = None, rdfdom = None, thisResource = None,  scope = ''):
-    '''given a DOM of a RXML document, iterate through it, adding its statements to the specified output RDF model    
+    '''given a DOM of a RXML document, iterate through it, adding its statements to the specified 4Suite model    
     Note: no checks if the statement is already in the model
     '''
     if nsMap is None:
@@ -240,20 +255,41 @@ def addRxdom2Model(rootNode, model, nsMap = None, rdfdom = None, thisResource = 
             resources = [ resource ]
         for resource in resources:
             addResource(model, scope, resource, s, rxNSPrefix,nsMap,thisResource, len(resources) > 1)        
-        
-def getResourceNameFromURI(namespaceURI, revNsMap, rxPrefix):
-    prefixURI, rest = RxPath.splitUri(namespaceURI)
-    #print 'spl %s %s %s' % (namespaceURI, prefixURI, rest)
-    #print revNsMap
-    if rest and revNsMap.has_key(prefixURI): 
-        prefix = revNsMap[prefixURI]
-        return prefix + ':' + rest
-    else:
-        return rxPrefix + 'resource id="' + namespaceURI + '"'
-    
+    return nsMap
+            
 def getRXAsRhizmlFromNode(resourceNodes, nsMap=None, includeRoot = False,
-                         INDENT = '    ', NL = '\n', INITINDENT=' ', rescomment=''):
+                         INDENT = '    ', NL = '\n', INITINDENT=' ', rescomment='', fixUp=None):
     '''given a nodeset of RxPathDom nodes, return RXML serialization in Rhizml markup format'''    
+    def getResourceNameFromURI(resNode):
+        namespaceURI = resNode.getAttributeNS(RDF_MS_BASE, 'about')
+        prefixURI, rest = RxPath.splitUri(namespaceURI)
+        #print 'spl %s %s %s' % (namespaceURI, prefixURI, rest)
+        #print revNsMap        
+        if not rest:
+            printResourceElem = True
+        elif revNsMap.has_key(prefixURI):
+            printResourceElem = False
+        elif resNode.ownerDocument.nsRevMap.has_key(prefixURI):
+            prefix = resNode.ownerDocument.nsRevMap[prefixURI]
+            nsMap[prefix] = prefixURI
+            revNsMap[prefixURI] = prefix
+            printResourceElem = False
+        else:
+            printResourceElem = True
+            
+        if not printResourceElem: 
+            prefix = revNsMap[prefixURI]
+            retVal = prefix + ':' + rest
+            if fixUp:
+                retVal = fixUp % utils.kw2dict(uri=namespaceURI,
+                    encodeduri=urllib.quote(namespaceURI), res=retVal)
+        else:        
+            if fixUp:
+                namespaceURI = fixUp % utils.kw2dict(uri=namespaceURI,
+                    encodeduri=urllib.quote(namespaceURI), res=namespaceURI)
+            retVal = rxPrefix + 'resource id="' + namespaceURI + '"'
+        return retVal
+
     def outputPredicate(predNode, indent):
         if revNsMap.has_key(predNode.namespaceURI):
             prefix = revNsMap[predNode.namespaceURI]
@@ -271,34 +307,36 @@ def getRXAsRhizmlFromNode(resourceNodes, nsMap=None, includeRoot = False,
         assert len(predNode.childNodes) == 1        
         if  predNode.childNodes[0].nodeType == predNode.TEXT_NODE:
             line += ': '
-            line += quoteString(predNode.childNodes[0].nodeValue) + NL #todo: datatype, xml literal
+            line += doQuote(predNode.childNodes[0].nodeValue) + NL #todo: datatype, xml literal
         else:
             object = predNode.childNodes[0]
             isList = object.isCompound()
             if isList:
                 line += ' '+rxPrefix+'list="' + object.getAttributeNS(RDF_MS_BASE, 'about') + '"'
-
+                isList = isList[len(RDF_MS_BASE):]
+                if isList != 'List':
+                    assert isList in ['Alt', 'Seq', 'Bag'], 'isList should not be ' + isList
+                    line += ' '+rxPrefix+'listType="rdf:' + isList + '"'
+                    
             line += ': '
             line += NL
             indent += INDENT
 
-            if isList == RDF_MS_BASE+'List': #is the object a list resource?
+            if isList: #is the object a list resource?
                 for li in [p.childNodes[0] for p in object.childNodes\
-                        if p.stmt.predicate == RDF_MS_BASE+'first']:            
+                        if p.stmt.predicate in [RDF_MS_BASE+'first', RDF_MS_BASE+'li']]:   
                     if li.nodeType == li.TEXT_NODE: #todo: datatype, xml literal
-                        line += indent + rxPrefix + RX_LITERALELEM + ':'+ quoteString(li.nodeValue) + NL
+                        line += indent + rxPrefix + RX_LITERALELEM + ':'+ doQuote(li.nodeValue) + NL
                     elif li.nodeType == li.ELEMENT_NODE: 
-                        line += indent + getResourceNameFromURI(
-                            li.getAttributeNS(RDF_MS_BASE, 'about'),revNsMap,rxPrefix) + NL
-            #todo: elif isList in [rdf:seq, rdf:alt, rdf:bag]:
-                #set listType
-                #for p.stmt.predicate == 'rdf:li' #handle containers
+                        line += indent + getResourceNameFromURI(li) + NL
             else:
-                line += indent + getResourceNameFromURI(
-                    object.getAttributeNS(RDF_MS_BASE, 'about'),revNsMap,rxPrefix) + NL
+                line += indent + getResourceNameFromURI(object) + NL
                 
         return line
-
+    if fixUp: #if fixUp we assume we're outputing xml/html not rhizml
+        doQuote = utils.htmlQuote
+    else:
+        doQuote = quoteString
     if nsMap is None:
       nsMap = { 'bNode': BNODE_BASE,
                 RX_META_DEFAULT : RX_NS
@@ -322,8 +360,7 @@ def getRXAsRhizmlFromNode(resourceNodes, nsMap=None, includeRoot = False,
     #print resourceNodes
     for resourceNode in resourceNodes:
         #print resourceNode
-        line += indent + getResourceNameFromURI(
-            resourceNode.getAttributeNS(RDF_MS_BASE, 'about'),revNsMap,rxPrefix) + ':'
+        line += indent + getResourceNameFromURI(resourceNode) + ':'
         if rescomment:
             line += ' ;'+ rescomment
         line += NL
@@ -339,7 +376,16 @@ def getRXAsRhizmlFromNode(resourceNodes, nsMap=None, includeRoot = False,
 
     return root + prefixes + line
 
-def rx2model(path, url=None, debug=0, nsMap = None):    
+def rxml2RxPathDOM(path, url=None, debug=0, nsMap = None):
+    outputModel, db, nsMap = rx2model(path, url, debug, nsMap)
+    #todo: bug! revNsMap doesn't work with 2 prefixes one ns
+    revNsMap = dict(map(lambda x: (x[1], x[0]), nsMap.items()) )#uri to prefix namespace map    
+    return RxPath.createDOM(RxPath.FtModel(outputModel), revNsMap)
+
+def rx2model(path, url=None, debug=0, nsMap = None):
+    '''
+    Parse the RxML and returns a 4Suite model containing its statements.
+    '''
     from Ft.Lib import Uri
     from Ft.Xml import Domlette
 
@@ -356,14 +402,14 @@ def rx2model(path, url=None, debug=0, nsMap = None):
     import Ft.Rdf.Model
     outputModel = Ft.Rdf.Model.Model(db)
     
-    addRxdom2Model(doc, outputModel, nsMap = nsMap, thisResource='wikiwiki:')
-    return outputModel, db
+    nsMap = addRxdom2Model(doc, outputModel, nsMap = nsMap, thisResource='wikiwiki:')
+    return outputModel, db, nsMap
 
 def rx2statements(path, url=None, debug=0, nsMap = None):
     '''
-    given a rxml file return a list of tuples like (subject, predicate, object, statement id, scope, objectType)
+    Given a rxml file return a list of tuples like (subject, predicate, object, statement id, scope, objectType)
     '''
-    model, db = rx2model(path, url, debug, nsMap)
+    model, db, nsMap = rx2model(path, url, debug, nsMap)
     stmts = db._statements['default'] #get statements directly, avoid copying list
     return stmts
     
@@ -389,7 +435,8 @@ def rhizml2nt(stream=None, contents=None, debug=0, nsMap = None, addRootElement=
             
 if __name__ == '__main__':                     
     if len(sys.argv) < 2:
-        print '''usage:
+        print '''        
+usage:
    -n|-r filepath
    -n given an RxML/XML file output RDF in NTriples format
    -r given an RDF file (.rdf, .nt or .mk) convert to RxML/RhizML

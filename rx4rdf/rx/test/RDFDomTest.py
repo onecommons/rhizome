@@ -102,6 +102,15 @@ class RDFDomTestCase(unittest.TestCase):
                u'http://purl.org/dc/elements/1.1/#':u'dc',
                }
         self.rdfDom = RDFDoc(self.model, self.nsMap)
+
+    def getModel(self, source, type='nt'):
+        model = self.loadFtModel(source, type)
+        #self.model = self.loadRedlandModel(source, type)
+        self.nsMap = {u'http://rx4rdf.sf.net/ns/archive#':u'arc',
+               u'http://www.w3.org/2002/07/owl#':u'owl',
+               u'http://purl.org/dc/elements/1.1/#':u'dc',
+               }
+        return RDFDoc(model, self.nsMap)
        
     def tearDown(self):
         pass
@@ -128,12 +137,12 @@ class RDFDomTestCase(unittest.TestCase):
         #test recursive elements        
         xpath = "/*[wiki:name/text()='HomePage']/a:has-expression/*/a:hasContent/text()"
         res4 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-        
         start = time.time()        
         xpath = "/*[.='urn:sha:XPmK/UXVwPzgKryx1EwoHtTMe34=']/a:hasContent/text()"
         res5 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-        print time.time() - start
-        self.failUnless(res4 == res5)
+        #print time.time() - start
+        #they have the same string value but occupy different positions in the tree
+        self.failUnless(res4[0] != res5[0] and res4[0].data == res5[0].data)
 
     def timeXPath(self):
         self.loadModel(cStringIO.StringIO(self.model1) )
@@ -168,8 +177,7 @@ class RDFDomTestCase(unittest.TestCase):
                 
         xpath = "//rdf:type"        
         res4 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-        #print res4
-        self.failUnless(len(res4)==8) #todo: why 8?
+        self.failUnless(len(res4)==5) 
 
         self.rdfDom.globalRecurseCheck = 1
         PrettyPrint(self.rdfDom) #Xml.Lib.Print.Nss.seek() causes infinite regress
@@ -179,14 +187,13 @@ class RDFDomTestCase(unittest.TestCase):
         self.loadModel("about.rx.nt")
         xpath = "*/wiki:revisions/*"
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-        
-        xpath = "(*/wiki:revisions/*//a:contents)[last()]"
+       
+        xpath = "(*/wiki:revisions/*/rdf:first/*//a:contents)[last()]"
         res2 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         
-        xpath = "(*/wiki:revisions/*//a:contents)"
+        xpath = "(*/wiki:revisions/*/rdf:first/*//a:contents)"
         res3 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-        print res2
-        print res3
+ 
         self.failUnless(res2[-1] == res3[-1])        
 
         #print 'cmp test', res1[0], res2[0]
@@ -194,7 +201,7 @@ class RDFDomTestCase(unittest.TestCase):
 
     def testLists(self):
         self.loadModel("about.rx.nt")
-        xpath = "*/wiki:revisions/*/rdf:first/@listID='http://4suite.org/rdf/banonymous/xc52aaabe-6b72-42d1-8772-fcb90303c24b_5'"
+        xpath = "*/wiki:revisions/*/rdf:first/@listID='http://4suite.org/rdf/anonymous/xc52aaabe-6b72-42d1-8772-fcb90303c24b_5'"
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)        
         self.failUnless( res1 )
 
@@ -210,9 +217,76 @@ class RDFDomTestCase(unittest.TestCase):
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless( len(res1)==0 )
 
-        xpath = "*[wiki:name='about']/wiki:revisions/*/rdf:first[2]='http://4suite.org/rdf/banonymous/x467ce421-1a30-4a2f-9208-0a4b01cd0da1_9'"
+        xpath = "*[wiki:name='about']/wiki:revisions/*/rdf:first[2]='http://4suite.org/rdf/anonymous/x467ce421-1a30-4a2f-9208-0a4b01cd0da1_9'"
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless( res1 )
+
+    def testDiff(self):
+        self.loadModel("about.rx.nt")
+        updateDom = self.getModel("about.diff1.nt")
+        updateNode = updateDom.findSubject('http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2')
+        self.failUnless( updateNode )
+        added, removed, reordered = diffResources(self.rdfDom, [updateNode])
+        #nothing should have changed
+        self.failUnless( not added and not removed and not reordered )
+
+        updateDom = self.getModel("about.diff2.nt")
+        updateNode = updateDom.findSubject('http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2')
+        self.failUnless( updateNode )
+        added, removed, reordered = diffResources(self.rdfDom, [updateNode])
+        #print added, removed, reordered
+        #we've add and removed one non-list statement and changed the first list item (and so 1 add, 1 remove)
+        self.failUnless( len(added) == len(removed) == len(reordered) ==
+            len(reordered.values()[0][0]) == len(reordered.values()[0][1]) == 1)
+
+        updateDom = self.getModel("about.diff3.nt")
+        updateNode = updateDom.findSubject('http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2')
+        self.failUnless( updateNode )
+        added, removed, reordered = diffResources(self.rdfDom, [updateNode])
+        #with this one we've just re-ordered the list, so no statements should be listed as added or removed
+        self.failUnless(reordered and len(reordered.values()[0][0]) == len(reordered.values()[0][1]) == 0)
+        
+    def _mergeAndUpdate(self, updateDom, resources):
+        statements, nodesToRemove = mergeDOM(self.rdfDom, updateDom ,resources)
+        #print 'res'; pprint( (statements, nodesToRemove) )
+        
+        #delete the statements or whole resources from the dom:            
+        for node in nodesToRemove:
+            node.parentNode.removeChild(node)
+        #and add the statements
+        addStatements(self.rdfDom, statements)
+        return statements, nodesToRemove
+
+    def testMerge(self):
+        self.loadModel("about.rx.nt")
+        updateDom = self.getModel("about.diff1.nt")
+        statements, nodesToRemove = mergeDOM(self.rdfDom, updateDom ,
+            ['http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2'])                
+        #nothing should have changed
+        self.failUnless( not statements and not nodesToRemove )
+
+        self.loadModel("about.rx.nt")
+        updateDom = self.getModel("about.diff2.nt")
+        #we've added and removed one non-list statement and changed the first list item
+        statements, nodesToRemove = self._mergeAndUpdate(updateDom ,
+            ['http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2'])
+        self.failUnless( statements and nodesToRemove )
+        #merge in the same updateDom in again, this time there should be no changes
+        statements, nodesToRemove = self._mergeAndUpdate(updateDom ,
+            ['http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2'])
+        self.failUnless( not statements and not nodesToRemove )
+
+        self.loadModel("about.rx.nt")        
+        updateDom = self.getModel("about.diff3.nt")
+        #with this one we've just re-ordered the list,
+        statements, nodesToRemove = self._mergeAndUpdate(updateDom ,
+            ['http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2'])
+        self.failUnless( statements and nodesToRemove )
+        #merge in the same updateDom in again, this time there should be no changes
+        statements, nodesToRemove = self._mergeAndUpdate(updateDom ,
+            ['http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2'])
+        self.failUnless( not statements and not nodesToRemove )
+        
         
     def testXUpdate(self):       
         '''test xupdate'''
@@ -284,6 +358,7 @@ class RDFDomTestCase(unittest.TestCase):
                     </x:stylesheet>'''
 
         result = applyXslt(self.rdfDom, xslStylesheet)
+        #print result
         #todo assert something!
         #print 'XLST2 ', result
         #PrettyPrint(self.rdfDom)
@@ -339,8 +414,9 @@ class RDFDomTestCase(unittest.TestCase):
          
         </xsl:stylesheet>
         '''
-      
+
         result = applyXslt(self.rdfDom, xslStylesheet)
+        print result
         #d = difflib.Differ()
         #print list(d.compare(result,outputXml)) #list of characters, not lines!
         self.failUnless( result == file('testXslt1.xml').read(),'xml output does not match')

@@ -1,0 +1,24 @@
+ prefixes:
+     wiki: `http://rx4rdf.sf.net/ns/wiki#
+     a: `http://rx4rdf.sf.net/ns/archive#
+     bnode: `http://4suite.org/rdf/anonymous/
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+     rdf: `http://www.w3.org/1999/02/22-rdf-syntax-ns#
+     rdfs: `http://www.w3.org/2000/01/rdf-schema#
+     auth: `http://rx4rdf.sf.net/ns/auth#
+     base: `%(base)s
+
+ ;creates a new document type
+
+ ;The document type of a page is the XML vocabulary used in the page
+ ;It determines which stylesheet will be invoked to render the page
+ ;(determined by the wiki:handles-doctype property).
+ 
+ ;(you probably want to rename the resource id to something like base:myDocType)
+ bnode:newDocType: 
+     rdf:type: 
+         wiki:DocType
+                 
+     ;this name shows up in the Output Document Type drop-down on the edit page
+     rdfs:label: `Document Type Name
+     

@@ -1,0 +1,23 @@
+ prefixes:
+     wiki: `http://rx4rdf.sf.net/ns/wiki#
+     a: `http://rx4rdf.sf.net/ns/archive#
+     bnode: `http://4suite.org/rdf/anonymous/
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+     rdf: `http://www.w3.org/1999/02/22-rdf-syntax-ns#
+     rdfs: `http://www.w3.org/2000/01/rdf-schema#     
+     auth: `http://rx4rdf.sf.net/ns/auth#
+     base: `%(base)s
+
+ ;creates a new disposition
+
+ ;the disposition of a page determines which page template is used 
+ ;to display the page (determined by the wiki:handles-disposition property)
+ 
+ ;(you probably want to rename the resource id to something like base:myDisposition)
+ bnode:newItemDisposition: 
+     rdf:type: 
+         wiki:ItemDisposition
+         
+     ;this name shows up in the Item Type drop-down on the edit page
+     rdfs:label: `Disposition Name
+     

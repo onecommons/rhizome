@@ -9,11 +9,15 @@
 #see docs/RacoonConfig for documentation on config file settings
 
 import rx.rhizome
+from rx import rxml
+
 if not hasattr(__server__, 'rhizome') or not __server__.rhizome: #make executing this config file idempotent
     rhizome = rx.rhizome.Rhizome(__server__)
     __server__.rhizome = rhizome
 else:
     rhizome = __server__.rhizome
+
+RHIZOME_APP_ID = "Rhizome 0.3" #don't change this unless you have a good reason
 
 rhizome.BASE_MODEL_URI = locals().get('BASE_MODEL_URI', __server__.BASE_MODEL_URI)
 MAX_MODEL_LITERAL = 0 #will save all content to disk
@@ -24,50 +28,58 @@ MAX_MODEL_LITERAL = 0 #will save all content to disk
 
 #map the request to a resource in the model, finds 1st match, context is root
 resourceQueries=[
-'/a:NamedContent[wiki:name=$_name]',  #view the resource
-#'/wiki:Alias[wiki:name=$_name]/wiki:alias-of/*',  #view the resource
-"xf:if(starts-with($_name,'users-'), /*[wiki:login-name=substring($_name, 7)] )", #treat anything under /users/ as user
+'/*[.=$about]',  #view any resource by its RDF URI reference
+'/a:NamedContent[wiki:name=$_name]',  #give NamedContent priority 
+'/*[wiki:name=$_name]',  #view any other type by its wiki:name
+'/*[wiki:alias=$_name]',  #view the resource
 #name not found, see if there's an external file on the Racoon path with this name:
 '''wf:if(wf:file-exists($_name), "wf:assign-metadata('externalfile', wf:string-to-nodeset($_name))")''',
 "/*[wiki:name='_not_found']", #invoke the not found page 
 ]
 
 #now see if we're authorized to handle this request
-#if we're not, the resource context will be set to _not_authorized
 #2 checks:
 #1. super-user can always get in
-#2. if either the resource or an authorization group it belongs to requires an auth token,
-#   make sure the user or one of its roles has that token
-authorizationQuery = '''xf:if ( not($_user/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser') and 
-    count(./auth:needs-token/auth:AccessToken[auth:has-permission=$authAction] | ./auth:member-of/*/auth:needs-token/auth:AccessToken[auth:has-permission=$authAction])
-!= count( (./auth:needs-token/auth:AccessToken[auth:has-permission=$authAction] | ./auth:member-of/*/auth:needs-token/auth:AccessToken[auth:has-permission=$authAction])
-    [.=$_user/auth:has-token/* or .=$_user/auth:has-role/*/auth:has-token/*] ), %s)'''
+#2. select all the resource's access tokens that apply to the current action 
+#   and see if the user or one of its roles has rights to any of them
 
+filterTokens = '''auth:guarded-by/auth:AccessToken[auth:has-permission=$__authAction]
+  [not($__authProperty) or not(auth:with-property) or auth:with-property=$__authProperty]
+  [not($__authValue) or not(auth:with-value) or auth:with-value=$__authValue]'''
+
+findTokens = '''(./%(filterTokens)s  | ./rdf:type/*/%(filterTokens)s)''' % locals()
+
+#note: save.xml and edit.xsl have expressions that you may need to change if you change this expression
+rhizome.authorizationQuery = locals().get('unAuthorizedExpr', '''not($__user/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser') and
+  wf:max(%(findTokens)s/auth:priority, 0) > 
+  wf:max(%(findTokens)s[.=$__user/auth:has-rights-to/* or .=$__user/auth:has-role/*/auth:has-rights-to/*]/auth:priority,0)''' % locals())
+ 
 #now find a resource that will be used to display the resource
 contentHandlerQueries= [
 #if the request has an action associated with it
-'/*[wiki:handles-action=$authAction][wiki:action-for-type = $_context/rdf:type]', #[compatibleTypes(wiki:action-for-type/*,$_context/rdf:type/*)]',
+'/*[wiki:handles-action=$__authAction][wiki:action-for-type = $__context/rdf:type]', #[compatibleTypes(wiki:action-for-type/*,$__context/rdf:type/*)]',
+"xf:if(not(self::text()), /*[wiki:handles-action=$__authAction][wiki:action-for-type='http://rx4rdf.sf.net/ns/wiki#Any'])", #get the default handler
 #if the resource is content
 'self::a:NamedContent',
 #if the resource is set to the Unauthorized resource select the unauthorized page
 "xf:if(self::auth:Unauthorized, /*[wiki:name='_not_authorized'])",
-#default for any real resource (i.e. an resource element)
+#default if nothing matches for any real resource (i.e. an resource element)
 "xf:if(not(self::text()), /*[wiki:name='default-resource-viewer'])"
 ]
 
 #context is now a content resource, now set the context to a version of the resource
 revisionQueries=[
 '(wiki:revisions/*/rdf:first/*)[number($revision)]', #view a particular revision e.g. mypage.html?revision=3
-'(wiki:revisions/*/rdf:first/*[wiki:has-label=$_label])[last()]', #view a particular label if specified
-'(wiki:revisions/*/rdf:first/*[wiki:has-label="released"])[last()]', #get the released version
+'(wiki:revisions/*/rdf:first/*)[wiki:has-label/*/rdfs:label=$_label][last()]', #view a particular label if specified
+'(wiki:revisions/*/rdf:first/*)[wiki:has-label/*/wiki:is-released][last()]', #get the released version
 '(wiki:revisions/*/rdf:first/*)[last()]', #get the last revision
 ]
 
 #finally have a resource, get its content
 contentQueries=[
 #'''wf:if(a:contents/a:ContentCollection, "wf:assign-metadata('REDIRECT', 'dir.xsl')")''', #todo
-'.//a:contents/text()',
-'wf:openurl( .//a:contents/a:ContentLocation/wiki:alt-contents)', #contents stored externally (higher priority)
+'.//a:contents/text()', #content stored in model
+'wf:openurl( .//a:contents/a:ContentLocation/wiki:alt-contents)', #contents externally editable (higher priority)
 'wf:openurl( .//a:contents/a:ContentLocation)', #contents stored externally
 'wf:openurl(wf:ospath2pathuri($externalfile))', #external file
 ]
@@ -88,36 +100,39 @@ templateQueries=[
 #'''/*[wiki:name='_default-template']''', #todo??
 ]
 
-findResourceAction = Action(resourceQueries)
-#we want the first Action to set the $_user variable
-findResourceAction.assign("_user", '/wiki:User[wiki:login-name=$session:login]',
+rhizome.findResourceAction = findResourceAction = Action(resourceQueries)
+#we want the first Action to set the $__user variable
+findResourceAction.assign("__user", '/wiki:User[wiki:login-name=$session:login]',
                          "/wiki:User[wiki:login-name='guest']")
-findResourceAction.assign("_resource", '.', post=True)
+findResourceAction.assign("__resource", '.', post=True)
+#if we matched a resource via an alias, reassign the _name to the main name not the alias 
+findResourceAction.assign("_name", "string(self::*[wiki:alias=$_name]/wiki:name)", "$_name", post=True)
 
-resourceAuthorizationAction = Action( [authorizationQuery % '/auth:Unauthorized'] )
+#if we're not authorized, the resource context will be set to _not_authorized
+rhizome.resourceAuthorizationAction = Action( ['''xf:if (%s, /auth:Unauthorized)''' % rhizome.authorizationQuery] )
 #default to 'view' if not specified
-resourceAuthorizationAction.assign("authAction", 'concat("http://rx4rdf.sf.net/ns/wiki#action-",$action)', "'http://rx4rdf.sf.net/ns/wiki#action-view'") 
-
+rhizome.resourceAuthorizationAction.assign("__authAction", 'concat("http://rx4rdf.sf.net/ns/wiki#action-",$action)', "'http://rx4rdf.sf.net/ns/wiki#action-view'") 
+rhizome.resourceAuthorizationAction.assign("__authProperty", '0')
+rhizome.resourceAuthorizationAction.assign("__authValue", '0')
 #revisionAuthorizationAction = Action( [authorizationQuery % "/*[wiki:name='_not_authorized']/wiki:revisions/*[last()]"] )
 
 rhizome.findRevisionAction = Action(revisionQueries)
-findResourceAction.assign("_label", '$label', '$session:label', "'released'")
+rhizome.findRevisionAction.assign("_label", '$label', '$session:label', "'Released'")
 
 rhizome.findContentAction = Action(contentQueries, lambda result, kw, contextNode, retVal, self=__server__:\
                                   self.getStringFromXPathResult(result), requiresContext = True) #get its content
 rhizome.processContentAction = Action(encodingQueries, __server__.processContents,
-                                      matchFirst = False, forEachNode = True,
-                                      cachePredicate=__server__.getProcessContentsCachePredicate,
-                                      sideEffectsFunc=__server__.getProcessContentsSideEffectsFunc,
-                                      sideEffectsPredicate=__server__.getProcessContentsSideEffectsPredicate) #process the content 
+                                      matchFirst = False, forEachNode = True) #process the content 
 
 templateAction = Action(templateQueries, rhizome.processTemplateAction)
 #setup these variables to give content a chance to have dynamically set them
 templateAction.assign("_doctype", '$_doctype', "wiki:doctype/*")
 templateAction.assign("_disposition", '$_disposition', "wiki:item-disposition/*")
+templateAction.assign('response-header:content-type', '$response-header:content-type', 
+   'string(/*[.=$_doctype]/a:content-type)', 'string(/*[.=$__lastFormat]/a:content-type)')
 
 handleRequestSequence = [ findResourceAction, #first map the request to a resource
-      resourceAuthorizationAction, #see if the user is authorized to access it                          
+      rhizome.resourceAuthorizationAction, #see if the user is authorized to access it                          
       Action(contentHandlerQueries), #find a resource that can display this resource
       rhizome.findRevisionAction, #get the appropriate revision
       #revisionAuthorizationAction, #see if the user is authorized for this revision #todo
@@ -160,48 +175,57 @@ cmd_usage = '''\n\nrhizome-config.py specific:
 from rx import rhizml
 contentProcessors = {
     'http://rx4rdf.sf.net/ns/content#pydiff-patch-transform':
-        lambda self, contents, kw, result, context, rhizome=rhizome: rhizome.processPatch(contents, kw, result),
+        lambda result, kw, contextNode, contents, rhizome=rhizome: rhizome.processPatch(contents, kw, result),
     #this stylesheet transforms kw['_contents'] not the rdf model
-    'http://www.w3.org/1999/XSL/Transform' : lambda self, contents, kw, result, context:\
+    'http://www.w3.org/1999/XSL/Transform' : lambda result, kw, contextNode, contents, self=__server__:\
         self.processXslt(contents, kw['_contents'], kw, uri=self.evalXPath( 
-            'concat("site:///", (/a:NamedContent[wiki:revisions/*/*[.=$_context]]/wiki:name)[1])',node=context) ), 
+            'concat("site:///", (/a:NamedContent[wiki:revisions/*/*[.=$__context]]/wiki:name)[1])',node=contextNode) ), 
     'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
-        lambda self, contents, kw, result, context, rhizml=rhizml, mmf=rx.rhizome.MarkupMapFactory(): rhizml.rhizmlString2xml(contents,mmf)
+        lambda result, kw, contextNode, contents, rhizome=rhizome: rhizome.processRhizml(contents, kw),
+    'http://rx4rdf.sf.net/ns/wiki#item-format-custom': 
+        lambda result, kw, contextNode, contents, rhizome=rhizome: rhizome.customProcessor(contents, kw),
 }
 
+customProcessor = rhizome.customProcessor
+
 contentProcessorCachePredicates = {
-    'http://www.w3.org/1999/XSL/Transform' : lambda self, result, kw, contextNode,
-      contents:\
+    'http://www.w3.org/1999/XSL/Transform' : lambda result, kw, contextNode, contents, self=__server__:\
           self.partialXsltCacheKeyPredicate(contents, kw['_contents'], kw, contextNode, self.evalXPath( 
-            'concat("site:///", (/a:NamedContent[wiki:revisions/*/*[.=$_context]]/wiki:name)[1])',
+            'concat("site:///", (/a:NamedContent[wiki:revisions/*/*[.=$__context]]/wiki:name)[1])',
             node=contextNode)) , 
     
     'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
-        lambda self, result, kw, contextNode, contents: contents #the key is just the contents
+        lambda result, kw, contextNode, contents: contents #the key is just the contents
 }
 
 contentProcessorSideEffectsFuncs = {
-    'http://www.w3.org/1999/XSL/Transform' : __server__.__class__.xsltSideEffectsFunc  }
+    'http://www.w3.org/1999/XSL/Transform' : __server__.xsltSideEffectsFunc,  
+    'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
+    lambda cacheValue, sideEffects, resultNodeset, kw, contextNode, contents, \
+        rhizome=rhizome: rhizome.processRhizmlSideEffects(kw)
+    }
+    
 contentProcessorSideEffectsPredicates = {
-    'http://www.w3.org/1999/XSL/Transform' :  __server__.__class__.xsltSideEffectsCalc }
+    'http://www.w3.org/1999/XSL/Transform' :  __server__.xsltSideEffectsCalc }
 
-from rx import rxml
-def getrxrxity(context, resultset = None, comment = '', rxml = rxml):
-      if resultset is None:
-            [ node ] = context.node
-      return rxml.getRXAsRhizmlFromNode(resultset, rescomment = comment)
-     
 extFunctions = {
-(RXWIKI_XPATH_EXT_NS, 'get-rdf-as-rhizml'): getrxrxity,
+(RXWIKI_XPATH_EXT_NS, 'get-rdf-as-rhizml'): rhizome.getRxML,
 (RXWIKI_XPATH_EXT_NS, 'get-contents'): rhizome.getContents,
+(RXWIKI_XPATH_EXT_NS, 'save-metadata'): rhizome.saveMetadata,
 (RXWIKI_XPATH_EXT_NS, 'generate-patch'): rhizome.generatePatch,
 (RXWIKI_XPATH_EXT_NS, 'save-contents'): rhizome.saveContents,
 (RXWIKI_XPATH_EXT_NS, 'get-nameURI'): rhizome.getNameURI,
+(RXWIKI_XPATH_EXT_NS, 'has-page'): rhizome.hasPage,
+(RXWIKI_XPATH_EXT_NS, 'secure-hash'): rhizome.getSecureHash,
+(RXWIKI_XPATH_EXT_NS, 'get-rhizml'): lambda context, contents,\
+    rhizml=rhizml, mmf=rhizome.mmf: rhizml.rhizmlString2xml(contents,mmf),
 }
 
 NOT_CACHEABLE_FUNCTIONS = {
     (RXWIKI_XPATH_EXT_NS, 'generate-patch'): 0,
+    (RXWIKI_XPATH_EXT_NS, 'save-metadata'): 0,
     (RXWIKI_XPATH_EXT_NS, 'save-contents'): 0,
+    (RXWIKI_XPATH_EXT_NS, 'has-page'): 0,
 }
 
 STORAGE_PATH = "./wikistore.nt"
@@ -209,152 +233,328 @@ STORAGE_PATH = "./wikistore.nt"
 #from rx import RxPath
 #initModel = RxPath.initRedlandHashBdbModel
 
-configHook = rhizome.configHook
+MODEL_RESOURCE_URI = rhizome.BASE_MODEL_URI
+MODEL_UPDATE_PREDICATE = 'http://rx4rdf.sf.net/ns/wiki#model-update-id'
 
+configHook = rhizome.configHook
+getPrincipleFunc = lambda kw: kw.get('__user', '')
+authorizeMetadata=rhizome.authorizeMetadata
+authorizeAdditions=rhizome.authorizeAdditions
+authorizeRemovals=rhizome.authorizeRemovals
+authPredicates=['http://www.w3.org/1999/02/22-rdf-syntax-ns#first', 
+ 'http://www.w3.org/1999/02/22-rdf-syntax-ns#li', 
+ 'http://rx4rdf.sf.net/ns/wiki#revisions', 
+ 'http://rx4rdf.sf.net/ns/archive#contents' ]
 ##############################################################################
 ## Define the template for a Rhizome site
 ##############################################################################
 
-templateList = rhizome.addItemTuple('_not_found',loc='path:_not_found.xsl', format='rxslt', disposition='entry')\
-+ rhizome.addItemTuple('edit',loc='path:edit.xsl', format='rxslt', disposition='entry', handlesAction=['edit'])\
-+ rhizome.addItemTuple('save',loc='path:save.xml', format='rxupdate', disposition='handler', handlesAction=['save', 'creation'])\
-+ rhizome.addItemTuple('confirm-delete',loc='path:confirm-delete.xsl', format='rxslt', disposition='entry', handlesAction=['confirm-delete'])\
-+ rhizome.addItemTuple('delete', loc='path:delete.xml', format='rxupdate', disposition='handler', handlesAction=['delete'])\
-+ rhizome.addItemTuple('basestyles.css',format='text', loc='path:basestyles.css')\
-+ rhizome.addItemTuple('edit-icon.png',format='binary',loc='path:edit.png')\
-+ rhizome.addItemTuple('list',loc='path:list-page.py', format='python', disposition='entry')\
-+ rhizome.addItemTuple('showrevisions',loc='path:showrevisions.xsl', format='rxslt', disposition='entry',handlesAction=['showrevisions'])\
-+ rhizome.addItemTuple('dump.xml', contents="print __requestor__.server.dump()", format='python')\
-+ rhizome.addItemTuple('item-disposition-handler-template',format='python', disposition='entry', handlesDisposition='handler',
-          contents="print '''<div class='message'>Completed <b>%(action)s</b> of <a href='%(itemname)s'><b>%(itemname)s<b></a>!</div>'''% _prevkw")\
-+ rhizome.addItemTuple('save-metadata',contents="__requestor__.server.rhizome.metadata_save(about, metadata)",
-                       format='python', disposition='handler', handlesAction=['save-metadata'])\
-+ rhizome.addItemTuple('edit-metadata',loc='path:edit-metadata.xsl', format='rxslt', disposition='entry', handlesAction=['edit-metadata'])\
-+ rhizome.addItemTuple('_not_authorized',contents="<div class='message'>Error. You are not authorized to perform this operation on this page.</div>",
-                  format='xml', disposition='entry')\
-+rhizome.addItemTuple('search', format='rxslt', disposition='complete', loc='path:search.xsl')\
-+rhizome.addItemTuple('login', format='rxslt', disposition='complete', loc='path:login.xsl')\
-+rhizome.addItemTuple('logout', format='rxslt', disposition='complete', loc='path:logout.xsl')\
-+rhizome.addItemTuple('signup', format='rxslt', disposition='entry', loc='path:signup.xsl',
-                      handlesAction=['edit', 'new'], actionType='http://rx4rdf.sf.net/ns/wiki#User')\
-+rhizome.addItemTuple('save-user', format='rxupdate', disposition='handler', loc='path:signup-handler.xml',
-                      handlesAction=['save', 'creation'], actionType='http://rx4rdf.sf.net/ns/wiki#User')\
-+ rhizome.addItemTuple('default-resource-viewer',format='python', disposition='entry',
-          contents="import rxml; _response.headerMap['content-type']='text/plain'; print rxml.getRXAsRhizmlFromNode(_resource)")
-#+ rhizome.addItemTuple('_default-template',loc='path:_default_template.xsl', disposition='template', format='rxslt')\
+templateList = [rhizome.addItemTuple('_not_found',loc='path:_not_found.xsl', format='rxslt', disposition='entry'),
+ rhizome.addItemTuple('edit',loc='path:edit.xsl', format='rxslt', disposition='entry', handlesAction=['edit']),
+ rhizome.addItemTuple('save',loc='path:save.xml', format='rxupdate', disposition='handler', handlesAction=['save', 'creation']),
+ rhizome.addItemTuple('confirm-delete',loc='path:confirm-delete.xsl', format='rxslt', disposition='entry', 
+                        handlesAction=['confirm-delete'], actionType='http://rx4rdf.sf.net/ns/wiki#Any'),
+ rhizome.addItemTuple('delete', loc='path:delete.xml', format='rxupdate', disposition='handler', 
+                        handlesAction=['delete'], actionType='http://rx4rdf.sf.net/ns/wiki#Any'),
+ rhizome.addItemTuple('basestyles.css',format='text', loc='path:basestyles.css'),
+ rhizome.addItemTuple('edit-icon.png',format='binary',loc='path:edit.png'),
+ #rhizome.addItemTuple('list',loc='path:list-pages.xsl', format='rxslt', disposition='entry'),
+ rhizome.addItemTuple('showrevisions',loc='path:showrevisions.xsl', format='rxslt', disposition='entry',handlesAction=['showrevisions']),
+ rhizome.addItemTuple('dump.xml', contents="dump", format='custom'),
+ rhizome.addItemTuple('item-disposition-handler-template',loc='path:item-disposition-handler.xsl', format='rxslt', 
+                        disposition='entry', handlesDisposition='handler'),
+ rhizome.addItemTuple('save-metadata',loc='path:save-metadata.xml', format='rxupdate', 
+      disposition='handler', handlesAction=['save-metadata'], actionType='http://rx4rdf.sf.net/ns/wiki#Any'),
+ rhizome.addItemTuple('edit-metadata',loc='path:edit-metadata.xsl', format='rxslt', disposition='entry', 
+            handlesAction=['edit-metadata', 'edit'], actionType='http://rx4rdf.sf.net/ns/wiki#Any'),
+ rhizome.addItemTuple('_not_authorized',contents="<div class='message'>Error. You are not authorized to perform this operation on this page.</div>",
+                  format='xml', disposition='entry'),
+rhizome.addItemTuple('search', format='rxslt', disposition='complete', loc='path:search.xsl'),
+rhizome.addItemTuple('login', format='rxslt', disposition='complete', loc='path:login.xsl'),
+rhizome.addItemTuple('logout', format='rxslt', disposition='complete', loc='path:logout.xsl'),
+rhizome.addItemTuple('signup', format='rxslt', disposition='entry', loc='path:signup.xsl',
+                      handlesAction=['edit', 'new'], actionType='http://rx4rdf.sf.net/ns/wiki#User'),
+rhizome.addItemTuple('save-user', format='rxupdate', disposition='handler', loc='path:signup-handler.xml',
+                      handlesAction=['save', 'creation'], actionType='http://rx4rdf.sf.net/ns/wiki#User'),
+rhizome.addItemTuple('default-resource-viewer',format='rxslt', disposition='entry', loc='path:default-resource-viewer.xsl',
+                    handlesAction=['view-metadata'], actionType='http://rx4rdf.sf.net/ns/wiki#Any'),
+rhizome.addItemTuple('preview', loc='path:preview.xsl', disposition='complete', format='rxslt'),
+rhizome.addItemTuple('wiki2html.xsl', loc='path:wiki2html.xsl', format='http://www.w3.org/1999/XSL/Transform', handlesDoctype='wiki'),
+rhizome.addItemTuple('intermap.txt',format='text', loc='path:intermap.txt'),
+rhizome.addItemTuple('dir', format='rxslt', disposition='entry', loc='path:dir.xsl',
+                      handlesAction=['view'], actionType='http://rx4rdf.sf.net/ns/wiki#Folder'),
+rhizome.addItemTuple('rxml-template-handler',loc='path:rxml-template-handler.xsl', format='rxslt', 
+                        disposition='entry', handlesDisposition='rxml-template'),               
+#administration pages
+rhizome.addItemTuple('administer', loc='path:administer.xsl', disposition='entry', format='rxslt', title="Administration"), 
+rhizome.addItemTuple('new-role-template', loc='path:new-role-template.txt', 
+            disposition='rxml-template', format='text', title='Create New Role'), 
+rhizome.addItemTuple('new-accesstoken-template', loc='path:new-accesstoken-template.txt', 
+            disposition='rxml-template', format='text', title='Create New Access Token'), 
+rhizome.addItemTuple('new-folder-template', loc='path:new-folder-template.txt', 
+            disposition='rxml-template', format='text', title='Create New Folder'), 
+rhizome.addItemTuple('new-label-template', loc='path:new-label-template.txt', 
+            disposition='rxml-template', format='text', title='Create New Label'), 
+rhizome.addItemTuple('new-disposition-template', loc='path:new-disposition-template.txt', 
+            disposition='rxml-template', format='text', title='Create New Disposition'), 
+rhizome.addItemTuple('new-doctype-template', loc='path:new-doctype-template.txt', 
+            disposition='rxml-template', format='text', title='Create New DocType'), 
+]
 
 #forrest templates, essentially recreates forrest/src/resources/conf/sitemap.xmap 
-templateList += rhizome.addItemTuple('faq2document.xsl', loc='path:faq2document.xsl', format='http://www.w3.org/1999/XSL/Transform', disposition='template', doctype='document', handlesDoctype='faq')\
-+ rhizome.addItemTuple('document2html.xsl', loc='path:document2html.xsl', format='http://www.w3.org/1999/XSL/Transform', disposition='entry', handlesDoctype='document')\
-+ rhizome.addItemTuple('site-template',loc='path:site-template.xsl', disposition='template', format='rxslt',handlesDisposition='entry')\
-+ rhizome.addItemTuple('spec2html.xsl', loc='path:spec2html.xsl', format='http://www.w3.org/1999/XSL/Transform', disposition='complete', handlesDoctype='specification')\
-+ rhizome.addItemTuple('docbook2document.xsl', loc='path:docbook2document.xsl', format='http://www.w3.org/1999/XSL/Transform', disposition='template', doctype='document', handlesDoctype='docbook')
-#+ rhizome.addItemTuple('todo2document.xsl', loc='path:todo2document.xsl', format='http://www.w3.org/1999/XSL/Transform', disposition='template', doctype='document', handlesDoctype='todo')\
+templateList += [rhizome.addItemTuple('faq2document.xsl', loc='path:faq2document.xsl', 
+    format='http://www.w3.org/1999/XSL/Transform', disposition='template', doctype='document', handlesDoctype='faq'),
+rhizome.addItemTuple('document2html.xsl', loc='path:document2html.xsl', 
+    format='http://www.w3.org/1999/XSL/Transform', disposition='entry', handlesDoctype='document'),
+rhizome.addItemTuple('site-template',loc='path:site-template.xsl', 
+    disposition='template', format='rxslt',handlesDisposition='entry'),
+rhizome.addItemTuple('spec2html.xsl', loc='path:spec2html.xsl', format='http://www.w3.org/1999/XSL/Transform', 
+    disposition='complete', handlesDoctype='specification'),
+rhizome.addItemTuple('docbook2document.xsl', loc='path:docbook2document.xsl', format='http://www.w3.org/1999/XSL/Transform', 
+    disposition='template', doctype='document', handlesDoctype='docbook')]
+#+ rhizome.addItemTuple('todo2document.xsl', loc='path:todo2document.xsl', format='http://www.w3.org/1999/XSL/Transform', disposition='template', doctype='document', handlesDoctype='todo'),
   
 #help and sample pages
-templateList += rhizome.addItemTuple('index',loc='path:index.txt', format='rhizml', disposition='entry', accessTokens=None)\
-+rhizome.addItemTuple('sidebar',loc='path:sidebar.txt', format='rhizml', accessTokens=None)\
-+rhizome.addItemTuple('TextFormattingRules',loc='path:TextFormattingRules.txt', format='rhizml', disposition='entry')\
-+rhizome.addItemTuple('MarkupFormattingRules',loc='path:MarkupFormattingRules.txt', format='rhizml', disposition='entry')\
-+rhizome.addItemTuple('RhizML',loc='path:RhizML.rz', format='rhizml', disposition='entry')\
-+rhizome.addItemTuple('SandBox', format='rhizml', disposition='entry', accessTokens=None,
-	contents="Feel free to [edit|?action=edit] this page to experiment with [RhizML]...")\
+templateList += [rhizome.addItemTuple('index',loc='path:index.txt', format='rhizml', disposition='entry', accessTokens=None),
+rhizome.addItemTuple('sidebar',loc='path:sidebar.txt', format='rhizml', accessTokens=None),
+rhizome.addItemTuple('TextFormattingRules',loc='path:TextFormattingRules.txt', format='rhizml', disposition='entry'),
+rhizome.addItemTuple('MarkupFormattingRules',loc='path:MarkupFormattingRules.txt', format='rhizml', disposition='entry'),
+rhizome.addItemTuple('RhizML',loc='path:RhizML.rz', format='rhizml', disposition='entry'),
+rhizome.addItemTuple('SandBox', format='rhizml', disposition='entry', accessTokens=None,
+	contents="Feel free to [edit|?action=edit] this page to experiment with [RhizML]...")]
 
 #add the authorization and authentification structure
-#uses one of two config settings: ADMIN_PASSWORD or ADMIN_PASSWORD_SHA (use the latter if you don't want to store the password in clear text)
-#otherwise default password is 'admin'
 
-adminShaPassword = locals().get('ADMIN_PASSWORD_SHA') #hex encoding of the sha1 digest
+#secureHashSeed is a string that is combined with plaintext when generating a secure hash of passwords
+#You really should set your own private value. If it is compromised, it will be much
+#easier to mount a dictionary attack on the password hashes.
+#If you change this all previously generated password hashes will no longer work.
+secureHashSeed = locals().get('secureHashSeed', 'YOU REALLY SHOULD CHANGE THIS!')
+
+passwordHashProperty  = locals().get('passwordHashProperty', rhizome.BASE_MODEL_URI+'password-hash')
+
+#uses one of two config settings: ADMIN_PASSWORD or ADMIN_PASSWORD_HASH
+#(use the latter if you don't want to store the password in clear text)
+#otherwise default password is 'admin'
+adminShaPassword = locals().get('ADMIN_PASSWORD_HASH') #hex encoding of the sha1 digest
 if not adminShaPassword:
     import sha
-    adminShaPassword = sha.sha( locals().get('ADMIN_PASSWORD','admin') ).hexdigest()    
+    adminShaPassword = sha.sha( locals().get('ADMIN_PASSWORD','admin')+ secureHashSeed ).hexdigest()    
+
 #rxml
 authStructure =\
 '''
- rx:resource
-   rdf:type: auth:Unauthorized
-   
- rx:resource id='%(base)susers-guest':
+ auth:Unauthorized:
+  rdf:type: auth:Unauthorized
+
+ auth:permission-remove-statement
+  rdf:type: auth:Permission
+ 
+ auth:permission-add-statement
+  rdf:type: auth:Permission
+
+ ;define two built-in users and their corresponding roles
+ rx:resource id='%(base)susers/guest':
   rdf:type: wiki:User
   wiki:login-name: `guest
+  wiki:name: `users/guest
   auth:has-role: wiki:role-guest
 
- rx:resource id='%(base)susers-admin':
+ rx:resource id='%(base)susers/admin':
   rdf:type: wiki:User
   wiki:login-name: `admin
-  wiki:sha1-password: `%(adminShaPassword)s
+  wiki:name: `users/admin
   auth:has-role: auth:role-superuser
+  ;note: we set the password in the application model below so its not hardcoded into the datastore
+  ;and can be set in the config file
 
  wiki:role-guest:
   rdf:type: auth:Role
+  rdfs:label: `Guest
   
  auth:role-superuser:
+  rdfs:comment: `the superuser role is a special case that always has permission to do anything
   rdf:type: auth:Role
-  auth:has-token: base:write-structure-token
+  rdfs:label: `Super User
+  ; even though the super-user role doesn't need this token for authentication 
+  ; we add it here so it shows up in the Sharing dropdown on the edit page
+  auth:has-rights-to: base:write-structure-token 
 
  ; add access token to protect structural pages from modification
- ; (assign (auth:has-token) to adminstrator users or roles to give access )
+ ; (assign (auth:has-rights-to) to adminstrator users or roles to give access )
  base:write-structure-token:
   rdf:type: auth:AccessToken
   rdfs:label: `Administrator Write/Public Read
   auth:has-permission: wiki:action-delete     
   auth:has-permission: wiki:action-save
   auth:has-permission: wiki:action-save-metadata
+  auth:has-permission: auth:permission-add-statement
+  auth:has-permission: auth:permission-remove-statement   
+  auth:priority: 100
 
-''' % {'base' : rhizome.BASE_MODEL_URI, 'adminShaPassword' : adminShaPassword }
+ wiki:ItemDisposition:
+  auth:guarded-by: base:write-structure-token
+  
+ wiki:DocType:
+  auth:guarded-by: base:write-structure-token
+
+ wiki:Label:
+  auth:guarded-by: base:write-structure-token
+  
+ ; some class level access tokens to globally prevent dangerous actions
+ a:ContentTransform:
+  auth:guarded-by: base:execute-python-token
+  auth:guarded-by: base:execute-rxupdate-token
+      
+ base:execute-python-token:
+  rdf:type: auth:AccessToken  
+  auth:has-permission: auth:permission-add-statement
+  auth:with-property: a:transformed-by
+  auth:with-value: wiki:item-format-python      
+  auth:priority: 100
+  
+ base:execute-rxupdate-token:
+  rdfs:comment: `we need this since we don't yet support fine-grained authentication processing RxUpdate 
+  rdf:type: auth:AccessToken  
+  auth:has-permission: auth:permission-add-statement
+  auth:with-property: a:transformed-by 
+  auth:with-value: wiki:item-format-rxupdate        
+  auth:priority: 100
+
+ auth:Role:
+  auth:guarded-by: base:role-guard
+
+ base:role-guard:
+   rdf:type: auth:AccessToken   
+   rdfs:comment: `protects all Roles from being being modified
+   auth:has-permission: auth:permission-add-statement
+   auth:has-permission: auth:permission-remove-statement  
+   auth:priority: 100
+
+ wiki:User:
+  auth:guarded-by: base:user-guard
+
+ base:user-guard:
+   rdf:type: auth:AccessToken   
+   rdfs:comment: `protects all Users from having their roles and access tokens changed
+   auth:has-permission: auth:permission-add-statement
+   auth:has-permission: auth:permission-remove-statement  
+   auth:with-property:  auth:has-rights-to
+   auth:with-property:  auth:has-role
+   auth:priority: 100
+      
+ auth:AccessToken:
+  auth:guarded-by: base:access-token-guard
+  
+ base:access-token-guard:
+   rdf:type: auth:AccessToken   
+   rdfs:comment: `protects all AccessTokens from being being modified
+   auth:has-permission: auth:permission-add-statement
+   auth:has-permission: auth:permission-remove-statement
+   auth:priority: 100
+
+ ; access tokens guards common to all resources
+ ; (currently only fine-grained authentication checks this)
+ ; if we supported owl we could have owl:Thing as the subject instead 
+ ; and we wouldn't need a seperate check in the authorizationQuery
+ base:common-access-checks:
+  auth:guarded-by: base:all-resources-guard 
+  
+ base:all-resources-guard:
+   rdf:type: auth:AccessToken   
+   rdfs:comment: `protects all resources from having its access tokens added or removed
+   auth:has-permission: auth:permission-add-statement
+   auth:has-permission: auth:permission-remove-statement
+   auth:with-property:  auth:guarded-by
+   auth:priority: 100
+''' % {'base' : rhizome.BASE_MODEL_URI }
 
 #add actions:
 for action in ['view', 'edit', 'new', 'creation', 'save', 'delete', 'confirm-delete',
-               'showrevisions', 'edit-metadata', 'save-metadata']:
+               'showrevisions', 'edit-metadata', 'save-metadata', 'view-metadata']:
     authStructure += "\n wiki:action-%s: rdf:type: auth:Permission" % action
 
-templateList.append( (None, rxml.rhizml2nt(contents=authStructure, nsMap=nsMap)) )
+templateList.append( ('@auth', rxml.rhizml2nt(contents=authStructure, nsMap=nsMap)) )
 
 siteVars =\
 '''
  base:site-template:
   wiki:header-image: `underconstruction.gif
   wiki:header-text: `Header, site title goes here: edit the<a href="site-template?action=edit-metadata">site template</a>
-''' 
+'''
 templateList.append( ('@sitevars', rxml.rhizml2nt(contents=siteVars, nsMap=nsMap)) )
+
+import sys, time
+currentTime = "%.3f" % time.time() 
+platform = 'python ' + sys.version
+
+modelVars =\
+'''
+ rx:resource id='%(MODEL_RESOURCE_URI)s':
+  rdf:type: wiki:Model
+  wiki:created-by-app: `%(RHIZOME_APP_ID)s
+  wiki:created-on: `%(currentTime)s
+  wiki:initial-platform: `%(platform)s
+  auth:guarded-by: base:write-structure-token
+''' % locals()
+#we could include the storage location, e.g.:
+#  wiki:initial-location: `%(STORAGE_PATH)s
+#but that might be sensitive information -- perhaps storage a hash instead?
+  
+templateList.append( ('@model', rxml.rhizml2nt(contents=modelVars, nsMap=nsMap)) )
    
+def addStructure(type, structure):
+    n3 = ''
+    for props in structure:
+        name, label = props[0], props[1]
+        n3 += '''<%s> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <%s> .\n''' % (name, type)
+        n3 += '''<%s> <http://www.w3.org/2000/01/rdf-schema#label> "%s" .\n''' % (name, label)
+        if len(props) > 2:
+            n3 += '''<%s> <http://rx4rdf.sf.net/ns/archive#content-type> "%s" .\n''' % (name, props[2])        
+    return n3
+
+itemDispositions = [ ('http://rx4rdf.sf.net/ns/wiki#item-disposition-complete', 'Page'),
+                ('http://rx4rdf.sf.net/ns/wiki#item-disposition-entry', 'Entry'),
+                ('http://rx4rdf.sf.net/ns/wiki#item-disposition-template', 'Template'),
+                ('http://rx4rdf.sf.net/ns/wiki#item-disposition-handler', 'Handler'),            
+                ('http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template', 'RxML Template'),            
+              ]
+
+docTypes = [ ('http://rx4rdf.sf.net/ns/wiki#doctype-faq', 'FAQ', 'text/xml'),
+                ('http://rx4rdf.sf.net/ns/wiki#doctype-xhtml', 'XHTML', 'text/html'),
+                ('http://rx4rdf.sf.net/ns/wiki#doctype-document', 'Document', 'text/xml'),
+                ('http://rx4rdf.sf.net/ns/wiki#doctype-specification', 'Specification', 'text/xml'),
+                ('http://rx4rdf.sf.net/ns/wiki#doctype-docbook', 'DocBook', 'text/xml'),                
+              ]
+
+labels = [ ('http://rx4rdf.sf.net/ns/wiki#label-draft', 'Draft'),
+            ('http://rx4rdf.sf.net/ns/wiki#label-released', 'Released'),
+         ]
+
+templateList.append( ('@dispositions', addStructure('http://rx4rdf.sf.net/ns/wiki#ItemDisposition', itemDispositions)) )
+templateList.append( ('@doctypes', addStructure('http://rx4rdf.sf.net/ns/wiki#DocType', docTypes)) )
+templateList.append( ('@labels', addStructure('http://rx4rdf.sf.net/ns/wiki#Label', labels)+\
+    '''<http://rx4rdf.sf.net/ns/wiki#label-released> <http://rx4rdf.sf.net/ns/wiki#is-released> "" .\n''') )
+
 templateMap = dict(templateList) #create a map so derived sites can replace pages: for example, see site-config.py
 STORAGE_TEMPLATE = "".join(templateMap.values()) #create a NTriples string
 
-#define the APPLICATION_MODEL (static, read-only statements in the 'application' scope)
-def addStructure(type, structure):
-    n3 = ''
-    for name, label in structure:
-        n3 += '''<%s> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <%s> .\n''' % (name, type)
-        n3 += '''<%s> <http://www.w3.org/2000/01/rdf-schema#label> "%s" .\n''' % (name, label)
-    return n3
-
-itemFormats = [ ('http://rx4rdf.sf.net/ns/wiki#item-format-binary', 'Binary'),
-                ('http://rx4rdf.sf.net/ns/wiki#item-format-text', 'Text'),
-                ('http://rx4rdf.sf.net/ns/wiki#item-format-xml', 'XML/XHTML'),
+itemFormats = [ ('http://rx4rdf.sf.net/ns/wiki#item-format-binary', 'Binary', 'application/octet-stream'),
+                ('http://rx4rdf.sf.net/ns/wiki#item-format-text', 'Text', 'text/plain'),
+                ('http://rx4rdf.sf.net/ns/wiki#item-format-xml', 'XML/XHTML', 'text/html'),
                 ('http://rx4rdf.sf.net/ns/wiki#item-format-rxslt', 'RxSLT'),
                 ('http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate', 'RxUpdate'),
                 ('http://rx4rdf.sf.net/ns/wiki#item-format-python', 'Python'),
                 ('http://www.w3.org/1999/XSL/Transform', 'XSLT'),
                 ('http://rx4rdf.sf.net/ns/wiki#item-format-rhizml', 'RhizML'),
               ]
+#don't include disabled content processors:
+itemFormats = [x for x in itemFormats if x[0] not in locals().get('disabledDefaultContentProcessors', 
+                                            rhizome.server.defaultDisabledDefaultContentProcessors)]
 
-itemDispositions = [ ('http://rx4rdf.sf.net/ns/wiki#item-disposition-complete', 'Page'),
-                ('http://rx4rdf.sf.net/ns/wiki#item-disposition-entry', 'Entry'),
-                ('http://rx4rdf.sf.net/ns/wiki#item-disposition-template', 'Template'),
-                ('http://rx4rdf.sf.net/ns/wiki#item-disposition-handler', 'Handler'),            
-              ]
-
-docTypes = [ ('http://rx4rdf.sf.net/ns/wiki#doctype-faq', 'FAQ'),
-                ('http://rx4rdf.sf.net/ns/wiki#doctype-xhtml', 'XHTML'),
-                ('http://rx4rdf.sf.net/ns/wiki#doctype-document', 'Document'),
-                ('http://rx4rdf.sf.net/ns/wiki#doctype-specification', 'Specification'),
-                ('http://rx4rdf.sf.net/ns/wiki#doctype-docbook', 'DocBook'),
-              ]
-
+#define the APPLICATION_MODEL (static, read-only statements in the 'application' scope)
 APPLICATION_MODEL= addStructure('http://rx4rdf.sf.net/ns/wiki#ItemFormat', itemFormats)\
-                   + addStructure('http://rx4rdf.sf.net/ns/wiki#ItemDisposition', itemDispositions)\
-                  + addStructure('http://rx4rdf.sf.net/ns/wiki#DocType', docTypes)
+   + '''<%susers/admin> <%s> "%s" .\n''' % (rhizome.BASE_MODEL_URI, passwordHashProperty, adminShaPassword)
 
 #we add these functions to the config namespace so that config files that include this can access them
 #making it easy to extend or override the rhizome default template

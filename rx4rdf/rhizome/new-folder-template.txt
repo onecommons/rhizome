@@ -1,0 +1,27 @@
+ prefixes:
+     wiki: `http://rx4rdf.sf.net/ns/wiki#
+     a: `http://rx4rdf.sf.net/ns/archive#
+     bnode: `http://4suite.org/rdf/anonymous/
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+     rdf: `http://www.w3.org/1999/02/22-rdf-syntax-ns#
+     rdfs: `http://www.w3.org/2000/01/rdf-schema#     
+     auth: `http://rx4rdf.sf.net/ns/auth#
+     base: `%(base)s
+
+ ;create a new folder
+ 
+ ;note: folder are created automatically when you create a page with a 
+ ;hierarchical name (e.g. myFolder/myPage) 
+ ;so you might not need to create them here.
+ 
+ ;(you probably want to rename the resource id to something like base:myFolder)
+ bnode:newRole:
+  rdf:type: wiki:Folder
+  ;wiki:name is required and must be the full path of the folder
+  ;e.g. if the folder is a child of another folder you must include parent path
+  ;in the name. Also the parent folder must be linked to this folder using the 
+  ;wiki:has-child property (again, this happens automatically when you create a page)
+  wiki:name `full\path
+  
+  ;these are created automatically when you create a page in this folder
+  ;wiki:has-child: base:aPage

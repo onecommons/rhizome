@@ -7,26 +7,30 @@ You can always [Edit|?action=edit] this page (use the link at the bottom of this
 
 !Hyperlinks
 
-You can create links to \[[internal]] or external web pages by putting the name in brackets. External links must be a complete URL, while internal pages just need to be the name of page. For example, to point at the java.sun.com home page, use \[http://java.sun.com], which becomes [http://java.sun.com/] or \[Java home page|http://java.sun.com], which becomes [Java home page|http://java.sun.com], while this page can be linked to like this: \[text formatting rules]: [text formatting rules].
+You can create links to internal or external web pages by putting the name in brackets. External links must be a complete URL, while internal pages just need to be the name of page. For example, to point at the java.sun.com home page, use \[http://java.sun.com], which becomes [http://java.sun.com/] or \[Java home page|http://java.sun.com], which becomes [Java home page|http://java.sun.com], while this page can be linked to like this: \[text formatting rules]: [text formatting rules].
 
-To add a new page you just create a link to it from somewhere else. After all, there isn't much point in having a page if you can't access it! You'll then see a small question mark after the page name when you return to that page. Then click on it and you have created a new page!
+If you want to create a relative link, start the link with a ./ or ../ For example, suppose the page you are editing is named "folder1/folder2/foo" contains these three links: \[bar], \[./bar], and \[../bar] -- the first will link to the page "bar" while the second to "folder1/folder2/bar" and the third to "folder1/bar".
 
-If you want to use brackets in regular text start with two instead one, like this: \\\[sic], to avoid creating a link. If you want to wrap a link in brackets that should work as is: [[sdf]] or \[[sdf]]
+If you want to use brackets in regular text precede the bracket with a backslash, like this: \\\[sic], to avoid creating a link. 
 
 !Adding pictures
 
-If you create a link to an image it will be automatically inlined. For example, this is an inlined PNG image: [http://www.ecyrd.com/~jalkanen/test.png]. If you specify link text (\[this one here|http://example.com/example.png]) it becomes
+If you create a link to an image it will be automatically inlined. For example, this is an inlined PNG image: [example.png]. If you specify link text (\[this one here|example.png]) it becomes
 the ALT text for those who either can't or don't want to view images. 
 If you don't want the image to be inlined, used the wiki:xlink-replace link annotation:
-\[not inlined|wiki:xlink-replace; http://www.ecyrd.com/~jalkanen/test.png]:
+\[not inlined|wiki:xlink-replace; example.png]:
 
-[not inlined|wiki:xlink-replace; http://www.ecyrd.com/~jalkanen/test.png] (Link annotation is an advanced feature that is not documented yet -- sorry.)
+[not inlined|wiki:xlink-replace; example.png] (Link annotation is an advanced feature that is not documented yet -- sorry.)
 
 !Anchors
 
 You can create a link to another part of the page by creating an anchor and linking to it. An anchor is special link that begins with & followed by its name, for example \[&chapter2] or \[&1].  You create links to the anchor use a link that starts with a # and matches the anchor name, e.g. \[#chapter2] or \[#1].
 
 Here's a link to [Footnote number 1|#1] and another footnote [#2].
+
+!Text effects
+
+You may use __bold__ text or //italic// text, by placing two underscores (\__) (for bold) or two slashes (\//) (for italics) before and after the text. You can create ^^monospaced^^ text using \^^.
 
 !Bulleted lists
 Use an asterisk (*) in the first column to make bulleted lists. Use more asterisks for deeper indentation. For example:
@@ -70,7 +74,7 @@ If you want to write the list item on multiple lines, add a '\\' at the end of t
 
 A simple way to make definition lists is to use the '+=' -construct:
 
-+__Construct__=''Something you use to do something with''
++Construct=''Something you use to do something with''
 
 : Starting with a ':' causes text to be indented like this (useful because remember, you can't start lines with spaces or tabs!).
 :: Multiple colons create greater indentation, like the '::' used here.
@@ -85,10 +89,6 @@ Extended quotes can have:
 ---- 
 etc. ~~ -- anonymous
 ::
-
-!Text effects
-
-You may use __bold__ text or //italic// text, by placing two underscores (\__) (for bold) or two slashes (\//) (for italics) before and after the text. You can create ^^monospaced^^ text using \^^.
 
 !Headings 
 
@@ -110,10 +110,10 @@ p'''here's
 If you want to turn off markup escaping so you enter HTML or XML markup directly into the document start the quote with r''' or r""". (You can combine both prefixes, e.g. pr""".)  For more info, see [Markup Formatting Rules] or edit this page for an example.
 
 !Character escaping
-If you want to display characters preceed the first character with a \\ e.g. here \// is displayed instead starting italics text.
+If you want to display any of these formatting characters instead of creating the formatting precede the character with a \\ e.g. here \// is displayed instead starting italics text.
 
 !Line Breaks and Continuations
-Occasionally you may want to create a line break without creating a new paragraph, for example in list bullet item. User \~~ to create a line break:
+Occasionally you may want to create a line break without creating a new paragraph, for example in a list bullet item. Use \~~ to create a line break:
 
 * this item is on ~~ two lines
 

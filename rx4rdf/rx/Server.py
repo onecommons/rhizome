@@ -439,7 +439,11 @@ if not globals().has_key('hotReload'):
 
             try:
                 onError()
-                _wfile.write('HTTP/1.1 %s\r\n'%response.headerMap['status'])
+                #rhizome change:                
+                status = response.headerMap['status']
+                if type(status) is float:
+                    status = int(status)
+                _wfile.write('HTTP/1.1 %s\r\n'%status)
                 if response.headerMap.has_key('content-length') and response.headerMap['content-length']==0:
                     response.headerMap['content-length']=len(response.body)
                 for _key, _valueList in response.headerMap.items():
@@ -485,7 +489,11 @@ if not globals().has_key('hotReload'):
                 if _sessionStorageType != 'custom': ramOrFileOrCookieSaveSessionData(_sessionId, _obj)
                 else: saveSessionData(_sessionId, _obj)
 
-        _wfile.write('HTTP/1.1 %s\r\n'%response.headerMap['status'])
+        #rhizome change:                
+        status = response.headerMap['status']
+        if type(status) is float:
+            status = int(status)
+        _wfile.write('HTTP/1.1 %s\r\n'%status)        
         for _key, _valueList in response.headerMap.items():
             if _key!='status':
                 if type(_valueList)!=type([]): _valueList=[_valueList]
@@ -522,7 +530,7 @@ if not globals().has_key('hotReload'):
         _year, _month, _day, _hh, _mm, _ss, _wd, _y, _z = time.gmtime(_now)
         _date="%s, %02d %3s %4d %02d:%02d:%02d GMT"%(_weekdayname[_wd],_day,_monthname[_month],_year,_hh,_mm,_ss)
         #modified for rhizome:
-        response.headerMap={"status": "200 OK", "server": "Rhizome 0.2", "date": _date, "set-cookie": [], "content-length": 0}
+        response.headerMap={"status": "200 OK", "server": "Rhizome 0.3/Python " + sys.version, "date": _date, "set-cookie": [], "content-length": 0}
 
         # Two variables used for streaming
         response.wfile = _wfile

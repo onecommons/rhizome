@@ -20,10 +20,7 @@
     dom nodes which will be coerced into RDF Dom nodes when attached the RDF DOM via appendChild et. al.
     
     Todo:    
-    * check for object references when removing a resource
-    * you can not insert a list item, only append 
-    * rdf containers (rdf:Seq, rdf:Bag, rdf:Alt) are not treated specially as per the spec
-    * descendant axes are not treated specially as per the spec    
+    * check for object references when removing a resource   
 
     Copyright (c) 2003 by Adam Souzis <asouzis@users.sf.net>
     All rights reserved, see COPYING for details.
@@ -36,15 +33,11 @@ from xml.dom import IndexSizeErr
 from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL
 from Ft.Xml import SplitQName, XMLNS_NAMESPACE
 from rx import RxPath, utils
+from utils import NotSet
 from rx.RxPath import RDF_MS_BASE
-import sys
+import sys, copy
 from rx import logging #for python 2.2 compatibility
 log = logging.getLogger("RxPath")
-
-class NotSetType(object):
-    '''use when None is a valid value'''
-    
-NotSet = NotSetType()
 
 class Node(xml.dom.Node, object):
     nodeName = None
@@ -150,11 +143,13 @@ class Node(xml.dom.Node, object):
     def getSafeChildNodes(self, stopNode): #this also serves as marker that this node is in a RDFDom tree
         return self.childNodes
 
-    def _orderedInsert(self, key, ctor):
+    def _orderedInsert(self, key, ctor, cmpPredicate=None, lo=0, hi=None):
         if len(self.childNodes):
-            #ugh... the default comparison logic choose the right operand's __cmp__
-            #      over the left operand's __cmp__ if its an old-style class and the left is a new-style class!            
-            index = utils.bisect_left(self.childNodes, key, lambda x, y: x.__cmp__(y))
+            if cmpPredicate is None:
+                #ugh... the default comparison logic choose the right operand's __cmp__
+                #      over the left operand's __cmp__ if its an old-style class and the left is a new-style class!
+                cmpPredicate = lambda x, y: x.__cmp__(y)
+            index = utils.bisect_left(self.childNodes, key, cmpPredicate, lo, hi)
 
             if index == len(self.childNodes): #we'll be the last item
                 nextSibling = None
@@ -163,9 +158,8 @@ class Node(xml.dom.Node, object):
                 #print >>sys.stderr, key, '\nbefore', self.childNodes[index]
                 nextSibling = self.childNodes[index]
                 previousSibling = nextSibling.previousSibling 
-                #check for duplicate                
-                #if cmp(nextSibling, key) == 0: #see bisect_left comment above
-                if nextSibling.__cmp__(key) == 0:
+                #check for duplicate                                
+                if cmpPredicate(nextSibling, key) == 0:
                     raise IndexError("can't insert duplicate keys")                    
             
             newNode = ctor(key, self, nextSibling, previousSibling)
@@ -347,7 +341,7 @@ class Resource(Element):
                 type = n.childNodes[0].uri
                 if local == '*' and type.startswith(namespaceURI):
                     return True
-                elif type == (namespaceURI + RxPath.getURIFragmentFromLocal(local)): 
+                elif type == (namespaceURI + RxPath.getURIFragmentFromLocal(local)): #schema.compatibleType(namespace+local, type)
                     return True
                 
         return False
@@ -358,16 +352,23 @@ class Resource(Element):
         (http://www.w3.org/1999/02/22-rdf-syntax-ns#List, http://www.w3.org/1999/02/22-rdf-syntax-ns#Bag, etc.)
         or None if it is not one.
         '''
+        if self.uri == RDF_MS_BASE+'nil': #we're an empty list
+            return RDF_MS_BASE + 'List'            
+        #optimization: check this first because we put ordering predicates last
+        if self.lastChild:
+            if self.lastChild.stmt.predicate == RDF_MS_BASE + 'first': 
+                return RDF_MS_BASE + 'List'
+            
         for p in self.childNodes:
             #from the RDF/XML spec it doesn't appear that list has to specify its type is a list so also look for rdf:first
-            if p.stmt.predicate == RDF_MS_BASE + 'first': 
-                return RDF_MS_BASE + 'List'
-            elif p.stmt.predicate == RDF_MS_BASE + 'type':
+            if p.stmt.predicate == RDF_MS_BASE + 'type':
                 if p.stmt.object in [RDF_MS_BASE + 'List', RDF_MS_BASE + 'Bag',
                         RDF_MS_BASE + 'Alt', RDF_MS_BASE + 'Seq']:
                     return p.stmt.object
-            elif p.stmt.predicate not in [ RDF_MS_BASE + 'rest', RDF_MS_BASE + 'li' ]:
-                return None
+                else:
+                    return None
+            elif p.stmt.predicate == RDF_MS_BASE + 'first': 
+                return RDF_MS_BASE + 'List'                
         return None #not a list
                         
     def __cmp__(self, other):
@@ -430,6 +431,10 @@ class Subject(Resource):
         else:
             return self.ownerDocument == other.ownerDocument and self.uri == other.uri 
 
+    def getModelStatements(self):
+        return reduce(lambda l, p: l.extend(p.getModelStatements()) or l,
+                        self.childNodes, [])
+    
     def _addListItem(self, children, listID):
         stmts = self.ownerDocument.model.getStatements(listID)
         nextList = None
@@ -441,30 +446,47 @@ class Subject(Resource):
                 if stmt.object != RDF_MS_BASE+'nil':
                     nextList = stmt.object
                 if nextList == listID:
-                    raise 'model error -- circular list resource: ' % listID
+                    raise 'model error -- circular list resource: ' % str(listID)
             elif stmt.predicate != RDF_MS_BASE+'type':  #rdf:type statement ok, assumes its rdf:List
                 raise 'model error -- unexpected triple for inner list resource'
         if nextList:
             self._addListItem(children, nextList)
         
-    def toPredicateNodes(self):                
-        stmts = self.ownerDocument.model.getStatements(self.uri) #list will be sorted
+    def toPredicateNodes(self):
+        '''        
+        Statements are sorted by (predicate uri, object value) unless they are RDF list or containers.
+        If the RDF list or container has non-membership statements (usually just rdf:type) those will appear first.
+        '''
+        stmts = self.ownerDocument.model.getStatements(self.uri) #we assume list will be sorted
         children = []
-        nextList = None
+        containerItems = {}
+        listItem = nextList = None        
         for stmt in stmts:
             assert stmt.subject == self.uri, `self.uri` + '!=' + `stmt.subject`
             if stmt.predicate == RDF_MS_BASE+'first':
-                self._doAppendChild(children, Predicate(stmt, self, listID=self.uri))            
+                listItem = stmt
             elif stmt.predicate == RDF_MS_BASE+'rest':
                 if stmt.object != RDF_MS_BASE+'nil':
-                    nextList = stmt.object
-            elif stmt.predicate.startswith(RDF_MS_BASE+'_'): #rdf:first or rdf:_n
+                    nextList = stmt.object                    
+            elif stmt.predicate.startswith(RDF_MS_BASE+'_'): #rdf:_n
                 ordinal = int(stmt.predicate[len(RDF_MS_BASE+'_'):])
-                #todo handle containers insert after next lowest ordinal 
+                containerItems[ordinal] = stmt
             else:
                 self._doAppendChild(children, Predicate(stmt, self))
+
+        if listItem:
+            self._doAppendChild(children, Predicate(listItem, self, listID=self.uri))
         if nextList:
             self._addListItem(children, nextList)
+
+        #add any container items in order
+        ordinals = containerItems.keys()
+        ordinals.sort()        
+        for ordinal in ordinals:
+            stmt = containerItems[ordinal]
+            realPredicate = stmt.predicate
+            stmt.predicate = RDF_MS_BASE+'li'
+            self._doAppendChild(children, Predicate(stmt, self, listID=realPredicate))            
         return children
 
     def findPredicate(self, stmt):
@@ -534,7 +556,7 @@ class Subject(Resource):
                 previousListId = None                
                 if refChild:
                     #previousListId = 
-                    raise NotSupportedErr("insertbefore for lists not supported yet")#todo: predicateNode = self._doInsertBefore()
+                    raise NotSupportedErr("inserting items into lists not yet supported") #todo #todo: predicateNode = self._doInsertBefore()
                 else:
                     for i in xrange(len(self.childNodes)-1, -1, -1): #iterate through in reverse order                        
                         if self.childNodes[i].stmt.predicate == RDF_MS_BASE+'first':
@@ -543,7 +565,24 @@ class Subject(Resource):
                 if previousListId: #we found a previous item in the list
                     if not listID: #create new node if not specified in the newChild element
                         listID = RxPath.generateBnode()
-                    previousRestListStmt = RxPath.Statement(previousListId, RDF_MS_BASE+'rest', listID, objectType=OBJECT_TYPE_RESOURCE)
+                    else:                        
+                        #make sure using this list id isn't used elsewhere
+                        listStmts = self.ownerDocument.model.getStatements(listID, RDF_MS_BASE+'first')
+                        for listStmt in listStmts:                            
+                            if stmt.object != listStmt.object:
+                                raise "model error: list resource %s already used" % str(listID)
+                            else:                                
+                                previousListStmts = self.ownerDocument.model.getStatements(
+                                                previousListId, RDF_MS_BASE+'rest')
+                                if previousListStmts:
+                                    if previousListStmts[0].object == listID:
+                                        log.debug('add statement failed: statement already exists: %s' % stmt)
+                                        return None
+                                    elif previousListStmts[0].object != RDF_MS_BASE+'nil': #rdf:nil gets removed below
+                                        raise "model error: list statement %s already exists but in different order" % str(listID)
+                        
+                    previousRestListStmt = RxPath.Statement(previousListId,
+                        RDF_MS_BASE+'rest', listID, objectType=OBJECT_TYPE_RESOURCE)
                     self.ownerDocument.model.addStatement( previousRestListStmt)
                 else: #this statement is the first item in the list, so our subject will be head list resource
                     assert not listID or listID == self.uri, `listID` + '==' + `self.uri`
@@ -555,21 +594,66 @@ class Subject(Resource):
                 else:
                     if previousListId:
                         #we assume must have been a <previousListId, rdf:rest, rdf:nil> statement
-                        oldPreviousRestStmt = RxPath.Statement(previousListId, RDF_MS_BASE+'rest', RDF_MS_BASE+'nil', objectType=OBJECT_TYPE_RESOURCE)
+                        oldPreviousRestStmt = RxPath.Statement(previousListId,
+                            RDF_MS_BASE+'rest', RDF_MS_BASE+'nil', objectType=OBJECT_TYPE_RESOURCE)
                         self.ownerDocument.model.removeStatement( oldPreviousRestStmt )
                     predicateNode = Predicate(stmt, self, None, self.lastChild, listID = listID)
                     self._doAppendChild(self.childNodes, predicateNode)
                     self._firstChild = self._childNodes[0]
                     self._lastChild = self._childNodes[-1]
-                    restListStmt = RxPath.Statement(listID, RDF_MS_BASE+'rest', RDF_MS_BASE+'nil', objectType=OBJECT_TYPE_RESOURCE)
+                    restListStmt = RxPath.Statement(listID, RDF_MS_BASE+'rest',
+                            RDF_MS_BASE+'nil', objectType=OBJECT_TYPE_RESOURCE)
                     self.ownerDocument.model.addStatement( restListStmt)                
                 #update statement with the real subject, the listID
                 stmt.subject = listID
                 self.ownerDocument.model.addStatement( stmt )                
-            elif stmt.predicate == RDF_MS_BASE+'li': #what about rdf:_n?:#we're a list so we need to follow the insert order
-                raise NotSupportedErr("rdf containers not yet supported") #todo
-            else:
-                predicateNode = self._orderedInsert(stmt, Predicate)
+            elif stmt.predicate == RDF_MS_BASE+'li': 
+                if refChild:
+                    raise NotSupportedErr("inserting items into lists not yet supported") #todo
+                ordinal = 0
+                for i in xrange(len(self.childNodes)-1, -1, -1): #iterate through in reverse order
+                    if self.childNodes[i].listID:
+                        assert self.childNodes[i].listID.startswith(RDF_MS_BASE+'_')
+                        ordinal = int(stmt.predicate[len(RDF_MS_BASE+'_'):])
+                        break
+                ordinal += 1                
+                if listID:
+                    assert listID.startswith(RDF_MS_BASE+'_'), 'invalid listID resource '+ listID
+                    listIDordinal = int(listID[len(RDF_MS_BASE+'_'):])
+                    assert listIDordinal >= ordinal, 'out of order listID resource '+ listID 
+                listID = listID or RDF_MS_BASE+'_'+str(ordinal + 1)
+                containerStmts = self.ownerDocument.model.getStatements(
+                                stmt.subject, listID)
+                if containerStmts:
+                    if len(containerStmts) > 1:
+                        raise "model error: %s is used more than once for the same container %s" % str(listID), str(stmt.subject)
+                    if containerStmts[0].object == stmt.object:
+                        log.debug('add statement failed: statement already exists: %s' % stmt)
+                        return None
+                    else:
+                        raise "model error: container statement %s already exists but in different order" % str(listID)
+                
+                predicateNode = Predicate(stmt, self, None, self.lastChild, listID = listID)
+                self._doAppendChild(self.childNodes, predicateNode)
+                self._firstChild = self._childNodes[0]
+                self._lastChild = self._childNodes[-1]
+                                
+                #update statement with the real predicate, the listID
+                stmt.predicate = listID                
+                self.ownerDocument.model.addStatement( stmt )
+            else:                
+                if self.childNodes and self.childNodes[-1].stmt.predicate in \
+                   [ RDF_MS_BASE + 'first', RDF_MS_BASE + 'li' ]:
+                    # the resource is a container or rdf list so insert
+                    # this non-ordering statement before any of those                    
+                    for i in xrange(len(self.childNodes) ):
+                        #find the first ordering predicate
+                        if self.childNodes[i].stmt.predicate in [ RDF_MS_BASE + 'first', RDF_MS_BASE + 'li' ]:
+                            hi = i-1
+                            break
+                else:
+                    hi = None
+                predicateNode = self._orderedInsert(stmt, Predicate, hi = hi)
                 self.ownerDocument.model.addStatement( stmt )
             self.revision += 1        
             self.ownerDocument.revision += 1
@@ -581,8 +665,11 @@ class Subject(Resource):
     def removeChild(self, oldChild):
         '''
             removes the statement identified by the child Predicate node oldChild.
+            If the predicate is rdf:first then previous and next list item statements are adjusted.
+            (Note: In the case of rdf:li, sibling rdf:_n statements are not adjusted.)            
         '''
-        if oldChild.listID: #if a list item
+        if oldChild.stmt.predicate == RDF_MS_BASE+'first': #if a list item
+            assert oldChild.listID
             #check if there's item in the list preceeding this one
             previousListItem = oldChild.previousSibling            
             while previousListItem:
@@ -621,8 +708,13 @@ class Subject(Resource):
                     
             #the subject of the item is really listID, set that so we can remove the correct statement below
             oldChild.stmt.subject = oldChild.listID
-
-        #todo: rdf:li 
+        
+        if oldChild.stmt.predicate == RDF_MS_BASE+'li':
+            #restore the orginal predicate before removing the statement from the model 
+            assert oldChild.listID
+            oldChild.stmt.predicate = oldChild.listID
+            #we don't bother reordering the sibling rdf:_n because their order is still preserved after removing this on
+            #(if not monotonic)
         self.ownerDocument.model.removeStatement( oldChild.stmt ) #handle exception here?
         self._doRemoveChild(self._childNodes, oldChild)        
         self.revision += 1
@@ -844,7 +936,7 @@ class BasePredicate(Element):
     #  how this change happens depends on whether is a Predicate or a RecursivePredicate
     def __init__(self,stmt, parent, listID):
         self.ownerDocument = self.rootNode = parent.ownerDocument        
-        self.stmt = stmt
+        self.stmt = copy.copy(stmt)
         self.listID=listID
         
         qname, self.namespaceURI, self.prefix, self.localName = \
@@ -858,6 +950,30 @@ class BasePredicate(Element):
             self.firstChild = self.lastChild  = Object(stmt.object, self)
         self.childNodes = [ self.firstChild ] 
 
+    def getModelStatements(self):
+        '''
+        Returns a list of statements this Predicate Element represents as they appear in model.
+        This will be different from the stmt property in the case of RDF lists and container predicates.
+        Usually one statement but may be up to three if the Predicate node is a list item.        
+        '''
+        if self.listID:
+            stmt = copy.copy(self.stmt)
+            if self.stmt.predicate == RDF_MS_BASE+'li':
+                stmt.predicate = self.listID
+                return (stmt,)
+            else:
+                stmt.subject = self.listID            
+                listStmts = [ stmt ]
+                if self.previousSibling and self.previousSibling.listID:
+                    listStmts.append( RxPath.Statement(self.previousSibling.listID,
+                        RDF_MS_BASE+'rest', self.listID, objectType=OBJECT_TYPE_RESOURCE) )
+                if self.nextSibling is None:
+                    listStmts.append( RxPath.Statement( self.listID, RDF_MS_BASE+'rest',
+                                    RDF_MS_BASE+'nil', objectType=OBJECT_TYPE_RESOURCE))
+                return tuple(listStmts)
+        else:
+            return (self.stmt, )
+            
     def cmpSiblingOrder(self, other):
         '''
         Assumes the other node is a sibling 
@@ -891,6 +1007,8 @@ class BasePredicate(Element):
             #    datatype        
         elif not namespaceURI and localName == 'listID':
             return self.listID or ''
+        elif not namespaceURI and localName == 'uri':
+            return self.stmt.predicate
         else:
             return ''
 
@@ -904,6 +1022,10 @@ class BasePredicate(Element):
             if not self.listIDNode and self.listID:            
                 self.listIDNode = Attr(self, None, u'', u'listID', self.listID)
             return self.listIDNode
+        elif not namespaceURI and localName == 'uri':
+            if not self.uriNode:            
+                self.uriNode = Attr(self, None, u'', u'uri', self.stmt.predicate)
+            return self.uriNode
         else:
             return None
     
@@ -1080,8 +1202,13 @@ class Attr(Node):
         if other.nodeType == Node.ATTRIBUTE_NODE:
             return 0 #attributes are unordered, so all siblings are equal
         else: #attributes come before child nodes
-            return -1 
-    
+            return -1
+        
+    def __repr__(self):
+        return "<pAttr at %X: name %s, value %s>" % (id(self),
+                                                     repr(self.nodeName),
+                                                     repr(self.nodeValue))   
+
 class Text(Node):
     '''
     Text nodes can only appear as object nodes and thus have no siblings
@@ -1188,21 +1315,22 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     
     def removeChild(self, oldChild, removeListObjects=False):
         '''
-            Removes all the statements that the resource identified by the node oldChild.
-            The optional removeListObjects parameter specifies that object that are lists should be removed also.
-            (Don't use this option if more than one statement refer to the list.)
+        Removes all the statements that the resource identified by the node oldChild.
+        If the optional removeListObjects parameter is True then objects that are lists will be removed also.
+        (Don't use this option if more than one statement refer to the list.)
         '''
         #todo: what if the resource is reference by an object? -- model should throw an exception?
         for predicate in tuple(oldChild.childNodes):
             log.debug("removing statement %s" % predicate.stmt)
             list = None
             if removeListObjects:
+                #if the object is a list 
                 isCompound = getattr(predicate.childNodes[0], 'isCompound', None)
                 if isCompound and isCompound() == RDF_MS_BASE + 'List':
                     list = predicate.childNodes[0]            
             oldChild.removeChild(predicate)
-            if list:
-                self.removeChild(list.source)
+            if list: #recursively remove the next item in the list
+                self.removeChild(list.source, True)
             
         #self.model.removeResource(oldChild.uri)
         self._doRemoveChild(self._childNodes, oldChild)        
@@ -1253,6 +1381,14 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         for child in newChild.childNodes: 
             subjectNode.appendChild(child)
 
+    def getElementById(self, id):
+        '''
+        Equivalent to self.findSubject(id)
+        
+        This also implements RxPath's redefinition XPath's id().
+        '''
+        return self.findSubject(id)
+    
     def addResource(self, uri):
         '''
         Add a new resource to the model and return the new Subject node
@@ -1271,59 +1407,34 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         log.debug("removing %s" % subject)
         if subject:
             self.removeChild(subject, removeListObjects)
-
-    def addStatements(self, stmts):
-        '''
-        Update the DOM (and so the underlying model) with the given list of statements.
-        if a include a list, it must include all items of the list
-        '''
-        #we have this complete list requirement because otherwise we'd have to figure out
-        #the head list resource and update its children and possible also do this for every nested list 
-        #resource not included in the statements (if the model exposed them)
-        listLinks = {}
-        for stmt in stmts:
-            #print 'stmt', stmt
-            if stmt.predicate == RDF_MS_BASE+'first':
-                pass #handle these below
-            elif stmt.predicate == RDF_MS_BASE+'rest':                
-                if stmt.object != RDF_MS_BASE+'nil':
-                    listLinks[stmt.object] = stmt.subject
-            elif stmt.predicate.startswith(RDF_MS_BASE+'_'): #rdf:first or rdf:_n
-                ordinal = int(stmt.predicate[len(RDF_MS_BASE)+1:]) #todo
-            else:
-                subject = self.findSubject(stmt.subject) or self.addResource(stmt.subject)
-                subject.addStatement(stmt)
-                                
-        for stmt in stmts:
-            if stmt.predicate == RDF_MS_BASE+'first':
-                listid = stmt.subject
-                head = stmt.subject
-                #find the first item in this list
-                while listLinks.has_key(head): 
-                    head = listLinks[head]                
-                stmt.subject = head #set the subject to be the head of the list
-                subject = self.findSubject(stmt.subject) or self.addResource(stmt.subject)
-                subject.addStatement(stmt, listid)
             
     def evalXPath(self, xpath, nsMap = None, vars=None, extFunctionMap = None, node = None, expCache=None):
         node = node or self
         #print node    
-        context = RxPath.XPath.Context.Context(node, varBindings = vars, extFunctionMap = extFunctionMap, processorNss = nsMap)
+        context = RxPath.XPath.Context.Context(node,
+                    varBindings = vars, extFunctionMap = extFunctionMap, processorNss = nsMap)
         #extModuleList = os.environ.get("EXTMODULES","").split(":"))
         return RxPath.evalXPath(xpath, context, expCache)
 
     def begin(self):
         self.model.begin()
 
-    def commit(self):
-        self.model.commit()
+    def commit(self, **kw):
+        self.model.commit(**kw)
 
     def rollback(self):
         self.model.rollback()
-        #to remove the changes we need to rollback we just force the DOM's nodes to be regenerated from the model
-        #null out childNodes and incremement revision
-        #warning: its still possible the application may have a dangling references to a node that don't know they've been deleted
-        #todo: to fix, add a rollbackCount to the doc and subject nodes and have the various getters check compare that to see if they need to regenerate themselves        
+        #to remove the changes we need to rollback we just force the
+        #DOM's nodes to be regenerated from the model null out
+        #childNodes and incremement revision
+        
+        #warning: its still possible the application may have a
+        #dangling references to a node that don't know they've been
+        #deleted
+
+        #todo: to fix this, add a rollbackCount to the doc and subject
+        #nodes and have the various getters check compare that to see
+        #if they need to regenerate themselves
         self._childNodes = None
         self.revision += 1 #note that revision is also used as part of cache keys
 
@@ -1334,7 +1445,9 @@ def main():
         try:
             compExpr = RxPath.XPath.Compile(query)
             #compExpr.pprint()
-            res = RxPath.XPath.Evaluate(compExpr, rdfDom, context)
+            context.node = rdfDom
+            #bug in context.clone() -- doesn't copy functions
+            res = RxPath.XPath.Evaluate(compExpr, context=context)
         except:
             print "Unexpected error:", sys.exc_info()[0]
             traceback.print_exc(file=sys.stdout)    
@@ -1364,13 +1477,22 @@ def main():
           ('http://rx4rdf.sf.net/ns/auth#', u'auth'),
            ('http://www.w3.org/2002/07/owl#', u'owl'),
            ('http://purl.org/dc/elements/1.1/#', u'dc'),
+           ('http://xmlns.4suite.org/ext', 'xf'),
            ( RDF_MS_BASE, u'rdf')
         ]
+    extFunctionMap = None
+    try:
+        from rx import racoon
+        extFunctionMap = racoon.DefaultExtFunctions        
+        ns.append( (racoon.RXWIKI_XPATH_EXT_NS, 'wf') )
+    except ImportError:
+        pass    
     nsMap = dict( ns )
     processorNss = dict( map(lambda x: (x[1], x[0]), ns) )
     vars = { (None, 'dummy') : [] } #dummy so Context uses this dictionary
-    rdfDom = Document(model, nsMap)    
-    context = RxPath.XPath.Context.Context(rdfDom, varBindings=vars, processorNss = processorNss)
+    rdfDom = Document(model, nsMap)
+    context = RxPath.XPath.Context.Context(rdfDom, varBindings=vars,
+            extFunctionMap=extFunctionMap, processorNss = processorNss)    
 
     if len(sys.argv) > 2:    
         query = sys.argv[2]

@@ -21,10 +21,6 @@ Use this import script to mark pages as "structural" (only can be modified by an
     
     <!-- require that that a user needs the structure write access token to modify this -->
     <xu:append select='/*[wiki:name]'>
-    <auth:needs-token>
-      <xu:attribute name="rdf:resource">
-        <xu:value-of select="concat($base-uri,'write-structure-token')"/>
-      </xu:attribute>
-    </auth:needs-token>
+        <auth:guarded-by rdf:resource='{$base-uri}write-structure-token' />
     </xu:append>     
 </xu:modifications>

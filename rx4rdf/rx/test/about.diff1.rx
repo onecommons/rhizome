@@ -1,0 +1,15 @@
+ prefixes:
+     wiki: `http://rx4rdf.sf.net/ns/wiki#
+     a: `http://rx4rdf.sf.net/ns/archive#
+     bNode: `http://4suite.org/rdf/anonymous/
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+     rdf: `http://www.w3.org/1999/02/22-rdf-syntax-ns#
+     auth: `http://rx4rdf.sf.net/ns/auth#
+ 
+ bNode:xc52aaabe-6b72-42d1-8772-fcb90303c24b_7:
+ ;     auth:needs-token: 
+ ;         resource id="http://rx4rdf.sf.net/site/write-structure-token"
+ ;     wiki:name: `index
+     wiki:revisions list="http://4suite.org/rdf/anonymous/xc52aaabe-6b72-42d1-8772-fcb90303c24b_5":
+         bNode:xc52aaabe-6b72-42d1-8772-fcb90303c24b_4
+         bNode:x467ce421-1a30-4a2f-9208-0a4b01cd0da1_9

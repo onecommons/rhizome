@@ -1,0 +1,23 @@
+ prefixes:
+     wiki: `http://rx4rdf.sf.net/ns/wiki#
+     a: `http://rx4rdf.sf.net/ns/archive#
+     bnode: `http://4suite.org/rdf/anonymous/
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+     rdf: `http://www.w3.org/1999/02/22-rdf-syntax-ns#
+     rdfs: `http://www.w3.org/2000/01/rdf-schema#     
+     auth: `http://rx4rdf.sf.net/ns/auth#
+     base: `%(base)s
+
+ ;creates a new label 
+ 
+ ;(you probably want to rename the resource id to something like base:myLabel)
+ bnode:newRole: 
+     rdf:type: 
+         wiki:Label
+         
+     ;this name shows up in the Label drop-down on the edit page
+     rdfs:label: `Label Name
+     
+     ;if this resource has this property (regardless of its value)
+     ;all resources that have this label will be treated as released
+     ;wiki:is-released: `

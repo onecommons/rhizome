@@ -147,14 +147,11 @@ class MarkupMap(object):
         return (element, attrib list, text)
         '''
         if name is None:
-            if link.startswith('site://'):
-                name = link[len('site://'):]
+            if link.startswith('site:///'):
+                name = link[len('site:///'):]
             else:
                 name = link
-        
-        if link.startswith('site://'):            
-            link = link[len('site://'):] #todo! this only support sites with no real hierarchy -- hack for now (should fix up link)
-        
+                
         if isImage and (annotations is None or \
                    not [annotation for annotation in annotations if annotation.name == 'wiki:xlink-replace']):
             attribs = [ ('src', xmlquote(link)), ('alt', xmlquote(name)) ]
@@ -213,6 +210,15 @@ class MarkupMapFactoryHandler(Handler):
             mm = self.markupfactory.comment(string)
             if mm:
                 self.st.mm = mm      
+
+def interWikiMapParser(interwikimap):
+    interWikiMap = {}
+    for line in interwikimap:
+        line = line.strip()
+        if line and not line.startswith('#'):
+            prefix, url = line.split()
+            interWikiMap[prefix.lower()] = url
+    return interWikiMap
 
 def normalizeAttribs(attribs, handler=None):
     '''
@@ -436,8 +442,6 @@ def _handleInlineWiki(st, handler, string, wantTokenMap=None, userTextHandler=No
                     isAnchor = link[0] == '&'
                     if isAnchor:
                         link = link[1:] #strip &
-                    if not isFootNote and not isAnchor and link.find(':') == -1: #not a uri, assume is a wiki name
-                        link = 'site://' + link
                     element, attribs, text = st.mm.mapLinkToMarkup(link, name, type, isInlineIMG, isAnchor)
                 else: #no link, just a type
                     assert(type)

@@ -22,7 +22,7 @@ body {
 }
 
 #contentTable {
-	border-left: 2px dotted #333;
+	border: 2px dotted #333;
 	border-spacing: 0px;
 	padding: 0px
 }
@@ -51,21 +51,32 @@ body {
 }
 
 #header {
-	background-color: #294563; /* #EFE */
-	color: #CCCCCC;
+	background-color: #EBEBB5; /* #EFE */
+	color: black;	
 }
 
 #header * {
 	padding: 1px;
 }
 
+#login-box {
+    float: right;
+    font-size: 80%;
+    line-spacing: 0;
+    
+}
+
+#login-box form {
+    margin: 0 0 0 0;
+}
+
 #footer {
-	background-color: #294563;/* #333333 */
-	color: #CCCCCC;
+	background-color: #EBEBB5;/* #294563 #333333 */
+	color: black;
 }
 
 #footer a, #header a {
-  color: white
+  color: black
 }
 
 
@@ -78,7 +89,7 @@ h1 { font-size: 160%; }
 h2 { font-size: 140%; }
 
 #sidebar {       
-    background-color: #294563;
+    background-color: #EBEBB5;
 	font-size: 12px;
 	/*/*/font-size: 85%; /* */
 }
@@ -86,14 +97,14 @@ h2 { font-size: 140%; }
 #sidebar a {
 	/*/*/padding: 3px;
 	display: block;
-	border: 2px dotted #CCC;
+	border: 2px dotted #aaa;
 	text-decoration: none;
 	line-height: 1em;
 	width: 100px; /* */
 }
 
 #sidebar a:link, #sidebar a:visited {
-	color: white;
+	color: black;
 }
 
 #sidebar a:hover, #sidebar a:active {
@@ -119,7 +130,7 @@ h2 { font-size: 140%; }
 }
 
 /* entry content */
-#maincontent td, #maincontent th {
+#maincontent td, #maincontent th {  
   border: 1px solid black;
   padding: 5px
 }
@@ -156,6 +167,7 @@ table .title {
 
 .code { border-color: #CFDCED; border-style: solid; border-width: 1px; 
        line-height: 1.25em; 
+       font-size : 75%;
       }
 .codefrag {	font-family: "Courier New", Courier, monospace; }
 

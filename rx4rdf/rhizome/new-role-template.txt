@@ -1,0 +1,23 @@
+ prefixes:
+     wiki: `http://rx4rdf.sf.net/ns/wiki#
+     a: `http://rx4rdf.sf.net/ns/archive#
+     bnode: `http://4suite.org/rdf/anonymous/
+     default-ns: `http://rx4rdf.sf.net/ns/rxml#
+     rdf: `http://www.w3.org/1999/02/22-rdf-syntax-ns#
+     rdfs: `http://www.w3.org/2000/01/rdf-schema#     
+     auth: `http://rx4rdf.sf.net/ns/auth#
+     base: `%(base)s
+
+ ;creates a new role 
+ 
+ ;(you probably want to rename the resource id to something like base:myRole)
+ bnode:newRole:
+  rdf:type: auth:Role
+  rdfs:label: `Role name
+  rdfs:comment: `add comments here if you wish
+  
+  ; list all the Access Tokens you want to grant to users with this role.
+  ; this also shows up in the Sharing dropdown on the edit page
+  ; when edited by a user with this role
+  ;auth:has-rights-to: base:role-access-token1
+ 

@@ -1,0 +1,53 @@
+ x:stylesheet (version="1.0" xmlns:x="http://www.w3.org/1999/XSL/Transform",
+    xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+    xmlns:wf='http://rx4rdf.sf.net/ns/racoon/xpath-ext#',
+    xmlns:f = 'http://xmlns.4suite.org/ext',
+    xmlns:a="http://rx4rdf.sf.net/ns/archive#",
+    xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#",
+    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#",
+    xmlns:auth="http://rx4rdf.sf.net/ns/auth#",
+    exclude-result-prefixes = "f wf a wiki rdf rdfs auth"
+    ) 
+  x:param name="__resource"
+   
+  x:template match='/':  	    `
+
+    Administration
+    hr
+     table:         
+         tr:
+             td: `Users
+             td: a href='site:///search?search=%2Fwiki%3AUser&searchType=RxPath&view=html&Search=search': `List 
+             td: a href='site:///search?search=%2Fwiki%3AUser&searchType=RxPath&view=edit&Search=search': `Edit All 
+             td: a href='site:///users/guest?action=new': `New 
+         tr: 
+             td: `Roles
+             td: a href='site:///search?search=%2Fauth%3ARole&searchType=RxPath&view=html&Search=search': `List 
+             td: a href='site:///search?search=%2Fauth%3ARole&searchType=RxPath&view=edit&Search=search': `Edit All 
+             td: a href='site:///new-role-template': `New 
+         tr: 
+             td: `Access Tokens     
+             td: a href='site:///search?search=%2Fauth%3AAccessToken&searchType=RxPath&view=html&Search=search': `List 
+             td: a href='site:///search?search=%2Fauth%3AAccessToken&searchType=RxPath&view=edit&Search=search': `Edit All 
+             td: a href='site:///new-accesstoken-template': `New 
+         tr: 
+             td: `Folders     
+             td: a href='site:///search?search=%2Fwiki%3AFolder&searchType=RxPath&view=html&Search=search': `List 
+             td: a href='site:///search?search=%2Fwiki%3AFolder&searchType=RxPath&view=edit&Search=search': `Edit All 
+             td: a href='site:///new-folder-template': `New 
+         tr: 
+             td: `Labels     
+             td: a href='site:///search?search=%2Fwiki%3ALabel&searchType=RxPath&view=html&Search=search': `List 
+             td: a href='site:///search?search=%2Fwiki%3ALabel&searchType=RxPath&view=edit&Search=search': `Edit All 
+             td: a href='site:///new-label-template': `New 
+         tr: 
+             td: `Dispositions
+             td: a href='site:///search?search=%2Fwiki%3AItemDisposition&searchType=RxPath&view=html&Search=search': `List 
+             td: a href='site:///search?search=%2Fwiki%3AItemDisposition&searchType=RxPath&view=edit&Search=search': `Edit All 
+             td: a href='site:///new-disposition-template': `New 
+         tr: 
+             td: `Doc Types
+             td: a href='site:///search?search=%2Fwiki%3ADocType&searchType=RxPath&view=html&Search=search': `List 
+             td: a href='site:///search?search=%2Fwiki%3ADocType&searchType=RxPath&view=edit&Search=search': `Edit All 
+             td: a href='site:///new-doctype-template': `New 
+             

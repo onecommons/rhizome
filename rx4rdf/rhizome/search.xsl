@@ -2,29 +2,37 @@
 <xsl:stylesheet version="1.0"
 		xmlns:a="http://rx4rdf.sf.net/ns/archive#"
 		xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"
+		xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
 		xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
 		xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'
 		xmlns:wf='http://rx4rdf.sf.net/ns/racoon/xpath-ext#'
 		xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
 		xmlns:f = 'http://xmlns.4suite.org/ext'
 		xmlns:response-header = 'http://rx4rdf.sf.net/ns/racoon/http-response-header#'
-		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header" >
+		exclude-result-prefixes = "rdfs f wf a wiki auth rdf response-header" >
 
 <xsl:param name="search" />
 <xsl:param name="view" />
 <xsl:param name="searchType" />
 <xsl:param name="_base-url" />
 <xsl:param name="_url" />
+<xsl:param name="_name" />
 
 <xsl:variable name="searchExp">     
      <xsl:choose>
-        <xsl:when test="$searchType='simple'">        
-             /a:NamedContent[.//a:transformed-by !='http://rx4rdf.sf.net/ns/wiki#item-format-binary'][contains( wf:get-contents(.), $search)]
-             | /a:NamedContent[.//wiki:title[contains(.,$search)]]
+        <xsl:when test="$searchType='Simple'">                     
+             /a:NamedContent[
+                wiki:revisions/*/rdf:first/wiki:Item[
+                    (.//a:contents/*/a:transformed-by !='http://rx4rdf.sf.net/ns/wiki#item-format-binary'
+                    and contains( wf:get-contents(.), $search))
+                    or contains(wiki:title,$search)] ] 
         </xsl:when>
-        <xsl:when test="$searchType='regex'">   
-             /a:NamedContent[.//a:transformed-by !='http://rx4rdf.sf.net/ns/wiki#item-format-binary'][f:match( wf:get-contents(.), $search)]
-             | /a:NamedContent[.//wiki:title[f:match(.,$search)]]
+        <xsl:when test="$searchType='RegEx'">   
+             /a:NamedContent[
+                wiki:revisions/*/rdf:first/wiki:Item[
+                    (.//a:contents/*/a:transformed-by !='http://rx4rdf.sf.net/ns/wiki#item-format-binary'
+                    and f:match( wf:get-contents(.), $search))
+                    or f:match(wiki:title,$search)] ]
         </xsl:when>
          <!-- rxpath -->
         <xsl:otherwise> 
@@ -35,6 +43,12 @@
 
 <xsl:variable name="results" select="f:evaluate($searchExp)" />     
 
+<xsl:template match="node()|@*" mode="dump">
+<xsl:copy>
+    <xsl:apply-templates select="node()|@*" mode="dump" />
+</xsl:copy>
+</xsl:template>
+        
 <xsl:template match="/" >
 <!-- search result header -->
      <xsl:choose>
@@ -45,7 +59,7 @@
 <title>Rhizome search for "<xsl:value-of select="$search" />"</title>
 
 <description>
-This RSS feed is the result of applying this query <xsl:value-of select="$search" /> 
+This RSS feed is the result of applying the query "<xsl:value-of select="$search" />"
 on <xsl:value-of select="$_base-url" />
 </description>
 
@@ -53,25 +67,79 @@ on <xsl:value-of select="$_base-url" />
 
 <xsl:for-each select="$results">
     <item>
-       <title><xsl:value-of select="./wiki:name" /></title>
-       <link>
-       <!-- replace with link fixup extension function when completed -->   
-       <xsl:value-of select="$_base-url" /><xsl:value-of select="./wiki:name" />
+       <xsl:variable name='relUrl' select="f:if(self::a:NamedContent, concat(./wiki:name, '?'), concat('.?about=', f:escape-url(.)))" />
+       <title><xsl:value-of select="f:if(./wiki:name, ./wiki:name, f:if(./rdfs:label,./rdfs:label, string(.)))" /></title>       
+       <link>       
+       <xsl:value-of select="$_base-url" />site:///<xsl:value-of select="$relUrl" />
        </link>
     </item>
 </xsl:for-each>    
     </channel>
 </rss>
+       </xsl:when>       
+       <xsl:when test="$view = 'rxml'">
+<xsl:variable name='_disposition' select="wf:assign-metadata('_disposition', /*[.='http://rx4rdf.sf.net/ns/wiki#item-disposition-entry'])" />       
+<div class="title"><xsl:value-of select="$searchType" /> Search Results for "<xsl:value-of select="$search" />"</div>
+<xsl:if test='not($results)'>
+No results found.
+</xsl:if>
+<pre>
+<xsl:variable name='fixup' select="&quot;&lt;a href='site:///.?action=view-metadata&amp;amp;about=%(encodeduri)s'>%(res)s&lt;/a>&quot;" />
+<xsl:value-of disable-output-escaping='yes' select="wf:get-rdf-as-rhizml($results, '', $fixup)" />
+</pre>
        </xsl:when>
+       <xsl:when test="$view = 'edit'">
+<xsl:variable name='_disposition' select="wf:assign-metadata('_disposition', /*[.='http://rx4rdf.sf.net/ns/wiki#item-disposition-entry'])" />       
+<div class="title"><xsl:value-of select="$searchType" /> Search Results for "<xsl:value-of select="$search" />"</div>
+<xsl:if test='not($results)'>
+No results found.
+</xsl:if>
+<form METHOD="POST" ACTION="site:///save-metadata" ENCTYPE="multipart/form-data">	
+    <input TYPE="hidden" NAME="itemname" VALUE="save-metadata" />
+    <input TYPE="hidden" NAME="action" VALUE="save-metadata" />    
+    <xsl:for-each select="$results">
+        	<input TYPE="hidden" NAME="resource" VALUE="{.}" />
+    </xsl:for-each>
+        Edit Metadata
+         <br/>
+	<textarea NAME="metadata" ROWS="30" COLS="75" STYLE="width:100%" WRAP="off">
+	<xsl:value-of select="wf:get-rdf-as-rhizml($results)" />
+	</textarea>
+	<br/>
+	<input TYPE="submit" NAME="save" VALUE="Save" />	
+</form>
+       </xsl:when>
+       <xsl:when test="$view = 'rxpathdom'">
+<RxPathDOM>       
+<xsl:apply-templates select="$results" mode="dump" />
+</RxPathDOM>       
+       </xsl:when>       
        <xsl:otherwise>  
        
 <xsl:variable name='_disposition' select="wf:assign-metadata('_disposition', /*[.='http://rx4rdf.sf.net/ns/wiki#item-disposition-entry'])" />
-<div class="title">Search Results for "<xsl:value-of select="$search" />"</div>
+<div class="title"><xsl:value-of select="$searchType" /> Search Results for "<xsl:value-of select="$search" />" 
+  (<xsl:value-of select="count($results)" /> found)</div>
 <br />   
 <table>
+    <xsl:variable name="long-table" select="$results[1][self::a:NamedContent]" />
+    <xsl:if test='$long-table'>
+        <tr><th></th><th>Name </th><th>Last Modified</th><th>By</th></tr> 
+    </xsl:if>
 <xsl:for-each select="$results">
-    <tr><td><a href="{./wiki:name/text()}?action=edit" ><img border="0" src='edit-icon.png' /></a></td>
-    <td><a href="{./wiki:name/text()}" ><xsl:value-of select='./wiki:name/text()' /></a></td>
+    <xsl:variable name='relUrl' select="f:if(self::a:NamedContent, concat(./wiki:name, '?'), concat('.?about=', f:escape-url(.)))" />
+    <xsl:variable name='resName' select="f:if(./wiki:name, ./wiki:name, f:if(./rdfs:label,./rdfs:label, string(.)))" />
+    
+    <tr>
+    <td><a href="site:///{$relUrl}&amp;action=edit" title='edit'><img border="0" alt='edit' src='site:///edit-icon.png' /></a></td>
+    <td><a href="site:///{$relUrl}" ><xsl:value-of select='$resName' /></a></td>    
+    <xsl:if test='$long-table'>
+    <td><xsl:value-of select='f:pytime-to-exslt( (./wiki:revisions/*/rdf:first/*)[last()]/a:created-on)' /></td>
+    <td><a href='site:///users/{(./wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by/*/wiki:login-name}'>
+        <xsl:value-of select='(./wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by/*/wiki:login-name'/></a></td>    
+    </xsl:if>
+    <xsl:if test='not($long-table)'>    
+    <td><a href='site:///search?search=%2F*%5B*%2F*%5B.%3D%27{f:escape-url(.)}%27%5D%5D&amp;searchType=RxPath&amp;view=html'>Used By</a></td>        
+    </xsl:if>
     </tr>        
 </xsl:for-each>    
 </table>

@@ -7,7 +7,7 @@
 """
 from __future__ import generators
 import os.path
-import os, sys, sha
+import os, sys, sha, types
 from stat import *
 from time import *
 from types import *
@@ -31,12 +31,21 @@ def generateBnode(name=None):
     name = name or `_bNodeCounter`    
     return BNODE_BASE + _sessionBNodeUUID +  name
 
+class NotSetType(object):
+    '''use when None is a valid value'''
+    
+NotSet = NotSetType()
+
 def cond(ifexp, thenexp, elseexp = lambda: None):
     '''to enable short circuit evaluation the thenexp and elseexp parmeters are functions that are lazily evaluated'''
     if ifexp:
         return thenexp()
     else:
         return elseexp()
+
+def kw2dict(**kw):
+    #not needed in python 2.3, dict ctor does the same thing
+    return kw
 
 def bisect_left(a, x, cmp=cmp, lo=0, hi=None):
     """
@@ -109,52 +118,165 @@ def createThreadLocalProperty(name, fget=True, fset=True, fdel=True, doc=None, i
     return property(fget, fset, fdel, doc)
 
 def htmlQuote(data):
-    return data.replace('&','&amp').replace('<','&lt;').replace('>','&gt;')
+    return data.replace('&','&amp;').replace('<','&lt;').replace('>','&gt;')
 
 def diff(new, old, cutoffOffset = -100, sep = '\n'):
     '''
-    returns a list of changes needed to transform new to old unless the length
+    returns a list of changes needed to transform the first string to the second unless the length
     of the list of changes is greater the length of the old content itself plus 
     the cutoffOffset, in which case None is returned.
     '''
     maxlen = len(old) + cutoffOffset
     old = old.split(sep) 
-    new = new.split(sep) 
-    changes = []
+    new = new.split(sep)     
     import difflib
     cruncher = difflib.SequenceMatcher(None, new, old)
+    return opcodes2Patch(new, old, cruncher.get_opcodes(), maxlen)
+    
+def opcodes2Patch(new, old, opcodes, maxlen = 0):
+    '''
+    Converts a list of opcodes as returned by difflib.SequenceMatcher.get_opcodes()
+    into a list that can be applied to the first sequence using patchList() or patch(),
+    allowing the second list to be discarded.
+    '''
+    changes = []
     patchlen = 0
-    for tag, alo, ahi, blo, bhi in cruncher.get_opcodes():#to turn a into b
+    offset = 0    
+    for tag, alo, ahi, blo, bhi in opcodes:#to turn a into b
         if tag == 'replace':        
-            #g = self._fancy_replace(a, alo, ahi, b, blo, bhi)
-            changes.append( ( 'r', alo, ahi, old[blo:bhi] ) )
-            patchlen = reduce(lambda x, y: x + len(y), old[blo:bhi], patchlen)
-        elif tag == 'delete':
-            changes.append( ( 'd', alo, ahi) )
-        elif tag == 'insert':
-            changes.append( ( 'i', alo, old[blo:bhi]) )
-            patchlen = reduce(lambda x, y: x + len(y), old[blo:bhi], patchlen)
+            #g = self._fancy_replace(a, alo, ahi, b, blo, bhi)            
+            changes.append( ( 'r', alo+offset, ahi+offset, old[blo:bhi] ))
+            offset += (bhi - blo) - (ahi - alo)
+            if maxlen:
+                patchlen = reduce(lambda x, y: x + len(y), old[blo:bhi], patchlen)
+        elif tag == 'delete':            
+            changes.append( ( 'd', alo+offset, ahi+offset) )
+            offset -= ahi - alo
+        elif tag == 'insert':            
+            changes.append( ( 'i', alo+offset, old[blo:bhi] ))
+            offset += bhi - blo
+            if maxlen:
+                patchlen = reduce(lambda x, y: x + len(y), old[blo:bhi], patchlen)
         if patchlen > maxlen:
             return None #don't bother
     return changes
 
 def patch(base, patch, sep = '\n'):
-    base = base.split(sep) 
+    base = base.split(sep)
     for op in patch:
         if op[0] == 'r':
             base[op[1]:op[2]] = op[3]
         elif op[0] == 'd':
             del base[ op[1]:op[2]]
         elif op[0] == 'i':
-            base.insert(op[1], op[2])
+            base.insert(op[1], sep.join(op[2]) )
     return sep.join(base)
 
+def patchList(base, patch):
+    for op in patch:
+        if op[0] == 'r':
+            base[op[1]:op[2]] = op[3]
+        elif op[0] == 'd':
+            del base[ op[1]:op[2]]
+        elif op[0] == 'i':
+            base[op[1]:op[1]] = op[2]    
+
+def removeDupsFromSortedList(aList):       
+    def removeDups(x, y):
+        if not x or x[-1] != y:
+            x.append(y)
+        return x
+    return reduce(removeDups, aList, [])
+
+def diffSortedList(oldList, newList, cmp=cmp):
+    '''
+    Returns a list of instructions for turning the first list 
+    into the second assuming they both sorted lists of comparable objects
+    
+    The instructions will be equivalent to the list returned by
+    difflib.SequenceMatcher.get_opcodes()
+
+    An optional comparision function can be specified.    
+    '''
+    opcodes = []
+    nstart = nstop = ostart = ostop = 0
+
+    try:
+        last = 'i'            
+        old = oldList[ostop]            
+        
+        last = 'd'
+        new = newList[nstop]     
+        while 1:
+            while cmp(old,new) < 0:
+                last = 'i'
+                ostop += 1                            
+                old = oldList[ostop]                
+            if ostop > ostart:
+                #delete the items less than new
+                op = [ 'delete', ostart, ostop, None, None]
+                opcodes.append( op )
+                ostart = ostop
+
+            assert cmp(old, new) >= 0
+            if cmp(old, new) == 0:                
+                last = 'i='
+                ostart = ostop = ostop+1            
+                old = oldList[ostop]
+                
+                last = 'd'
+                nstart = nstop = nstop+1
+                new = newList[nstop]     
+      
+            while cmp(old, new) > 0:
+                last = 'd'
+                nstop += 1 
+                new = newList[nstop]                                
+            if nstop > nstart:
+                #add
+                op = [ 'insert', ostart, ostop, nstart, nstop]
+                opcodes.append( op )
+                nstart = nstop
+
+            assert cmp(old, new) <= 0
+            
+            if cmp(old, new) == 0:
+                last = 'i='
+                ostart = ostop = ostop+1            
+                old = oldList[ostop]                
+                
+                last = 'd'
+                nstart = nstop = nstop+1
+                new = newList[nstop]                     
+    except IndexError:
+        #we're done
+        if last[0] == 'i':
+            if last[-1] == '=':
+                try:
+                    nstart = nstop = nstop+1
+                    new = newList[nstop]
+                except IndexError:
+                    return opcodes #at end of both lists so we're done
+            
+            if ostop > ostart:
+                #delete the items less than new
+                op = [ 'delete', ostart, ostop, None, None]
+                opcodes.append( op )
+            if len(newList) > nstop:
+                op = [ 'insert', ostop, ostop, nstop, len(newList)]
+                opcodes.append( op )                
+        else:
+            if nstop > nstart:
+                #add
+                op = [ 'insert', ostart, ostop, nstart, nstop]
+                opcodes.append( op )                            
+            op = [ 'delete', ostop, len(oldList), None, None]
+            opcodes.append( op )
+
+    return opcodes
+
 def walkDir(path, fileFunc, *funcArgs, **kw):
-##        if filefuncArgs is not None:
-##            if not isinstance(filefuncArgs, TupleType):
-##                filefuncArgs = (filefuncArgs, )
-##        else
-##            filefuncArgs = () #to pass None as arguement pass in (None, )            
+    path = os.path.normpath(path).replace(os.sep, '/')
     assert S_ISDIR( os.stat(path)[ST_MODE] )
 
     def _walkDir(path, recurse, funcArgs, kw):
@@ -195,6 +317,7 @@ def walkDir(path, fileFunc, *funcArgs, **kw):
 #see w3.org/TR/rdf-testcases/#ntriples 
 #todo: assumes utf8 encoding and not string escapes for unicode
 Removed = object()
+Comment = object()
 def parseTriples(lines, bNodeToURI = None):
     remove = False
     for line in lines:
@@ -217,7 +340,8 @@ def parseTriples(lines, bNodeToURI = None):
         if predicate.startswith('_:'):
             predicate = predicate[2:] #bNode
             predicate = bNodeToURI(predicate)
-        else:            
+        else:
+            assert predicate[0] == '<' and predicate[-1] == '>', 'malformed predicate: %s' % predicate
             predicate = predicate[1:-1] #uri
             
         object = object.strip()        
@@ -289,6 +413,10 @@ def writeTriples(stmts, stream):
     object = 2
     objectType = 5
     for stmt in stmts:
+       if stmt[0] is Comment:
+           stream.write("#" + stmt[1] + "\n")
+           continue
+
        if stmt[0] is Removed:
            stream.write("#!remove\n")
            stmt = stmt[1]
@@ -629,55 +757,87 @@ class DynaExceptionFactory(object):
             setattr(self.module, classname, dynaexception)
         return dynaexception
 
+def toXPathDataType(value, ownerDocument):        
+    if isinstance(value, ( types.ListType, types.TupleType ) ):
+        newvalue = []
+        for item in value:
+            if getattr(item, 'nodeType', None):
+                newvalue.append(item)
+            else:
+                newvalue.append( ownerDocument.createTextNode( unicode(item) ))
+        return newvalue
+    else:
+        import Ft.Xml.XPath
+        assert isinstance(value, (type(''), Ft.Xml.XPath.boolean.BooleanType,
+                                 type(True), type(u''), type(1), type(1.0), type(None)) )\
+               or getattr(value, 'nodeType', None), 'not a valid XPath datatype %s: ' % type(value)
+        return value
+
 try:
-    from Ft.Xml import XPath
-    def _visit(self, visitor, fields):
-        visitor(self)
+    from Ft.Xml import XPath, Xslt
+    import Ft.Xml.Xslt.XPathExtensions
+    def _visit(self, fields, pre=None, post=None):
+        if pre:
+            pre(self)
         for field in fields:
             if field is not None:
-                field.visit(visitor)
+                field.visit(pre=pre, post=post)
+        if post:
+            post(self)            
             
-    def _visit0(self, visitor):
-        visitor(self)
+    def _visit0(self, pre=None, post=None):        
+        if pre:
+            pre(self)
+        if post:
+            post(self)            
         
-    def _visitlr(self, visitor):    
-        _visit(self, visitor, [self._left, self._right])
+    def _visitlr(self, pre=None, post=None):
+        _visit(self, [self._left, self._right], pre=pre, post=post)
 
-    def _additiveVisit(self, visitor):
-        visitor(self)
+    def _additiveVisit(self, pre=None, post=None):
+        if pre:
+            pre(self)
         if not self._leftLit:            
-            self._left.visit(visitor)            
+            self._left.visit(pre=pre, post=post)
         if not self._rightLit:
-            self._right.visit(visitor)            
-                
-    XPath.ParsedExpr.FunctionCall.visit = lambda self, visitor: _visit(self, visitor, self._args)
+            self._right.visit(pre=pre, post=post)
+        if post:
+            post(self)            
+                            
+    XPath.ParsedExpr.FunctionCall.visit = lambda self, pre=None, post=None: _visit(self, self._args, pre, post)
     XPath.ParsedExpr.ParsedNLiteralExpr.visit = _visit0
     XPath.ParsedExpr.ParsedLiteralExpr.visit = _visit0    
     XPath.ParsedExpr.ParsedVariableReferenceExpr.visit = _visit0
     XPath.ParsedExpr.ParsedUnionExpr.visit = _visitlr
     XPath.ParsedExpr.ParsedPathExpr.visit = _visitlr #may have implicit decendent-or-self step too
-    XPath.ParsedExpr.ParsedFilterExpr.visit = lambda self, visitor: _visit(self, visitor, [self._filter, self._predicates])
+    XPath.ParsedExpr.ParsedFilterExpr.visit = \
+            lambda self, pre=None, post=None: _visit(self, [self._filter, self._predicates], pre, post)
     XPath.ParsedExpr.ParsedOrExpr.visit = _visitlr
     XPath.ParsedExpr.ParsedAndExpr.visit = _visitlr
     XPath.ParsedExpr.ParsedEqualityExpr.visit = _visitlr
     XPath.ParsedExpr.ParsedRelationalExpr.visit = _visitlr
     XPath.ParsedExpr.ParsedMultiplicativeExpr.visit = _visitlr
     XPath.ParsedExpr.ParsedAdditiveExpr.visit = _additiveVisit
-    XPath.ParsedExpr.ParsedUnaryExpr.visit = lambda self, visitor: _visit(self, visitor, [self._exp])
+    XPath.ParsedExpr.ParsedUnaryExpr.visit = lambda self, visitor: _visit(self, [self._exp], pre, post)
     XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath.visit = \
-                    lambda self, visitor: _visit(self, visitor, [_rel])
+                    lambda self, pre=None, post=None: _visit(self, [_rel], pre, post)
     XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath.visit = \
-                    lambda self, visitor: _visit(self, visitor, [self._left, self._middle, self._right])
+                    lambda self, pre=None, post=None: _visit(self, [self._left, self._middle, self._right], order='pre')
     XPath.ParsedAbsoluteLocationPath.ParsedAbsoluteLocationPath.visit = \
-                    lambda self, visitor: _visit(self, visitor, [self._child])
+                    lambda self, pre=None, post=None: _visit(self, [self._child], pre, post)
     XPath.ParsedAxisSpecifier.AxisSpecifier.visit = _visit0
     XPath.ParsedNodeTest.NodeTestBase.visit = _visit0
-    XPath.ParsedPredicateList.ParsedPredicateList.visit = lambda self, visitor: _visit(self, visitor, self._predicates)
+    XPath.ParsedPredicateList.ParsedPredicateList.visit = \
+                    lambda self, pre=None, post=None: _visit(self, self._predicates, pre, post)
     XPath.ParsedRelativeLocationPath.ParsedRelativeLocationPath.visit = _visitlr
     XPath.ParsedStep.ParsedStep.visit = \
-            lambda self, visitor: _visit(self, visitor, [self._axis, self._nodeTest, self._predicates])
+            lambda self, pre=None, post=None: _visit(self, [self._axis, self._nodeTest, self._predicates], pre, post)
     XPath.ParsedStep.ParsedAbbreviatedStep.visit = _visit0
-    XPath.ParsedStep.ParsedNodeSetFunction.visit = lambda self, visitor: _visit(self, visitor, [self._function, _self._predicates])
+    XPath.ParsedStep.ParsedNodeSetFunction.visit = \
+            lambda self, pre=None, post=None: _visit(self, [self._function, _self._predicates], pre, post)
+    Xslt.XPathExtensions.SortedExpression.visit = \
+            lambda self, pre=None, post=None: _visit(self, [self.expression], pre, post)
+    Xslt.XPathExtensions.RtfExpr.visit = _visit0
 
     def _iter(self, fields):
         yield self
@@ -729,6 +889,131 @@ try:
             lambda self: _iter(self, [self._axis, self._nodeTest, self._predicates])
     XPath.ParsedStep.ParsedAbbreviatedStep.__iter__ = _iter0
     XPath.ParsedStep.ParsedNodeSetFunction.__iter__ = lambda self: _iter(self, [self._function, _self._predicates])
+    Xslt.XPathExtensions.SortedExpression.__iter__ = lambda self: _iter(self, [self.expression])
+    Xslt.XPathExtensions.RtfExpr.__iter__ = _iter0
 
 except ImportError: #don't create a dependency on Ft.Xml.XPath
     pass
+
+import HTMLParser
+    
+class LinkFixer(HTMLParser.HTMLParser):
+    def __init__(self, out):
+        HTMLParser.HTMLParser.__init__(self)
+        self.out = out
+        self.tagStack = []
+
+    def needsFixup(self, tag, name, value):
+        '''
+        This method is called for each attribute, element content,
+        processor instruction, doctype declaration or comment.
+        
+        tag is the current element's name (or None if not inside an element)
+        name is the name of the attribute (or None if not called on an attribute)
+        value that may need fixing up.
+
+        You can determine the context in which the method is called from its arguments:
+        
+        each attribute: tag, name and value (value will be None when encounting HTML compact attributes)
+        in element content: tag and value (Note: in HTML content tag may be wrong.)
+        each comment: value (starts with '<!--')
+        each doctype declaration: value (starts with '<!')
+        each processor instruction: value (starts with '<?')
+        '''
+        return False
+
+    def doFixup(self, tag, name, value):
+        return value
+    
+    def handle_starttag(self, tag, attrs):
+        self.tagStack.append(tag)
+        changes = []
+        for name, value in attrs:
+            if self.needsFixup(tag, name, value): 
+                newvalue = self.doFixup(tag, name, value)
+                changes.append( (value, newvalue) )
+        tagtext = self.get_starttag_text()        
+        for old, new in changes:            
+            tagtext = tagtext.replace(old, new) #todo: might lead to unexpected results
+        self.out.write(tagtext)
+
+    def unescape(self, s):
+        '''
+        This does nothing!!
+        We disable this by overriding it so that we get the real attribute value.
+        Use reallyUnescape() if you need this functionality
+        '''
+        return s
+    
+    def reallyUnescape(self, s):
+        return HTMLParser.HTMLParser(self, s)
+        
+    # Overridable -- finish processing of start+end tag: <tag.../>
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        self.tagStack.pop()
+
+    # we need to override this internal function because xml needs to preserve the case of the end tag
+    #Internal -- parse endtag, return end or -1 if incomplete
+    def parse_endtag(self, i):
+        rawdata = self.rawdata
+        assert rawdata[i:i+2] == "</", "unexpected call to parse_endtag"
+        match = HTMLParser.endendtag.search(rawdata, i+1) # >
+        if not match:
+            return -1
+        j = match.end()
+        match = HTMLParser.endtagfind.match(rawdata, i) # </ + tag + >
+        if not match:
+            self.error("bad end tag: %s" % `rawdata[i:j]`)
+        self.endtag_text = match.string[match.start():match.end()]
+        tag = match.group(1)        
+        self.handle_endtag(tag.lower())
+        return j
+        
+    # Overridable -- handle end tag
+    def handle_endtag(self, tag):
+        while self.tagStack:
+           lastTag = self.tagStack.pop()
+           if lastTag == tag:
+               break
+        self.out.write(self.endtag_text)    
+
+    # Overridable -- handle character reference
+    def handle_charref(self, name):
+        self.out.write('&#'+name+';')    
+
+    # Overridable -- handle entity reference
+    def handle_entityref(self, name):
+        self.out.write('&'+name+';')    
+
+    # Overridable -- handle data
+    def handle_data(self, data):
+        if self.tagStack:
+            tag = self.tagStack[-1]
+        else:
+            tag = None
+        if self.needsFixup(tag, None, data): 
+            data = self.doFixup(tag, None, data)
+        self.out.write(data)    
+
+    # Overridable -- handle comment
+    def handle_comment(self, data):
+        data = '<!--'+data+'-->'
+        if self.needsFixup(None, None, data): 
+            data = self.doFixup(None, None, data)                
+        self.out.write(data)    
+
+    # Overridable -- handle declaration
+    def handle_decl(self, data):
+        data = '<!'+data+'>'
+        if self.needsFixup(None, None, data): 
+            data = self.doFixup(None, None, data)        
+        self.out.write(data)    
+
+    # Overridable -- handle processing instruction
+    def handle_pi(self, data):
+        data = '<?'+data+'>' #final ? is included in data 
+        if self.needsFixup(None, None, data): 
+            data = self.doFixup(None, None, data)        
+        self.out.write(data)    
+

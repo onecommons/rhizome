@@ -1,0 +1,20 @@
+ x:stylesheet (version="1.0" xmlns:x="http://www.w3.org/1999/XSL/Transform",
+    xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+    xmlns:wf='http://rx4rdf.sf.net/ns/racoon/xpath-ext#',
+    xmlns:f = 'http://xmlns.4suite.org/ext',
+    xmlns:a="http://rx4rdf.sf.net/ns/archive#",
+    xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#",
+    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#",
+    exclude-result-prefixes = "f wf a wiki rdf rdfs"
+    ) 
+  x:param name="format"
+  x:param name="contents"
+   
+  x:template match='/':
+    html
+     body onload="parent.document.getElementById('previewFrame').height=document.body.scrollHeight+20" 
+         x:choose
+          x:when test="$format='http://rx4rdf.sf.net/ns/wiki#item-format-rhizml'"
+            x:value-of disable-output-escaping='yes' select='wf:get-rhizml($contents)'
+          x:otherwise:
+            `You can only preview content in the RhizML format            

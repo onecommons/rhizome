@@ -8,9 +8,79 @@
         <xu:message text="Conflict: Item has been modified after you started editing this item!" terminate="yes" />
     </xu:if>
 
+    <xu:if test="not($__user/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser')">        
+        <!-- we don't support fine-grained authentication yet for RxUpdate yet so let's block the most egrarious security holes 
+            you can remove this check if you trust your users, etc.
+         -->
+        <xu:if test="$format = 'http://rx4rdf.sf.net/ns/wiki#item-format-python' and
+             not(/*[.=concat($BASE_MODEL_URI, 'execute-python-token')][.=$__user/auth:has-rights-to/* or .=$__user/auth:has-role/*/auth:has-rights-to/*])">
+            <xu:message text="You ({$__user/wiki:login-name}) don't have permission to create a page with format {$format}" terminate="yes" />
+        </xu:if>
+    
+        <xu:if test="$format = 'http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate' and
+             not(/*[.=concat($BASE_MODEL_URI, 'execute-rxupdate-token')][.=$__user/auth:has-rights-to/* or .=$__user/auth:has-role/*/auth:has-rights-to/*])">
+            <xu:message text="You ({$__user/wiki:login-name}) don't have permission to create a page with format {$format}" terminate="yes" />
+        </xu:if>
+    </xu:if>
+    
+    <xu:variable name='current-time' select="wf:current-time()"/>
+
+    <!-- if anonymous was selected treat the itemname as the folder path 
+         if no itemname was specified assume the item is anonymous
+         in either case, we create a name based on the current time
+     -->    
+    <xu:if test="wf:get-metadata('anonymous') and $itemname">
+        <xu:if test="substring($itemname, string-length($itemname)) != '/'">
+            <xu:variable name='itemname' select="concat($itemname, '/')" />
+        </xu:if>
+        <xu:variable name='itemname' select="concat($itemname, translate(f:pytime-to-exslt($current-time), ':', '_') )" />
+    </xu:if>
+    <xu:if test="not($itemname)">
+        <xu:variable name='itemname' select="translate(f:pytime-to-exslt($current-time), ':', '_')" />
+    </xu:if>
+    <!-- update the external metadata context with the possibly new itemname value -->
+    <xu:if test="wf:assign-metadata('itemname', $itemname)" />
+    
     <xu:variable name='resource' select='/*[wiki:name=$itemname]' />
         
     <xu:variable name = 'contents' select="f:if($file, $file, $contents)" />
+
+    <xu:define-template name='getOrCreateFolder'>
+    <!--
+    requires 2 variables to be set: $folderPath and $parentName (initial value should be an empty string)
+    exits with $folder set to the deepest folder resource    
+    -->
+    
+      <!-- get the next segment: the substring stopping at the next / after parentName -->
+      <xu:variable name='folderName' select="concat($parentName, substring-before( substring($folderPath, string-length($parentName)+1 ), '/'))" />
+      <xu:if test='$folderName != $parentName'>  <!-- stop at the last segment (we assume its not a folder) -->
+          <xu:variable name='folder' select='/wiki:Folder[wiki:name=$folderName]'/>            
+          <xu:if test='not($folder)'>
+              <xu:append select='/'>
+                <!-- the final slash is there to distinguish it from a a:NamedContent resource with the same URI,
+                     it has no impact on URI resolution
+                -->
+                <wiki:Folder rdf:about='{wf:get-nameURI($folderName)}/' >
+                  <wiki:name><xu:value-of select="$folderName" /></wiki:name>
+                </wiki:Folder>
+              </xu:append>
+              <!-- now that we've created it, rebind the variable -->
+              <xu:variable name='folder' select='/wiki:Folder[wiki:name=$folderName]'/>
+              
+              <xu:if test='$parentName'>
+                   <!-- removes trailing slash from parentName and the folder with that name -->
+                  <xu:variable name='parentFolder' select='/wiki:Folder[wiki:name=substring($parentName, 1, string-length($parentName)-1)]'/>
+                  <xu:append select='$parentFolder'>
+                      <wiki:has-child>
+                        <xu:attribute name="rdf:resource"><xu:value-of select="$folder"/></xu:attribute>
+                      </wiki:has-child>
+                  </xu:append>             
+              </xu:if>          
+          </xu:if>
+          <xu:variable name='parentName' select="concat($folderName, '/')"/>            
+          <xu:call-template name='getOrCreateFolder'/>                        
+      </xu:if>          
+    </xu:define-template>
     
     <!-- if the wikiname does not exist, add it now -->    
     <xu:if test='not($resource)'>
@@ -24,19 +94,30 @@
         </xu:append>
         <!-- now that we've created it, rebind the variable -->
         <xu:variable name='resource' select='/*[wiki:name=$itemname]' />
+                
+        <xu:if test='contains($itemname, "/")'>
+          <xu:variable name='folderPath' select="$itemname" />
+          <xu:variable name='parentName' select='""'/>
+          <xu:call-template name='getOrCreateFolder'/>
+          <xu:append select='$folder'>
+              <wiki:has-child>
+                <xu:attribute name="rdf:resource"><xu:value-of select="$resource"/></xu:attribute>
+              </wiki:has-child>
+          </xu:append>          
+        </xu:if>
     </xu:if>
     
     <!-- add or update last modified -->
     <xu:remove select='$resource/a:last-modified'/> 
     <xu:append select='$resource'>
-        <a:last-modified><xu:value-of select="wf:current-time()"/></a:last-modified>
+        <a:last-modified><xu:value-of select="$current-time"/></a:last-modified>
     </xu:append>
 
     <!-- set access control: remove previous, add selected, if any -->
-    <xu:remove select='$resource/auth:needs-token'/>
+    <xu:remove select='$resource/auth:guarded-by'/>
     <xu:if test="$authtoken"> 
        <xu:append select='$resource'>    
-         <auth:needs-token><xu:attribute name="rdf:resource"><xu:value-of select="$authtoken"/></xu:attribute></auth:needs-token>
+         <auth:guarded-by rdf:resource='{$authtoken}'/>
        </xu:append>
     </xu:if>
     
@@ -45,12 +126,11 @@
     <!-- don't bother saving the last revision if this was just a minor edit
     todo: this doesn't delete the actual contents if stored in an external file
 
-    we disallow minor edit if the previous revision was edited by a different user 
-    todo: we should still add a minor-edit flag to metadata to mark the revision as minor:
-      <if not($addRevision) and $minor-edit>...
+    we disallow minor edit logic if the previous revision was edited by a different user 
+    (instead we add a minor-edit property to mark the revision as minor)
     -->
     <xu:variable name='replaceRevision' select="wf:get-metadata('minor_edit') and 
-       (not($resource/wiki:revisions/*) or ($resource/wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by = $_user)" /> 
+       (not($resource/wiki:revisions/*) or ($resource/wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by = $__user)" /> 
         
     <xu:if test='$replaceRevision'>    
     
@@ -89,8 +169,8 @@
             if the previous revision stored its content as base64 encoded, we need to replace the base64 decode transform also
             Likewise if previous revision was a patch (which will be true with a minor edit, since we just removed the latest revision)
             -->            
-            <xu:variable name = 'isPatch' select="$lastContents/../a:transformed-by = 'http://rx4rdf.sf.net/ns/content#pydiff-patch-transform'" />
-            <xu:variable name = 'replaceContents' select="f:if($base64decode or $isPatch, $lastContents/../../.., $lastContents)" />
+            <xu:variable name = 'isPatch' select="$lastContents/../a:transformed-by = 'http://rx4rdf.sf.net/ns/content#pydiff-patch-transform'" />            
+            <xu:variable name = 'replaceContents' select="f:if($base64decode or $isPatch, $lastContents/../../.., $lastContents)" /> 
              
             <xu:replace select='$replaceContents'>
               <a:contents>
@@ -163,10 +243,13 @@
                 <wiki:title><xu:value-of select="$title"/></wiki:title>
             </xu:if>
             <xu:if test='wf:get-metadata("label")'>
-                <wiki:has-label><xu:value-of select="$label"/></wiki:has-label>
+                <wiki:has-label rdf:resource="{$label}"/>
             </xu:if>
-            <a:created-on><xu:value-of select="wf:current-time()"/></a:created-on>
-            <wiki:created-by><xu:attribute name="rdf:resource"><xu:value-of select="$_user"/></xu:attribute></wiki:created-by>
+            <a:created-on><xu:value-of select="$current-time"/></a:created-on>
+            <wiki:created-by rdf:resource="{$__user}"/>
+            <xu:if test='not($replaceRevision) and wf:get-metadata("minor_edit")'>
+                <wiki:minor-edit>1</wiki:minor-edit>
+            </xu:if>            
         </wiki:Item>
        </rdf:first>
     </xu:append>

@@ -12,7 +12,7 @@
 		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header auth" >
 <xsl:output method='html' indent='no' />
 <xsl:param name="_name" />
-<xsl:param name="_user" />
+<xsl:param name="__user" />
 <xsl:param name="action" />
 <xsl:variable name='target'>
      <xsl:choose>
@@ -43,20 +43,51 @@
 	
 <xsl:template match="/" name="edit-main" >
 <xsl:param name="itemname" select="$target" />
-<form METHOD="POST" ACTION="{f:if($item,$itemname, 'save')}" ENCTYPE="multipart/form-data">
-    <input TYPE="hidden" NAME="action" VALUE="{f:if($item,'save','creation')}" />    
+
+<script language="JavaScript">
+function OnSubmitEditForm()
+{
+  if(document.editFormPressed == 'Preview')
+  {
+   document.edit.action ="site:///preview";
+   document.edit.target ="preview";
+   var actionField = document.getElementById("action")
+   if (actionField != null)
+        actionField.parentNode.removeChild(actionField);     
+  }
+  else
+  if(document.editFormPressed == 'Save')
+  {	
+    var newEditAction = document.getElementById("startTime").cloneNode(false)
+    newEditAction.name = 'action'
+    newEditAction.id = 'action'
+    newEditAction.value = "<xsl:value-of select="f:if($item,'save','creation')"/>"
+    document.edit.appendChild(newEditAction)
+    
+    document.edit.action ="site:///<xsl:value-of select="f:if($item,$itemname, 'save')"/>";
+    document.edit.target ="_self";
+  }
+  return true;
+}
+</script>
+
+<form name="edit" METHOD="POST" onSubmit="return OnSubmitEditForm();" ACTION="site:///{f:if($item,$itemname, 'save')}" ENCTYPE="multipart/form-data">
+    <!-- <input TYPE="hidden" NAME="action" VALUE="{f:if($item,'save','creation')}" />  -->
 	<xsl:if test='string-length($itemname) > 0'>		
 	    <input TYPE="hidden" NAME="itemname" VALUE="{$itemname}" />
 	    <xsl:variable name='title' select="wf:assign-metadata('title', concat('Editing ', $itemname))" />
 	</xsl:if>	
 	<xsl:if test='string-length($itemname)=0'>
-	    Name <input TYPE="text" NAME="itemname" VALUE="" SIZE="20" MAXLENGTH="100" />	    
+	    <input TYPE="radio" NAME="anonymous" checked="checked" VALUE="" /> 
+	    <label for="itemname">Name</label><input TYPE="text" NAME="itemname" VALUE="" SIZE="20" MAXLENGTH="100" />	    
+	    <input TYPE="radio" NAME="anonymous" VALUE="on" /><label for="anonymous">Anonymous</label>
 	    <xsl:variable name='title' select="wf:assign-metadata('title', 'New Item')" />
+	    <br/>
     </xsl:if>
-    Title <input TYPE="text" NAME="title" VALUE="{$item/wiki:title}" SIZE="80" MAXLENGTH="100" />
+    <label for='title'>Title</label> <input TYPE="text" NAME="title" VALUE="{$item/wiki:title}" SIZE="80" MAXLENGTH="100" />
     <br/>
-	<input TYPE="hidden" NAME="startTime" VALUE="{wf:current-time()}" />
-	Upload File:<input TYPE='file' name='file' /><br /> OR edit text here: <br />
+	<input TYPE="hidden" NAME="startTime" id="startTime" VALUE="{wf:current-time()}" />
+	Upload File:<input TYPE='file' name='file' /> OR edit text here: <br />
 	<textarea NAME="contents" ROWS="20" COLS="65" STYLE="width:100%" WRAP="virtual">
 	<xsl:value-of select="$contents" />
 	</textarea>
@@ -68,7 +99,7 @@
             <xsl:call-template name="add-option" >
                 <xsl:with-param name="text" select="rdfs:label/text()" />
                 <xsl:with-param name="value" select="$i" />
-                <xsl:with-param name="selected" select="f:if($item, $item//a:transformed-by/*/@rdf:about[.=$i], $i='http://rx4rdf.sf.net/ns/wiki#item-format-rhizml')" />
+                <xsl:with-param name="selected" select="f:if($item, $item//a:contents/*/a:transformed-by/*/@rdf:about[.=$i], $i='http://rx4rdf.sf.net/ns/wiki#item-format-rhizml')" />
             </xsl:call-template>
 	</xsl:for-each>
 	</select>
@@ -89,7 +120,7 @@
             </xsl:call-template>
 	</xsl:for-each>
 	</select>    
-	&#xa0;Item Type:&#xa0;<select name="disposition" size="1" width="100">	
+	Item&#xa0;Type:&#xa0;<select name="disposition" size="1" width="100">	
         <xsl:for-each select="/wiki:ItemDisposition">
             <xsl:variable name="i" select="./@rdf:about" />
             <xsl:call-template name="add-option" >
@@ -99,9 +130,9 @@
             </xsl:call-template>
 	</xsl:for-each>
 	</select>
-	<br />Sharing
+	Sharing
 	<select name="authtoken" size="1" width="100">	
-	    <xsl:variable name="tokens" select="$_user/auth:has-token/* | $_user/auth:has-role/*/auth:has-token/*" />
+	    <xsl:variable name="tokens" select="$__user/auth:has-rights-to/* | $__user/auth:has-role/*/auth:has-rights-to/*" />
 	    <xsl:call-template name="add-option" >
 	        <xsl:with-param name="text">Public</xsl:with-param>
 	        <xsl:with-param name="value" />
@@ -110,35 +141,36 @@
             <xsl:call-template name="add-option" >
                 <xsl:with-param name="text" select="rdfs:label/text()" />
                 <xsl:with-param name="value" select="." />
-                <xsl:with-param name="selected" select=". = ($namedContent/auth:needs-token/* | $namedContent/auth:member-of/*/auth:needs-token/*)" />
+                <xsl:with-param name="selected" select=". = ($namedContent/auth:guarded-by/*)" />
             </xsl:call-template>
 	    </xsl:for-each>
 	</select>
 	&#xa0;Label:&#xa0;<select name="label" size="1" width="100">	
-	<xsl:variable name="label" select="f:if($item, string($item/wiki:has-label), 'released')" />
+	    <xsl:call-template name="add-option" >
+            <xsl:with-param name="text" select="''" />
+            <xsl:with-param name="value" select="''" />
+	        <!-- select this only when the item exists and it has no doctype -->
+	        <xsl:with-param name="selected" select="f:if($item, not($item/wiki:label))" />
+	    </xsl:call-template>		
+        <xsl:for-each select="/wiki:Label">
+            <xsl:variable name="i" select="./@rdf:about" />
             <xsl:call-template name="add-option" >
-                <xsl:with-param name="text" select="''" />
-                <xsl:with-param name="value" select="''" />
-                <xsl:with-param name="selected" select="not($label)" />
+                <xsl:with-param name="text" select="rdfs:label" />
+                <xsl:with-param name="value" select="$i" />
+                <xsl:with-param name="selected" select="f:if($item, 
+                    $item/wiki:has-label/*[.=$i], $i='http://rx4rdf.sf.net/ns/wiki#label-released')" />
             </xsl:call-template>
-	        <xsl:call-template name="add-option" >
-                <xsl:with-param name="text" select="'Draft'" />
-                <xsl:with-param name="value" select="'draft'" />
-                <xsl:with-param name="selected" select="$label='draft'" />
-            </xsl:call-template>            
-	        <xsl:call-template name="add-option" >
-                <xsl:with-param name="text" select="'Released'" />
-                <xsl:with-param name="value" select="'released'" />
-                <xsl:with-param name="selected" select="$label='released'" />
-            </xsl:call-template>            
+    	</xsl:for-each>
 	</select>		
 	<br />
 	<input TYPE="checkbox" NAME="minor_edit" VALUE="on" />This change is a minor edit.<br/>
-	<input TYPE="submit" NAME="save" VALUE="Save" />
-		
-	<!-- todo: <input TYPE="submit" NAME="preview" VALUE="Preview" /> -->	
-</form>
-<a href="RhizML">RhizML</a> Formatting Quick Reference (see <a href="TextFormattingRules">TextFormattingRules</a> for more info)
+
+	<input TYPE="SUBMIT" name="preview" onClick="document.editFormPressed=this.value" VALUE="Preview" />
+    &#xa0;<input TYPE="SUBMIT" name="save" onClick="document.editFormPressed=this.value" VALUE="Save" />
+    </form>
+    <iframe src='' name='preview' id='previewFrame' width='100%' height='0'/>
+
+<a href="site:///RhizML">RhizML</a> Formatting Quick Reference (see <a href="site:///TextFormattingRules">TextFormattingRules</a> for more info)
 <pre class="code">
 ----             Horizontal ruler
                  Blank line starts a new paragraph

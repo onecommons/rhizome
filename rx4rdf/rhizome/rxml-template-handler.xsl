@@ -12,27 +12,20 @@
 
 <xsl:output omit-xml-declaration='yes' indent='no' />
 <xsl:param name="_name" />
-<xsl:param name="__resource" />
+<xsl:param name="_contents" />		
+<xsl:param name="BASE_MODEL_URI" />
 
 <!-- this edit page is always html, not the content's mimetype -->
-<xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />
-<xsl:variable name='revision' select="($__resource/wiki:revisions/*/rdf:first/*)[last()]" />
-<xsl:variable name='transforms' select="$revision//a:contents/*" />	
+<xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />	
 
 <xsl:template match="/" >
 <form METHOD="POST" ACTION="site:///{$_name}" ENCTYPE="multipart/form-data">	
-    <input TYPE="hidden" NAME="itemname" VALUE="{$_name}" />
-    <input type="hidden" name="about" value="{$__resource}"/>
     <input TYPE="hidden" NAME="action" VALUE="save-metadata" />    
-	<input TYPE="hidden" NAME="resource" VALUE="{$__resource}" />
-    <input TYPE="hidden" NAME="resource" VALUE="{$revision}" />
-    <xsl:for-each select="$transforms">
-        	<input TYPE="hidden" NAME="resource" VALUE="{.}" />
-    </xsl:for-each>
-        Edit Metadata
+    <input TYPE="hidden" NAME="itemname" VALUE="{$_name}" />
+        Create New Resources from Template
          <br/>
 	<textarea NAME="metadata" ROWS="30" COLS="75" STYLE="width:100%" WRAP="off">
-	<xsl:value-of select="wf:get-rdf-as-rhizml($__resource | $revision | $transforms)" />
+	<xsl:value-of select="f:replace('%(base)s',$BASE_MODEL_URI,$_contents)" />
 	</textarea>
 	<br/>
 	<input TYPE="submit" NAME="save" VALUE="Save" />
