@@ -1,23 +1,31 @@
 '''
-    An XML Dom Implementation that conforms to RxPath.
-    Loads and saves the Dom to a RDF model.
+    An XML DOM Implementation that conforms to RxPath.
+    Loads and saves the DOM to a RDF model.
 
     Design notes:
     Queries the underlying model as needed to build up the DOM on demand.
     The DOM is only mutable in 2 ways:
-    * Resources can be added or deleted by calling appendChild or removeChild on the root (document) node
-      Adding a resource has no effect on the underlying model until statements that reference it are added.
-      Deleting a resource removes all statements that are the resource is the subject of.
-    * Statements can be added or deleted by calling appendChild or removeChild
-      on a Resource (i.e. a Subject or Object) node
-    Therefore it is an error to try to remove an Object node.
-    Also, it is error to remove a resource if there is an object with a reference to it
 
-    The underlying model will be modified as the DOM is modified and the moodel should
-    only be modified by the DOM for the lifetime of the DOM instance.
+    * Resources can be added or deleted by calling appendChild or
+      removeChild on the root (document) node. Adding a resource has
+      no effect on the underlying model until statements that
+      reference it are added. Deleting a resource removes all
+      statements that are the resource is the subject of.
+
+    * Statements can be added or deleted by calling appendChild or removeChild
+      on a Resource (i.e. a Subject or Object) node. Therefore it is
+      an error to try to remove an Object node. Also, it is error to
+      remove a resource if there is an object with a reference to it.
+
+    The underlying model will be modified as the DOM is modified and
+    the model should only be modified by the DOM for the lifetime of
+    the DOM instance. In addition, the Document class has begin(),
+    commit(), and rollback() methods to allow the DOM and underlying
+    model to be modified atomically.
 
     The Document factory methods (e.g. createElementNS) create "regular" XML
-    dom nodes which will be coerced into RDF Dom nodes when attached the RDF DOM via appendChild et. al.
+    DOM nodes which will be coerced into RDF DOM nodes when attached the
+    RDF DOM via appendChild, etc.
     
     Todo:    
     * check for object references when removing a resource   
@@ -33,7 +41,7 @@ from rx import RxPath, utils, DomTree
 from xml.dom import NotSupportedErr, HierarchyRequestErr, NotFoundErr
 from xml.dom import IndexSizeErr
 from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL
-from Ft.Xml import SplitQName, XMLNS_NAMESPACE
+from Ft.Xml import SplitQName, XML_NAMESPACE
 from utils import NotSet
 from rx.RxPath import RDF_MS_BASE
 import sys, copy
@@ -421,7 +429,7 @@ class Subject(Resource):
     # anywhere in the document (i.e. modifying the children of an Object node)
         
     def __init__(self, uri, owner, next=NotSet, prev=NotSet):
-        Resource.__init__(self, owner, uri)
+        Resource.__init__(self, owner, uri)        
         self.parentNode = owner
         self.nextSibling = next
         self.previousSibling = prev
@@ -518,7 +526,7 @@ class Subject(Resource):
             #rewrite predicate based on rdf:_n or listID or bNode
         stmtID = newChild.getAttributeNS(RDF_MS_BASE,'ID')
         datatype = newChild.getAttributeNS(RDF_MS_BASE,'datatype')
-        lang  = newChild.getAttributeNS(XMLNS_NAMESPACE,'lang')
+        lang  = newChild.getAttributeNS(XML_NAMESPACE,'lang')
         listID = newChild.getAttributeNS(None,'listID')
         if newChild.getAttributeNS(RDF_MS_BASE,'resource'): #for concision, allow the use of a rdf:resource attribute instead of a child element
             object = newChild.getAttributeNS(RDF_MS_BASE, 'resource')
@@ -526,10 +534,10 @@ class Subject(Resource):
             objectType = OBJECT_TYPE_RESOURCE            
         elif newChild.firstChild is None: #if no children assign an empty string as the object            
             object = ''
-            objectType = OBJECT_TYPE_LITERAL            
+            objectType = datatype or lang or OBJECT_TYPE_LITERAL            
         elif newChild.firstChild.nodeType == Node.TEXT_NODE:
             object = newChild.firstChild.nodeValue
-            objectType = OBJECT_TYPE_LITERAL
+            objectType = datatype or lang or OBJECT_TYPE_LITERAL
         else:
             object = newChild.firstChild.getAttributeNS(RDF_MS_BASE, 'about')
             if not object: #no explicit URI assigned, generate a bNode now
@@ -924,12 +932,12 @@ class Object(Resource):
             self._firstChild = self._lastChild = None
 
 class BasePredicate(Element):
-    idNode = None
-    listIDNode = None
-    uriNode = None
-    builtInAttr = { (RDF_MS_BASE, 'ID') : 'self.stmt.uri',
-                    (None, 'listID') : 'self.listID',
-                    (None, 'uri') : 'self.stmt.predicate',
+    __attributes = None
+    builtInAttr = { (RDF_MS_BASE, u'ID') : 'self.stmt.uri',
+                    (None, u'listID') : 'self.listID',
+                    (None, u'uri') : 'self.stmt.predicate',
+                    (XML_NAMESPACE, u'lang'): "self.lang",
+                    (RDF_MS_BASE, u'datatype') : 'self.datatype',
                   }
     
     #design notes:
@@ -947,10 +955,10 @@ class BasePredicate(Element):
         self.nodeName = self.tagName = qname
                 
         self._parentNode = parent
-        if stmt.objectType == OBJECT_TYPE_LITERAL:
-            self.firstChild = self.lastChild = Text(stmt.object, self)
+        if stmt.objectType == OBJECT_TYPE_RESOURCE:
+            self.firstChild = self.lastChild = Object(stmt.object, self)            
         else:
-            self.firstChild = self.lastChild  = Object(stmt.object, self)
+            self.firstChild = self.lastChild = Text(stmt.object, self)            
         self.childNodes = [ self.firstChild ] 
 
     def getModelStatements(self):
@@ -1003,37 +1011,12 @@ class BasePredicate(Element):
                 self.stmt == other.stmt and self.listID == other.listID
 
     def getAttributeNS(self, namespaceURI, localName):
-        if namespaceURI == RDF_MS_BASE:
-            if localName == 'ID':
-                return self.stmt.uri
-            #elif localName == 'datatype': #todo support datatype and xml:lang
-            #    datatype
-            else:
-                return ''
-        elif not namespaceURI and localName == 'listID':
-            return self.listID or ''
-        elif not namespaceURI and localName == 'uri':
-            return self.stmt.predicate
+        toEval = self.builtInAttr.get( (namespaceURI, localName) )
+        if toEval:
+            return eval(toEval) or u''
         else:
-            return ''
+            return u''
 
-    def getAttributeNodeNS(self, namespaceURI, localName):
-        if namespaceURI == RDF_MS_BASE and localName == 'ID':        
-            if not self.idNode and self.stmt.uri:            
-                prefix = self.ownerDocument.nsRevMap[RDF_MS_BASE]            
-                self.idNode = Attr(self, RDF_MS_BASE, prefix, u'ID', self.stmt.uri)
-            return self.idNode
-        elif not namespaceURI and localName == 'listID':
-            if not self.listIDNode and self.listID:            
-                self.listIDNode = Attr(self, None, u'', u'listID', self.listID)
-            return self.listIDNode
-        elif not namespaceURI and localName == 'uri':
-            if not self.uriNode:            
-                self.uriNode = Attr(self, None, u'', u'uri', self.stmt.predicate)
-            return self.uriNode
-        else:
-            return None
-    
     def hasAttributeNS(self, namespaceURI, localName):
         toEval = self.builtInAttr.get( (namespaceURI, localName) )
         if toEval and eval(toEval):        
@@ -1041,18 +1024,48 @@ class BasePredicate(Element):
         else:
             return False
 
-    def _get_attributes(self):
-        attributes = { (None, u'uri') : self.getAttributeNodeNS(None, 'uri') }
-        attr = self.getAttributeNodeNS(RDF_MS_BASE, 'ID')
-        if attr:
-            attributes[(RDF_MS_BASE, u'ID')] = attr
-        attr = self.getAttributeNodeNS(None, 'listID')
-        if attr:
-            attributes[(None, u'listID')] = attr
-        
-        return attributes
+    def getAttributeNodeNS(self, namespaceURI, localName):
+        toEval = self.builtInAttr.get( (namespaceURI, localName) )
+        if toEval:            
+            node = getattr(self, localName + 'Node', None)
+            if not node:
+                prefix = self.ownerDocument.nsRevMap.get(namespaceURI, u'')                
+                value = eval(toEval)
+                if value:
+                    node = Attr(self, namespaceURI, prefix, localName, value)
+                    setattr(self, localName + 'Node', node)
+                else:
+                    return None
+            return node                
+        return None
     
+    def _get_attributes(self):
+        if self.__attributes is None:
+            self.__attributes = dict([
+                ((namespaceURI, localName),
+                    self.getAttributeNodeNS(namespaceURI, localName))
+                for ((namespaceURI, localName),toEval)
+                  in self.builtInAttr.items() if eval(toEval)
+              ])
+        return self.__attributes
+               
     attributes = property(_get_attributes)
+    
+    def _get_lang(self):        
+        if len(self.stmt.objectType) > 1 and self.stmt.objectType.find(':') == -1:
+            return unicode(self.stmt.objectType)
+        else:
+            return None
+
+    lang = property(_get_lang)
+
+    def _get_datatype(self):
+        if self.stmt.objectType.find(':') > -1:
+            return unicode(self.stmt.objectType)
+        else:
+            return None
+
+    datatype = property(_get_datatype)
 
     #work around for a 'bug' in _conversions.c, unlike Conversion.py (and object_to_string),
     #node_descendants() doesn't check for a stringvalue attribute
@@ -1223,7 +1236,9 @@ class Text(Node):
     nodeName = u'#text'
 
     def __init__(self, data, parent):
-        self.nodeValue = self.data = unicode(data)
+        if not isinstance(data, unicode):
+            data = unicode(data, 'utf8')
+        self.nodeValue = self.data = data
         self.parentNode = parent
         self.ownerDocument = self.rootNode = parent.ownerDocument
 
@@ -1496,9 +1511,10 @@ def main():
           ('http://rx4rdf.sf.net/ns/wiki#', u'wiki'),
           ('http://rx4rdf.sf.net/ns/auth#', u'auth'),
            ('http://www.w3.org/2002/07/owl#', u'owl'),
-           ('http://purl.org/dc/elements/1.1/#', u'dc'),
+           ('http://purl.org/dc/elements/1.1/', u'dc'),
            ('http://xmlns.4suite.org/ext', 'xf'),
-           ( RDF_MS_BASE, u'rdf')
+           ( RDF_MS_BASE, u'rdf'),
+           ('http://www.w3.org/2000/01/rdf-schema#', u'rdfs'),
         ]
     extFunctionMap = None
     try:
