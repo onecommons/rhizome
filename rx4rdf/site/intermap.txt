@@ -1,0 +1,95 @@
+#we place our own copy here so rx4rdf points to ourself
+
+#interwiki link definitions
+#note: you will need to restart Rhizome for changes to this to take affect
+
+rx4rdf site:///
+
+#from moin-1.2.1 
+# MoinMoin additions
+MoinMaster http://moinmaster.wikiwikiweb.de/
+MoinMoin http://moinmoin.wikiwikiweb.de/
+FOLDOC http://foldoc.doc.ic.ac.uk/foldoc/foldoc.cgi?query=
+# for Germany: bookzilla.de instead of amazon == supporting GNU/Linux and 5% for FSF Europe
+# ISBN http://bookzilla.de/shop/action/advancedSearch?action=search&isbn=
+ISBN http://www.amazon.com/exec/obidos/ISBN=
+RFC http://www.ietf.org/rfc/rfc
+FreshMeat http://freshmeat.net/
+Thinki http://www.thinkware.se/cgi-bin/thinki.cgi/
+PythonFaq http://www.python.org/cgi-bin/faqw.py?req=show&file=faq$PAGE.htp
+DseWiki http://www.wikiservice.at/dse/wiki.cgi?
+DocBook http://docbook.org/wiki/moin.cgi/
+AwarenessWiki http://aware.wiki.taoriver.net/moin.cgi/
+PythonWiki http://www.pythonwiki.de/
+JuraWiki http://jurawiki.de/
+SpackOrg http://www.spack.org/index.cgi/
+ESW http://esw.w3.org/topic/
+OSPedia http://ospedia.osdir.com/
+
+#from http://www.usemod.com/cgi-bin/mb.pl?InterMapTxt mar-8-2004
+AbbeNormal http://ourpla.net/cgi/pikie?
+AcadWiki http://xarch.tu-graz.ac.at/autocad/wiki/
+Acronym http://www.acronymfinder.com/af-query.asp?String=exact&Acronym=
+Advogato http://www.advogato.org/
+ALife http://news.alife.org/wiki/index.php?
+AndStuff http://andstuff.org/
+AnnotationWiki http://www.seedwiki.com/page.cfm?wikiid=368&doc=
+BookShelved http://bookshelved.org/cgi-bin/wiki.pl?
+C2find http://c2.com/cgi/wiki?FindPage&value=
+Cache http://www.google.com/search?q=cache:
+CommunityWiki http://www.emacswiki.org/cgi-bin/community?
+CraoWiki http://wiki.crao.net/index.php/
+CreationMatters http://www.ourpla.net/cgi-bin/wiki.pl?
+Dictionary http://www.dict.org/bin/Dict?Database=*&Form=Dict1&Strategy=*&Query=
+Disinfopedia http://www.disinfopedia.org/wiki.phtml?title=
+DseWiki http://www.wikiservice.at/dse/wiki.cgi?
+EmacsWiki http://www.emacswiki.org/cgi-bin/wiki.pl?
+Foldoc http://www.foldoc.org/foldoc/foldoc.cgi?
+FoxWiki http://fox.wikis.com/wc.dll?Wiki~
+FractalWiki http://www.wikiservice.at/fractal/wikidev.cgi?
+Google http://www.google.com/search?q=
+GoogleGroups http://groups.google.com/groups?q=
+HammondWiki http://www.dairiki.org/HammondWiki/
+h2g2 http://www.bbc.co.uk/dna/h2g2/
+IAWiki http://www.IAwiki.net/
+IMDB http://us.imdb.com/Title?
+JargonFile http://downlode.org/perl/jargon-redirect.cgi?term=
+JspWiki http://www.ecyrd.com/JSPWiki/Wiki.jsp?page=
+JuraWiki http://jurawiki.de/
+KnowHow http://www2.iro.umontreal.ca/~paquetse/cgi-bin/wiki.cgi?
+LinuxWiki http://linuxwiki.org/
+LiveJournal http://livejournal.com/users/
+Login http://www.usemod.com/cgi-bin/mb.pl?action=login&p_userid=
+MbTest http://www.usemod.com/cgi-bin/mbtest.pl?
+MeatBall http://www.usemod.com/cgi-bin/mb.pl?
+MetaWiki http://sunir.org/apps/meta.pl?
+MetaWikiPedia http://meta.wikipedia.org/wiki/
+MoinMoin http://moinmoin.wikiwikiweb.de/
+OddMuse http://www.emacswiki.org/cgi-bin/oddmuse/
+OpenWiki http://openwiki.com/?
+PeriPeri http://www.srcf.ucam.org/~cjp39/Peri/
+PersonalTelco http://www.personaltelco.net/index.cgi/
+PhpWiki http://phpwiki.sourceforge.net/phpwiki/index.php?
+Pikie http://pikie.darktech.org/cgi/pikie?
+PythonInfo http://www.python.org/cgi-bin/moinmoin/
+PythonWiki http://www.pythonwiki.de/
+PyWiki http://www.voght.com/cgi-bin/pywiki?
+ReformSociety http://www.reformsociety.com/
+SeattleWireless http://seattlewireless.net/?
+SenseisLibrary http://senseis.xmp.net/?
+StrikiWiki http://ch.twi.tudelft.nl/~mostert/striki/teststriki.pl?
+Tavi http://tavi.sourceforge.net/index.php?
+TWiki http://twiki.org/cgi-bin/view/
+Unreal http://wiki.beyondunreal.com/wiki/
+UseMod http://www.usemod.com/cgi-bin/wiki.pl?
+WebSeitzWiki http://webseitz.fluxent.com/wiki/
+WcsWiki http://www.myelin.co.nz/cgi-bin/wcswiki.pl?
+Why http://clublet.com/c/c/why?
+Wiki http://c2.com/cgi/wiki?
+WikiPedia http://www.wikipedia.org/wiki/
+WikiTravel http://www.wikitravel.org/article/
+WikiWorld http://WikiWorld.com/wiki/index.php/
+WikiZnanie http://www.wikiznanie.ru/wiki/wiki.phtml?title=
+WorldWideWiki http://www.worldwidewiki.net/wiki/
+YpsiEyeball http://sknkwrks.dyndns.org:1957/writewiki/wiki.pl?
+ZWiki http://www.zwiki.org/
