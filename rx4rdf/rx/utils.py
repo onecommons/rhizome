@@ -418,18 +418,26 @@ class Res(dict):
        usage:
        Res.nsMap = { ... } #global namespace map
        
-       res = Res(uri, nsMap) #2nd param is optional instance override of global nsMap
+       res = Res(resourceName, nsMap) #2nd param is optional instance override of global nsMap
        
-       res['q:name'] = 'adfasdfdf' #assign property with literal
+       res['q:name'] = 'foo' #add a statement with property 'q:name' and object literal 'foo'
        
-       #if prefix not found in nsMap treat as an URL
-       res['http://foo'] = Res('http://') #assign a resource
+       res['q:name'] = Res('q:name2') #add a statement with property 'q:name' and object resource 'q:name2'
+       
+       #if prefix not found in nsMap it is treated as an URI
+       res['http://foo'] = Res('http://bar') #add a statement with property http://foo and object resource 'http://bar'
+
+       #if resourceName starts with '_:' it is treated as a bNode
+       res['_:bNode1']
        
        #if you want multiple statements with the same property, use a list as the value, e.g.:
        res.setdefault('q:name', []).append(child)
        
-       #retrieve the statements as NTriples:
+       #retrieve the properties in the resource's dictionary as a NTriples string
        res.toTriples()
+
+       #return a NTriples string by recursively looking at each resource that is the object of a statement
+       res.toTriplesDeep()
     '''
     
     nsMap =  { 'owl': 'http://www.w3.org/2002/07/owl#',
@@ -547,3 +555,153 @@ class Singleton(type):
             cls.instance=super(Singleton,cls).__call__(*args,**kw)
         return cls.instance
 
+class Patcher(type):
+    def __init__(self,name,bases,dic):
+        assert len(bases) == 1
+        self.base = bases[0]
+        for name, value in dic.items():
+            try:
+                oldValue = getattr(self.base,name)
+                hasOldValue = True
+            except:
+                hasOldValue = False
+            setattr(self.base, name, value)
+            if hasOldValue:
+                setattr(self.base, '_super_' + name, oldValue)
+
+    def __call__(self,*args,**kw):
+        '''instantiate the base object'''        
+        return self.base.__metaclass__.__call__(*args,**kw)
+            
+class DynaException(Exception):
+    def __init__(self, msg = None):
+        if not msg is None:
+            self.msg = msg
+        Exception.__init__(self, msg)
+
+class DynaExceptionFactory(object):
+    '''
+    Defines an Exception class
+    usage:
+    _defexception = DynaExceptionFactory(__name__)
+    _defexception('not found error') #defines exception NotFoundError
+    ...
+    raise NotFoundError()
+    '''    
+    def __init__(self, module, base = DynaException):
+        self.module = __import__(module)
+        self.base = base
+                        
+    def __call__(self, name, msg = None):
+        classname = name.title().replace(' ','') #generate classname: capitalize then remove spaces
+        dynaexception = getattr(self.module, classname, None)
+        if dynaexception is None:
+            #create a new class derived from the base Exception type
+            msg = msg or name                
+            dynaexception = type(self.base)(classname, (self.base,), { 'msg': msg })
+            setattr(self.module, classname, dynaexception)
+        return dynaexception
+
+try:
+    from Ft.Xml import XPath
+    def _visit(self, visitor, fields):
+        visitor(self)
+        for field in fields:
+            if field is not None:
+                field.visit(visitor)
+            
+    def _visit0(self, visitor):
+        visitor(self)
+        
+    def _visitlr(self, visitor):    
+        _visit(self, visitor, [self._left, self._right])
+
+    def _additiveVisit(self, visitor):
+        visitor(self)
+        if not self._leftLit:            
+            self._left.visit(visitor)            
+        if not self._rightLit:
+            self._right.visit(visitor)            
+                
+    XPath.ParsedExpr.FunctionCall.visit = lambda self, visitor: _visit(self, visitor, self._args)
+    XPath.ParsedExpr.ParsedNLiteralExpr.visit = _visit0
+    XPath.ParsedExpr.ParsedLiteralExpr.visit = _visit0    
+    XPath.ParsedExpr.ParsedVariableReferenceExpr.visit = _visit0
+    XPath.ParsedExpr.ParsedUnionExpr.visit = _visitlr
+    XPath.ParsedExpr.ParsedPathExpr.visit = _visitlr #may have implicit decendent-or-self step too
+    XPath.ParsedExpr.ParsedFilterExpr.visit = lambda self, visitor: _visit(self, visitor, [self._filter, self._predicates])
+    XPath.ParsedExpr.ParsedOrExpr.visit = _visitlr
+    XPath.ParsedExpr.ParsedAndExpr.visit = _visitlr
+    XPath.ParsedExpr.ParsedEqualityExpr.visit = _visitlr
+    XPath.ParsedExpr.ParsedRelationalExpr.visit = _visitlr
+    XPath.ParsedExpr.ParsedMultiplicativeExpr.visit = _visitlr
+    XPath.ParsedExpr.ParsedAdditiveExpr.visit = _additiveVisit
+    XPath.ParsedExpr.ParsedUnaryExpr.visit = lambda self, visitor: _visit(self, visitor, [self._exp])
+    XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath.visit = \
+                    lambda self, visitor: _visit(self, visitor, [_rel])
+    XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath.visit = \
+                    lambda self, visitor: _visit(self, visitor, [self._left, self._middle, self._right])
+    XPath.ParsedAbsoluteLocationPath.ParsedAbsoluteLocationPath.visit = \
+                    lambda self, visitor: _visit(self, visitor, [self._child])
+    XPath.ParsedAxisSpecifier.AxisSpecifier.visit = _visit0
+    XPath.ParsedNodeTest.NodeTestBase.visit = _visit0
+    XPath.ParsedPredicateList.ParsedPredicateList.visit = lambda self, visitor: _visit(self, visitor, self._predicates)
+    XPath.ParsedRelativeLocationPath.ParsedRelativeLocationPath.visit = _visitlr
+    XPath.ParsedStep.ParsedStep.visit = \
+            lambda self, visitor: _visit(self, visitor, [self._axis, self._nodeTest, self._predicates])
+    XPath.ParsedStep.ParsedAbbreviatedStep.visit = _visit0
+    XPath.ParsedStep.ParsedNodeSetFunction.visit = lambda self, visitor: _visit(self, visitor, [self._function, _self._predicates])
+
+    def _iter(self, fields):
+        yield self
+        for field in fields:
+            if field is not None:
+                for node in field:
+                    yield node
+
+    def _iter0(self):
+        yield self
+        
+    def _iterlr(self):    
+        return _iter(self, [self._left, self._right])
+
+    def _additiveIter(self):
+        yield self
+        if not self._leftLit:
+            for node in self._left:
+                yield node
+        if not self._rightLit:
+            for node in self._right:
+                yield node
+
+    XPath.ParsedExpr.FunctionCall.__iter__ = lambda self: _iter(self, self._args)
+    XPath.ParsedExpr.ParsedNLiteralExpr.__iter__ = _iter0
+    XPath.ParsedExpr.ParsedLiteralExpr.__iter__ = _iter0    
+    XPath.ParsedExpr.ParsedVariableReferenceExpr.__iter__ = _iter0
+    XPath.ParsedExpr.ParsedUnionExpr.__iter__ = _iterlr
+    XPath.ParsedExpr.ParsedPathExpr.__iter__ = _iterlr #may have implicit decendent-or-self step too
+    XPath.ParsedExpr.ParsedFilterExpr.__iter__ = lambda self: _iter(self, [self._filter, self._predicates])
+    XPath.ParsedExpr.ParsedOrExpr.__iter__ = _iterlr
+    XPath.ParsedExpr.ParsedAndExpr.__iter__ = _iterlr
+    XPath.ParsedExpr.ParsedEqualityExpr.__iter__ = _iterlr
+    XPath.ParsedExpr.ParsedRelationalExpr.__iter__ = _iterlr
+    XPath.ParsedExpr.ParsedMultiplicativeExpr.__iter__ = _iterlr
+    XPath.ParsedExpr.ParsedAdditiveExpr.__iter__ = _additiveIter
+    XPath.ParsedExpr.ParsedUnaryExpr.__iter__ = lambda self: _iter(self, [self._exp])
+    XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath.__iter__ = \
+                    lambda self: _iter(self, [_rel])
+    XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath.__iter__ = \
+                    lambda self: _iter(self, [self._left, self._middle, self._right])
+    XPath.ParsedAbsoluteLocationPath.ParsedAbsoluteLocationPath.__iter__ = \
+                    lambda self: _iter(self, [self._child])
+    XPath.ParsedAxisSpecifier.AxisSpecifier.__iter__ = _iter0
+    XPath.ParsedNodeTest.NodeTestBase.__iter__ = _iter0
+    XPath.ParsedPredicateList.ParsedPredicateList.__iter__ = lambda self: _iter(self, self._predicates)
+    XPath.ParsedRelativeLocationPath.ParsedRelativeLocationPath.__iter__ = _iterlr
+    XPath.ParsedStep.ParsedStep.__iter__ = \
+            lambda self: _iter(self, [self._axis, self._nodeTest, self._predicates])
+    XPath.ParsedStep.ParsedAbbreviatedStep.__iter__ = _iter0
+    XPath.ParsedStep.ParsedNodeSetFunction.__iter__ = lambda self: _iter(self, [self._function, _self._predicates])
+
+except ImportError: #don't create a dependency on Ft.Xml.XPath
+    pass

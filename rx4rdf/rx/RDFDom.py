@@ -518,6 +518,13 @@ class RDFDoc(Document):
         resourceUris.sort()
         for u in resourceUris:                        
             self.appendChild( resources[u] )
+            
+    def evalXPath(self, xpath, nsMap = None, vars=None, extFunctionMap = None, node = None, expCache=None):
+        node = node or self
+        #print node    
+        context = XPath.Context.Context(node, varBindings = vars, extFunctionMap = extFunctionMap, processorNss = nsMap)
+        #extModuleList = os.environ.get("EXTMODULES","").split(":"))
+        return evalXPath(xpath, context, expCache)
 
 def getObject(elem):
     if elem.nodeType == Node.TEXT_NODE:
@@ -751,7 +758,7 @@ def _NamespaceTest_match(self, context, node, principalType=Node.ELEMENT_NODE):
         
 XPath.ParsedNodeTest.NamespaceTest.match = _NamespaceTest_match
 
-
+#patch a new GenerateId that uses hash(node) instead of id(node)
 from Ft.Xml.Xslt import XsltRuntimeException, Error,XsltFunctions
 def GenerateId(context, nodeSet=None):
     """
@@ -777,10 +784,37 @@ def GenerateId(context, nodeSet=None):
         return u''
 XsltFunctions.GenerateId = GenerateId
 
+#make XPath.ParsedExpr.FunctionCall*.evaluate have no side effects so we can cache them
+def _FunctionCallEvaluate(self, context, oldFunc):
+    self._func = None
+    return oldFunc(self, context)
+    
+XPath.ParsedExpr.FunctionCall.evaluate = lambda self, context, \
+    func = XPath.ParsedExpr.FunctionCall.evaluate.im_func: \
+        _FunctionCallEvaluate(self, context, func)
+
+XPath.ParsedExpr.FunctionCall1.evaluate = lambda self, context, \
+    func = XPath.ParsedExpr.FunctionCall1.evaluate.im_func: \
+        _FunctionCallEvaluate(self, context, func)
+
+XPath.ParsedExpr.FunctionCall2.evaluate = lambda self, context, \
+    func = XPath.ParsedExpr.FunctionCall2.evaluate.im_func: \
+        _FunctionCallEvaluate(self, context, func)
+
+XPath.ParsedExpr.FunctionCall3.evaluate = lambda self, context, \
+    func = XPath.ParsedExpr.FunctionCall3.evaluate.im_func: \
+        _FunctionCallEvaluate(self, context, func)
+
+XPath.ParsedExpr.FunctionCallN.evaluate = lambda self, context, \
+    func = XPath.ParsedExpr.FunctionCallN.evaluate.im_func: \
+        _FunctionCallEvaluate(self, context, func)
+
+
 ##########################################################################
 ## public user functions
 ##########################################################################                
-def applyXslt(rdfDom, xslStylesheet, topLevelParams = None, extFunctionMap = None, baseUri='file:'):
+def applyXslt(rdfDom, xslStylesheet, topLevelParams = None, extFunctionMap = None,
+              baseUri='file:', styleSheetCache = None, processor = None):
     if extFunctionMap is None: extFunctionMap = {}
     #ExtFunctions = { (FT_EXT_NAMESPACE, 'base-uri'): BaseUri,
     #processor.registerExtensionModules( [__name__] )
@@ -789,15 +823,22 @@ def applyXslt(rdfDom, xslStylesheet, topLevelParams = None, extFunctionMap = Non
         extFunctionMap.update(BuiltInExtFunctions)
     else:
         extFunctionMap = BuiltInExtFunctions
-    
-    from Ft.Xml.Xslt.Processor import Processor
-    processor = Processor()
-    processor.appendStylesheet( InputSource.DefaultFactory.fromString(xslStylesheet, baseUri)) #todo: fix this
+
+    if processor is None:
+        from Ft.Xml.Xslt.Processor import Processor
+        processor = Processor()
+
+    if styleSheetCache:
+        styleSheet = styleSheetCache.getValue(xslStylesheet, baseUri)
+        processor.appendStylesheetInstance( styleSheet, baseUri ) 
+    else:
+        processor.appendStylesheet( InputSource.DefaultFactory.fromString(xslStylesheet, baseUri)) #todo: fix this
+        
     for (k, v) in extFunctionMap.items():
         namespace, localName = k
         processor.registerExtensionFunction(namespace, localName, v)
         
-    oldVal = rdfDom.globalRecurseCheck
+    oldVal = rdfDom.globalRecurseCheck #todo make globalRecurseCheck a thread local property
     rdfDom.globalRecurseCheck=True #todo remove this when we implement RxSLT
     try:
         return processor.runNode(rdfDom, None, 0, topLevelParams) 
@@ -825,21 +866,20 @@ def applyXUpdate(rdfdom, xup = None, vars = None, extFunctionMap = None, uri='fi
         extFunctionMap = BuiltInExtFunctions    
     processor.execute(rdfdom, xupdate, vars, extFunctionMap = extFunctionMap)
 
-def evalXPath(rdfDom, xpath, nsMap = None, vars=None, extFunctionMap = None, node = None, expCache=None):
-    node = node or rdfDom
-    #print node    
+def evalXPath(xpath, context, expCache=None, queryCache=None):
     log.debug(xpath)
-    if extFunctionMap:
-        extFunctionMap.update(BuiltInExtFunctions)
-    else:
-        extFunctionMap = BuiltInExtFunctions
-    context = XPath.Context.Context(node, varBindings = vars, extFunctionMap = extFunctionMap, processorNss = nsMap)
-    #extModuleList = os.environ.get("EXTMODULES","").split(":"))
+
+    context.functions.update(BuiltInExtFunctions)
+    
     if expCache:
-       compExpr = expCache.getValue(xpath)
+       compExpr = expCache.getValue(xpath) #todo: nsMap should be part of the key -- until then clear the cache if you change that!
     else:
         compExpr = XPath.Compile(xpath)
-    res = compExpr.evaluate(context)
+    
+    if queryCache:
+        res = queryCache.getValue(compExpr, context)         
+    else:
+        res = compExpr.evaluate(context)
     return res
                            
 import traceback, sys
@@ -849,7 +889,7 @@ def main():
         try:
             compExpr = XPath.Compile(query)
             #compExpr.pprint()
-            res = evalXPath(rdfDom, query, vars = vars, nsMap = processorNss)            
+            res = rdfDom.evalXPath(query, vars = vars, nsMap = processorNss)            
             #compExpr = XPath.Compile(query)
             #res = XPath.Evaluate(compExpr, rdfDom, context)
         except:

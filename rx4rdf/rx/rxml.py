@@ -225,7 +225,7 @@ def addRxdom2Model(rootNode, model, nsMap = None, rdfdom = None, thisResource = 
         elif matchName(s, rxNSPrefix, 'res-query'):
             assert rdfdom
             if rdfdom:
-                result = RDFDom.evalXPath(rdfdom, s.getAttributeNS(EMPTY_NAMESPACE, 'id'), nsMap)
+                result = rdfdom.evalXPath(s.getAttributeNS(EMPTY_NAMESPACE, 'id'), nsMap)
                 if isinstance(result, ( type(''), type(u'')) ):
                     resources = [ result ]
                 else:
@@ -306,8 +306,8 @@ def getRXAsRhizmlFromNode(resourceNodes, nsMap=None, includeRoot = False,
         indent += INDENT
         root = INITINDENT + rxPrefix + 'rx:' + NL        
 
-    #if not isinstance(resourceNodes, type([])):
-    #    resourceNodes = [ resourceNodes ]
+    if not isinstance(resourceNodes, (type([]), type(()) )):
+        resourceNodes = [ resourceNodes ]
     #print resourceNodes
     for resourceNode in resourceNodes:
         #print resourceNode

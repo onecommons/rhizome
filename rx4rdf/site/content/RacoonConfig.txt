@@ -34,6 +34,28 @@ nsMap = { 'dc' : 'http://purl.org/dc/elements/1.1/#',
           'myNs' : 'http://www.example.com/#'
         }         
 
+#XPATH_CACHE_SIZE sets the maximum number of items to be stored in the XPath processing cache. Set to 0 to disable.
+#default is 1000
+XPATH_CACHE_SIZE=1000
+
+#ACTION_CACHE_SIZE sets the maximum number of items to be stored in the Action cache. Set to 0 to disable.
+#default is 1000
+ACTION_CACHE_SIZE=1000
+
+#XPATH_PARSER_CACHE_SIZE sets the maximum number of items to be stored in the XPath parser cache. Set to 0 to disable.
+#default is 200
+XPATH_PARSER_CACHE_SIZE=200
+
+#STYLESHEET_CACHE_SIZE sets the maximum number of items to be stored in the stylesheet parser cache. Set to 0 to disable.
+#default is 200
+STYLESHEET_CACHE_SIZE=200
+        
+#if LIVE_ENVIRONMENT is True, the system will not cache XPath expressions or Actions that reference functions (such as document()) 
+#that retrieve URL or interact with the file system. 
+#Also stylesheets with xsl:import, xsl:include, xinclude or external entity references will not be cached.
+#default is False
+LIVE_ENVIRONMENT = True
+
 #################################################
 ## rhizome-specific configuration variables 
 ## this are only used when including rhizome into your config and must be set before you include it
@@ -92,10 +114,29 @@ contentProcessors = {
         lambda self, contents, kw, result, context, rhizml=rhizml, mmf=rx.rhizome.MarkupMapFactory(): rhizml.rhizmlString2xml(contents,mmf)
 }
 
+#contentProcessorCachePredicates is a dictionary used by racoon.getProcessContentsCachePredicate to specify
+#a cache predicate if the results of a content processor can be cached
+contentProcessorCachePredicates = {    
+    'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
+        lambda self, result, kw, contextNode, contents: contents #the key is just the contents
+}
+
+#contentProcessorSideEffectsPredicates is a dictionary used by racoon.getProcessContentsSideEffectsPredicate to specify
+#a side effects predicate if the content processor has side effects that need to be played back when retrieving the cached value
+contentProcessorSideEffectsPredicates = { } #none for 'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml'
+
+#contentProcessorSideEffectsFuncs is a dictionary used by racoon.getProcessContentsSideEffectsFunc to specify
+#a side effects function that will be called after the value is retrieved from the cache
+contentProcessorSideEffectsFuncs = { } #none for 'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml'
+
 #extFunctions is a dictionary of RxPath extension functions to be made available RxPath, RxSLT, RxUpdate, etc.
 extFunctions = {
 ('http://example.com/extfuncs', 'reverse'): lambda context, nodeset: nodeset.reverse() or nodeset
 }
+
+#list of XPath functions that shouldn't be cached
+#default is [] (but the system will always append its own list)
+NOT_CACHEABLE_FUNCTIONS=[('http://example.com/extfuncs', 'delete-everything')]
 
 #######################################
 ## available read-only variables 

@@ -108,7 +108,11 @@ resourceAuthorizationAction.assign("authAction", 'concat("http://rx4rdf.sf.net/n
 rhizome.findRevisionAction = Action(revisionQueries)
 rhizome.findContentAction = Action(contentQueries, lambda result, kw, contextNode, retVal, self=__server__:\
                                   self.getStringFromXPathResult(result), requiresContext = True) #get its content
-rhizome.processContentAction = Action(encodingQueries, __server__.processContents, matchFirst = False, forEachNode = True) #process the content 
+rhizome.processContentAction = Action(encodingQueries, __server__.processContents,
+                                      matchFirst = False, forEachNode = True,
+                                      cachePredicate=__server__.getProcessContentsCachePredicate,
+                                      sideEffectsFunc=__server__.getProcessContentsSideEffectsFunc,
+                                      sideEffectsPredicate=__server__.getProcessContentsSideEffectsPredicate) #process the content 
 
 templateAction = Action(templateQueries, rhizome.processTemplateAction)
 #setup these variables to give content a chance to have dynamically set them
@@ -167,6 +171,22 @@ contentProcessors = {
     'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
         lambda self, contents, kw, result, context, rhizml=rhizml, mmf=rx.rhizome.MarkupMapFactory(): rhizml.rhizmlString2xml(contents,mmf)
 }
+
+contentProcessorCachePredicates = {
+    'http://www.w3.org/1999/XSL/Transform' : lambda self, result, kw, contextNode,
+      contents:\
+          self.partialXsltCacheKeyPredicate(contents, kw, contextNode, self.evalXPath( 
+            'concat("site:///", (/a:NamedContent[wiki:revisions/*[.=$_context]]/wiki:name)[1])',
+            node=contextNode)) , 
+    
+    'http://rx4rdf.sf.net/ns/wiki#item-format-rhizml' :
+        lambda self, result, kw, contextNode, contents: contents #the key is just the contents
+}
+
+contentProcessorSideEffectsFuncs = {
+    'http://www.w3.org/1999/XSL/Transform' : __server__.__class__.xsltSideEffectsFunc  }
+contentProcessorSideEffectsPredicates = {
+    'http://www.w3.org/1999/XSL/Transform' :  __server__.__class__.xsltSideEffectsCalc }
 
 import rxml
 def getrxrxity(context, resultset = None, comment = ''):

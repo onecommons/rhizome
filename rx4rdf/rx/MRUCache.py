@@ -7,9 +7,13 @@
 # Use per Python Software Foundation (PSF) license.
 # 
 
+import utils
+_defexception = utils.DynaExceptionFactory(__name__)
+_defexception('not cacheable')
+
 class UseNode(object):
     """For linked list kept in most-recent .. least-recent *use* order"""
-    __slots__ = ['value','hkey','older','newer']
+    __slots__ = ['value','hkey','older','newer', 'sideEffects']
     def __init__(self, value, hkey, older=None, newer=None):
         self.value = value  # as returned by user valueCalc function
         self.hkey = hkey    # defaults to arg tuple for valueCalc, or else
@@ -17,7 +21,7 @@ class UseNode(object):
         self.older = older  # link to node not as recently used as current
         self.newer = newer  # Note that list is circular: mru.newer is lru
                             # and lru.older is mru, which is the reference point.
-        
+                            
 class MRUCache:
     """
     Produces cache object with given capacity for MRU/LRU list.
@@ -29,13 +33,20 @@ class MRUCache:
     """
     def __init__(self,
         capacity,       # max number of simultaneous cache MRU values kept
-        valueCalc,      # user function to calculate actual value from args
+        valueCalc=None,      # user function to calculate actual value from args
         hashCalc=None,  # normally takes same args as valueCalc if present
+        #valueCalc might have some sideEffects that we need to reproduce when we retrieve the cache value:
+        sideEffectsFunc=None, #execute the sideEffectsFunc when we return retrieve the value from the cache
+        sideEffectsCalc=None, #calculate the sideEffects when we calculate the value
+        isValueCacheableCalc=None, #calculate if value should be cached
     ):
         """ """
         self.capacity = capacity
         self.hashCalc = hashCalc
         self.valueCalc = valueCalc
+        self.sideEffectsCalc = sideEffectsCalc
+        self.sideEffectsFunc = sideEffectsFunc
+        self.isValueCacheableCalc = isValueCacheableCalc
         
         self.mru = UseNode(`'<unused value>'`, '<*initially unused node*>') # ``for test
         self.mru.older = self.mru.newer = self.mru  # init circular list
@@ -47,24 +58,81 @@ class MRUCache:
         Get value from cache or calcuate a new value using user function.
         Either way, make the new value the most recently used, replacing
         the least recently used if cache is full.
-        """
-        if self.hashCalc:
-            hkey = self.hashCalc(*args, **kw)
+        """    
+        return self.getOrCalcValue(self.valueCalc, hashCalc=self.hashCalc,
+                sideEffectsFunc=self.sideEffectsFunc, sideEffectsCalc=self.sideEffectsCalc,
+                                isValueCacheableCalc=self.isValueCacheableCalc,*args, **kw)
+    
+    def getOrCalcValue(self, valueCalc, *args, **kw):
+        '''
+        Like getValue() except you must specify the valueCalc function and (optionally)
+        hashCalc and sideEffectCalc as keyword arguments.
+        Use this when valueCalc may vary or when valueCalc shouldn't be part of the cache or the owner of the cache.
+
+        self.valueCalc, self.hashCalc, self.sideEffectsCalc, etc. are all ignored by this function.
+        '''
+        if kw.has_key('hashCalc'):
+            hashCalc = kw['hashCalc']
+            del kw['hashCalc']
         else:
-            hkey = args         # use tuple of args as default key for first stage LU
+            hashCalc = None
+
+        if kw.has_key('sideEffectsCalc'):
+            sideEffectsCalc = kw['sideEffectsCalc']
+            del kw['sideEffectsCalc']
+        else:
+            sideEffectsCalc = None
+            
+        if kw.has_key('sideEffectsFunc'):
+            sideEffectsFunc = kw['sideEffectsFunc']
+            del kw['sideEffectsFunc']
+        else:
+            sideEffectsFunc = None
+
+        if kw.has_key('isValueCacheableCalc'):
+            isValueCacheableCalc = kw['isValueCacheableCalc']
+            del kw['isValueCacheableCalc']
+        else:
+            isValueCacheableCalc = None
+
+        if self.capacity == 0: #no cache, so just execute valueCalc
+            return valueCalc(*args, **kw)
+            
+        if hashCalc:
+            try: 
+                hkey = hashCalc(*args, **kw)
+            except NotCacheable: #can't calculate a key
+                return valueCalc(*args, **kw)
+        else:
+            hkey = args # use tuple of args as default key for first stage LU
+            #warning: kw args will not be part of key
         try:
             node = self.nodeDict[hkey]
             assert node.hkey == hkey
+            #if node.invalidate and node.invalidate(node.value, *args, **kw):
+            #    self.removeNode(node)
+            #    raise KeyError 
+            if sideEffectsFunc:
+                #print 'found key:\n', hkey, '\n value:\n', node.value
+                sideEffectsFunc(node.value, node.sideEffects, *args, **kw)            
         except KeyError:
             # here we know we can't get to value
             # calculate new value
-    	    value = self.valueCalc(*args, **kw)
+            value = valueCalc(*args, **kw)
+            if isValueCacheableCalc and not isValueCacheableCalc(hkey, value, *args, **kw):
+                return value #value isn't cacheable
+                
+            if sideEffectsCalc:
+                sideEffects = sideEffectsCalc(value, *args, **kw)
+            else:
+                sideEffects = None
 
             # get mru use node if cache is full, else make new node
             lru = self.mru.newer    # newer than mru circularly goes to lru node
             if self.nodeCount<self.capacity:
                 # put new node between existing lru and mru
                 node = UseNode(value, hkey, self.mru, lru)
+                node.sideEffects = sideEffects
                 self.nodeCount += 1
                 # update links on both sides
                 self.mru.newer = node     # newer from old mru is new mru
@@ -75,6 +143,7 @@ class MRUCache:
                 # position of lru node is correct for becoming mru so
                 # jusr replace value and hkey #
                 lru.value = value
+                lru.sideEffects = sideEffects
                 # delete invalidated key->node mapping
                 del self.nodeDict[lru.hkey]
                 lru.hkey = hkey
@@ -102,6 +171,12 @@ class MRUCache:
         lru.older = node
         self.mru = node                 # new node is new mru
         return node.value
+
+    def removeNode(self, node):
+        assert node.older is not None #can't remove the first node
+        node.older.newer = node.newer
+        self.nodeCount -= 1
+        del self.nodeDict[node.hkey]                
 
     def clear(self):
         """

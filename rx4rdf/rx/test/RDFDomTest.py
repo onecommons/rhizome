@@ -87,34 +87,34 @@ class RDFDomTestCase(unittest.TestCase):
 
         #test model -> dom (correct resources created)
         xpath = '/*'
-        res1 = evalXPath(self.rdfDom, xpath,  self.model1NsMap)
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless(len(res1)==6)
 
         #test predicate stringvalue         
         xpath = "string(/*[wiki:name/text()='HomePage']/a:has-expression)"
-        res2 = evalXPath(self.rdfDom, xpath,  self.model1NsMap)        
+        res2 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)        
 
         xpath = "string(/*[wiki:name='HomePage']/a:has-expression/node())"
-        res3 = evalXPath(self.rdfDom, xpath,  self.model1NsMap)
+        res3 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless(res2 and res2 == res3)
 
         #test virtual reference elements
         xpath = "/*[wiki:name/text()='HomePage']/a:has-expression/*/a:hasContent/text()"
-        res4 = evalXPath(self.rdfDom, xpath,  self.model1NsMap)
+        res4 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
 
         xpath = "/*[.='urn:sha:XPmK/UXVwPzgKryx1EwoHtTMe34=']/a:hasContent/text()"
-        res5 = evalXPath(self.rdfDom, xpath,  self.model1NsMap)                
+        res5 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)                
         self.failUnless(res4 == res5)
 
     def testDocIndex(self):
         self.loadModel("about.rx.nt")
         xpath = "*/wiki:revisions/*"
-        res1 = evalXPath(self.rdfDom, xpath,  self.model1NsMap)
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         xpath = "(*/wiki:revisions/*//a:contents)[last()]"
-        res2 = evalXPath(self.rdfDom, xpath,  self.model1NsMap)
+        res2 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         
         xpath = "(*/wiki:revisions/*//a:contents)"
-        res3 = evalXPath(self.rdfDom, xpath,  self.model1NsMap)
+        res3 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless(res2[-1] == res3[-1])        
 
         #print 'cmp test', res1[0], res2[0]

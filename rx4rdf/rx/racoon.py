@@ -13,7 +13,9 @@ from Ft.Xml.Lib.Print import PrettyPrint
 from Ft.Xml.XPath.Conversions import StringValue        
 from Ft.Xml import SplitQName
 from Ft.Xml.XPath import RuntimeException,FT_EXT_NAMESPACE
+from Ft.Xml.Xslt import XSL_NAMESPACE
 from Ft.Lib import Uri, UriException
+import MRUCache
 try:
     import cPickle
     pickle = cPickle
@@ -114,15 +116,15 @@ def If(context, cond, v1, v2=None):
     else:
         return parser.new().parse(Conversions.StringValue(v2)).evaluate(context)
     
-def HasMetaData(context, name):
+def HasMetaData(kw, context, name):
     def _test(local, dict):
         if dict.has_key(local):
             return True
         else:
             return False
-    return _onMetaData(context, name, _test)
+    return _onMetaData(kw, context, name, _test)
 
-def GetMetaData(context, name):
+def GetMetaData(kw, context, name):
     '''
     the advantage of using this instead of a variable reference is that it just returns 0 if the name doesn't exist, not an error
     '''
@@ -131,9 +133,9 @@ def GetMetaData(context, name):
             return dict[local]
         else:
             return False
-    return _onMetaData(context, name, _get)
+    return _onMetaData(kw, context, name, _get)
 
-def AssignMetaData(context, name, val):
+def AssignMetaData(kw, context, name, val, recordChange = None):
     '''
     new variable and values don't affect corresponding xpath variable 
     '''
@@ -141,21 +143,27 @@ def AssignMetaData(context, name, val):
         #oldval = dict.get(local, None)
         dict[local] = val
         return val
-    #print >>sys.stderr,'AssignMetaData ', name, ' ' , val
-    return _onMetaData(context, name, _assign)
+    #print >>sys.stderr,'AssignMetaData ', name, ' ' , val    
+    retVal = _onMetaData(kw, context, name, _assign)
+    if recordChange:
+        kw.setdefault(recordChange, []).append( (context.processorNss, (name, val)) )
+    return retVal
 
-def RemoveMetaData(context, name):
+def RemoveMetaData(kw, context, name, recordChange = None):
     def _delete(local, dict):
         if dict.has_key(local):
             del dict[local]
             return True
         else:
             return False
-    return _onMetaData(context, name, _delete)
+    retVal = _onMetaData(kw, context, name, _delete)
+    if retVal and recordChange:
+        kw.setdefault(recordChange, []).append( (context.processorNss, name) )
+    return retVal
+
+_defexception('unusable namespace error')
 
 def _onMetaData(kw, context, name, func):
-    kw = context.varBindings[(None, '_kw')]
-    
     (prefix, local) = SplitQName(name)
     if prefix:
         try:
@@ -177,9 +185,11 @@ def _onMetaData(kw, context, name, func):
     elif namespace == RXIKI_RESPONSE_COOKIES_NS: #assigning values will be automatically converted to a Morsel
         retVal = func(local, kw['_response'].simpleCookie)        
     elif namespace == RXIKI_SESSION_NS:
-        retVal = func(local, kw['_session'])        
+        retVal = func(local, kw['_session'])
+    elif namespace == RXIKI_PREV_NS:
+        retVal = func(local, kw['_prevkw'])
     else:
-        raise 'unusable namespace: ', namespace 
+        raise UnusableNamespaceError( '%s uses unusable namespace: %s' % (local, namespace) )
     return retVal
 
 ############################################################
@@ -194,11 +204,6 @@ DefaultExtFunctions = {
 (RXWIKI_XPATH_EXT_NS, 'file-exists'):  FileExists,
 (RXWIKI_XPATH_EXT_NS, 'if'): If,
 (RXWIKI_XPATH_EXT_NS, 'ospath2pathuri'): OsPath2PathUri,
-#these ones require context.kw to be set:
-(RXWIKI_XPATH_EXT_NS, 'assign-metadata') : AssignMetaData,
-(RXWIKI_XPATH_EXT_NS, 'remove-metadata') : RemoveMetaData,
-(RXWIKI_XPATH_EXT_NS, 'has-metadata') : HasMetaData,
-(RXWIKI_XPATH_EXT_NS, 'get-metadata') : GetMetaData,        
 }
 
 DefaultNsMap = { 'owl': 'http://www.w3.org/2002/07/owl#',
@@ -356,19 +361,32 @@ class SiteUriResolver(Uri.SchemeRegistryResolver):
         except AttributeError: #not found
             raise UriException(UriException.RESOURCE_ERROR, uri, 'Not Found')
 
-_defexception('expression will fail')
+
+def defaultActionCacheKeyPredicateFactory(action, cacheKeyPredicate):
+    '''    
+    returns a predicate to extract a key for the action out of a request
+    This function give an action a chance to customize the cacheKeyPredicate for the particulars of the action instance.
+    At the very least it must bind the action instance with the cacheKeyPredicate to disambiguate keys from different actions.
+    '''
+    actionid = id(action) #do this to avoid memory leaks
+    return lambda resultNodeset, kw, contextNode, retVal: (actionid, cacheKeyPredicate(resultNodeset, kw, contextNode, retVal) )
     
+def notCacheableKeyPredicate(*args, **kw):
+    raise MRUCache.NotCacheable
+
 class Action(object):    
     def __init__(self, queries, action = None, matchFirst = True, forEachNode = False,
-                 depthFirst = True, requiresContext = False):#, cachePredicateFactory = defaultCacheKeyPredicateFactory):
+                 depthFirst=True, requiresContext=False, cachePredicate=notCacheableKeyPredicate,
+                 sideEffectsPredicate=None, sideEffectsFunc=None, isValueCacheableCalc=None,
+                 cachePredicateFactory=defaultActionCacheKeyPredicateFactory):
         '''Queries is a list of RxPath expressions associated with this action
         
 action must be a function with this signature:    
 def action(resultNodeset, kw, contextNode, retVal) where:
-    resultNodeset is result of the RxPath expression associated with this action
+    resultNodeset is the result of the RxPath query associated with this action
     kw is dictionary of the parameters associated with the request
-    contentNode is context node of used when the RxPath expressions were evaluated
-    retVal was return value of the last action invoked in the in action sequence or None
+    contentNode is the context node of used when the RxPath expressions were evaluated
+    retVal was the return value of the last action invoked in the in action sequence or None
 If action is None this action will reset the context node
 
 if matchFirst is True the requesthandler will only run the action using the first matching xpath expression in queries
@@ -385,10 +403,10 @@ otherwise the action will be called once and whole nodeset will passed as the re
         self.preVars = {}
         self.postVars = {}        
         # self.requiresRetVal = requiresRetVal not yet implemented
-        #if cachePredicateFactory:
-        #    self.cachePredicate = cachePredicateFactory(self)
-        #else:
-        self.cachePredicate = None
+        self.cacheKeyPredicate = cachePredicateFactory(self, cachePredicate)
+        self.sideEffectsPredicate = sideEffectsPredicate
+        self.sideEffectsFunc = sideEffectsFunc
+        self.isValueCacheableCalc = isValueCacheableCalc
 
     def assign(self, varName, *exps, **kw):
         '''
@@ -403,57 +421,111 @@ otherwise the action will be called once and whole nodeset will passed as the re
             self.preVars[varName] = exps
 
 #functions used by the caches
-def _getKeyFromXPathExp(compExpr, context):
+def _splitKey(key, context):
+    (prefix, local) = key
+    if prefix:
+        try:
+            expanded = (context.processorNss[prefix], local)
+        except:
+            raise RuntimeException(RuntimeException.UNDEFINED_PREFIX, prefix)
+    else:
+        expanded = key
+    return expanded
+
+def _getKeyFromXPathExp(compExpr, context, notCacheableXPathFunctions):
     '''
     return the key for the expression given a context.
     The key consists of:
-        context.node, (var1, value1), (var2, value2), etc. for each var referenced in the expression
-        
-    If the expression contains an function that dynamically evaluates an XPath string we throw MRUCache.NotCacheable
+        expr, context.node, (var1, value1), (var2, value2), etc. for each var referenced in the expression
     '''
-    #todo: allow the user to indicate extension function that should throw not NotCacheable
-    key = [ context.node ] 
+    
+    key = [ repr(compExpr), context.node ] 
     for field in compExpr:
         if isinstance(field, XPath.ParsedExpr.ParsedVariableReferenceExpr):
            value = field.evaluate(context) #may raise RuntimeException.UNDEFINED_VARIABLE
-           (prefix, local) = field._key
-           if prefix:            
-               expanded = (context.processorNss[prefix], local)
-           else:
-               expanded = self._key           
+           (expanded, local) = _splitKey(field._key, context)
+           if type(value) is type([]):
+                value = tuple(value)
            key.append( (expanded, value) )
         elif isinstance(field, XPath.ParsedExpr.FunctionCall):
-            #todo: should resolve the qname 
-           if field._name in ['wf:if','xf:evaluate', 'f:evaluate','dyn:evaluate']:
+           expandedKey = _splitKey(field._key, context)
+           if expandedKey in notCacheableXPathFunctions:               
                raise MRUCache.NotCacheable
-
+           #else: log.debug("%s cacheable! not in %s" % (str(expandedKey), str(notCacheableXPathFunctions) ) )
+    #print 'returning key', tuple(key)
     return tuple(key)
 
-def _evaluateXPathExp(compExpr, context):
-    res = compExpr.evaluate(context)
+def _calcXPathSideEffects(result, compExpr, context):    
     def hasSideEffect(field):
-        if isinstance(field, XPath.ParsedExpr.FunctionCall):
-            #todo: should resolve the qname 
-            if field._name in ['wf:remove-metadata', 'wf:assign-metadata']:
+        if isinstance(field, XPath.ParsedExpr.FunctionCall):            
+            expandedKey = _splitKey(field._key, context)
+            if expandedKey in [(RXWIKI_XPATH_EXT_NS, 'remove-metadata'),
+                               (RXWIKI_XPATH_EXT_NS, 'assign-metadata')]:
+                log.debug("recording side effect for %s" % str(expandedKey) )
                 return field
     #figure out sideeffect
     callList = [node for node in compExpr if hasSideEffect(node)]
-    return res, callList
+    return callList
 
-def _processXPathExpSideEffects(cacheValue, compExpr, context):
-    callList = cacheValue[1] #cacheValue is (result, callList)
+def _processXPathExpSideEffects(cacheValue, callList, compExpr, context):
     for function in callList:
+        log.debug("performing side effect for %s with args %s" % (field._name, str(field._args) ) )
         function.evaluate(context) #invoke the function with a side effect
 
-def _resetFunctions(compiledExp, textExp):
-    '''because the function map are not part of the key for the
+def _resetFunctions(compiledExp, *ignoreArgs):
+    '''because the function map is not part of the key for the
        expression cache we need to clear out _func field after retrieving
-       the expression from the cache, forcing _func from being recalculated
+       the expression from the cache, thus forcing _func to be recalculated
        in order to guard against the function map values changing.
     '''
     for field in compiledExp:
         if isinstance(field, XPath.ParsedExpr.FunctionCall):
+            print 'clearing ', field._name
             field._func = None
+
+import Ft.Xml.Xslt.StylesheetReader 
+class StylesheetReader(Ft.Xml.Xslt.StylesheetReader.StylesheetReader):
+    '''
+    Subclass StylesheetReader so we can tell if the stylesheet had dependencies on external resources
+    '''
+    standAlone = True
+    
+    def externalEntityRef(self, context, base, sysid, pubid):
+        self.standAlone = False
+        return Ft.Xml.Xslt.StylesheetReader.StylesheetReader.externalEntityRef(self, context, base, sysid, pubid)
+        
+    def _handle_xinclude(self, attribs):
+        self.standAlone = False
+        return Ft.Xml.Xslt.StylesheetReader.StylesheetReader._handle_xinclude(self, attribs)
+        
+    def _combine_stylesheet(self, href, is_import):
+        self.standAlone = False
+        return Ft.Xml.Xslt.StylesheetReader.StylesheetReader._combine_stylesheet(self, href, is_import)
+        
+def styleSheetValueCalc(source, uri):    
+      iSrc = InputSource.DefaultFactory.fromString(source, uri)      
+      _styReader = StylesheetReader()
+      return _styReader.fromSrc(iSrc) #todo: support extElements=self.extElements
+
+def isStyleSheetCacheable(key, styleSheet, source, uri):
+    return getattr(styleSheet, 'standAlone', True)
+    
+DefaultNotCacheableFunctions = [(RXWIKI_XPATH_EXT_NS, 'get-metadata'),
+        (RXWIKI_XPATH_EXT_NS, 'has-metadata'),
+        (FT_EXT_NAMESPACE, 'iso-time'),        
+        (RXWIKI_XPATH_EXT_NS, 'current-time'),
+        ('http://exslt.org/dates-and-times', 'date-time'), #todo: other exslt date-and-times functions but only if no arguments
+        (RXWIKI_XPATH_EXT_NS, 'generate-bnode'),
+        (FT_EXT_NAMESPACE, 'generate-uuid'),
+        #functions that dynamically evaluate expression may have hidden dependencies so they aren't cacheable
+        (RXWIKI_XPATH_EXT_NS, 'if'),
+        (FT_EXT_NAMESPACE, 'evaluate'),
+        ('http://exslt.org/dynamic', 'evaluate'), ]
+    #what about random? (ftext and exslt) 
+
+EnvironmentDependentFunctions = [ (None, 'document'),
+    (RXWIKI_XPATH_EXT_NS, 'openurl'),
+    (RXWIKI_XPATH_EXT_NS, 'file-exists') ]
 
 ############################################################
 ##Racoon main class
@@ -473,11 +545,10 @@ class Root(object):
     requestContext = utils.createThreadLocalProperty('__requestContext',
         doc='variables you want made available to anyone during this request (e.g. the session)')
 
-    import MRUCache
     import Ft.Xml.XPath
             
-    expCache = MRUCache.MRUCache(200, XPath.Compile, sideEffectsCalc=_resetFunctions)
-    
+    expCache = MRUCache.MRUCache(0, XPath.Compile)#, sideEffectsFunc=_resetFunctions)
+
     def __init__(self,argv):
         self.requestContext = {}
         configpath = self.DEFAULT_CONFIG_PATH
@@ -562,19 +633,40 @@ class Root(object):
                     raise 'config variable %s must be compatible with type %s' % name, type(default)
                 setattr(self, name, value)
                         
-        initConstants( [ 'nsMap', 'extFunctions', 'contentProcessors', 'actions'], {} )
+        initConstants( [ 'nsMap', 'extFunctions', 'actions', 'contentProcessors',
+                         'contentProcessorCachePredicates',
+                         'contentProcessorSideEffectsFuncs',
+                         'contentProcessorSideEffectsPredicates'], {} )
         initConstants( [ 'STORAGE_PATH', 'STORAGE_TEMPLATE_PATH', 'STORAGE_TEMPLATE', 'APPLICATION_MODEL'], '')
         initConstants( ['ROOT_PATH'], '/')
         assert self.ROOT_PATH[0] == '/', "ROOT_PATH must start with a '/'"
         initConstants( ['BASE_MODEL_URI'], self.BASE_MODEL_URI)
         initConstants( ['MAX_MODEL_LITERAL'], -1)
+        #cache settings:
+        initConstants( ['NOT_CACHEABLE_FUNCTIONS'], [])
+        initConstants( ['LIVE_ENVIRONMENT'], False)
+        initConstants( ['XPATH_CACHE_SIZE','ACTION_CACHE_SIZE'], 1000)
+        initConstants( ['XPATH_PARSER_CACHE_SIZE','STYLESHEET_CACHE_SIZE'], 200)
+        self.expCache.capacity = self.XPATH_PARSER_CACHE_SIZE
+        styleSheetCache.capacity = self.STYLESHEET_CACHE_SIZE
+        
         self.SAVE_DIR = kw.get('SAVE_DIR', 'content/')
         self.PATH = kw.get('PATH', self.PATH)
         self.SECURE_FILE_ACCESS= kw.get('SECURE_FILE_ACCESS', True)        
-        self.cmd_usage = DEFAULT_cmd_usage + kw.get('cmd_usage', '')    
+        self.cmd_usage = DEFAULT_cmd_usage + kw.get('cmd_usage', '')
+        #todo: shouldn't these be set before so it doesn't override config changes?:
+        self.NOT_CACHEABLE_FUNCTIONS += DefaultNotCacheableFunctions
+        if self.LIVE_ENVIRONMENT:
+            self.NOT_CACHEABLE_FUNCTIONS += EnvironmentDependentFunctions
+            styleSheetCache.isValueCacheableCalc = isStyleSheetCacheable
+            
         self.nsMap.update(DefaultNsMap)
         self.contentProcessors.update(DefaultContentProcessors)
+        self.contentProcessorCachePredicates.update(DefaultContentProcessorCachePredicates)
+        self.contentProcessorSideEffectsFuncs.update(DefaultContentProcessorSideEffectsFuncs)
+        self.contentProcessorSideEffectsPredicates.update(DefaultContentProcessorSideEffectsPredicates)
         self.extFunctions.update(DefaultExtFunctions)
+
 
     def getLock(self):
         '''
@@ -614,7 +706,14 @@ class Root(object):
                                         
         self.revNsMap = dict(map(lambda x: (x[1], x[0]), self.nsMap.items()) )#reverse namespace map #todo: bug! revNsMap doesn't work with 2 prefixes one ns
         self.rdfDom = RDFDoc(model, self.revNsMap)
-        self.rdfDom.queryCache = MRUCache.MRUCache(200, _evaluateXPathExp, _getKeyFromXPathExp, _processXPathExpSideEffects)
+        self.rdfDom.queryCache = MRUCache.MRUCache(self.XPATH_CACHE_SIZE, lambda compExpr, context: compExpr.evaluate(context),
+                lambda compExpr, context: _getKeyFromXPathExp(compExpr, context, self.NOT_CACHEABLE_FUNCTIONS),
+                _processXPathExpSideEffects, _calcXPathSideEffects)
+        self.rdfDom.actionCache = MRUCache.MRUCache(self.ACTION_CACHE_SIZE)
+        global styleSheetCache 
+        if not styleSheetCache.isValueCacheableCalc:
+            #invalidate this cache if we weren't checking for external dependencies
+            styleSheetCache = MRUCache.MRUCache(self.STYLESHEET_CACHE_SIZE, styleSheetValueCalc)
         lock.release()
 ##        outputfile = file('debug.xml', "w+", -1)
 ##        from Ft.Xml.Domlette import Print, PrettyPrint
@@ -644,16 +743,21 @@ class Root(object):
         if sequence:
             return self.doActions(sequence, kw)
 
-    COMPLEX_REQUESTVARS = ['__requestor__', '__server__','_request', '_response','_session', '_prevkw', '__argv__']
+    COMPLEX_REQUESTVARS = ['__requestor__', '__server__','_request','_response',
+                           '_session', '_prevkw', '__argv__']
     
     def mapToXPathVars(self, kw):
         '''map request kws to xpath vars (include http request headers)'''
         extFuncs = self.extFunctions.copy()
+        extFuncs.update({
+        (RXWIKI_XPATH_EXT_NS, 'assign-metadata') : lambda context, name, val: AssignMetaData(kw, context, name, val, recordChange = '_metadatachanges'),
+        (RXWIKI_XPATH_EXT_NS, 'remove-metadata') : lambda context, name: RemoveMetaData(kw, context, name, recordChange = '_metadatachanges'),
+        (RXWIKI_XPATH_EXT_NS, 'has-metadata') : lambda context, name: HasMetaData(kw, context, name),
+        (RXWIKI_XPATH_EXT_NS, 'get-metadata') : lambda context, name: GetMetaData(kw, context, name),        
+        })        
         #add most kws to vars (skip references to non-simple types):
         vars = dict( [( (None, x[0]), x[1] ) for x in kw.items()\
-                      if x[0] not in self.COMPLEX_REQUESTVARS] )
-        #this should only be accessed by the xx-metadata functions:
-        vars[(None, '_kw')] = kw
+                      if x[0] not in self.COMPLEX_REQUESTVARS and x[0] != '_metadatachanges'] )
         #magic constants:
         vars[(None, 'STOP')] = 0
         vars[(None, 'ROOT_PATH')] = self.ROOT_PATH        
@@ -688,8 +792,9 @@ class Root(object):
                 vars = { (None, '_context'): [ context ] } #we also set this in doActions()
                 
             context = XPath.Context.Context(node, varBindings = vars,
-                        extFunctionMap = extFunctionMap, processorNss = nsMap)
-            return evalXPath(xpath, context, expCache = self.expCache, getattr(self.rdfDom, 'queryCache', None))
+                        extFunctionMap = extFunctionMap, processorNss = self.nsMap)
+            #sorry this confusing... call RDFDom modules' evalXPath
+            return evalXPath(xpath, context, expCache = self.expCache, queryCache=getattr(self.rdfDom, 'queryCache', None))
         except (RuntimeException), e:
             if e.errorCode == RuntimeException.UNDEFINED_VARIABLE:                            
                 log.debug(e.message) #undefined variables are ok
@@ -710,7 +815,7 @@ class Root(object):
             return StringValue(result)
 
     def __assign(self, actionvars, kw, contextNode):
-        for name, exps in actionvars.items():
+        for name, exps in actionvars.items():            
             vars, extFunMap = self.mapToXPathVars(kw)
             for exp in exps:
                 #print exp
@@ -725,11 +830,13 @@ class Root(object):
             
     def doActions(self, sequence, kw = None, contextNode = None, retVal = None):
         if kw is None: kw = {}
+        if isinstance(contextNode, type([])):
+            contextNode = contextNode[0]        
+
         kw['__requestor__'] = self.requestDispatcher
-        kw['__server__'] = self 
+        kw['__server__'] = self
+        
         for action in sequence:
-            if isinstance(contextNode, type([])):
-                contextNode = contextNode[0]
             if action.requiresContext:
                 if not contextNode: #if the next action requires a contextnode and there isn't one, end the sequence
                     return retVal
@@ -757,11 +864,24 @@ class Root(object):
                             if action.depthFirst:
                                 result.reverse()#we probably want the reverse of document order (e.g. the deepest first)
                             for node in result:
-                                retVal = action.action(node, kw, contextNode, retVal)
+                                if kw.get('_metadatachanges'): del kw['_metadatachanges']
+                                retVal = self.rdfDom.actionCache.getOrCalcValue(action.action,
+                                    node, kw, contextNode, retVal, hashCalc=action.cacheKeyPredicate,
+                                    sideEffectsCalc=action.sideEffectsPredicate,
+                                    sideEffectsFunc=action.sideEffectsFunc,
+                                    isValueCacheableCalc=action.isValueCacheableCalc)
                         else:
-                            retVal = action.action(result, kw, contextNode, retVal)
+                            if kw.get('_metadatachanges'): del kw['_metadatachanges']
+                            retVal = self.rdfDom.actionCache.getOrCalcValue(action.action,
+                                        result, kw, contextNode, retVal,
+                                        hashCalc=action.cacheKeyPredicate,
+                                        sideEffectsCalc=action.sideEffectsPredicate,
+                                        sideEffectsFunc=action.sideEffectsFunc,
+                                        isValueCacheableCalc=action.isValueCacheableCalc)
                     if action.matchFirst:
                         break
+            if isinstance(contextNode, type([])):
+                contextNode = contextNode[0]                    
             self.__assign(action.postVars, kw, contextNode)
         return retVal
 
@@ -780,7 +900,7 @@ class Root(object):
             #but are made available in the 'previous' namespace (think of them as template parameters)
             if k in self.COMPLEX_REQUESTVARS + globalVars:
                 templatekw[k] = v
-            else:
+            elif k != '_metadatachanges':
                 prevkw[k] = v
         templatekw['_prevkw'] = prevkw    
         templatekw['_contents'] = retVal            
@@ -803,12 +923,49 @@ class Root(object):
         trigger = kw.get('_update-trigger')
         if trigger:
             del kw['_update-trigger']
-            self.runActions(trigger, kw)         
+            self.runActions(trigger, kw)
+
+    def getProcessContentsCachePredicate(self, result, kw, contextNode, contents):
+        formatType = self.getStringFromXPathResult(result)
+        if formatType and self.contentProcessorCachePredicates.get(formatType):
+            return self.contentProcessorCachePredicates[formatType](self, 
+                                                    result, kw, contextNode, contents)
+        else:
+            raise MRUCache.NotCacheable 
+
+    def getProcessContentsSideEffectsPredicate(self, cacheValue, result, kw, contextNode, contents):
+        '''
+        returns a predicate that returns a representation of the side effects of calculating the cacheValue
+        '''
+        formatType = self.getStringFromXPathResult(result)
+        if formatType and self.contentProcessorSideEffectsPredicates.get(formatType):
+            return self.contentProcessorSideEffectsPredicates[formatType](
+                                self, cacheValue, result, kw, contextNode, contents)
+        else:
+            return None 
+
+    def getProcessContentsSideEffectsFunc(self, cacheValue, sideEffects, result, kw, contextNode, contents):
+        '''
+        returns a function that replayes the side effects for the cacheValue.
+        sideEffects is the object returned by sideEffects predicate for that cacheValue
+        '''
+        formatType = self.getStringFromXPathResult(result)
+        if formatType and self.contentProcessorSideEffectsFuncs.get(formatType):
+            return self.contentProcessorSideEffectsFuncs[formatType](
+                    self, cacheValue, sideEffects, result, kw, contextNode, contents)
+        else:
+            return None 
 
     def transform(self, stylesheet, kw=None):
         if kw is None: kw = {}        
         vars, funcs = self.mapToXPathVars(kw)
-        return applyXslt(self.rdfDom, stylesheet, vars, funcs, baseUri='path:')
+
+        #processor = utils.XsltProcessor()        
+        #def contextHook(context): context.varBindings[(None, '_kw')] = kw
+        #processor.contextSetterHook = contextHook 
+        
+        return applyXslt(self.rdfDom, stylesheet, vars, funcs, baseUri='path:',
+                         styleSheetCache=styleSheetCache)#, processor = processor)
 
     def xupdateRDFDom(self, rdfDom, outputfile, xupdate=None, kw=None, uri=None):
         kw = kw or {}
@@ -873,15 +1030,19 @@ class Root(object):
         
     def processXslt(self, source, contents, kw = None, uri='path:'):
         if kw is None: kw = {}
-        vars, extFunMap = self.mapToXPathVars(kw)        
-        processor = utils.XsltProcessor()
+        vars, extFunMap = self.mapToXPathVars(kw)
         
-        def contextHook(context): context.varBindings[(None, '_kw')] = kw
-        processor.contextSetterHook = contextHook 
+        from Ft.Xml.Xslt.Processor import Processor
+        processor = Processor()
+        #processor = utils.XsltProcessor()        
+        #def contextHook(context): context.varBindings[(None, '_kw')] = kw
+        #processor.contextSetterHook = contextHook
+        
         #print 'xslt ', uri
         #print 'xslt template:', source
         #print 'xslt source: ', contents
-        processor.appendStylesheet( InputSource.DefaultFactory.fromString(source, uri)) 
+        styleSheet = styleSheetCache.getValue(source, uri)
+        processor.appendStylesheetInstance( styleSheet, uri) 
         for (k, v) in extFunMap.items():
             namespace, localName = k
             processor.registerExtensionFunction(namespace, localName, v)        
@@ -923,6 +1084,59 @@ class Root(object):
       outputfile.close()      
       self.loadModel()
       lock.release()      
+
+    def partialXsltCacheKeyPredicate(self, retVal, kw, contextNode, styleSheetUri):
+      styleSheetNotCacheableFunctions = self.NOT_CACHEABLE_FUNCTIONS
+      key = [retVal, styleSheetUri, contextNode]
+      
+      styleSheet = styleSheetCache.getValue(retVal, styleSheetUri)
+      
+      try:
+          isCacheable = styleSheet.isCacheable
+      except AttributeError:
+          isCacheable = styleSheet.isCacheable = isCacheableStylesheet(
+                  styleSheet.children, styleSheetNotCacheableFunctions)
+          if not isCacheable:
+              log.debug("stylesheet %s is not cacheable" % styleSheetUri)
+      #todo: similarly, the stylesheet might reference functions that are cacheable if given a chance to modify the key
+          
+      if not isCacheable:
+          raise MRUCache.NotCacheable
+          
+      topLevelParams = [child for child in styleSheet.children \
+         if child.expandedName[0] == XSL_NAMESPACE and child.expandedName[1] == 'param']
+           
+      for var in topLevelParams:
+         #note: we don't really need the contextNode     
+         #var._name is (ns, local)
+         if var._name[0]:
+             processorNss = { 'x' : var._name[0]}
+             qname = 'x:'+ var._name[1]
+         else:
+             processorNss = { }
+             qname = var._name[1]
+             
+         context = XPath.Context.Context(contextNode, processorNss = processorNss)
+         if HasMetaData(kw, context, qname): 
+            value = GetMetaData(kw, context, qname)
+            if type(value) is type([]):
+                 value = tuple(value)
+            key.append( ( var._name ,value) )
+      return tuple(key)
+
+    def xsltSideEffectsCalc(self, cacheValue, resultNodeset, kw, contextNode, retVal):
+        return kw.get('_metadatachanges', [])
+
+    def xsltSideEffectsFunc(self, cacheValue, sideEffects, resultNodeset, kw, contextNode, retVal):
+      for change in sideEffects:
+         nssMap = change[0]
+         change = change[1]
+         #note: we don't really need the contextNode
+         context = XPath.Context.Context(contextNode, processorNss = nssMap)
+         if type(change) == type(()):
+            AssignMetaData(kw, context, change[0],change[1])
+         else:        
+            RemoveMetaData(kw, context, change)
 
 ###########################################
 ## http request handling
@@ -990,10 +1204,79 @@ class Root(object):
         </xsl:stylesheet>'''
         return self.transform(styleSheet)
 
+#more cacheing functions (xslt, rxslt content processors)
+    
+styleSheetCache = MRUCache.MRUCache(0, styleSheetValueCalc)
+
+def isXPathExprCacheable(compExpr, nsMap, notCacheableXPathFunctions):
+    for field in compExpr:
+        if isinstance(field, XPath.ParsedExpr.FunctionCall):
+          (prefix, local) = field._key
+          if prefix:
+              expanded = (nsMap[prefix], local)
+          else:
+              expanded = field._key
+          if expanded in notCacheableXPathFunctions:
+              return False
+    return True
+
+def isCacheableStylesheet(nodes, styleSheetNotCacheableFunctions):
+    '''walk through the elements in the stylesheet looking for
+    elements that reference XPath expressions; then iterate through each 
+    expression looking for functions that aren't cacheable'''
+    #todo: also look for extension elements that aren't cacheable
+    from Ft.Xml.Xslt import AttributeInfo, AttributeValueTemplate
+    for node in nodes: 
+        attrDict = getattr(node, 'legalAttrs', None)
+        if attrDict is not None:
+            for name, value in attrDict.items():
+                if isinstance(value, (AttributeInfo.Expression, AttributeInfo.Avt)):
+                    #this attribute may have an expression expression in it
+                    attributeName = '_' + SplitQName(name)[1].replace('-', '_') #see Ft.Xml.Xslt.StylesheetHandler
+                    attributeValue = getattr(node, attributeName, None)
+                    if isinstance(attributeValue, AttributeInfo.ExpressionWrapper):
+                        #print 'ExpressionWrapper ', attributeValue.expression
+                        if not isXPathExprCacheable(attributeValue.expression,
+                            node.namespaces, styleSheetNotCacheableFunctions):
+                            return False
+                    elif isinstance(attributeValue, AttributeValueTemplate.AttributeValueTemplate):
+                        for expr in attributeValue._parsedParts:
+                            #print 'parsedPart ', expr
+                            if not isXPathExprCacheable(expr, node.namespaces,
+                                             styleSheetNotCacheableFunctions):
+                                return False
+        #handle LiteralElements
+        outputAttrs = getattr(node, '_output_attrs', None) 
+        if outputAttrs is not None:
+            for (qname, namespace, value) in outputAttrs:
+                if value is not None:
+                    #value will be a AttributeValueTemplate.AttributeValueTemplate
+                    for expr in value._parsedParts:
+                        if not isXPathExprCacheable(expr, node.namespaces,
+                                         styleSheetNotCacheableFunctions):
+                            return False        
+        
+        if node.children is not None:
+            if not isCacheableStylesheet(node.children, styleSheetNotCacheableFunctions):
+                return False
+    return True
+
+DefaultContentProcessorCachePredicates = {
+    'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt' : lambda self, result, kw, contextNode, contents:\
+        self.partialXsltCacheKeyPredicate(contents, kw, contextNode, 'path:'), 
+    
+    'http://www.w3.org/2000/09/xmldsig#base64' :
+        lambda self, result, kw, contextNode, contents: contents #the key is just the contents
+}
+
+DefaultContentProcessorSideEffectsFuncs = {
+    'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt' : Root.xsltSideEffectsFunc }
+DefaultContentProcessorSideEffectsPredicates ={
+    'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt' :  Root.xsltSideEffectsCalc }
+
 #################################################
 ##command line handling
 #################################################
-    
 DEFAULT_cmd_usage = 'python [racoon.py -l [log.config] -r -d [debug.pkl] -x -s server.cfg -p path -m store.nt] -a config.py [config specific options]'
 cmd_usage = '''\nusage:
 -h this help message
