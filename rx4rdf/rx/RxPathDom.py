@@ -94,8 +94,7 @@ class Node(xml.dom.Node, object):
     def cloneNode(self, deep):
         raise NotSupportedErr("cloning RDFDom nodes")
 
-    #RxDom additions: copied from rx.DomTree.Node
-
+    #RxDom additions: copied from rx.DomTree.Node    
     def _get_docIndex(self):
         '''
         correct order even after DOM has been reordered
@@ -1082,8 +1081,12 @@ class BasePredicate(Element):
     stringValue = property(_get_stringValue)
     
     def __repr__(self):
+        object = self.stmt.object[:DomTree.CDATA_REPR_LIMIT]
+        if isinstance(object, unicode):
+            object = object.encode('utf8') 
+
         return "<pPredicateElem at %X: %s %s list %s>" % (
-            id(self), repr(self.nodeName), self.stmt.object, self.listID)
+            id(self), repr(self.nodeName), object,self.listID)
     
 class Predicate(BasePredicate):
     #design notes:

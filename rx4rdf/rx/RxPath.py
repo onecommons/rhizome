@@ -377,7 +377,7 @@ try:
             return BNODE_BASE + node.blank_identifier
         elif node.is_literal():
             literal = node.literal_value['string']
-            if type(literal) != type(u''):
+            if not isinstance(literal, unicode):
                 return unicode(literal, 'utf8')
             else:
                 return literal

@@ -634,8 +634,11 @@ else:
         def resolveSiteScheme(self, uri, base=None):
             if base:
                 uri = self.normalize(uri, base) 
-            paramMap = {}        
-            path = str(uri)
+            paramMap = {}
+            if isinstance(uri, unicode):
+                #we need uri to be a string so paramMap below will contain strings not unicode
+                uri = uri.encode('utf8') 
+            path = uri
 
             i=path.find('?')
             if i!=-1:

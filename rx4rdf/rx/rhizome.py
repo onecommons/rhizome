@@ -740,7 +740,8 @@ Options:
                  wikiItem = resources[1] #should be the Item                 
                  assert self.server.evalXPath('self::wiki:Item', node = wikiItem), wikiItem.childNodes
                  
-                 #replace a:content statement
+                 #replace the final a:content statement with the actual contents 
+                 #and only include the last revision
                  for res in resources:
                      for stmt in res.getModelStatements():
                          #todo: handle binary files                     
@@ -893,7 +894,7 @@ Options:
         
     def getNameURI(self, context, wikiname):
         #note filter: URI fragment might not match wikiname
-        #python bug: filter() on a unicode returns a list not unicode
+        #python 2.2 bug: filter() on a unicode returns a list not unicode
         #todo I8N (return a IRI?)
         return self.server.BASE_MODEL_URI + \
                filter(lambda c: c.isalnum() or c in '_-./', str(wikiname))
@@ -920,7 +921,11 @@ Options:
             if oldContents:
                 if base64decode:
                     #we want to base64 decode the old content before attempting the diff
-                    oldContents = base64.decodestring(oldContents)                
+                    oldContents = base64.decodestring(oldContents)
+                if isinstance(contents, unicode):
+                    contents = contents.encode('utf8')                
+                if isinstance(oldContents, unicode):
+                    oldContents = oldContents.encode('utf8')                
                 patchTupleList = utils.diff(contents, oldContents) #compare  
                 if patchTupleList is not None:
                     patch = pickle.dumps(patchTupleList)                    
@@ -1071,7 +1076,9 @@ Options:
              "%(contentProps)s%(altContents)s</a:ContentLocation>" % locals())
         else: #save the contents inside the model
             try:
-                contents.encode('ascii') #test to see if it is just ascii (all <128)
+                if isinstance(contents, str):
+                    #test to see if the string can be treated as utf8
+                    contents.decode('utf8')
                 return contents
                 #contents = utils.htmlQuote(contents)
                 #xml = '''<a:Content rdf:about='%(sha1urn)'>%(contentProps)s<a:contents>%(contents)s</a:contents></<a:Content>''' % locals()
