@@ -8,6 +8,42 @@
     See http://rx4rdf.liminalzone.org/ZML for more info on ZML.    
 """
 
+try:
+    from rx.utils import InterfaceDelegator, NestedException
+except ImportError:
+    #copied from rx/utils.py so this file has no dependencies
+    class InterfaceDelegator:
+        '''assumes only methods will be called on this object and the methods always return None'''
+        def __init__(self, handlers):
+            self.handlers = handlers
+        
+        def call(self, name, args, kw):
+            for h in self.handlers:
+                getattr(h, name)(*args, **kw)
+            
+        def __getattr__(self, name):
+            return lambda *args, **kw: self.call(name, args, kw)
+
+    class NestedException(Exception):
+        def __init__(self, msg = None,useNested = False):
+            if not msg is None:
+                self.msg = msg
+            self.nested_exc_info = sys.exc_info()
+            self.useNested = useNested
+            Exception.__init__(self, msg)
+
+class ZMLParseError(NestedException):
+    def __init__(self, msg = ''):                
+        NestedException.__init__(self, msg)
+        self.state = None
+        
+    def setState(self, state):
+        self.state = state #line, col #, etc.
+        if state:
+            self.msg = 'ZML syntax error at line %d, column %d: %s\nline: "%s"' % (
+                state.currentStartPos[0], state.currentStartPos[1], self.msg, state.currentLine.trim())
+            self.args = ( self.msg, ) #'cuz that's the way Exception stores its message
+        
 ######################################################
 ###begin tokenizer
 ######################################################
@@ -72,7 +108,6 @@ Comment = r';[^\r\n]*' #replace # with ;
 StrLine = r'`[^\r\n]*'
 Ignore = Whitespace + any(r'\\\r?\n' + Whitespace) + maybe(Comment) + maybe(StrLine)
 Name = r'[a-zA-Z_][\w:.-]*' #added _:.-
-
 Hexnumber = r'0[xX][\da-fA-F]*[lL]?'
 Octnumber = r'0[0-7]*[lL]?'
 Decnumber = r'[1-9]\d*[lL]?'
@@ -135,21 +170,19 @@ endprogs = {"'": re.compile(Single), '"': re.compile(Double),
 
 tabsize = 8
 
-class TokenError(Exception): pass
-
 class StopTokenizing(Exception): pass
 
 def printtoken(type, token, (srow, scol), (erow, ecol), line, *args): # for testing
     print "%d,%d-%d,%d:\t%s\t%s" % \
         (srow, scol, erow, ecol, tok_name[type], repr(token))
 
-def tokenize(readline, tokeneater=printtoken, useFreestr = True):
+def tokenize(readline, tokeneater=printtoken, useFreestr = True, counter = None):
     try:
         tokenize_loop(readline, tokeneater, useFreestr)
     except StopTokenizing:
         pass
 
-def tokenize_loop(readline, tokeneater, useFreestr = True):
+def tokenize_loop(readline, tokeneater, useFreestr = True, counter = None):
     lnum = parenlev = continued = 0
     namechars, numchars = string.letters + '_', string.digits  
     contstr, needcont = '', 0
@@ -162,6 +195,9 @@ def tokenize_loop(readline, tokeneater, useFreestr = True):
         lnum = lnum + 1
         pos, max = 0, len(line)
         #print 'LN:', pos, line, parenlev
+        if counter:
+            counter.currentLine = line
+            counter.currentStartPos = lnum, pos
         
         if literalstr: #last line was a FREESTR
             if line and not line.isspace() and line[0].isspace():
@@ -206,7 +242,7 @@ def tokenize_loop(readline, tokeneater, useFreestr = True):
 
         if contstr:                            # continued string
             if not line:
-                #raise TokenError, ("EOF in multi-line string", strstart)
+                #raise ZMLParseError, ("EOF in multi-line string", strstart)
                 #don't raise an error, just close the string 
                 if contstr[0] in 'pPrR':
                     if contstr[1] in 'rR':
@@ -286,7 +322,7 @@ def tokenize_loop(readline, tokeneater, useFreestr = True):
 
         else:                                  # continued statement
             if not line:
-                raise TokenError, ("EOF in multi-line statement", (lnum, 0))
+                raise ZMLParseError("Encountered the end of the file while within a multi-line statement")
             continued = 0
 
         while pos < max:
@@ -370,20 +406,9 @@ def tokenize_loop(readline, tokeneater, useFreestr = True):
 
 DEFAULT_MARKUPMAP_URI = 'http://rx4rdf.sf.net/zml/mm/default'
 
-class UnknownMarkupMap(Exception): pass
-
-#copied from rx/utils.py so this file has no dependencies
-class InterfaceDelegator:
-    '''assumes only methods will be called on this object and the methods always return None'''
-    def __init__(self, handlers):
-        self.handlers = handlers
-    
-    def call(self, name, args, kw):
-        for h in self.handlers:
-            getattr(h, name)(*args, **kw)
-        
-    def __getattr__(self, name):
-        return lambda *args, **kw: self.call(name, args, kw)
+class UnknownMarkupMap(ZMLParseError):
+    def __init__(self, uri):
+        ZMLParseError.__init__(self, "Unknow markup map:" + uri)
 
 class Handler(object):
     '''
@@ -426,7 +451,8 @@ class OutputHandler(Handler):
         
     def comment(self, string):
         self.__finishElement()
-        assert string.find('--') == -1, ' -- not allowed in comments'
+        if string.find('--') != -1:
+            raise ZMLParseError(' "--" not allowed in comments')
         self.output.write( u'<!--' + string.rstrip('\n') + '-->')
         
     def text(self, string):
@@ -838,7 +864,8 @@ def _handleInlineWiki(st, handler, string, wantTokenMap=None, userTextHandler=No
                         link = words[-1]
                         type = ' '.join(words[:-1])
                     else: #must be a link like [this is also a link] handled below
-                        assert name is None, 'link names or URLs can not have spaces'
+                        if name is not None:
+                            raise ZMLParseError(st, 'link names or URLs can not have spaces')
                         type = None
                     if type:
                         type = parseLinkType(type) #type is a list of Annotations
@@ -849,7 +876,7 @@ def _handleInlineWiki(st, handler, string, wantTokenMap=None, userTextHandler=No
                 if name is None and len(words) > 1 and [word for word in words if word.isalnum()]: #if no punctuation etc.
                     link = ''
                     for word in words:
-                        link += word.capitalize()
+                        link += word[0].upper() + word[1:] #capitalize() makes other characters lower
                     name = ' '.join(words)
                 else:
                     if type is None: #if the type has already been set, so has the link (which might be None)
@@ -944,6 +971,9 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
     #should maintain this order: nestable block elements (e.g. section, blockquote)*, block elements (e.g. p, ol/li, table/tr)+, inline elements*
     st.wikiStack = []
     st.mm = mmf.getDefault()
+    st.currentLine = ''
+    st.currentStartPos = (0, 0)
+    
     elementStack = []
     wikiStructureStack = {}
     output = StringIO.StringIO()
@@ -1063,10 +1093,12 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
             popWikiStack()
             st.toClose -= 1
         
-    def tokenHandler(type, token, (srow, scol), (erow, ecol), line, indents=None):
+    def tokenHandler(type, token, (srow, scol), (erow, ecol), line, indents=None):        
         if debug:                
             print >>sys.stderr, "STATE: A %d, Ch %d nI %d Fr %d NL %d" % (st.in_attribs, st.in_elemchild, st.wantIndent, st.in_freeform, st.nlcount)
             print >>sys.stderr, "TOKEN: %d,%d-%d,%d:\t%s\t%s" % (srow, scol, erow, ecol, tok_name[type], repr(token))
+        st.currentLine = line
+        st.currentStartPos = (srow, scol)
         if type == WHITESPACE:
             if not st.in_attribs and not st.in_elemchild:
                 handler.whitespace(token.replace('<', ' '))
@@ -1160,8 +1192,9 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
                 normalizeAttribs(st.attribs, handler)
                 st.attribs = []
             else:
-                assert token in '=(),', 'invalid token: ' + token + ' on line #' + `srow` + ' col ' + `scol` + ' line: ' + line
-                assert st.in_attribs, ' on line #' + `srow` + ' col ' + `scol` + ' line: ' + line
+                if token not in '=(),':
+                    raise ZMLParseError('invalid token: ' + repr(token))
+                assert st.in_attribs
                 if token == '=':
                     st.attribs.append(token)
         elif type == NUMBER:
@@ -1170,7 +1203,7 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
             elif st.in_elemchild:
                 handler.text(token)
             else:
-                raise 'error: a number shouldnt be here: ' + token
+                raise ZMLParseError('encountered a number in an illegal location: ' + token)
         elif type == DEDENT:
             if st.in_attribs: #never encountered the :
                 st.in_attribs = 0
@@ -1208,7 +1241,8 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
                     #look at each word in the PI for a URI
                     uris = [x for x in split[1].split() if x.find(':') > -1]
                     if uris:
-                        assert len(uris) == 1, 'malformed zml prologue'
+                        if len(uris) != 1:
+                            raise ZMLParseError('malformed zml prologue')
                         st.mm = mmf.getMarkupMap(uris[0])
                         mmf.done = True
             else:
@@ -1222,9 +1256,21 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
             while elementStack:
                 handler.endElement( elementStack.pop() )
         elif type == ERRORTOKEN and not token.isspace(): #not sure why this happens
-            raise "parse error %d,%d-%d,%d:\t%s\t%s" % (srow, scol, erow, ecol, tok_name[type], repr(token))
-                    
-    tokenize(fd.readline, tokeneater=tokenHandler, useFreestr=mixed)
+            raise ZMLParseError("unexpected token: " + repr(token))
+
+    try:                    
+        tokenize(fd.readline, tokeneater=tokenHandler, useFreestr=mixed, counter=st)
+    except ZMLParseError, e:
+        e.setState(st)
+        raise 
+    except Exception, e:
+        #unexpected error
+        import traceback        
+        zpe = ZMLParseError("Unhandled error:\n"
+            +''.join(format_exception_only( type(e), e) ))
+        zpe.setState(st)
+        raise zpe
+
     handler.endDocument()
 
     if getMM:
