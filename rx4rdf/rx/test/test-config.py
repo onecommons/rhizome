@@ -17,18 +17,6 @@ r'''
 exec __kw__['code'].replace('\r', '\n')+'\n'
 ''')
 
-__addRxML__(replace = '@sitevars', contents = """
- base:site-template:
-  wiki:header-text: '''<h1>Be The Media</h1>
-<h2>Independent Media Begins With You!</h2>'''
-  wiki:uses-theme: base:movabletype-theme
-  
- #unfortunately we also have to add this alias in addition to setting wiki:uses-theme
- #because site-template.xsl can only statically import an URL
- {%smovabletype/theme.xsl}:
-    wiki:alias: `theme.xsl
-"""% rhizome.BASE_MODEL_URI ) 
-
 useIndex = False #for startup speed for testing, disable indexing 
 
 LIVE_ENVIRONMENT=1
@@ -37,7 +25,7 @@ LIVE_ENVIRONMENT=1
 authorizeContentProcessors['http://rx4rdf.sf.net/ns/wiki#item-format-python'] = lambda *args: 1
 
 if __argv__.count('--testplayback'):
-    #make these variables visible to all requests  
+    #make these variables visible to throughout nested requests:  
     globalRequestVars = globalRequestVars + ['_noErrorHandling', '__noConflictDetection']
     rhizome.findResourceAction.assign('_noErrorHandling', '1') #we want errors to propagate up to the unittest framework
     rhizome.findResourceAction.assign('__noConflictDetection', '1') #used by save.xml so we can recreate pages using old edit requests

@@ -1,4 +1,3 @@
-#!zml markup
 #?zml
 <foo
 <<bar;child-of-foo a=v: child-of-child-of-foo a-v: 'child-child text';child-of-foo: 'child text';

@@ -1,0 +1,2 @@
+#?zml markup
+rx;<this att=foo;<<foo;<<<parent;<<bar:'ddd';<another;<<foo;<<<parent

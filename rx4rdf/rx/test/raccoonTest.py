@@ -81,6 +81,11 @@ class RaccoonTestCase(unittest.TestCase):
         else:
             self.failUnless(False) #NotAuthorized should have been raised            
         
+    def testStreaming(self):
+        '''
+        test actions pipeline whose retVal is a file-like object
+        '''
+        
     def testXPathSecurity(self):
         '''
         test that we can't access insecure 4Suite extension functions
@@ -98,7 +103,7 @@ class RaccoonTestCase(unittest.TestCase):
             pass
         else:
             self.fail("should have thrown exception")
-
+            
     def testXPathExtFuncs(self):
         root = raccoon.RequestProcessor(a='testAuthAction.py')
         

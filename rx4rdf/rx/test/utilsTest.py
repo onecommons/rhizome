@@ -73,6 +73,7 @@ class utilsTestCase(unittest.TestCase):
         fixlinks = fixerFactory(out)
         fixlinks.feed(contents)
         fixlinks.close()
+        #print out.getvalue()
         self.failUnless(result == out.getvalue())
 
     def testLinkFixer(self):
@@ -121,6 +122,103 @@ class utilsTestCase(unittest.TestCase):
         </html>'''
         self.runLinkFixer(BlackListHTMLSanitizer, contents, result)        
 
+    def testHTMLTruncator(self):        
+        def makeTruncator(out):
+            fixer = HTMLTruncator(out)
+            fixer.maxWordCount = 3
+            return fixer
+
+        contents = '''
+        <body>
+        <div>
+        one two
+        three
+        four
+        </div>
+        </body>
+        '''
+
+        result = '''
+        <body>
+        <div>
+        one two
+        three
+        </div></body>'''
+        
+        self.runLinkFixer(makeTruncator, contents, result)
+
+        contents = '''
+        <body>
+        <div>
+        one two
+        three
+        </div>
+        </body>
+        '''
+        self.runLinkFixer(makeTruncator, contents, result)
+        
+        contents = '''
+        <html>
+        <head>
+        <title>text inside the head element should not count</title>
+        </head>
+        <body>
+        <div>
+        one two
+        three
+        four
+        </div>
+        </body>
+        </html>
+        '''
+
+        result = '''
+        <html>
+        <head>
+        <title>text inside the head element should not count</title>
+        </head>
+        <body>
+        <div>
+        one two
+        three
+        </div></body></html>'''
+
+        self.runLinkFixer(makeTruncator, contents, result)
+
+        #<div class='summary'> let's the user explicitly declare what to include in the summary
+        contents = '''
+        <html>
+        <head>
+        <title>text inside the head element should not count</title>
+        </head>
+        <body>
+        <div class='summary'>
+        <div>
+        one two
+        three
+        four
+        </div>
+        </div>
+        </body>
+        </html>
+        '''
+
+        result = '''
+        <html>
+        <head>
+        <title>text inside the head element should not count</title>
+        </head>
+        <body>
+        <div class='summary'>
+        <div>
+        one two
+        three
+        four
+        </div>
+        </div></body></html>'''
+
+        self.runLinkFixer(makeTruncator, contents, result)
+        
     def testDiffPatch(self):
         orig = "A B C D E"
         new = "A C E D"

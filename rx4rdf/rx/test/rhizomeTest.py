@@ -6,7 +6,7 @@
     http://rx4rdf.sf.net    
 """
 
-from rx import raccoon, utils, logging
+from rx import raccoon, utils, logging, rhizome
 import unittest, os, os.path, shutil, glob
 
 RHIZOMEDIR = '../../rhizome'
@@ -32,6 +32,27 @@ class RhizomeTestCase(unittest.TestCase):
         logging.root.setLevel(logLevel)
         logging.basicConfig()
         raccoon.DEFAULT_LOGLEVEL = logLevel
+
+    def testNoSpamFixer(self):
+        contents='''<?xml version=1.0 standalone=true ?>
+        <!doctype asdf>
+        <test link='foo' t='1'>
+        <a href='http://viagra.com'>spam</a>
+        <!-- comment -->
+        <![CDATA[some < & > unescaped! ]]>
+        some content&#233;more content&amp;dsf<a href='http://viagra.com/next' rel='next' />
+        </test>'''
+        result = '''<?xml version=1.0 standalone=true ?>
+        <!doctype asdf>
+        <test link='foo' t='1'>
+        <a href='http://viagra.com' rel="nofollow" >spam</a>
+        <!-- comment -->
+        <![CDATA[some < & > unescaped! ]]>
+        some content&#233;more content&amp;dsf<a href='http://viagra.com/next' rel="nofollow" />
+        </test>'''
+        import utilsTest
+        runLinkFixer = utilsTest.utilsTestCase.runLinkFixer.im_func        
+        runLinkFixer(self, rhizome.SanitizeHTML, contents, result)
 
     def executeScript(self, config, histories):
         histories = [os.path.abspath(x) for x in histories]
@@ -72,11 +93,27 @@ class RhizomeTestCase(unittest.TestCase):
         1. edit the zmlsandbox
         1. view it
         1. create new html page called "sanitize" using illegal html (e.g. javascript)
-        1. view it 
+        1. view it
+        1. create a new user account
+        1. view it
         '''
         for configpath in glob.glob('test-config*.py'):
             print 'testing ', configpath
             self.executeScript(configpath, glob.glob('smoketest.*.pkl'))
+
+    def testNonAscii(self):
+        '''
+        This script:
+        1. Creates a text page with non-ascii name, title and contents
+        1. Previews it
+        1. Views it
+        1. Re-edits it
+        1. Creates a page with binary content (via file upload)
+        1. Views it
+        '''
+        for configpath in glob.glob('test-config*.py'):
+            print 'testing ', configpath
+            self.executeScript(configpath, glob.glob('nonascii.*.pkl'))
 
 
 SAVE_WORK=False
