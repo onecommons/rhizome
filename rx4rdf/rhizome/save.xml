@@ -100,9 +100,7 @@
           <xu:variable name='parentName' select='""'/>
           <xu:call-template name='getOrCreateFolder'/>
           <xu:append select='$folder'>
-              <wiki:has-child>
-                <xu:attribute name="rdf:resource"><xu:value-of select="$resource"/></xu:attribute>
-              </wiki:has-child>
+              <wiki:has-child rdf:resource='{$resource}'/>
           </xu:append>          
         </xu:if>
     </xu:if>

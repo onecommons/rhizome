@@ -53,6 +53,7 @@
         <rdfs:label>Group</rdfs:label>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-view"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-view-metadata"/>
+        <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-view-source"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-edit-metadata"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-edit"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-showrevisions"/>
@@ -97,6 +98,9 @@
         </wiki:email>
         <auth:guarded-by rdf:resource="{$BASE_MODEL_URI}users/{$loginname}/private-rw"/>
       </wiki:User>
+    </xu:append>
+    <xu:append select="/wiki:Folder[wiki:name='users']">
+      <wiki:has-child rdf:resource="{$BASE_MODEL_URI}users/{$loginname}"/>
     </xu:append>
   </xu:if>
   <xu:if test="not($action='creation')">

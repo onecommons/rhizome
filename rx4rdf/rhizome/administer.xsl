@@ -1,96 +1,58 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<x:stylesheet xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" xmlns:wf="http://rx4rdf.sf.net/ns/racoon/xpath-ext#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:a="http://rx4rdf.sf.net/ns/archive#" xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" xmlns:x="http://www.w3.org/1999/XSL/Transform" xmlns:f="http://xmlns.4suite.org/ext" xmlns:auth="http://rx4rdf.sf.net/ns/auth#" exclude-result-prefixes="f wf a wiki rdf rdfs auth" version="1.0">
+<x:stylesheet xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" 
+xmlns:wf="http://rx4rdf.sf.net/ns/racoon/xpath-ext#" 
+xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" 
+xmlns:a="http://rx4rdf.sf.net/ns/archive#" xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#" 
+xmlns:x="http://www.w3.org/1999/XSL/Transform" xmlns:f="http://xmlns.4suite.org/ext" 
+xmlns:auth="http://rx4rdf.sf.net/ns/auth#" 
+exclude-result-prefixes="f wf a wiki rdf rdfs auth" version="1.0">
   <x:param name="__resource"/>
-  <x:template match="/">
-    <Administration/>
-    <hr>
-      <table>
+  
+  <x:template name="rows">
+     <x:param name='search'/>
+     <x:param name='shownew'/>
+<x:for-each select="$search">
+    <x:variable name='resName' select="f:if(./wiki:name, ./wiki:name, f:if(./rdfs:label,./rdfs:label, name-from-uri(.) ))" />
         <tr>
-          <td>Users</td>
+          <td><x:value-of select='$resName' /></td>
           <td>
-            <a href="site:///search?search=%2Fwiki%3AUser&amp;searchType=RxPath&amp;view=html&amp;Search=search">List </a>
+            <a href="site:///search?search=%2F{f:escape-url(name-from-uri(.))}&amp;searchType=RxPath&amp;view=html">List </a>
           </td>
           <td>
-            <a href="site:///search?search=%2Fwiki%3AUser&amp;searchType=RxPath&amp;view=edit&amp;Search=search">Edit All </a>
+            <a href="site:///search?search=%2F{f:escape-url(name-from-uri(.))}&amp;searchType=RxPath&amp;view=edit">Edit All </a>
           </td>
+          <x:if test='$shownew'>
           <td>
-            <a href="site:///users/guest?action=new">New </a>
+            <a href="site:///.?about={f:escape-url(string(.))}&amp;action=new">New </a>
           </td>
-        </tr>
-        <tr>
-          <td>Roles</td>
-          <td>
-            <a href="site:///search?search=%2Fauth%3ARole&amp;searchType=RxPath&amp;view=html&amp;Search=search">List </a>
-          </td>
-          <td>
-            <a href="site:///search?search=%2Fauth%3ARole&amp;searchType=RxPath&amp;view=edit&amp;Search=search">Edit All </a>
-          </td>
-          <td>
-            <a href="site:///new-role-template">New </a>
-          </td>
-        </tr>
-        <tr>
-          <td>Access Tokens </td>
-          <td>
-            <a href="site:///search?search=%2Fauth%3AAccessToken&amp;searchType=RxPath&amp;view=html&amp;Search=search">List </a>
-          </td>
-          <td>
-            <a href="site:///search?search=%2Fauth%3AAccessToken&amp;searchType=RxPath&amp;view=edit&amp;Search=search">Edit All </a>
-          </td>
-          <td>
-            <a href="site:///new-accesstoken-template">New </a>
-          </td>
-        </tr>
-        <tr>
-          <td>Folders </td>
-          <td>
-            <a href="site:///search?search=%2Fwiki%3AFolder&amp;searchType=RxPath&amp;view=html&amp;Search=search">List </a>
-          </td>
-          <td>
-            <a href="site:///search?search=%2Fwiki%3AFolder&amp;searchType=RxPath&amp;view=edit&amp;Search=search">Edit All </a>
-          </td>
-          <td>
-            <a href="site:///new-folder-template">New </a>
-          </td>
-        </tr>
-        <tr>
-          <td>Labels </td>
-          <td>
-            <a href="site:///search?search=%2Fwiki%3ALabel&amp;searchType=RxPath&amp;view=html&amp;Search=search">List </a>
-          </td>
-          <td>
-            <a href="site:///search?search=%2Fwiki%3ALabel&amp;searchType=RxPath&amp;view=edit&amp;Search=search">Edit All </a>
-          </td>
-          <td>
-            <a href="site:///new-label-template">New </a>
-          </td>
-        </tr>
-        <tr>
-          <td>Dispositions</td>
-          <td>
-            <a href="site:///search?search=%2Fwiki%3AItemDisposition&amp;searchType=RxPath&amp;view=html&amp;Search=search">List </a>
-          </td>
-          <td>
-            <a href="site:///search?search=%2Fwiki%3AItemDisposition&amp;searchType=RxPath&amp;view=edit&amp;Search=search">Edit All </a>
-          </td>
-          <td>
-            <a href="site:///new-disposition-template">New </a>
-          </td>
-        </tr>
-        <tr>
-          <td>Doc Types</td>
-          <td>
-            <a href="site:///search?search=%2Fwiki%3ADocType&amp;searchType=RxPath&amp;view=html&amp;Search=search">List </a>
-          </td>
-          <td>
-            <a href="site:///search?search=%2Fwiki%3ADocType&amp;searchType=RxPath&amp;view=edit&amp;Search=search">Edit All </a>
-          </td>
-          <td>
-            <a href="site:///new-doctype-template">New </a>
-          </td>
-        </tr>
-      </table>
-    </hr>
+          </x:if>
+        </tr>  
+</x:for-each>  
+  </x:template>
+  
+  <x:template match="/">    
+    <p>
+    The tables below give you access that all the resources of this site. <br/>    
+    To create new resources of any type, click <a href='site:///generic-new-template'>here</a>.<br/> 
+    To delete resources, choose the appropriate "Edit All" link and delete the offending resources from the results.
+    </p>
+      <b>Manageable Resources by Type</b>
+      <table>   
+      <!--       
+      select all the classes that are handled in one way or the other      
+      -->                    
+      <x:call-template name='rows'>
+        <x:with-param name='search' select="id(/*/wiki:action-for-type/*)[. != uri('wiki:Any')]" />
+        <x:with-param name='shownew' select="true()" />
+      </x:call-template>
+      </table>  
+      <b>Internal Resources by Type</b>
+      <table>         
+      <x:call-template name='rows'>
+        <x:with-param name='search' select="id(/*/rdf:type/*)[not(. = /*/wiki:action-for-type)]"/>
+      </x:call-template> 
+      </table>  
+      <b>List all <a href='site:///search?search=%2F*%5Bnot%28rdf%3Atype%29%5D&amp;searchType=RxPath&amp;view=html'>un-typed resources</a></b>
   </x:template>
 </x:stylesheet>
 

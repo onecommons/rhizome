@@ -7,11 +7,7 @@ As an optimization it only set when one of these config options are set:
 'undefinedPageIndicator', 'externalLinkIndicator', 'interWikiLinkIndicator'
  (see rhizome.processRhizmlSideEffects() )
 -->
-
-<x:param name="previous:_disposition" />
 <x:output method='html' indent='no' />
-<!-- preserve the previous resource's disposition -->
-<x:variable name='_disposition' select="wf:assign-metadata('_disposition', $previous:_disposition)" />
 
 <x:template match='a'>
 <!--

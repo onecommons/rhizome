@@ -53,7 +53,7 @@
 <!-- search result header -->
      <xsl:choose>
      <xsl:when test="starts-with($view,'rss')">
-<xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'application/xml')" />        
+<xsl:variable name='content-type' select="wf:assign-metadata('_contenttype', 'application/xml')" />        
 <rss version="0.91">
 <channel>
 <title>Rhizome search for "<xsl:value-of select="$search" />"</title>
@@ -68,7 +68,7 @@ on <xsl:value-of select="$_base-url" />
 <xsl:for-each select="$results">
     <item>
        <xsl:variable name='relUrl' select="f:if(self::a:NamedContent, concat(./wiki:name, '?'), concat('.?about=', f:escape-url(.)))" />
-       <title><xsl:value-of select="f:if(./wiki:name, ./wiki:name, f:if(./rdfs:label,./rdfs:label, string(.)))" /></title>       
+       <title><xsl:value-of select="f:if(./wiki:name, ./wiki:name, f:if(./rdfs:label,./rdfs:label, name-from-uri(.)))" /></title>       
        <link>       
        <xsl:value-of select="$_base-url" />site:///<xsl:value-of select="$relUrl" />
        </link>
@@ -121,13 +121,18 @@ No results found.
   (<xsl:value-of select="count($results)" /> found)</div>
 <br />   
 <table>
+    <xsl:variable name="properties-table" select="is-predicate($results[1])" />
     <xsl:variable name="long-table" select="$results[1][self::a:NamedContent]" />
     <xsl:if test='$long-table'>
         <tr><th></th><th>Name </th><th>Last Modified</th><th>By</th></tr> 
     </xsl:if>
+    <xsl:if test='$properties-table'>
+        <tr><th>Resource </th><th>Property</th><th>Value</th></tr> 
+    </xsl:if>    
 <xsl:for-each select="$results">
+  <xsl:if test='not($properties-table)'>
     <xsl:variable name='relUrl' select="f:if(self::a:NamedContent, concat(./wiki:name, '?'), concat('.?about=', f:escape-url(.)))" />
-    <xsl:variable name='resName' select="f:if(./wiki:name, ./wiki:name, f:if(./rdfs:label,./rdfs:label, string(.)))" />
+    <xsl:variable name='resName' select="f:if(./wiki:name, ./wiki:name, f:if(./rdfs:label,./rdfs:label, name-from-uri(.)))" />
     
     <tr>
     <td><a href="site:///{$relUrl}&amp;action=edit" title='edit'><img border="0" alt='edit' src='site:///edit-icon.png' /></a></td>
@@ -138,9 +143,36 @@ No results found.
         <xsl:value-of select='(./wiki:revisions/*/rdf:first/*)[last()]/wiki:created-by/*/wiki:login-name'/></a></td>    
     </xsl:if>
     <xsl:if test='not($long-table)'>    
-    <td><a href='site:///search?search=%2F*%5B*%2F*%5B.%3D%27{f:escape-url(.)}%27%5D%5D&amp;searchType=RxPath&amp;view=html'>Used By</a></td>        
+    <td><a href='site:///search?search=%2F*%2F*%5B.%3D%27{f:escape-url(.)}%27%5D&amp;searchType=RxPath&amp;view=html'>Used By</a></td>        
     </xsl:if>
     </tr>        
+  </xsl:if>    
+  
+  <xsl:if test='$properties-table'>        
+    <xsl:variable name='subjectUrl' select="f:if(parent::a:NamedContent, concat(../wiki:name, '?'), concat('.?about=', f:escape-url(..)))" />
+    <xsl:variable name='subjectName' select="f:if(../wiki:name, ../wiki:name, f:if(../rdfs:label,../rdfs:label, name-from-uri(..)))" />
+
+    <xsl:variable name='predicateName' select="name(.)" />
+
+    <xsl:variable name='isLiteral' select="boolean(text())" />
+  
+    <tr>    
+    <td><a href="site:///{$subjectUrl}" ><xsl:value-of select='$subjectName' /></a></td>    
+
+    <td><a href='site:///search?search=%2F*%2F*%5B%40uri%3D%27{f:escape-url(./@uri)}%27%5D&amp;searchType=RxPath&amp;view=html&amp;title=Property%20Usage'>
+        <xsl:value-of select='$predicateName' /></a>
+    </td>        
+    
+    <xsl:if test='$isLiteral'>        
+        <td><xsl:value-of select='substring(text(),1,100)' /></td>    
+    </xsl:if>        
+    <xsl:if test='not($isLiteral)'>        
+        <xsl:variable name='objectUrl' select="f:if(a:NamedContent, concat(wiki:name, '?'), concat('.?about=', f:escape-url(*)))" />
+        <xsl:variable name='objectName' select="f:if(wiki:name,  wiki:name, f:if( rdfs:label, rdfs:label, name-from-uri(*)))" />        
+        <td><a href="site:///{$objectUrl}" ><xsl:value-of select='$objectName' /></a></td>    
+    </xsl:if>            
+    </tr>        
+  </xsl:if>    
 </xsl:for-each>    
 </table>
 <xsl:if test='not($results)'>

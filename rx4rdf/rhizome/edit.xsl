@@ -16,7 +16,7 @@
 <xsl:param name="action" />
 <xsl:variable name='target'>
      <xsl:choose>
-        <xsl:when test="$action"><xsl:value-of select="$_name" /></xsl:when>
+        <xsl:when test="$action='edit'"><xsl:value-of select="$_name" /></xsl:when>
         <xsl:otherwise></xsl:otherwise> <!-- no action, assume new item (set $target="") -->
     </xsl:choose> 
 </xsl:variable>
@@ -26,8 +26,6 @@
 
 <xsl:variable name='namedContent' select="/*[wiki:name/text()=$target]" />
 <xsl:variable name='item' select="($namedContent/wiki:revisions/*/rdf:first/*)[last()]" />
-
-<xsl:variable name="contents" select="wf:get-contents($item)" />
 
 <xsl:template name="add-option" >
 <xsl:param name="text" />
@@ -87,10 +85,21 @@ function OnSubmitEditForm()
     <label for='title'>Title</label> <input TYPE="text" NAME="title" VALUE="{$item/wiki:title}" SIZE="80" MAXLENGTH="100" />
     <br/>
 	<input TYPE="hidden" NAME="startTime" id="startTime" VALUE="{wf:current-time()}" />
-	Upload File:<input TYPE='file' name='file' /> OR edit text here: <br />
-	<textarea NAME="contents" ROWS="20" COLS="65" STYLE="width:100%" WRAP="virtual">
-	<xsl:value-of select="$contents" />
-	</textarea>
+	Upload File:<input TYPE='file' name='file' />
+	<xsl:choose>
+    <xsl:when test="$item/a:contents/a:ContentTransform/a:transformed-by = 'http://rx4rdf.sf.net/ns/wiki#item-format-binary'">         	    
+      <br/>The content of the item is in binary format and can not be edited. To modify the content, upload a replacement.
+      If you don't want to modify the content, edit its metadata <a href='site:///{$itemname}?action=edit-metadata'>here</a> --
+      saving this page without uploading a file will result in an item with no content!
+    </xsl:when>
+    <xsl:otherwise>
+    	<xsl:variable name="contents" select="wf:get-contents($item)" />
+    	 OR edit text here: <br />
+    	<textarea NAME="contents" ROWS="20" COLS="65" STYLE="width:100%" WRAP="virtual">
+    	<xsl:value-of select="$contents" />
+    	</textarea>
+	</xsl:otherwise>
+	</xsl:choose>
 	<br />
 	<br />Source Format:
 	<select name="format" size="1" width="100">

@@ -20,16 +20,14 @@
     <xsl:param name="_url" />		 
     <xsl:param name="response-header:content-type"/>    
     <xsl:param name="_static" />
-    <xsl:param name="previous:about" />		
+    <xsl:param name="previous:about" />
+    <xsl:param name="previous:itemname" />
+    <xsl:param name="previous:search" />				
+    <xsl:param name="previous:searchType" />				
     <xsl:output method='html' indent='no' />
     
 <xsl:template match="/">
-<!-- this page is always html, not the content's mimetype -->
 <xsl:variable name='prev-content-type' select="$response-header:content-type" />
-
-<xsl:if test="not($_static)" >
-<xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />
-</xsl:if>
 
 <xsl:variable name='title' select="f:if($previous:title, $previous:title, f:if($_orginalContext/wiki:title, $_orginalContext/wiki:title, $_name) )" />
 
@@ -58,7 +56,7 @@
          <xsl:choose>
             <xsl:when test="$session:login">
 <form action='site:///logout' method='POST' >
-Welcome <a href="users/{$session:login}?action=edit"><xsl:value-of select="$session:login" /></a>
+Welcome <a href="site:///users/{$session:login}?action=edit"><xsl:value-of select="$session:login" /></a>
 <input TYPE="hidden" NAME="redirect" value="{$_url}" />
 <input type="submit" style="font-size: 100%" value="logout" name="logout"/>    
 <br/><xsl:value-of select="$session:message" disable-output-escaping='yes' />
@@ -116,26 +114,23 @@ Or <a href="site:///users/guest?action=new">signup</a>
     <tr>
     <td valign="top" id="maincontent">        
          <xsl:choose>
-             <!-- if the content is xml or html insert it as is, otherwise
-              (because we don't yet always set the content-type), we'll assume any transformation other than text creates xml or html
-            todo: test for all the various xml, xhtml mimetypes
-           -->
-         <xsl:when test="starts-with($prev-content-type,'text/plain')">
-            <pre>
-            <xsl:value-of disable-output-escaping='no' select="$_contents" />
-            </pre>
-         </xsl:when>           
-         <xsl:when test="starts-with($prev-content-type,'text/xml')
-                      or starts-with($prev-content-type,'text/html')
-                       or not($_previousContext/a:contents/a:ContentTransform/a:transformed-by = 'http://rx4rdf.sf.net/ns/wiki#item-format-text')">
+         <xsl:when test="contains($prev-content-type,'xml')
+                      or starts-with($prev-content-type,'text/html')">
             <xsl:value-of disable-output-escaping='yes' select="$_contents" />
-         </xsl:when>
-         <xsl:otherwise>
+         </xsl:when>         
+         <!-- we never get this far for binary content because xslt.Processor._normalizeParams calls to_unicode on $_contents
+         <xsl:when test="$_previousContext/a:contents/a:ContentTransform/a:transformed-by = 'http://rx4rdf.sf.net/ns/wiki#item-format-binary'">         
+             <xsl:variable name='aboutparam' select="f:if($previous:about, concat('&amp;about=', f:escape-url($previous:about)), '')" />
+            <iframe height='100%' width='100%' 
+      href='site:///{$_name}?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-complete{$aboutparam}' />
+         </xsl:when>           
+        -->         
+         <xsl:otherwise>             
             <pre>
             <xsl:value-of disable-output-escaping='no' select="$_contents" />
             </pre>
          </xsl:otherwise>
-        </xsl:choose>
+        </xsl:choose>    
     </td>
     </tr>
     </table>
@@ -150,23 +145,37 @@ Or <a href="site:///users/guest?action=new">signup</a>
     <a href="site:///edit">New</a>
     &#xa0;<a href="site:///search?search=%2F*%5Bwiki%3Aname%5D&amp;searchType=RxPath&amp;view=html&amp;title=All%20Pages">List</a>
     &#xa0;<a href="site:///search?search=wf%3Asort%28%2Fa%3ANamedContent%2C%27%28wiki%3Arevisions%2F*%2Frdf%3Afirst%2F*%29%5Blast%28%29%5D%2Fa%3Acreated-on%27%2C%27number%27%2C%27descending%27%29&amp;searchType=RxPath&amp;view=html&amp;title=Recently%20Changed%20Pages">Recent</a>
-    &#xa0;<a href="site:///administer">Admin</a>
+    &#xa0;<a href="site:///administration">Admin</a>
 </div>
 <xsl:variable name='aboutparam' select="f:if($previous:about, concat('&amp;about=', f:escape-url($previous:about)), '')" />
-<a href="site:///{$_name}?{$aboutparam}">View</a>
-&#xa0;<a href="site:///{$_name}?action=edit{$aboutparam}">Edit</a>
-&#xa0;<a href="site:///{$_name}?action=showrevisions">Revisions</a>
-&#xa0;<a href="site:///{$_name}?action=edit-metadata{$aboutparam}">Metadata</a>
-&#xa0;<a href="site:///{$_name}?action=confirm-delete{$aboutparam}">Delete</a>
+<xsl:variable name='path' select="f:if($previous:itemname, $previous:itemname, $_name)" />
+<a href="site:///{$path}?{$aboutparam}">View</a>
+&#xa0;<a href="site:///{$path}?action=edit{$aboutparam}">Edit</a>
+&#xa0;<a href="site:///{$path}?action=showrevisions">Revisions</a>
+&#xa0;<a href="site:///{$path}?action=view-metadata{$aboutparam}">Metadata</a>
+&#xa0;<a href="site:///{$path}?action=confirm-delete{$aboutparam}">Delete</a>
+&#xa0;<a href="site:///{$path}?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-print{$aboutparam}">Print</a>
 </p>
 <p>       
 <form action='site:///search'>
 
-      Search <input TYPE="text" NAME="search" VALUE="" SIZE="40" />
-Type<select name="searchType">
-    <option value="Simple" selected='selected'>Simple</option>
-    <option value="RxPath" >RxPath</option>
-    <option value="RegEx" >Regex</option>
+      Search <input TYPE="text" NAME="search" VALUE="{$previous:search}" SIZE="40" />
+Type<select name="searchType">    
+    <option value="Simple">
+	<xsl:if test='not($previous:searchType) or $previous:searchType = "Simple"'>
+		<xsl:attribute name='selected'>selected</xsl:attribute>
+	</xsl:if>    
+    Simple</option>
+    <option value="RxPath" >
+	<xsl:if test='$previous:searchType = "RxPath"'>
+		<xsl:attribute name='selected'>selected</xsl:attribute>
+	</xsl:if>        
+    RxPath</option>
+    <option value="RegEx" >
+	<xsl:if test='$previous:searchType = "RegEx"'>
+		<xsl:attribute name='selected'>selected</xsl:attribute>
+	</xsl:if>            
+    Regex</option>
     </select>
 &#xa0;View<select name="view">
     <option value="html" selected='selected'>HTML</option>

@@ -24,6 +24,7 @@
   ;below are the pre-defined permissions you can choose from
   ; read permissions
   ;auth:has-permission: wiki:action-view
+  ;auth:has-permission: wiki:action-view-source
   ;auth:has-permission: wiki:action-view-metadata
   ;auth:has-permission: wiki:action-edit
   ;auth:has-permission: wiki:action-edit-metadata
