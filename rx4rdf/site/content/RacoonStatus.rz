@@ -1,0 +1,15 @@
+Racoon is fairly complete, I don't expect to add much functionality. Racoon is kind of like a microkernel -- it just handles and dispatches requests and serves as the glue between the underlying RxPath engine and the request handlers.
+
+That being said, here's a "strategic" feature list:
+
+* Build-out caching a bit more, in particular:
+** Add support for etags and if-none-else headers
+** Add caching to the URL/file resolver
+* Support for mod-python and plain old cgi
+** Technically not part of Racoon per se, but regardless, the current approach to integrating with Apache has its limitations.
+* Security
+** Allow for fine-grained authorization (i.e. when adding and removing individual statements) -- right now authorization is at the application level (in Rhizome)
+** Integrate a sandbox for the safe execution of Python content (Zope seems like it has one, can we use that?)
+* Support multiple applications per Racoon instance
+** Allow the application config files to treated like any content handler, allowing it to be edited through Racoon.
+** Support a master meta-application config file that can dispatch requests to the appropriate applications

@@ -1,0 +1,20 @@
+To illustrate how Racoon works let's walk through the steps it takes to serve a page.
+
+# Run racoon.py -a rhizome-config.py
+## Racoon executes the rhizome-config.py file, setting all the variables declared there, including:
+### ^^PATH^^ which specifies the directory search path for Racoon
+### ^^STORAGE_TEMPLATE^^ which specifies (in [NTriples|http://www.w3.org/TR/rdf-testcases/#ntriples]) the site structure for a new site. There's a helper function ^^\__addItem\__^^ to update this variable and the line ~~\
+^^\__addItem\__('index',loc='path:index.txt', format='rhizml', disposition='entry', owner=None)^^ ~~\
+adds a page named 'index' with the assertion that its contents is stored in "path:index.txt"
+### Perhaps most importantly, the config file must a set a dictionary called ^^actions^^ that maps trigger names to a pipeline of Actions that are invoked in order. Racoon currently uses two triggers: ^^handle-request^^, which is invoked by http requests and by the 'site:' scheme URL resolver, and ^^run-cmds^^, which is invoked on start-up to handle command line arguements.
+## Racoon next tries to load the model store specified in the ^^STORAGE_PATH^^ or with the -m option. If it is not found, it creates a new store using ^^STORAGE_TEMPLATE^^.
+## If there were any command line arguments listed after the '-a' they are mapped to a dictionary of XPath variables and the 'run-cmd' Action pipeline is invoked with them.
+## Racoon starts its http server, listening on port 8000 by default
+# retrieve http://localhost:8000/index with your browser
+## Racoon maps the HTTP request to XPath variables, using different namespaces for the request and response headers, query parameters, cookies, etc.
+## Racoon then invokes the Action pipeline associated with 'handle-request'. For each Action Racoon invokes each RxPath query until it find a match and then passes on the result to the next Action. The result of the final action is returned to browser.
+### The first action (^^findResourceAction^^) will match this expression ^^/a:NamedContent\[wiki:name=$_name]^^, selecting the resource added to the template by the above ^^\__addItem\__^^ call.
+### Skipping ahead to the 5th Action (^^findContentAction^^), our request will match ^^wf:openurl(.\//a:contents/a:ContentLocation)^^. Since ^^.\//a:contents/a:ContentLocation^^ points to the "path:index.txt" a:ContentLocation resource, ^^wf:openurl^^ will retrieve that URL.
+### To resolve the URL Racoon uses its custom URL resolver which supports the internal 'path:' scheme, which finds the first file on Racoon's PATH config variable. For example, if you are running site-config.py, Racoon will find the index.txt in the site directory before it finds the index.txt in the rx/rhizome directory.  Using path: URLs provides both security (by restricting access to the file system) and modularity, now you don't need to modify rhizome directly, enabling you easily upgrade rhizome, etc. 
+### The next Action tranforms the content based on its format (Rhizml, XSLT, etc.) and the final Action looks for any template pages that may applied to it. This Action may invoke another series of Actions and so on and so on. For example, if the page isn't HTML it will try to find an appropriate stylesheet, and those results may be further transformed by the site-template XSL script.
+### Finally, we've processed all the Actions and the results are delivered to the browser.

@@ -1,0 +1,44 @@
+ document:
+  header:
+   title: `Rhizome Manual
+   authors:
+     person name = 'Adam Souzis' email="asouzis@users.sourceforge.net"
+  body:
+!Overview
+Is like a wiki except that instead creating pages of content you create abstract entities presented depending on context.
+these entities are permanent, location-independent and grand vision is that will turn into 
+
+!Installation
+!!Requirements
+Rhizome requires Python 2.2 or later and [4Suite 1.0a1|http://4suite.org/?xslt=downloadproduct.xslt&show=http%3A//4suite.org/data/software/4Suite]. 
+   
+Rhizome are known to run on Linux, Windows 2000 and Cygwin and should work on any platform that supports Python and 4Suite.
+
+On Windows, [Win32 Extensions|http://www.python.org/windows/win32all] must be installed or locking will be disabled.
+
+!!Install
+This is a standard Python source distribution. To install:
+# Unzip
+# Run ^^python <unzip dir>/setup.py install^^
+
+!!Running
+Rhizome is an application that runs on [Racoon], a simple application server.  Rhizome just consists of a Racoon config file and a bunch of web pages. To run Rhizome, run Racoon specifying your Rhizome config file using the -a option, e.g.: 
+
+^^python racoon.py -a rhizome/rhizome-config.py^^
+
+This will launch Racoon's built-in http server, which runs on port 8000 by default. You can change this by editing ^^server.cfg^^ ([see below |#Configuration]). 
+
+That's it! You now have a new instance of Rhizome running. By default, the site will be stored in the current directory in file called "wikistore.nt" and content will be stored in a subdirectory called "content".  Most of the Rhizome's behaviour is defined in its pages so you can start customizing your Rhizome instance by editing its pages and metadata from within Rhizome.
+
+However, there are few additional things you might want to configure first if you deploying a live website. First, you should create your own config file to seperate your config settings from the stock Rhizome config settings.  For example, the Rx4RDF distribution contains a copy of the rx4rdf.sf.net website;  here's the first couple of lines of its site-config.py:
+
+p'''BASE_MODEL_URI='http://rx4rdf.sf.net/site/'
+__include__('../rx/rhizome/rhizome-config.py')'''
+
+!!!With Apache
+Racoon 
+
+!!Configuration
+See site/content/RacoonConfig.txt for documentation on config file settings
+
+!Exporting and static websites  
