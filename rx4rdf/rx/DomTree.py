@@ -171,6 +171,10 @@ class Node(_Node, _ComputedAttributes, object): #change to derive from object fo
 
     # XPath Data Model
     rootNode = None
+    #sync with Domlette implementation:
+    xpathAttributes = None
+    xpathNamespaces = None
+    XPATH_NAMESPACE_NODE = _Node.NOTATION_NODE+1 #DOM level 3 XPath
 
     def preAddHook(self, newChild):
         return newChild
@@ -181,6 +185,9 @@ class Node(_Node, _ComputedAttributes, object): #change to derive from object fo
     def _get_docIndex(self):
         return DocIndex(self)
 
+    def __cmp__(self, other):
+        return cmp(self.docIndex, other.docIndex)
+    
     def __ne__(self, other): #so __eq__ is called instead of __cmp__
         return not self.__eq__(other)
 
@@ -511,6 +518,22 @@ class DocumentFragment(Node):
 #readonly ops: __add__(self, other) __radd__(self, other) __mul__(self, other) __rmul__(self, other)
 #readonly methods: count index
 
+class XPathNamespace(Node):
+    '''The XPathNamespace interface represents the XPath namespace node type
+    that DOM lacks.'''
+
+    nodeType = Node.XPATH_NAMESPACE_NODE
+    
+    def __init__(self, parentNode, prefix, namespaceURI):          
+        self.ownerDocument = parentNode.ownerDocument;
+        self.localName = self.nodeName = prefix
+        self.value = self.nodeValue = namespaceURI
+        self.parentNode = parentNode
+                           
+    def __repr__(self):        
+        return "<pXPathNamespace at %p: name %s, value %s>" % (id(self),
+                      self.name,self.value);
+
 class Element(Node):
 
     nodeType = Node.ELEMENT_NODE
@@ -544,7 +567,15 @@ class Element(Node):
         # Attributes are unordered so they all share the same docIndex
         #attr.docIndex = self.docIndex + 2
         return
-    
+
+    def _get_xpathAttributes(self):
+        return [v for k,v in self.attributes.items() if k[0] != XMLNS_NAMESPACE]
+
+    def _get_xpathNamespaces(self):
+        import Domlette
+        return [XPathNamespace(self,prefix,uri)
+                for prefix, uri in Domlette.GetAllNs(self).items()]
+        
     def getAttributeNS(self, namespaceURI, localName):
         key = self._get_attrkey(namespaceURI, localName)
         try:
@@ -620,6 +651,9 @@ class Element(Node):
             len(self.childNodes)
             )
 
+_defproperty(Element, "xpathAttributes")
+_defproperty(Element, "xpathNamespaces")
+
 class _Childless:
     """
     Mixin that makes childless-ness easy to implement and avoids
@@ -627,6 +661,9 @@ class _Childless:
     """
     
     childNodes = []
+    #sync with Domlette:
+    xpathAttributes = []
+    xpathNamespaces = []
 
     def insertBefore(self, newChild, refChild):
         raise HierarchyRequestErr(self.nodeName + " nodes cannot have children")
