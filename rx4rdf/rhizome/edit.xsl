@@ -37,7 +37,7 @@
     </xsl:choose> 
 </xsl:variable>
 
-<xsl:variable name='namedContent' select="f:if($about, /*[.=$about], /*[wiki:name=$target])" />
+<xsl:variable name='namedContent' select="f:if($about, /*[.=$about], f:if($target, /*[wiki:name=$target]))" />
 <xsl:variable name='item' select="($namedContent/wiki:revisions/*/rdf:first/*)[last()]" />
 
 <xsl:template name="add-option" >
@@ -78,6 +78,9 @@
 <xsl:param name="labelDefault" select='$labelDefault'/>
 <xsl:param name="sharingDefault" select='$sharingDefault'/>
 <xsl:param name="minorEditDefault" select='$minorEditDefault'/>
+
+<!-- this edit page is always html, not the content's mimetype -->
+<xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />	
 
 <xsl:variable name='_robots' select="wf:assign-metadata('_robots', 'nofollow,noindex')" />    
 
