@@ -1,10 +1,11 @@
 !Latest News
-\[27 Dec 2004]
+\[25 Jan 2005]
 Version 0.4.3 of Rx4RDF and Rhizome released. 
 
 Changes include:
 
 Support for RDF Schema (subclasses and subproperties);
+new UI for adding comments and several other UI improvements;
 easier installation and initial configuration; 
 and, of course, more bug fixes.
 

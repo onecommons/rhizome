@@ -1,18 +1,25 @@
 !Upgrading to Rhizome version 0.4.3
-Any "rdf:li" psuedo-predicate that appeared in a RxPath expression should be replaced with "rdfs:member".
-Alternatively, you could add the statement "rdfs:member: rdfs:subPropertyOf: rdf:li" to any models that are
-used by those expressions (but this is an ugly hack).
+Any ^^rdf:li^^ psuedo-predicates that appeared in a RxPath expression should be replaced with ^^rdfs:member^^.
+Alternatively, you could add the statement "rdfs:member: rdfs:subPropertyOf: rdf:li" to any model that
+uses such expressions (but this is an ugly hack).
+
+Any references to the request metadata variable ^^\__user^^ should be replaced with ^^\__account^^.
 
 To upgrade an existing Rhizome store to this version you will need to make these modifications to the store:
-* replace references to ^^wiki:Any^^ with ^^rdfs:Resource^^
-* add the following statements:
+* Changes for RDF schema support:
+** replace references to ^^wiki:Any^^ with ^^rdfs:Resource^^
+** add the following statements:
 p'''
  rdfs:member: rdfs:subPropertyOf: auth:requires-authorization-for
  rdf:first: rdfs:subPropertyOf: auth:requires-authorization-for
  wiki:revisions: rdfs:subPropertyOf: auth:requires-authorization-for
  a:contents: rdfs:subPropertyOf: auth:requires-authorization-for
 '''
-If you set the ^^authPredicates^^ config variable, replace the above statements with the properties you listed there.
+::If you have set the ^^authPredicates^^ config variable, replace the above statements with the properties you listed there.
+* Changes for refactoring ^^foaf:OnlineAccount^^ out of ^^foaf:Person^^:
+** replace references to ^^foaf:Person^^ with ^^foaf:OnlineAccount^^. 
+** replace references to ^^wiki:login-name^^ with ^^foaf:accountName^^ (or declare ^^wiki:login-name^^ a subproperty of ^^foaf:accountName^^).
+* If you wish to enable comments, add comments.xsl (see ^^rhizome-config.py^^ for page attributes)
 
 !Upgrading to Rhizome version 0.4.2 
 

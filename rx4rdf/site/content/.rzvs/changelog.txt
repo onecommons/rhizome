@@ -1,18 +1,27 @@
 Rx4RDF and Rhizome Changelog
 ============================
 
-Changes in Version 0.4.3 (Dec. 27, 2004)
+Changes in Version 0.4.3 (Jan 25, 2005)
 ----------------------------------------
-Minor release:
+Major changes and bug fixes:
 * RxPath:  add support for RDF Schema (see RxPath.RDFSSchema for more info)
-* RxPath:  remove use of rdf:li, use rdfs:member instead
+* RxPath:  remove the special case rdf:li pseudo-predicate, use rdfs:member instead
 * Rhizome: various changes for RDF Schema support 
 * Rhizome: remove authPredicates config setting, use auth:requires-authorization-for 
            predicate instead (see docs/Upgrading)
 * Rhizome: replace wiki:Any with rdfs:Resource 
 * RxPath:  fix bugs with comparing attributes to elements that have the same parent
 * setup:   fix install directories, added the "blank" site directory
-* Rhizome: various bugs fixes
+* Rhizome: use foaf:OnlineAccount instead foaf:Person 
+* utils:   added class for safely truncating HTML or XML to a maximum number of words or lines
+* Rhizome: improved UI for summaries, edit, preview, and keyword selection 
+* Raccoon: cache bug fixes (incl. one which broke saving changes to a user profile)
+* ZML:     couple of bug fixes when splitting URIs into QNames and when missing final new line.
+* Rhizome: allow custom metadata to be saved along with a revision (see save.xml)
+* Rhizome: enable comments for any type of resource
+* Rhizome: external links will have rel='nofollow' added unless the content creator has
+           the "create-nospam-token" access token (by default all non-guest users do)
+* Rhizome: various other bugs fixes (incl. saving binary content)
 
 Changes in Version 0.4.2b (Nov. 26, 2004)
 -----------------------------------------
