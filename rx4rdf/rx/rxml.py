@@ -154,6 +154,8 @@ def addResource(model, scope, resource, resourceElem, rxNSPrefix,nsMap, thisReso
             continue
         if matchName(p, rxNSPrefix, 'resource'):
             predicate = p.getAttributeNS(EMPTY_NAMESPACE, 'id')
+        elif matchName(p, rxNSPrefix, 'a'): #alias for rdf:type
+            predicate = RDF_MS_BASE + 'type'
         else:
             predicate = getURIFromElementName(p, nsMap)
         id = getAttributefromQName(p, rxNSPrefix, RX_STMTID_ATTRIB)
@@ -300,7 +302,11 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
             nsMap[prefix] = predNode.namespaceURI
             revNsMap[predNode.namespaceURI] = prefix
 
-        predicateString = prefix+':'+predNode.localName
+        if predNode.namespaceURI == RDF_MS_BASE and predNode.localName == 'type':
+            predicateString = rxPrefix + 'a' #use rx:a instead rdf:type
+        else:
+            predicateString = prefix+':'+predNode.localName
+
         if fixUpPredicate:
             predURI = RxPath.getURIFromElementName(predNode)
             eu = urllib.quote(predURI)
@@ -344,7 +350,7 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
                 
         return line
     if fixUp: #if fixUp we assume we're outputing xml/html not zml
-        doQuote = utils.htmlQuote
+        doQuote = lambda s: '`' + utils.htmlQuote(s)
     else:
         doQuote = quoteString
     if nsMap is None:
