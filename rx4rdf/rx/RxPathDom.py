@@ -454,9 +454,9 @@ class Subject(Resource):
                 if stmt.object != RDF_MS_BASE+'nil':
                     nextList = stmt.object
                 if nextList == listID:
-                    raise 'model error -- circular list resource: ' % str(listID)
+                    raise  HierarchyRequestErr('model error -- circular list resource: %s' % str(listID))
             elif stmt.predicate != RDF_MS_BASE+'type':  #rdf:type statement ok, assumes its rdf:List
-                raise 'model error -- unexpected triple for inner list resource'
+                raise  HierarchyRequestErr('model error -- unexpected triple for inner list resource')
         if nextList:
             self._addListItem(children, nextList)
         
@@ -578,7 +578,7 @@ class Subject(Resource):
                         listStmts = self.ownerDocument.model.getStatements(listID, RDF_MS_BASE+'first')
                         for listStmt in listStmts:                            
                             if stmt.object != listStmt.object:
-                                raise "model error: list resource %s already used" % str(listID)
+                                raise HierarchyRequestErr("model error: list resource %s already used" % str(listID))
                             else:                                
                                 previousListStmts = self.ownerDocument.model.getStatements(
                                                 previousListId, RDF_MS_BASE+'rest')
@@ -587,7 +587,7 @@ class Subject(Resource):
                                         log.debug('add statement failed: statement already exists: %s' % stmt)
                                         return None
                                     elif previousListStmts[0].object != RDF_MS_BASE+'nil': #rdf:nil gets removed below
-                                        raise "model error: list statement %s already exists but in different order" % str(listID)
+                                        raise HierarchyRequestErr("model error: list statement %s already exists but in different order" % str(listID))
                         
                     previousRestListStmt = RxPath.Statement(previousListId,
                         RDF_MS_BASE+'rest', listID, objectType=OBJECT_TYPE_RESOURCE)
@@ -634,12 +634,12 @@ class Subject(Resource):
                                 stmt.subject, listID)
                 if containerStmts:
                     if len(containerStmts) > 1:
-                        raise "model error: %s is used more than once for the same container %s" % str(listID), str(stmt.subject)
+                        raise  HierarchyRequestErr("model error: %s is used more than once for the same container %s" % str(listID), str(stmt.subject))
                     if containerStmts[0].object == stmt.object:
                         log.debug('add statement failed: statement already exists: %s' % stmt)
                         return None
                     else:
-                        raise "model error: container statement %s already exists but in different order" % str(listID)
+                        raise HierarchyRequestErr("model error: container statement %s already exists but in different order" % str(listID))
                 
                 predicateNode = Predicate(stmt, self, None, self.lastChild, listID = listID)
                 self._doAppendChild(self.childNodes, predicateNode)
@@ -932,7 +932,13 @@ class Object(Resource):
 
 class BasePredicate(Element):
     __attributes = None
-    builtInAttr = { (RDF_MS_BASE, u'ID') : 'self.stmt.uri',
+    RDF_ID_EXPR = 'self.stmt.uri'
+    #the current model implementations don't support inferring refication ids    
+    #uncomment RDF_ID_EXPR below if you want to enable rdf:ID with models that don't handle reifications
+    #note: this may be expensive and doesn't properly handle modifications to reification statements
+    #RDF_ID_EXPR = 'self.getID()'
+    
+    builtInAttr = { (RDF_MS_BASE, u'ID') : RDF_ID_EXPR,
                     (None, u'listID') : 'self.listID',
                     (None, u'uri') : 'self.stmt.predicate',
                     (XML_NAMESPACE, u'lang'): "self.lang",
@@ -959,6 +965,18 @@ class BasePredicate(Element):
         else:
             self.firstChild = self.lastChild = Text(stmt.object, self)            
         self.childNodes = [ self.firstChild ] 
+
+    def insertBefore(self, newChild, refChild):
+        raise HierarchyRequestErr("Predicate node (%s) cannot add or remove its child" % self.nodeName)
+    
+    def replaceChild(self, newChild, oldChild):
+        raise HierarchyRequestErr("Predicate node (%s) cannot add or remove its child" % self.nodeName)
+    
+    def removeChild(self, oldChild):
+        raise HierarchyRequestErr("Predicate node (%s) cannot add or remove its child" % self.nodeName)
+    
+    def appendChild(self, newChild):
+        raise HierarchyRequestErr("Predicate node (%s) cannot add or remove its child" % self.nodeName)
 
     def getModelStatements(self):
         '''
@@ -1066,6 +1084,16 @@ class BasePredicate(Element):
 
     datatype = property(_get_datatype)
 
+    __id = NotSet
+    def getID(self):
+        if self.__id is NotSet:
+            findID = getattr(self.ownerDocument.model, 'findStatementID', None)
+            if findID:
+                self.__id = findID(self.stmt)
+            else:
+                self.__id = None
+        return self.__id            
+        
     #work around for a 'bug' in _conversions.c, unlike Conversion.py (and object_to_string),
     #node_descendants() doesn't check for a stringvalue attribute
     def _get_stringValue(self):
@@ -1463,7 +1491,36 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
 
 import traceback, sys, re
 
-def main():
+def invokeRxSLT(RDFPath, stylesheetPath):
+    _4suiteModel, db = utils.deserializeRDF( RDFPath )
+    model = RxPath.FtModel(_4suiteModel)
+    RxPathDom = RxPath.createDOM(model)
+    stylesheetContents = file(stylesheetPath).read()
+    return RxPath.applyXslt(RxPathDom, stylesheetContents)
+
+def main(argv=sys.argv):
+    modelPath = None
+    try:
+        if len(argv) > 1:
+            if argv[1] in ['-t', '--transform']:
+                print invokeRxSLT(argv[2], argv[3])
+                return
+            else:
+                modelPath = argv[1]
+    except IndexError:
+        pass
+    if not modelPath:
+        print '''        
+usage:
+ rdfpath
+   Enter interactive mode using the given RDF file
+ rdfpath query
+   Invoke the RxPath query using the given RDF file
+ -t|--transform rdfpath xsltpath
+   Invoke the RxSLT stylesheet on the given RDF file
+'''
+        return
+    
     #not exactly matching the XPointer xmlns() Scheme production
     #we just disallow namespace URI with () instead of supporting escaping
     #also we allow the default the namespace to be set by making the prefix optional
@@ -1499,12 +1556,6 @@ def main():
             #for n in res:
             #    Ft.Xml.Lib.Print.PrettyPrint(n)
 
-    
-    if len(sys.argv) > 1:
-        modelPath = sys.argv[1]
-    else:
-        modelPath = "./test/rdfdomtest1.rdf"
-
     #model = RxPath.initRedlandHashBdbModel('test-bdb', file(modelPath))    
     from rx import utils
     model, db = utils.deserializeRDF( modelPath )
@@ -1533,8 +1584,8 @@ def main():
     context = RxPath.XPath.Context.Context(rdfDom, varBindings=vars,
             extFunctionMap=extFunctionMap, processorNss = processorNss)    
 
-    if len(sys.argv) > 2:    
-        query = sys.argv[2]
+    if len(argv) > 2:    
+        query = argv[2]
     else:
         query = None
         
