@@ -263,6 +263,7 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
     '''given a nodeset of RxPathDom nodes, return RXML serialization in ZML markup format'''    
     def getResourceNameFromURI(resNode):
         namespaceURI = resNode.getAttributeNS(RDF_MS_BASE, 'about')
+        assert namespaceURI
         prefixURI, rest = RxPath.splitUri(namespaceURI)
         #print >>sys.stderr, 'spl %s %s %s' % (namespaceURI, prefixURI, rest)
         #print revNsMap        
@@ -442,22 +443,30 @@ def zml2nt(stream=None, contents=None, debug=0, nsMap = None, addRootElement=Tru
     if addRootElement:
         xml = '<rx:rx>'+ xml+'</rx:rx>'
     return rx2nt(StringIO.StringIO(xml), debug=debug, nsMap = nsMap)
-            
-if __name__ == '__main__':                     
-    if len(sys.argv) < 2:
-        print '''        
-usage:
-   -n|-r filepath
-   -n given an RxML/XML file output RDF in NTriples format
-   -r given an RDF file (.rdf, .nt or .mk) convert to RxML/RhizML
-'''
-        sys.exit()
-    toNT = '-n' in sys.argv
-    if toNT: sys.argv.remove('-n')    
-    if not toNT:
-        print rx2nt(sys.argv[1])
+
+def zml2RDF_XML(stream=None, contents=None, debug=0, nsMap = None, addRootElement=True):
+    from rx import zml
+    if stream is not None:
+        xml = zml.zml2xml(stream, mixed=False)
     else:
-        model, db = utils.deserializeRDF( sys.argv[1] )
+        xml = zml.zmlString2xml(contents, mixed=False)#parse the zml to rx xml
+    if addRootElement:
+        xml = '<rx:rx>'+ xml+'</rx:rx>'
+
+    model, db, nsMap = rx2model(StringIO.StringIO(xml), debug=debug, nsMap = nsMap)
+
+    from Ft.Rdf.Serializers.Dom import Serializer as DomSerializer
+    serializer = DomSerializer()
+    outdoc = serializer.serialize(model, nsMap = nsMap)
+    return outdoc
+
+if __name__ == '__main__':                     
+    if '-n' in sys.argv:
+        print rx2nt(sys.argv[2])
+    elif '-z' in sys.argv:
+        print zml2RDF_XML(file(sys.argv[2]))        
+    elif '-r' in sys.argv:
+        model, db = utils.deserializeRDF( sys.argv[2] )
         nsMap = {
                 'bnode': BNODE_BASE,   
                'rx': RX_NS              
@@ -465,4 +474,13 @@ usage:
         revNsMap = dict( [ (x[1], x[0]) for x in nsMap.items() if x[0] and ':' not in x[0] ])
         rdfDom = RxPath.createDOM(RxPath.FtModel(model), revNsMap)        
         print getRXAsZMLFromNode(rdfDom.childNodes, nsMap)
-        
+    else:
+        print '''        
+usage:
+   -n|-r|-z filepath
+   -n given an RxML/XML file output RDF in NTriples format
+   -z given an RxML/ZML file output RDF in RDF/XML format   
+   -r given an RDF file (.rdf, .nt or .mk) convert to RxML/ZML
+'''
+        sys.exit()
+
