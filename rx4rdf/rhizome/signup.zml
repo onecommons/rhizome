@@ -1,0 +1,49 @@
+#?zml0.9 markup
+#?raccoon-format http://rx4rdf.sf.net/ns/wiki#item-format-rxslt
+ x:stylesheet (version="1.0" xmlns:x="http://www.w3.org/1999/XSL/Transform",
+     xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+     xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#',
+     xmlns:f = 'http://xmlns.4suite.org/ext',
+     xmlns:a="http://rx4rdf.sf.net/ns/archive#",
+     xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#",
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#",
+     xmlns:auth="http://rx4rdf.sf.net/ns/auth#",
+     xmlns:foaf="http://xmlns.com/foaf/0.1/",
+     exclude-result-prefixes = "f wf a wiki rdf rdfs auth foaf"
+     ) 
+  x:param name="__resource"
+  x:param name="action"
+  x:param name="__passwordHashProperty"
+   
+  x:template match='/':  	    `
+    x:variable name='user' select='f:if($action!="new", $__resource)'
+    x:variable name='title' select='''wf:assign-metadata('title', 
+f:if($user, concat('Edit Profile of ', $user/wiki:login-name), 'Register new user'))'''
+
+    x:value-of select='$title'    
+    hr
+    form action="{concat('site:///users/',f:if($user, $user/wiki:login-name, 'guest'))}" method='post':
+     table:         
+         x:choose
+          x:when test='not($user)': 
+           tr: 
+             td: `*Login name:     
+             td: input type=text name=loginname
+          x:otherwise:
+             input type=hidden name=loginname value="{$__resource/wiki:login-name}"
+         tr:
+             td: `Password:     
+             td: input type=password name=password value="{$user/*[uri(.)=$__passwordHashProperty]}"
+         tr: 
+             td: `Confirm Password:          
+             td: input type=password name=confirm-password value="{$user/*[uri(.)=$__passwordHashProperty]}"         
+         tr: 
+             td: `email:     
+             td: input type=text name=email value="{substring-after($user/foaf:mbox,'mailto:')}" 
+         tr: 
+             td: `Full Name:     
+             td: input type=text name=fullname value="{$user/foaf:name}"           
+         tr:              
+             td: 
+               input type="hidden" name="action" value="{f:if($user,'save','creation')}" #fix IE bug
+               button type=submit name=action value="{f:if($user,'save','creation')}": `Signup
