@@ -10,7 +10,7 @@
 		exclude-result-prefixes = "f wf a wiki rdf" >
 <xsl:import href="search.xsl" />
 <xsl:param name="__resource" />
-<xsl:param name="search" select="'/wiki:Folder[.=$__resource]/wiki:has-child/*'" />
+<xsl:param name="search" select="concat('/wiki:Folder[.=&quot;',$__resource,'&quot;]/wiki:has-child/*')" />
 <xsl:param name="view" select="'list'"/>
 <xsl:param name="searchType" select="'RxPath'"/>
 <xsl:param name="title" select="wf:assign-metadata('title', concat('Directory of ', /wiki:Folder[.=$__resource]/wiki:name))"/>

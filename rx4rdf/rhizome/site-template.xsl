@@ -207,8 +207,9 @@ Or <a href="site:///accounts/?about={f:escape-url('http://xmlns.com/foaf/0.1/Onl
 <xsl:template name="recent-items" >
 <xsl:param name="max" select="21" />
 <ul>
-<xsl:for-each select="wf:sort(/a:NamedContent[not(wiki:appendage-to)][(wiki:revisions/*/rdf:first/*)[last()]/a:created-on != 1057919732.750],
-'(wiki:revisions/*/rdf:first/*)[last()]/a:created-on[.!=1057919732.750]','number','descending')[position()&lt;$max]" >
+<xsl:for-each select="/a:NamedContent[not(wiki:appendage-to)][(wiki:revisions/*/rdf:first/*)[last()]/a:created-on !=1057919732.750]">
+<xsl:sort select="(wiki:revisions/*/rdf:first/*)[last()]/a:created-on" data-type='number' order='descending' />
+<xsl:if test="position()&lt;$max">
 <li>
 <a href="{$_base-url}site:///{./wiki:name}">
 <xsl:value-of select='f:if( (./wiki:revisions/*/rdf:first/*)[last()]/wiki:title, 
@@ -217,6 +218,7 @@ Or <a href="site:///accounts/?about={f:escape-url('http://xmlns.com/foaf/0.1/Onl
                  and (./wiki:revisions/*/rdf:first/*)[last()]/wiki:auto-summary, 
                 (./wiki:revisions/*/rdf:first/*)[last()]/wiki:auto-summary, ./wiki:name))' />  
 </a></li>
+</xsl:if>
 </xsl:for-each>
 </ul>
 </xsl:template>
