@@ -925,8 +925,10 @@ class Object(Resource):
 class BasePredicate(Element):
     idNode = None
     listIDNode = None
+    uriNode = None
     builtInAttr = { (RDF_MS_BASE, 'ID') : 'self.stmt.uri',
                     (None, 'listID') : 'self.listID',
+                    (None, 'uri') : 'self.stmt.predicate',
                   }
     
     #design notes:
@@ -1037,7 +1039,7 @@ class BasePredicate(Element):
             return False
 
     def _get_attributes(self):
-        attributes = {}
+        attributes = { (None, u'uri') : self.getAttributeNodeNS(None, 'uri') }
         attr = self.getAttributeNodeNS(RDF_MS_BASE, 'ID')
         if attr:
             attributes[(RDF_MS_BASE, u'ID')] = attr

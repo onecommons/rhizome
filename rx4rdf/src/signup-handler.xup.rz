@@ -54,6 +54,7 @@
       rdfs:label: `Group
       auth:has-permission rdf:resource='http://rx4rdf.sf.net/ns/wiki#action-view'
       auth:has-permission rdf:resource='http://rx4rdf.sf.net/ns/wiki#action-view-metadata'
+      auth:has-permission rdf:resource='http://rx4rdf.sf.net/ns/wiki#action-view-source'
       auth:has-permission rdf:resource='http://rx4rdf.sf.net/ns/wiki#action-edit-metadata'
       auth:has-permission rdf:resource='http://rx4rdf.sf.net/ns/wiki#action-edit'            
       auth:has-permission rdf:resource='http://rx4rdf.sf.net/ns/wiki#action-showrevisions'             
@@ -88,7 +89,10 @@
         wiki:fullname: xu:value-of select="$fullname"
         wiki:email: xu:value-of select="$email"
         auth:guarded-by rdf:resource='{$BASE_MODEL_URI}users/{$loginname}/private-rw'
-  
+        
+   xu:append select="/wiki:Folder[wiki:name='users']":
+      wiki:has-child rdf:resource='{$BASE_MODEL_URI}users/{$loginname}'
+   
   xu:if test="not($action='creation')":  
       ;editing existing user, update values   
       xu:variable name='user' select='/wiki:User[wiki:login-name=$loginname]'

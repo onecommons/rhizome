@@ -725,11 +725,18 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False, rootEle
                 elementStack.append(token)
                 st.in_attribs = 1
                 st.lineElems += 1                
-        elif type in [STRLINE, STRING]:            
+        elif type == STRLINE: #`a string
+            if st.in_attribs:
+                #in attribs but never encountered the :
+                st.in_attribs = 0
+                handler.startElement( elementStack[-1])
+                normalizeAttribs(st.attribs,handler)
+                st.attribs = []
+            stringToText(token)
+        elif type == STRING:            
             if not st.in_attribs:
                 stringToText(token)                
-            else:
-                assert type != STRLINE
+            else:        
                 string = stripQuotes(token)
                 st.attribs.append(xmlquote(string))
         elif type == OP:

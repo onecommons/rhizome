@@ -73,9 +73,9 @@ class StringWriter(NullWriter.NullWriter):
 class Processor:
     def __init__(self, reader=None):
         self.writers = [NullWriter.NullWriter(None)]
-        self._suppressMsgs = 0
+        import sys
+        self._msgout = sys.stderr
         self.templates = {}
-        return
 
     def pushDomResult(self, ownerDocument):
         self.writers.append(DomWriter.DomWriter(ownerDocument))
@@ -563,16 +563,14 @@ class Processor:
     #next 2 functions copied from Xslt.Processor
     # FIXME: l10n
     def xupdateMessage(self, msg):
-        if not self._suppressMsgs:
-            import sys
-            sys.stderr.write("XUPDATE MESSAGE:\n")
-            sys.stderr.write(msg)
-            sys.stderr.write("\nEND XUPDATE MESSAGE\n")
-        return
+        if self._msgout:
+            self._msgout.write(msg+'\n')
 
-    def messageControl(self, suppress):
-        self._suppressMsgs = suppress
-        return
+    def messageControl(self, msgout):
+        '''
+        File-like object to write message to (default: sys.stderr)
+        '''
+        self._msgout = msgout
     
 # -- XUpdate user API -------------------------------------------------
 

@@ -258,12 +258,13 @@ def addRxdom2Model(rootNode, model, nsMap = None, rdfdom = None, thisResource = 
     return nsMap
             
 def getRXAsRhizmlFromNode(resourceNodes, nsMap=None, includeRoot = False,
-                         INDENT = '    ', NL = '\n', INITINDENT=' ', rescomment='', fixUp=None):
+                         INDENT = '    ', NL = '\n', INITINDENT=' ', rescomment='',
+                          fixUp=None, fixUpPredicate=None):
     '''given a nodeset of RxPathDom nodes, return RXML serialization in Rhizml markup format'''    
     def getResourceNameFromURI(resNode):
         namespaceURI = resNode.getAttributeNS(RDF_MS_BASE, 'about')
         prefixURI, rest = RxPath.splitUri(namespaceURI)
-        #print 'spl %s %s %s' % (namespaceURI, prefixURI, rest)
+        #print >>sys.stderr, 'spl %s %s %s' % (namespaceURI, prefixURI, rest)
         #print revNsMap        
         if not rest:
             printResourceElem = True
@@ -298,7 +299,14 @@ def getRXAsRhizmlFromNode(resourceNodes, nsMap=None, includeRoot = False,
             nsMap[prefix] = predNode.namespaceURI
             revNsMap[predNode.namespaceURI] = prefix
 
-        line = indent + prefix+':'+predNode.localName
+        predicateString = prefix+':'+predNode.localName
+        if fixUpPredicate:
+            predURI = RxPath.getURIFromElementName(predNode)
+            eu = urllib.quote(predURI)
+            predicateString = fixUpPredicate % utils.kw2dict(uri=predURI,
+                encodeduri=eu, predicate=predicateString)
+
+        line = indent + predicateString
         
         id = predNode.getAttributeNS(RDF_MS_BASE, 'ID')
         if id:
@@ -324,7 +332,8 @@ def getRXAsRhizmlFromNode(resourceNodes, nsMap=None, includeRoot = False,
 
             if isList: #is the object a list resource?
                 for li in [p.childNodes[0] for p in object.childNodes\
-                        if p.stmt.predicate in [RDF_MS_BASE+'first', RDF_MS_BASE+'li']]:   
+                        if RxPath.getURIFromElementName(p) in [
+                            RDF_MS_BASE+'first', RDF_MS_BASE+'li']]:   
                     if li.nodeType == li.TEXT_NODE: #todo: datatype, xml literal
                         line += indent + rxPrefix + RX_LITERALELEM + ':'+ doQuote(li.nodeValue) + NL
                     elif li.nodeType == li.ELEMENT_NODE: 
@@ -338,7 +347,7 @@ def getRXAsRhizmlFromNode(resourceNodes, nsMap=None, includeRoot = False,
     else:
         doQuote = quoteString
     if nsMap is None:
-      nsMap = { 'bNode': BNODE_BASE,
+      nsMap = { 'bnode': BNODE_BASE,
                 RX_META_DEFAULT : RX_NS
                 }
     revNsMap = dict( [ (x[1], x[0]) for x in nsMap.items() if x[0] and ':' not in x[0] and x[0] not in [RX_META_DEFAULT, RX_BASE_DEFAULT] ])
@@ -449,7 +458,7 @@ usage:
     else:
         model, db = utils.deserializeRDF( sys.argv[1] )
         nsMap = {
-                'bNode': BNODE_BASE,   
+                'bnode': BNODE_BASE,   
                'rx': RX_NS              
             }
         revNsMap = dict( [ (x[1], x[0]) for x in nsMap.items() if x[0] and ':' not in x[0] ])

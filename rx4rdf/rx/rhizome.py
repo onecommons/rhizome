@@ -165,12 +165,12 @@ class Rhizome(object):
         self.ALTSAVE_DIR = kw.get('ALTSAVE_DIR', 'content/')
         self.interWikiMapURL = kw.get('interWikiMapURL', 'site:///intermap.txt')
         initConstants( ['undefinedPageIndicator', 'externalLinkIndicator', 'interWikiLinkIndicator' ], 0)
-        initConstants( ['authPredicates'], [])
+        initConstants( ['authPredicates', 'globalRequestVars'], [])
         initConstants( ['RHIZOME_APP_ID'], '')
 
         self.passwordHashProperty = kw.get('passwordHashProperty',
                                           self.BASE_MODEL_URI+'password-hash')
-        self.secureHashSeed = kw.get('secureHashSeed',
+        self.secureHashSeed = kw.get('SECURE_HASH_SEED',
                                           'YOU REALLY SHOULD CHANGE THIS!')
         if self.secureHashSeed == 'YOU REALLY SHOULD CHANGE THIS!':
             log.warning("secureHashSeed using default seed -- set your own private value!")
@@ -567,13 +567,17 @@ Options:
                  metadatafile.close()
                  
     ######content processing####
-    def processRhizmlSideEffects(self, kw):
+    def processRhizmlSideEffects(self, contextNode, kw):
         #optimization: only set the doctype (which will invoke wiki2html.xsl if we need links to be transformed)
         if self.undefinedPageIndicator or self.externalLinkIndicator or self.interWikiLinkIndicator:
-            kw['_doctype'] = 'http://rx4rdf.sf.net/ns/wiki#doctype-wiki'
+            #wiki2html.xsl shouldn't get invoked with the doctype isn't html
+            if not kw.get('_doctype') and self.server.evalXPath(
+                "not(wiki:doctype) or wiki:doctype = 'http://rx4rdf.sf.net/ns/wiki#doctype-xhtml'",
+                    node = contextNode):
+                kw['_doctype'] = 'http://rx4rdf.sf.net/ns/wiki#doctype-wiki'
         
-    def processRhizml(self, contents, kw):
-        self.processRhizmlSideEffects(kw)
+    def processRhizml(self, contextNode, contents, kw):
+        self.processRhizmlSideEffects(contextNode, kw)
         contents = rhizml.rhizmlString2xml(contents,self.mmf)
         return (contents, 'http://rx4rdf.sf.net/ns/wiki#item-format-xml') #fixes up site://links
         
@@ -581,7 +585,12 @@ Options:
         #the resultNodeset is the template resource
         #so skip the first few steps that find the page resource
         actions = self.handleRequestSequence[3:]
-        return self.server.callActions(actions, [ '__user', '_name', '_static' ],
+
+        #so we can reference the template resource (will be placed in the the 'previous' namespace)
+        #print 'template resource', resultNodeset
+        kw["_template"] = resultNodeset
+        
+        return self.server.callActions(actions, self.globalRequestVars,
                                        resultNodeset, kw, contextNode, retVal)
 
     def processPatch(self, contents, kw, result):
@@ -613,10 +622,12 @@ Options:
         contents = racoon.StringValue(resultset)
         return rhizml.rhizmlString2xml(contents,self.mmf )
 
-    def getRxML(self, context, resultset = None, comment = '', fixUp=None):
+    def getRxML(self, context, resultset = None, comment = '',
+                                fixUp=None, fixUpPredicate=None):
       if resultset is None:
             resultset = [ context.node ]
-      return rxml.getRXAsRhizmlFromNode(resultset, rescomment = comment, fixUp=fixUp)
+      return rxml.getRXAsRhizmlFromNode(resultset, rescomment = comment,
+                            fixUp=fixUp, fixUpPredicate=fixUpPredicate)
 
     def getSecureHash(self, context, plaintext, secureProperty=None):
         if not secureProperty:

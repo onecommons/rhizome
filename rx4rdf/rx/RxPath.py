@@ -14,7 +14,7 @@ from __future__ import generators
 
 from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, Util, BNODE_BASE, BNODE_BASE_LEN,RDF_MS_BASE
 from Ft.Xml.XPath.Conversions import StringValue, NumberValue
-from Ft.Xml import XPath, InputSource
+from Ft.Xml import XPath, InputSource, SplitQName
 from Ft.Rdf.Statement import Statement
 from rx import utils
 from rx.utils import generateBnode, removeDupsFromSortedList
@@ -474,9 +474,11 @@ def splitUri(uri):
             index = uri.rfind(':')
             if index == -1:
                 return (uri, '')
-    if not uri[index+1:].replace('_', '0').replace('.', '0').replace('-', '0').isalnum():
-        return (uri, '')
     local = uri[index+1:]
+    if not local or (not local[0].isalpha() and local[0] != '_'):
+       return (uri, '')    
+    if not local.replace('_', '0').replace('.', '0').replace('-', '0').isalnum():
+       return (uri, '')    
     if local and not local.lstrip('_'): #must be all '_'s
         local += '_' #add one more
     return (uri[:index+1], local)
@@ -543,7 +545,7 @@ def applyXslt(rdfDom, xslStylesheet, topLevelParams = None, extFunctionMap = Non
     finally:
         rdfDom.globalRecurseCheck=oldVal
 
-def applyXUpdate(rdfdom, xup = None, vars = None, extFunctionMap = None, uri='file:'):
+def applyXUpdate(rdfdom, xup = None, vars = None, extFunctionMap = None, uri='file:', msgOutput=None):
     """
     Executes the XUpdate script on the given RxPathDOM.  The XUpdate document is either
     contained as a string in the xup parameter or as an URL specified in the uri parameter.
@@ -553,6 +555,8 @@ def applyXUpdate(rdfdom, xup = None, vars = None, extFunctionMap = None, uri='fi
     from Ft.Xml import Domlette
     xureader = Domlette.NonvalidatingReader    
     processor = XUpdate.Processor()
+    if msgOutput is not None:
+        processor.messageControl(msgOutput)
     if xup is None:
         xupInput = InputSource.DefaultFactory.fromUri(uri)
     else:
@@ -971,21 +975,37 @@ def _getNamesFromURI(context, uri=None):
     return qname, namespaceURI, prefix, localName 
 
 def getURIFromElement(context, nodeset=None):
+    string = None
     if nodeset is None:
         node = context.node
-    elif nodeset:
-        node = nodeset[0]
+    elif type(nodeset) == type([]):
+        if nodeset:
+            node = nodeset[0]
+            if node.nodeType != Node.ELEMENT_NODE:
+               string = node
+        else:
+            return ''
     else:
-        return ''
-    if node.nodeType != Node.ELEMENT_NODE:
-        return ''
-    return getURIFromElementName(node)
+        string = nodeset
+        
+    if string is not None:
+       qname = StringValue(string)
+       (prefix, local) = SplitQName(qname)
+       if prefix:
+        try:
+            namespace = context.processorNss[prefix]
+        except KeyError:
+            raise RuntimeException(RuntimeException.UNDEFINED_PREFIX,
+                                   prefix)       
+        return namespace + getURIFragmentFromLocal(local)
+    else:
+        return getURIFromElementName(node)
 
 RFDOM_XPATH_EXT_NS = None #todo: put these in an extension namespace?
 BuiltInExtFunctions = {
-(RFDOM_XPATH_EXT_NS, 'isPredicate'): isPredicate,
-(RFDOM_XPATH_EXT_NS, 'isResource'): isResource,
-(RFDOM_XPATH_EXT_NS, 'getResource'): getResource,
+(RFDOM_XPATH_EXT_NS, 'is-predicate'): isPredicate,
+(RFDOM_XPATH_EXT_NS, 'is-resource'): isResource,
+(RFDOM_XPATH_EXT_NS, 'resource'): getResource,
 
 (RFDOM_XPATH_EXT_NS, 'name-from-uri'): getQNameFromURI,
 (RFDOM_XPATH_EXT_NS, 'local-name-from-uri'): getLocalNameFromURI,
@@ -1197,11 +1217,20 @@ def GenerateId(context, nodeSet=None):
         return u''
 XsltFunctions.GenerateId = GenerateId
 
-#make XPath.ParsedExpr.FunctionCall*.evaluate have no side effects so we can cache them
+from Ft.Lib import Set
 def _FunctionCallEvaluate(self, context, oldFunc):
+    #make XPath.ParsedExpr.FunctionCall*.evaluate have no side effects so we can cache them
     self._func = None
+    
+    #todo: add authorize hook
     #authorize(self, context, split(self._name), self.args)
-    return oldFunc(self, context)
+    retVal = oldFunc(self, context)    
+    #fix pretty bad 4Suite bug where expressions that just function calls
+    #can return nodesets with duplicate nodes
+    if type(retVal) == type([]):
+       return Set.Unique(retVal)
+    else:
+       return retVal
     
 XPath.ParsedExpr.FunctionCall.evaluate = lambda self, context, \
     func = XPath.ParsedExpr.FunctionCall.evaluate.im_func: \

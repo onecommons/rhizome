@@ -9,12 +9,12 @@
     exclude-result-prefixes = "f wf a wiki rdf rdfs auth"
     ) 
   x:param name="__resource"
-   
+  ; this page is not used any more! -- replaced by administer.xsl
   x:template match='/':  	    `
 
-    Administration
+    `Administration
     hr
-     table:         
+    table:         
          tr:
              td: `Users
              td: a href='site:///search?search=%2Fwiki%3AUser&searchType=RxPath&view=html&Search=search': `List 
