@@ -384,6 +384,10 @@ class Resource(Element):
         '''
         assert self.parentNode == other.parentNode
         return cmp(self.uri, other.uri)
+
+    def getModelStatements(self):
+        return reduce(lambda l, p: l.extend(p.getModelStatements()) or l,
+                        self.childNodes, [])
         
     def replaceChild(self, newChild, oldChild):
         '''
@@ -431,10 +435,6 @@ class Subject(Resource):
             return False
         else:
             return self.ownerDocument == other.ownerDocument and self.uri == other.uri 
-
-    def getModelStatements(self):
-        return reduce(lambda l, p: l.extend(p.getModelStatements()) or l,
-                        self.childNodes, [])
     
     def _addListItem(self, children, listID):
         stmts = self.ownerDocument.model.getStatements(listID)
@@ -1443,16 +1443,31 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         self._childNodes = None
         self.revision += 1 #note that revision is also used as part of cache keys
 
-import traceback, sys
+import traceback, sys, re
 
 def main():
-    def doQuery():
+    #not exactly matching the XPointer xmlns() Scheme production
+    #we just disallow namespace URI with () instead of supporting escaping
+    #also we allow the default the namespace to be set by making the prefix optional
+    prog = re.compile(r"(\s*xmlns\s*\(\s*(\w*)\s*=\s*([^\(\)\t\n\r\f\v]+)\s*\))?(.*)")
+    def doQuery(query):    
         try:
-            compExpr = RxPath.XPath.Compile(query)
-            #compExpr.pprint()
-            context.node = rdfDom
-            #bug in context.clone() -- doesn't copy functions
-            res = RxPath.XPath.Evaluate(compExpr, context=context)
+            while 1:
+                m = prog.match(query)
+                if m and m.group(3):
+                   print 'set prefix', repr(m.group(2)), 'to', repr(m.group(3))
+                   context.processorNss[m.group(2)] = m.group(3)
+                   query = m.group(4)
+                else:
+                    break
+            if query.strip():
+                compExpr = RxPath.XPath.Compile(query)
+                #compExpr.pprint()
+                context.node = rdfDom
+                #bug in context.clone() -- doesn't copy functions
+                res = RxPath.XPath.Evaluate(compExpr, context=context)
+            else:
+                res = 'No query entered'
         except:
             print "Unexpected error:", sys.exc_info()[0]
             traceback.print_exc(file=sys.stdout)    
@@ -1510,9 +1525,9 @@ def main():
             query = sys.stdin.readline()
             sys.stderr.write("\n")                
             #raise SystemExit("You must either specify a query on the command line our use the --file option")
-            doQuery()            
+            doQuery(query)            
     else:
-        doQuery()
+        doQuery(query)
 
 if __name__  == "__main__":
     main()
