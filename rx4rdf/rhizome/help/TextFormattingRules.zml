@@ -57,19 +57,19 @@ creates
 ** Three.One
 
 !Numbered lists
-Just like with bulleted lists, but use a hash (#) instead of the asterisk. Like this:
+Just like with bulleted lists, but use "1." instead of the asterisk. Like this:
 r'''<pre class='code'>
-# One
-# Two
-# Three
-## Three.One
+1. One
+1. Two
+1. Three
+11. Three.One
 </pre>'''
 
 creates
-# One
-# Two
-# Three
-## Three.One
+1. One
+1. Two
+1. Three
+11. Three.One
 
 If you want to write the list item on multiple lines just start the following lines with a space.
 
@@ -163,4 +163,4 @@ You can create arbitrary XML markup using ZML's markup formatting rules. Any lin
 
 [[The other footnote|&2]] The other footnote.  Note how it's name is different?
 
-; Acknowledgements: Much of the content on this pages was based on http://www.jspwiki.org/Wiki.jsp?page=TextFormattingRules
+# Acknowledgements: Much of the content on this pages was based on http://www.jspwiki.org/Wiki.jsp?page=TextFormattingRules

@@ -69,8 +69,8 @@ On Windows, [Win32 Extensions for Python|http://www.python.org/windows/win32all]
 
 !Installation
 This is a standard Python source distribution. To install:
-# Unzip rx4rdf.zip or rx4rdf.tar.gz
-# Run ^^python <unzip dir>/setup.py install^^
+1. Unzip rx4rdf.zip or rx4rdf.tar.gz
+1. Run ^^python <unzip dir>/setup.py install^^
 
 This installs:
 * a package named "rx" in the Python ^^site-packages^^ directory
@@ -80,7 +80,7 @@ This installs:
 !Running
 Rhizome is an application that runs on [rx4rdf:Raccoon], a simple application server.  Rhizome consists entirely of a Raccoon config file and a bunch of web pages. To run Rhizome, run Raccoon specifying your Rhizome config file using the -a option, e.g.: 
 
-#^^<python script dir>/run-raccoon -a <python share dir>/rx4rdf/rhizome/rhizome-config.py
+1.^^<python script dir>/run-raccoon -a <python share dir>/rx4rdf/rhizome/rhizome-config.py
 
 This will launch Raccoon's built-in http server, which runs on port 8000 by default. You can change this by editing ^^server.cfg^^ (see the [Raccoon Manual] for more information). 
 
@@ -133,7 +133,7 @@ Below is a guide to the form controls found on the edit and new pages:
 ++Page=This means that content is a stand-alone page and no template should be applied to it. For example, you probably want to set this for images.
 ++Entry=(the default). This frames the content in the default [site-template|site-template?action=edit].
 ++Handler=The content is used to update the site or handle a POST from a form page. Typically used for RxUpdate or Python pages that might not create any response output and for page that handle write actions for other types of resources. The default handler template just prints the message "Completed <action name> of <resource name>!"
-++RxML Template=Indicates the content is text containing RxML that when invoked will bring up an edit metadata page containing the RxML. When saved, Rhizome will treate all the properties as new and replace any anonymous (aka //blank//) resources (those whose name start 'bnode:') with new anonymous resources. Using RxML templates provides a quick and dirty way of adding new types of resources to the sytem without to build a form UI for creating and editing them.
+++RxML Template=Indicates the content is text containing RxML that when invoked will bring up an edit metadata page containing the RxML. When saved, Rhizome will treate all the properties as new and replace any anonymous (aka //blank//) resources (those whose name starts with 'bnode:') with new anonymous resources. Using RxML templates provides a quick and dirty way of adding new types of resources to the sytem without to build a form UI for creating and editing them.
 ++Template=The content will be used as template (typically for XSLT content). Currently, this just effect of stopping any more templates from being applied to the content.
 
 +Sharing=This dropdown let's you choose how the content can be accessed. Choices depend on rights the user has. The Guest user (the default if you are not logged in) only has one choice: "Public", which means anyone can view, edit or delete the content. If you sign in as a user, you'll see choices that allow to make content only readable and writable by you (and administrators), or public readable but only privately modifiable. You can also set the content to be readable and/or writable only to members of the user group you below to.
@@ -170,36 +170,36 @@ There are a few useful properties that can be assigned to any resource:
 
 +rdfs:label=Many of Rhizomes pages check for this property when trying to display a human-readable name for a resource.
 
-;todo: !!Browsing and Searching
+#todo: !!Browsing and Searching
 
 !!Resources, actions and URLs
 
 When you request an URL from Rhizome, translates the URL to an internal resource, applies an //action// to the resource, and returns the result of that action to your browser. The default action is 'view' but you specify other actions by adding an 'action' parameter to a URL (or, when creating an html form, by adding an 'action' form variable) -- for examples, look at the links such as 'Edit' or 'Revisions' at bottom of the default template. 
 
 URLs are mapped to resources by through a series of steps:
-# Find the source resource. Rhizome applies the following queries, stopping at the first match:
-## If the URL has an 'about' parameter, find the resource whose URI matches the parameter's value.
-## Look for a resource that has a ^^wiki:name^^ property that matches the URL's path.
-## Look for a resource that has a ^^wiki:alias^^ property that matches the URL's path.
-## Look in the directories in Rhizome's PATH setting for a file that matches the URL's path. If one is found none of the following steps apply and the contents of the file is returned immediately.
-## Look for a resource that has a ^^wiki:name^^ property named '_not_found'. By default, this will be a page prompts you to create a new page using the missing name.
-# See if the user is authorized to perform the action associated with this URL on the selected resource. If not, set the resource to ^^auth:Unauthorized^^.
-# Look for a resource that can handle the action associated with this URL when applies to the selected resource.
-## If the action is 'view' and resource is of type 'NamedContent', choose the same resource.
-## Search for a resource with a ^^wiki:handles-action^^ property equal to the action and a ^^wiki:action-for-type^^ property equal to the type of the current resource or 'wiki:Any'.
-## Look for a resource that has a ^^wiki:name^^ property named 'default-resource-viewer'. The default view displays the resource as [RxML].
-# At this point the current resource should alway be of type NamedContent. Now find a revision associated with that resource (through the ^^wiki:revisions^^ property) that contains the resource's content:
-## If the URL had a revision parameter, choose the revision that matches that number
-## If the URL had a label parameter, choose the last revision that has a matching label
-## Choose the last revision that has a label with the ^^wiki:is-released^^ property
-## Choose the last revision
-# Now we retrieve the content associated with the revision (which can be either stored in external files or within the model, depending on how you configured Rhizome) and process it based on the content transform metadata associated with it (this is set by the 'Source Format' dropdown on the edit page). 
-# At this point we may be ready to return the contents to the browser or we might want to apply a template to the results. To find out we look for a template resource that first matches the following queries:
-## Search for a resource with a ^^wiki:handles-doctype^^ property equal to to the URL's '_doctype' parameter, if present, or the revision's ^^wiki:doctype^^ property. This allows for stylesheets that can convert content from one doctype to another.
-## Search for a resource with a ^^wiki:handles-disposition^^ property equal to the URL's '_disposition' parameter, if present, or the revision's ^^wiki:item-disposition^^ property. Item disposition's correspond to the "Item type" drop-down on the Edit page and allow for template stylesheets to control how content is rendered.
+1. Find the source resource. Rhizome applies the following queries, stopping at the first match:
+11. If the URL has an 'about' parameter, find the resource whose URI matches the parameter's value.
+11. Look for a resource that has a ^^wiki:name^^ property that matches the URL's path.
+11. Look for a resource that has a ^^wiki:alias^^ property that matches the URL's path.
+11. Look in the directories in Rhizome's PATH setting for a file that matches the URL's path. If one is found none of the following steps apply and the contents of the file is returned immediately.
+11. Look for a resource that has a ^^wiki:name^^ property named '_not_found'. By default, this will be a page prompts you to create a new page using the missing name.
+1. See if the user is authorized to perform the action associated with this URL on the selected resource. If not, set the resource to ^^auth:Unauthorized^^.
+1. Look for a resource that can handle the action associated with this URL when applies to the selected resource.
+11. If the action is 'view' and resource is of type 'NamedContent', choose the same resource.
+11. Search for a resource with a ^^wiki:handles-action^^ property equal to the action and a ^^wiki:action-for-type^^ property equal to the type of the current resource or 'wiki:Any'.
+11. Look for a resource that has a ^^wiki:name^^ property named 'default-resource-viewer'. The default view displays the resource as [RxML].
+1. At this point the current resource should alway be of type NamedContent. Now find a revision associated with that resource (through the ^^wiki:revisions^^ property) that contains the resource's content:
+11. If the URL had a revision parameter, choose the revision that matches that number
+11. If the URL had a label parameter, choose the last revision that has a matching label
+11. Choose the last revision that has a label with the ^^wiki:is-released^^ property
+11. Choose the last revision
+1. Now we retrieve the content associated with the revision (which can be either stored in external files or within the model, depending on how you configured Rhizome) and process it based on the content transform metadata associated with it (this is set by the 'Source Format' dropdown on the edit page). 
+1. At this point we may be ready to return the contents to the browser or we might want to apply a template to the results. To find out we look for a template resource that first matches the following queries:
+11. Search for a resource with a ^^wiki:handles-doctype^^ property equal to to the URL's '_doctype' parameter, if present, or the revision's ^^wiki:doctype^^ property. This allows for stylesheets that can convert content from one doctype to another.
+11. Search for a resource with a ^^wiki:handles-disposition^^ property equal to the URL's '_disposition' parameter, if present, or the revision's ^^wiki:item-disposition^^ property. Item disposition's correspond to the "Item type" drop-down on the Edit page and allow for template stylesheets to control how content is rendered.
 :If we do find a template resource, we stuff the content of the current request into a XPath variable called '$_contents' and then, starting with the fourth step, invoke the above steps again using template resource. Note that this means that another template can be invoked on the results of this template resource and so on and so on.
 
-; todo !!Folders
+# todo !!Folders
 
 !!RSS feeds
 You can create a RSS feed on nearly anything in the system by doing a search with the RSS view option. The URL for the search results can be used as the RSS URL. For example, for RSS feed of the most recently changed pages, click on the "Recent" link, change the view to RSS and then press the search button. Identical results need not be repeatedly sent as Raccoon always generates an etag for tools that support If-None-Match http headers. (Rhizome currently only supports RSS .91 but you can add easily support for later versions by editing search.xsl -- it took less than a 1/2 hour to implement .91)
@@ -250,12 +250,12 @@ There are three ways you could modify these files:
 
 !!Slightly Involved Customization Example
 In this example we'll add a template for displaying a print-friendly version of a page. (Note: going through the trouble writing and testing this example, I've decided to leave it in the core product -- see ^^print-template.xsl^^.)
-#Add a new disposition
-##On the [administration] page click on the new disposition link. 
-##Edit the new dispostion template: for consistency, we'll choose the resource URI of the new disposition to be "wiki:item-disposition-print" and label it 'Printable'
-#Add a new template
-##Click new to create a new page (let's call it 'print-template'), set the Item Format to "RxSLT" and the Item Type to "Template". (We don't want to set the format to "XSLT" because we don't want to tranform the contents that we are applying the template to (as it can be anything, not even XML); instead we just want to include the content (which is exposed as a XSLT param named $_contents) in the template's output.
-##We'll base the print template stylesheet on "site-template.xsl" by removing the structural tables from template and just displaying the content: ~~
+1.Add a new disposition
+11.On the [administration] page click on the new disposition link. 
+11.Edit the new dispostion template: for consistency, we'll choose the resource URI of the new disposition to be "wiki:item-disposition-print" and label it 'Printable'
+1.Add a new template
+11.Click new to create a new page (let's call it 'print-template'), set the Item Format to "RxSLT" and the Item Type to "Template". (We don't want to set the format to "XSLT" because we don't want to tranform the contents that we are applying the template to (as it can be anything, not even XML); instead we just want to include the content (which is exposed as a XSLT param named $_contents) in the template's output.
+11.We'll base the print template stylesheet on "site-template.xsl" by removing the structural tables from template and just displaying the content: ~~
 p'''<?xml version="1.0" encoding="ISO-8859-1"?>
 <xsl:stylesheet version="1.0"
         xmlns:a="http://rx4rdf.sf.net/ns/archive#"
@@ -300,23 +300,23 @@ p'''<?xml version="1.0" encoding="ISO-8859-1"?>
 </xsl:template>
 </xsl:stylesheet>
 '''
-#Set the template to handle the new print disposition
-##After saving the item, click on the "Metadata" link to get to the View Metadata page and then the "Edit Metadata" link to edit the metadata. 
-##Add a ^^wiki:handles-disposition^^ property to the main (the NamedContent) resource: ~~
+1.Set the template to handle the new print disposition
+11.After saving the item, click on the "Metadata" link to get to the View Metadata page and then the "Edit Metadata" link to edit the metadata. 
+11.Add a ^^wiki:handles-disposition^^ property to the main (the NamedContent) resource: ~~
 p''' base:print-template:    
   wiki:handles-disposition: wiki:item-disposition-print
   ...
 '''
-#Finally let's add "Print" link to the site template.
-##Edit "site-template" 
-##Find the action links in the footer of the template and add our own by copying the "view" link and adding a "_disposition" parameter to it. ~~
+1.Finally let's add "Print" link to the site template.
+11.Edit "site-template" 
+11.Find the action links in the footer of the template and add our own by copying the "view" link and adding a "_disposition" parameter to it. ~~
 p'''&#xa0;<a href=
 "site:///{$path}?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-print{$aboutparam}"
                                                                                       >Print</a>'''
 ::The _disposition parameter overrides the resources' default disposition that was set when choosing the "Item Type" on the edit page.
 
-;!!Advanced Customization Example
-;adding a todo resource type
+#!!Advanced Customization Example
+#adding a todo resource type
 
 !Importing content and schema migration
 
@@ -364,5 +364,5 @@ If the ^^-static^^ option is present, export will try to render each item as HTM
 
 If ^^-static^^ is not present each item will be exported to 2 files: one containing the raw content of item and the other a RxML document containing the metadata associated with the item. The first file will match the item's name with a file type extension added, if necessary, and the second will be the same but with '.metarx' appended.
 
-;todo:
-;!The RDF Store
+#todo:
+#!The RDF Store

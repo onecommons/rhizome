@@ -89,7 +89,7 @@ p'''  element attribute="value" attribute2=name, attribute3=3 compact-attribute'
 
 This example should the syntactic variety of attributes: The "," between attribute name value pairs is optional. An attribute can have as is value either a quoted string (see below), a name or a number as a value. If the attribute doesn't have a value, it is treated like an HTML compact attribute, where its value is equal to the attribute name.
 
-You can optionally wrap the attribute list in parentheses, if so, the attribute list can be broken across multiple lines, for example;
+You can optionally wrap the attribute list in parentheses, if so, the attribute list can be broken across multiple lines, for example:
 
 p'''element (attribute="value",
       attribute2='value')
@@ -99,13 +99,13 @@ If you terminate the attribute list with a ":" you can place child text, comment
 
 p'''element attribute="value" attribute2="value": `child text'''
  
-p'''element (attribute="value", attribute2="value"): ; a child comment 
-   ; another child comment 
+p'''element (attribute="value", attribute2="value"): # a child comment 
+   # another child comment 
 '''
 
 If the child after the ":" is an element, then parent element will have that element as its only child and all subsequent indented children will be the child of the last child element on that line.
 p'''
- element att1='value': child-element att="value": ; this comment is a child of <child-element>
+ element att1='value': child-element att="value": # this comment is a child of <child-element>
    `this text is a child of <child-element>
 '''
 
@@ -120,7 +120,7 @@ Second, you can create quoted strings using the following quote marks: " or ' or
 * A 'p' (or 'P') string prefix is added which indicates that the spacing in the string should be preserved (e.g. by wrapping it in a ^^<pre>^^ tag in HTML or using the ^^xml:space^^ attribute in XML). 'p' and 'r' string prefixes can be combined.
 
 !!!!Other XML structure
-* Comments. When a ";" appears in a line of markup, anything after it until the end of the line is inserted as a comment. As with XML, it is an error for a comment to contain two dashes in a row ("--"). 
+* Comments. When a "#" appears in a line of markup, anything after it until the end of the line is inserted as a comment. As with XML, it is an error for a comment to contain two dashes in a row ("--"). 
 
 * Internal Comments. Lines that begin with "#!" are treated as internal ZML comments that are not passed to the resulting XML document. On UNIX-style operating systems it maybe useful to put an internal comment on the first line to indicate the program that can process this ZML document, for example: 
 :^^#!python /bin/zml.py

@@ -302,7 +302,7 @@ Should we specify anything how inferences and entailments appear in the model? F
                 authors="S. Bradner"
                 date="March 1997"/>
          </bl>
-""""""   
+"""   
 <  s1 title="Other References": r"""<bl>
             <bi name="Syntactic-Web"
                 href="http://www.idealliance.org/papers/xml2001/papers/html/03-01-04.html"
@@ -315,7 +315,7 @@ Should we specify anything how inferences and entailments appear in the model? F
                 authors="Peter Patel-Schneider, Jerome Simeon"
                 date="2002"/>
          </bl>
-"""""" 
+""" 
 <  s1 title="Commentary":
 This section contain informal comments on the why certain approaches were taken. 
 <    s2 title="deviation from XPath behavior":             
