@@ -67,26 +67,60 @@ class utilsTestCase(unittest.TestCase):
         except (TestDynError), e:
             self.failUnless(e.msg == "another msg")
 
+    def runLinkFixer(self, fixerFactory, contents, result):
+        import StringIO
+        out = StringIO.StringIO()
+        fixlinks = fixerFactory(out)
+        fixlinks.feed(contents)
+        fixlinks.close()
+        self.failUnless(result == out.getvalue())
+
     def testLinkFixer(self):
         contents='''<?xml version=1.0 standalone=true ?>
         <!doctype asdf>
         <test link='foo' t='1'>        
-        <!-- comment -->        
+        <!-- comment -->
+        <![CDATA[some < & > unescaped! ]]>
         some content&#233;more content&amp;dsf<a href='foo'/>
         </test>'''
         result = '''<?xml version=1.0 standalone=true ?>
         <!doctype asdf>
         <test link='bar' t='1'>        
-        <!-- comment -->        
+        <!-- comment -->
+        <![CDATA[some < & > unescaped! ]]>
         some content&#233;more content&amp;dsf<a href='bar'/>
         </test>'''
-        import StringIO
-        out = StringIO.StringIO()
-        fixlinks = TestLinkFixer(out)
-        fixlinks.feed(contents)
-        fixlinks.close()
-        self.failUnless(result == out.getvalue())
-        
+        self.runLinkFixer(TestLinkFixer, contents, result)
+
+    def testBlackListHTMLSanitizer(self):        
+        contents = '''<html>
+        <head>
+        <style>
+        #test {
+            border: 1px solid #000000;
+            padding: 10px;
+            background-image: url('javascript:alert("foo");')
+        }
+        </style>
+        </head>
+        <body id='test'>
+        <span onmouseover="dobadthings()">
+        <a href="javascript:alert('foo')">alert</a>
+        </span>
+        </body>
+        </html>'''
+        result = '''<html>
+        <head>
+        <style></style>
+        </head>
+        <body id='test'>
+        <span onmouseover="">
+        <a href="">alert</a>
+        </span>
+        </body>
+        </html>'''
+        self.runLinkFixer(BlackListHTMLSanitizer, contents, result)        
+
     def testDiffPatch(self):
         orig = "A B C D E"
         new = "A C E D"
