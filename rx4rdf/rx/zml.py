@@ -1,18 +1,389 @@
+#! /usr/bin/env python
 """
-    Rhizml to XML
+    ZML to XML/XML to ZML
     
-    Copyright (c) 2003 by Adam Souzis <asouzis@users.sf.net>
-    All rights reserved, see COPYING for details.
-    http://rx4rdf.sf.net    
+    Copyright (c) 2003-4 by Adam Souzis <asouzis@users.sf.net>
+    All rights reserved, released under GPL v2, see COPYING for details.
+    
+    See http://rx4rdf.liminalzone.org/ZML for more info on ZML.    
 """
-from rx.rhizmltokenize import *
-from rx import rhizmltokenize, utils
-import re
+
+######################################################
+###begin tokenizer
+######################################################
+"""
+    Tokenizer for ZML
+
+    This is a modification of Python 2.2's tokenize module and behaves
+    the same except for:
+
+    * NAME tokens also can include '.', ':' and '-' (aligning them with XML's NMTOKEN production)
+      (but the trailing ':', if present, is treated as a OP)
+    * The COMMENT deliminator is changed from '#' to ';'
+    * New string tokens are introduced:
+      1. STRLINE, which behaves similar to a comment: any characters following a '`'
+         to the end of the line are part of the token
+      2. the optional FREESTR token, which if true (the default),
+    causes any non-indented, non-continued line to be returned whole as a FREESTR token
+        Its presence is controlled by the 'useFreestr' keyword parameter added to tokenize() (default: True)
+      3. WHITESPACE so the tokeneater function gets notified of all the whitespace
+      4. IGNORE for lines that begin with '#!'
+      5. PI for lines that begin with '#?'
+    * indention whitespace characters can include '<'
+    * string quote modifiers changed from 'ur' to 'pr'
+"""
+
+import string, re, sys, os
 try:
     import cStringIO
     StringIO = cStringIO
 except ImportError:
     import StringIO
+from token import *
+
+COMMENT = N_TOKENS
+tok_name[COMMENT] = 'COMMENT'
+NL = N_TOKENS + 1
+tok_name[NL] = 'NL'
+N_TOKENS += 2
+STRLINE = N_TOKENS
+tok_name[STRLINE] = 'STRLINE'
+N_TOKENS += 1
+FREESTR = N_TOKENS
+tok_name[FREESTR] = 'FREESTR'
+N_TOKENS += 1
+WHITESPACE = N_TOKENS
+tok_name[WHITESPACE] = 'WHITESPACE'
+N_TOKENS += 1
+PI = N_TOKENS
+tok_name[PI] = 'PI'
+N_TOKENS += 1
+IGNORE = N_TOKENS
+tok_name[IGNORE] = 'IGNORE'
+N_TOKENS += 1
+
+def group(*choices): return '(' + '|'.join(choices) + ')'
+def any(*choices): return apply(group, choices) + '*'
+def maybe(*choices): return apply(group, choices) + '?'
+
+COMMENTCHAR = ';' # instead of #
+Whitespace = r'[ \f\t]*'
+Comment = r';[^\r\n]*' #replace # with ;
+StrLine = r'`[^\r\n]*'
+Ignore = Whitespace + any(r'\\\r?\n' + Whitespace) + maybe(Comment) + maybe(StrLine)
+Name = r'[a-zA-Z_][\w:.-]*' #added _:.-
+
+Hexnumber = r'0[xX][\da-fA-F]*[lL]?'
+Octnumber = r'0[0-7]*[lL]?'
+Decnumber = r'[1-9]\d*[lL]?'
+Intnumber = group(Hexnumber, Octnumber, Decnumber)
+Exponent = r'[eE][-+]?\d+'
+Pointfloat = group(r'\d+\.\d*', r'\.\d+') + maybe(Exponent)
+Expfloat = r'[1-9]\d*' + Exponent
+Floatnumber = group(Pointfloat, Expfloat)
+Imagnumber = group(r'0[jJ]', r'[1-9]\d*[jJ]', Floatnumber + r'[jJ]')
+Number = group(Imagnumber, Floatnumber, Intnumber)
+
+# Tail end of ' string.
+Single = r"[^'\\]*(?:\\.[^'\\]*)*'"
+# Tail end of " string.
+Double = r'[^"\\]*(?:\\.[^"\\]*)*"'
+# Tail end of ''' string.
+Single3 = r"[^'\\]*(?:(?:\\.|'(?!''))[^'\\]*)*'''"
+# Tail end of """ string.
+Double3 = r'[^"\\]*(?:(?:\\.|"(?!""))[^"\\]*)*"""'
+Triple = group("[pP]?[rR]?'''", '[pP]?[rR]?"""')
+# Single-line ' or " string.
+String = group(r"[pP]?[rR]?'[^\n'\\]*(?:\\.[^\n'\\]*)*'",
+               r'[pP]?[rR]?"[^\n"\\]*(?:\\.[^\n"\\]*)*"')
+
+# Because of leftmost-then-longest match semantics, be sure to put the
+# longest operators first (e.g., if = came before ==, == would get
+# recognized as two instances of =).
+Operator = group(r"\*\*=?", r">>=?", r"<<=?", r"<>", r"!=",
+                 r"[+\-*/%&|^=<>]=?",
+                 r"~")
+
+Bracket = '[][(){}]'
+Special = group(r'\r?\n', r'[:#,]') #removed `. replace ; with #
+Funny = group(Operator, Bracket, Special)
+
+PlainToken = group(Funny, String, Name, Number) 
+Token = Ignore + PlainToken
+
+# First (or only) line of ' or " string.
+ContStr = group(r"[pP]?[rR]?'[^\n'\\]*(?:\\.[^\n'\\]*)*" +
+                group("'", r'\\\r?\n'),
+                r'[pP]?[rR]?"[^\n"\\]*(?:\\.[^\n"\\]*)*' +
+                group('"', r'\\\r?\n'))
+PseudoExtras = group(r'\\\r?\n', Comment, Triple, StrLine)
+PseudoToken = Whitespace + group(PseudoExtras, Funny, ContStr, Name, Number) 
+
+tokenprog, pseudoprog, single3prog, double3prog = map(
+    re.compile, (Token, PseudoToken, Single3, Double3))
+endprogs = {"'": re.compile(Single), '"': re.compile(Double),
+            "'''": single3prog, '"""': double3prog,
+            "r'''": single3prog, 'r"""': double3prog,
+            "p'''": single3prog, 'p"""': double3prog,
+            "pr'''": single3prog, 'pr"""': double3prog,
+            "P'''": single3prog, 'R"""': double3prog,
+            "U'''": single3prog, 'U"""': double3prog,
+            "pR'''": single3prog, 'pR"""': double3prog,
+            "Pr'''": single3prog, 'Pr"""': double3prog,
+            "PR'''": single3prog, 'PR"""': double3prog,
+            'r': None, 'R': None, 'p': None, 'p': None}
+
+tabsize = 8
+
+class TokenError(Exception): pass
+
+class StopTokenizing(Exception): pass
+
+def printtoken(type, token, (srow, scol), (erow, ecol), line, *args): # for testing
+    print "%d,%d-%d,%d:\t%s\t%s" % \
+        (srow, scol, erow, ecol, tok_name[type], repr(token))
+
+def tokenize(readline, tokeneater=printtoken, useFreestr = True):
+    try:
+        tokenize_loop(readline, tokeneater, useFreestr)
+    except StopTokenizing:
+        pass
+
+def tokenize_loop(readline, tokeneater, useFreestr = True):
+    lnum = parenlev = continued = 0
+    namechars, numchars = string.letters + '_', string.digits  
+    contstr, needcont = '', 0
+    contline = None
+    indents = [0]
+    literalstr = ''
+
+    while 1:                                   # loop over lines in stream        
+        line = readline()
+        lnum = lnum + 1
+        pos, max = 0, len(line)
+        #print 'LN:', pos, line, parenlev
+        
+        if literalstr: #last line was a FREESTR
+            if line and not line.isspace() and line[0].isspace():
+                #if this line starts with whitespace (but isn't all whitespace) it's a continuation of the last
+                literalstr = literalstr.rstrip() + line #line continued (previous line should end in newline whitespace)
+                literalstrstop = (lnum, max)
+                literalline = line
+                continue
+            else: #last line is complete
+                tokeneater(FREESTR, literalstr, literalstrstart, literalstrstop, literalline, indents)
+                literalstr = ''
+                if not line:
+                    break
+                
+        doIndent = True
+
+        if not contstr and line[:2] == '#!': #ignore these lines
+            tokeneater(IGNORE, line[2:], (lnum, 0), (lnum, max), line)
+            continue
+        if not contstr and line[:2] == '#?': #processor instruction #?zml1.0 markup
+            if line.startswith('#?zml'):
+                if line.find('markup') != -1:
+                    useFreestr = False
+                else:
+                    useFreestr = True                  
+            else:
+                tokeneater(PI, line[2:], (lnum, 0), (lnum, max), line)
+            continue
+          
+        if useFreestr and line and not line.isspace() and not continued and \
+                 parenlev == 0 and not contstr and not line[0] == '<': #free-form text
+            if line[0] in ("'", '"') or \
+                  line[:2] in ("r'", 'r"', "R'", 'R"',"p'", 'p"', "P'", 'P"') or \
+                  line[:3] in ("pr'", 'pr"', "Pr'", 'Pr"', "pR'", 'pR"', "PR'", 'PR"' ):
+                doIndent = False #this is a quoted string but treat like wiki markup (don't dedent)
+            else:
+                literalstrstart = (lnum, 0)
+                literalstrstop = (lnum, max)
+                literalline = line
+                literalstr = line
+                continue
+
+        if contstr:                            # continued string
+            if not line:
+                #raise TokenError, ("EOF in multi-line string", strstart)
+                #don't raise an error, just close the string 
+                if contstr[0] in 'pPrR':
+                    if contstr[1] in 'rR':
+                        delim = contstr[2] * 3
+                    else:
+                        delim = contstr[1] * 3
+                else:
+                    delim = contstr[0] * 3
+                tokeneater(STRING, contstr+delim, strstart, (lnum -1, endcontline), line)
+                break
+                
+            endmatch = endprog.match(line)
+            if endmatch:
+                pos = end = endmatch.end(0)
+                tokeneater(STRING, contstr + line[:end],
+                           strstart, (lnum, end), contline + line)
+                contstr, needcont = '', 0
+                contline = None
+                if pos < len(line) and line[pos] in '\r\n':         
+                  tokeneater(NEWLINE, line[pos:],(lnum, pos), (lnum, len(line)), line)
+                  continue                
+            elif needcont and line[-2:] != '\\\n' and line[-3:] != '\\\r\n':
+                tokeneater(ERRORTOKEN, contstr + line,
+                           strstart, (lnum, len(line)), contline)
+                contstr = ''
+                contline = None
+                continue
+            else:
+                contstr = contstr + line
+                contline = contline + line
+                endcontline = max
+                continue
+
+        elif parenlev == 0 and not continued:  # new statement
+            if not line: break
+            column = 0
+            while pos < max:                   # measure leading whitespace
+                if line[pos] == ' ' or line[pos] == '<': column = column + 1
+                elif line[pos] == '\t': column = (column/tabsize + 1)*tabsize
+                elif line[pos] == '\f': column = 0
+                else: break
+                pos = pos + 1
+            if pos == max: break            
+
+        if pos >= len(line): 
+            if not line:
+                tokeneater(ERRORTOKEN, line,
+                           (lnum, pos), (lnum, pos), line)
+                break
+            else:
+                #seems to happens when the last line == "'''" and there's no NL
+                continue
+
+        if line[pos] in '\r\n':           # skip blank lines            
+            tokeneater(NL, line[pos:],(lnum, pos), (lnum, len(line)), line)
+            if not line[:pos] or line[:pos].strip('<'): #if the 'whitespace' was not all '<' continue
+                continue              #but all < treat as an intentional dedent/indent
+          
+        if doIndent:
+          if column > indents[-1]:           # count indents or dedents
+              indents.append(column)
+              tokeneater(INDENT, line[:pos], (lnum, 0), (lnum, pos), line)
+          while column < indents[-1]:
+              indents = indents[:-1]
+              tokeneater(DEDENT, '', (lnum, pos), (lnum, pos), line)
+        tokeneater(WHITESPACE, line[:pos], (lnum, 0), (lnum, pos), line)
+
+        if line[pos] in COMMENTCHAR:           # skip comments 
+                tokeneater(COMMENT, line[pos:],
+                           (lnum, pos), (lnum, len(line)), line)
+                continue
+
+        if line[pos] in '`':           # our new type of string
+                tokeneater(STRLINE, line[pos:],
+                           (lnum, pos), (lnum, len(line)), line)
+                continue
+
+        else:                                  # continued statement
+            if not line:
+                raise TokenError, ("EOF in multi-line statement", (lnum, 0))
+            continued = 0
+
+        while pos < max:
+            pseudomatch = pseudoprog.match(line, pos)
+            if pseudomatch:                                # scan for tokens
+                start, end = pseudomatch.span(1)
+                spos, epos, pos = (lnum, start), (lnum, end), end
+                token, initial = line[start:end], line[start]
+
+                wstart, wend = pseudomatch.span(0)
+                if wstart != start:                  
+                  assert line[wstart:start].isspace()
+                  tokeneater(WHITESPACE, line[wstart:start], (lnum, wstart), (lnum, start), line)
+                
+                if initial in numchars or \
+                   (initial == '.' and token != '.'):      # ordinary number
+                    tokeneater(NUMBER, token, spos, epos, line)
+                elif initial in '\r\n':
+                    tokeneater(parenlev > 0 and NL or NEWLINE,
+                               token, spos, epos, line)
+                elif initial == COMMENTCHAR:
+                    tokeneater(COMMENT, token, spos, epos, line)
+                elif initial == '`':
+                    tokeneater(STRLINE, token, spos, epos, line)                    
+                elif token in ("'''", '"""',               # triple-quoted
+                               "r'''", 'r"""', "R'''", 'R"""',
+                               "p'''", 'p"""', "P'''", 'P"""',
+                               "pr'''", 'pr"""', "Pr'''", 'Pr"""',
+                               "pR'''", 'pR"""', "PR'''", 'PR"""'):
+                    endprog = endprogs[token]
+                    endmatch = endprog.match(line, pos)
+                    if endmatch:                           # all on one line
+                        pos = endmatch.end(0)
+                        token = line[start:pos]
+                        tokeneater(STRING, token, spos, (lnum, pos), line)
+                    else:
+                        strstart = (lnum, start)           # multiple lines
+                        contstr = line[start:]
+                        contline = line
+                        endcontline = max
+                        break
+                elif initial in ("'", '"') or \
+                    token[:2] in ("r'", 'r"', "R'", 'R"',
+                                  "p'", 'p"', "P'", 'P"') or \
+                    token[:3] in ("pr'", 'pr"', "Pr'", 'Pr"',
+                                  "pR'", 'pR"', "PR'", 'PR"' ):
+                    if token[-1] == '\n':                  # continued string
+                        strstart = (lnum, start)
+                        endprog = (endprogs[initial] or endprogs[token[1]] or
+                                   endprogs[token[2]])
+                        contstr, needcont = line[start:], 1
+                        contline = line
+                        break
+                    else:                                  # ordinary string
+                        tokeneater(STRING, token, spos, epos, line)
+                elif initial in namechars:                 # ordinary name
+                    if token[-1] == ':':
+                        tokeneater(NAME, token[:-1], spos, (lnum, pos-1), line)
+                        tokeneater(OP, token[-1], epos, epos, line)
+                    else:
+                        tokeneater(NAME, token, spos, epos, line)
+                    
+                elif initial == '\\':                      # continued stmt
+                    continued = 1
+                else:
+                    if initial in '([{': parenlev = parenlev + 1
+                    elif initial in ')]}': parenlev = parenlev - 1
+                    tokeneater(OP, token, spos, epos, line)
+            else:
+                tokeneater(ERRORTOKEN, line[pos],
+                           (lnum, pos), (lnum, pos+1), line)
+                pos = pos + 1
+
+    for indent in indents[1:]:                 # pop remaining indent levels
+        tokeneater(DEDENT, '', (lnum, 0), (lnum, 0), '')
+    tokeneater(ENDMARKER, '', (lnum, 0), (lnum, 0), '')
+
+######################################################
+###end tokenizer
+######################################################
+
+DEFAULT_MARKUPMAP_URI = 'http://rx4rdf.sf.net/zml/mm/default'
+
+class UnknownMarkupMap(Exception): pass
+
+#copied from rx/utils.py so this file has no dependencies
+class InterfaceDelegator:
+    '''assumes only methods will be called on this object and the methods always return None'''
+    def __init__(self, handlers):
+        self.handlers = handlers
+    
+    def call(self, name, args, kw):
+        for h in self.handlers:
+            getattr(h, name)(*args, **kw)
+        
+    def __getattr__(self, name):
+        return lambda *args, **kw: self.call(name, args, kw)
 
 class Handler(object):
     '''
@@ -24,6 +395,7 @@ class Handler(object):
     def comment(self, string): pass
     def text(self, string): pass
     def whitespace(self, string): pass
+    def pi(self, name, value): pass
     def endDocument(self): pass
 
 class OutputHandler(Handler):
@@ -55,7 +427,7 @@ class OutputHandler(Handler):
     def comment(self, string):
         self.__finishElement()
         assert string.find('--') == -1, ' -- not allowed in comments'
-        self.output.write( u'<!--' + string + '-->')
+        self.output.write( u'<!--' + string.rstrip('\n') + '-->')
         
     def text(self, string):
         self.__finishElement()
@@ -64,6 +436,9 @@ class OutputHandler(Handler):
     def whitespace(self, string):
         pass#self.output.write( string ) #this put whitespace in places you wouldn't expect
 
+    def pi(self, name, value):
+        self.output.write( u'<?' + name + ' ' + value.rstrip('\n') + '?>')
+    
     def endDocument(self):
         self.__finishElement()
 
@@ -151,7 +526,7 @@ class MarkupMap(object):
                 name = link[len('site:///'):]
             else:
                 name = link
-                
+        #print link, not annotations or [a.name for a in annotations]
         if isImage and (annotations is None or \
                    not [annotation for annotation in annotations if annotation.name == 'wiki:xlink-replace']):
             attribs = [ ('src', xmlquote(link)), ('alt', xmlquote(name)) ]
@@ -170,19 +545,27 @@ class LowerCaseMarkupMap(MarkupMap): pass
 for varname in MarkupMap.blockElems +\
         MarkupMap.headerElems + MarkupMap.tableElems + MarkupMap.inlineElems:
     setattr(LowerCaseMarkupMap, varname, getattr(LowerCaseMarkupMap, varname).lower() )
-
+    
 class DefaultMarkupMapFactory(Handler):
     '''
     This class is used to dynamic choose the appropriate MarkupMap based on the first element and comments encountered.
     Any Handler method may return a MarkupMap. See MarkupMapFactoryHandler for more info.
     '''
+    done = False
+    
     def getDefault(self):        
-        return LowerCaseMarkupMap() 
+        return LowerCaseMarkupMap()
+
+    def getMarkupMap(self, uri):
+        if uri == DEFAULT_MARKUPMAP_URI:
+            return self.getDefault()
+        else:
+            raise UnknownMarkupMap(uri)
 
 class MarkupMapFactoryHandler(Handler):
     '''    
     Calls MarkupMapFactory.startElement for the first element encountered
-    and MarkupMapFactory.attrib and MarkupMapFactory.comment until the second element is encountered
+    and MarkupMapFactory.attrib, MarkupMapFactory.pi and MarkupMapFactory.comment until the second element is encountered
 
     If the MarkupMapFactory returns a MarkupMap, use that one
     '''
@@ -192,22 +575,28 @@ class MarkupMapFactoryHandler(Handler):
         self.st = st
 
     def startElement(self, element):
-        if self.elementCount < 1: #examine first element encountered
+        #examine first element encountered
+        if not self.markupfactory.done and self.elementCount < 1: 
             mm = self.markupfactory.startElement(element)
             if mm:
                 self.st.mm = mm
-        else:
-            self.elementCount += 1
+        self.elementCount += 1
             
     def attrib(self, name, value):
-        if self.elementCount < 2:
+        if not self.markupfactory.done and self.elementCount < 2:
             mm = self.markupfactory.attrib(name, value)
             if mm:
                 self.st.mm = mm            
                             
     def comment(self, string): 
-         if self.elementCount < 2:
+         if not self.markupfactory.done and self.elementCount < 2:
             mm = self.markupfactory.comment(string)
+            if mm:
+                self.st.mm = mm      
+
+    def pi(self, name, value): 
+         if not self.markupfactory.done and self.elementCount < 2:
+            mm = self.markupfactory.pi(name, value)
             if mm:
                 self.st.mm = mm      
 
@@ -247,7 +636,9 @@ def stripQuotes(strQuoted, checkEscapeXML=True):
             return strQuoted[1:].replace('&', '&amp;').replace('<', '&lt;').rstrip() + ' '  
         else:
             return strQuoted[1:].replace('&', '&amp;').replace('<', '&lt;')
-    escapeXML = checkEscapeXML and not (strQuoted[0] in 'rR' or (strQuoted[0] in 'pP' and strQuoted[1] in 'rR'))#we xml escape strings unless raw quote type is specifed        
+    #we xml escape strings unless raw quote type is specifed        
+    escapeXML = checkEscapeXML and not (strQuoted[0] in 'rR' or (strQuoted[0] in 'pP' and strQuoted[1] in 'rR'))
+        
     #python 2.2 and below won't eval unicode strings while in unicode, so temporarily encode as UTF-8
     #NOTE: may cause some problems, but good enough for now
     strUTF8 = strQuoted.encode("utf-8")
@@ -256,11 +647,13 @@ def stripQuotes(strQuoted, checkEscapeXML=True):
         strUTF8 = 'u' + strUTF8[1:]
     elif strUTF8[0] in 'rR' and strUTF8[1] in 'pP':
         strUTF8 = 'ur' + strUTF8[2:]
-    strUnquoted = eval(strUTF8)
     if escapeXML:
-        #escape and then remove the \ for any \< or \&
-        #todo: handle odd number of \ > 1, like \\\< (broken now)
-        strUnquoted = re.sub(r'(?<!\\)\\(\&(?!amp;)|\<)', r'\1', xmlescape(strUnquoted)) 
+        #we need to do this before eval() because eval("'\&'") == eval("'\\&'")
+        strUTF8 = xmlescape(strUTF8)
+    strUnquoted = eval(strUTF8)
+    #now handle and \U and \u: replace with character reference
+    strUnquoted = re.sub(r'\\U(.{8})', r'&#x\1;', strUnquoted)
+    strUnquoted = re.sub(r'\\u(.{4})', r'&#x\1;', strUnquoted)        
     if type(strUnquoted) != type(u''):
         strUnquoted = unicode(strUnquoted, "utf-8")
     return strUnquoted
@@ -275,17 +668,42 @@ def xmlquote(quote, escape=True):
     else:
         return '"' + quote.replace('"', '&quot;') + '"'
 
-ampSearchProg = re.compile(r'(((?<!\\)(\\\\)+)|[^\\]|^)&')
-ltSearchProg = re.compile(r'(((?<!\\)(\\\\)+)|[^\\]|^)<')
-def xmlescape(s):    
-    r'''xml escape & and < unless proceeded by an odd number of \ '''
-    return re.sub(ltSearchProg, r'\1&lt;', re.sub(ampSearchProg, r'\1&amp;', s)) #&amp sub must go first
+def xmlescape(s):
+    r'''xml escape & and < unless proceeded by an odd number of \
+        e.g. '\&' -> '&' but '\\&' -> '\\&amp;'
+    '''            
+    def replace(match):
+        pos = match.start() #this will point to either \ or the searchChar        
+        raw = False        
+        while pos > -1 and s[pos] == '\\':
+            raw = not raw
+            pos -= 1
+            
+        if raw:
+            #print s[match.start():match.end()], searchChar
+            return searchChar
+        else:            
+            if s[match.start()] == '\\':
+                #print s[match.start():match.end()], '\\' + replaceStr
+                return '\\' + replaceStr
+            else:
+                #print s[match.start():match.end()], replaceStr
+                return replaceStr
+
+    searchChar = '&'
+    replaceStr = '&amp;'            
+    s = re.sub(r'\\?'+searchChar, replace, s)#&amp sub must go first
+
+    searchChar = '<'
+    replaceStr = '&lt;'            
+    s = re.sub(r'\\?'+searchChar, replace, s)
+    return s
         
-def rhizmlString2xml(strText, markupMapFactory=None, handler=None):
+def zmlString2xml(strText, markupMapFactory=None, **kw):
     if type(strText) == type(u''):
         strText = strText.encode("utf8")
     fd = StringIO.StringIO(strText)
-    contents = rhizml2xml(fd, mmf=markupMapFactory, handler=handler)   
+    contents = zml2xml(fd, mmf=markupMapFactory, **kw)   
     return contents
 
 def _group(*choices): return '(' + '|'.join(choices) + ')'
@@ -330,13 +748,14 @@ def parseLinkType(string, annotationList = None):
             self.annotation.child = string
             
         def comment(self, string):
-            #anything after the ; is another annotation, if anything            
-            parseLinkType(string, self.annotationList)
+            #anything after the ; is another annotation, if anything
+            if string:
+                parseLinkType(string, self.annotationList)
         
     if annotationList is None:
         annotationList = []
-    handler = TypeParseHandler(annotationList)    
-    rhizmlString2xml(' '+string, handler=handler) #add some indention
+    handler = TypeParseHandler(annotationList)
+    zmlString2xml(string, handler=handler, mixed=False)
     return annotationList
  
 def _handleInlineWiki(st, handler, string, wantTokenMap=None, userTextHandler=None):
@@ -360,7 +779,7 @@ def _handleInlineWiki(st, handler, string, wantTokenMap=None, userTextHandler=No
                 if token == '=':
                     del wantTokenMap['='] #only do this once per line
                 elif token == '|':
-                    if string[start+1] == '|': #|| = header                    
+                    if len(string) > start+1 and string[start+1] == '|': #|| = header                    
                         cell = st.mm.TH
                         end += 1 #skip second |
                     else:
@@ -471,9 +890,10 @@ def handleInlineWiki(st, handler, string, wantTokenMap ):
         return _handleInlineWiki(st, handler, string, wantTokenMap)
         st.in_wikicont = 0
             
-def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False, rootElement = None, getMM=False):
+def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
+               rootElement = None, getMM=False, mixed=True):
     """
-    given a string of rhizml, return a str of xml
+    given a string of zml, return a string of xml
     """
     #debug = 1
     if mmf is None:
@@ -503,7 +923,7 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False, rootEle
                 handler.endElement(wikiElem)
             if wikiStructureStack.get(st.mm.canonizeElem(wikiElem)):
                 wikiStructureStack[st.mm.canonizeElem(wikiElem)]-= 1
-            if not untilElem or utilElem == wikiElem:
+            if not untilElem or untilElem == wikiElem:
                 return wikiElem
         raise IndexError('pop from empty list')
 
@@ -528,7 +948,7 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False, rootEle
     wikiStructureStack = {}
     output = StringIO.StringIO()
     outputHandler = handler or OutputHandler(output)
-    handler = utils.InterfaceDelegator( [ outputHandler, MarkupMapFactoryHandler(st, mmf) ] )
+    handler = InterfaceDelegator( [ outputHandler, MarkupMapFactoryHandler(st, mmf) ] )
 
     def stringToText(token):
         preformatted = token[0] in 'Pp' or (token[0] in 'rR' and token[1] in 'pP')
@@ -543,21 +963,6 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False, rootEle
                 handler.endElement(st.mm.PRE)
              
     def handleWikiML(string):
-        '''          
-          \ to continue line
-          linking:
-            [name] internal link (site:name)
-            [url] external link #http:, ftp:, mailto:, https:, or news:
-            [name | link]
-            [type: link] typed link 
-            [name | type: link] 
-            [[ to escape [
-            images: *.png *.jpg *.gif unless type == 'wiki:xlink-replace'
-            
-        escaping:
-           line starts with "`"  raw contents (as markup)
-           line starts with \'\'\' or """ or r\'\'\' or r""" raw (as markup) multilines      
-        '''
         lead = string[0]
         if lead == '`': #treat just like STRLINE token
             handler.text( stripQuotes(string) ) 
@@ -660,19 +1065,21 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False, rootEle
         
     def tokenHandler(type, token, (srow, scol), (erow, ecol), line, indents=None):
         if debug:                
-            print "STATE: A %d, Ch %d nI %d Fr %d NL %d" % (st.in_attribs, st.in_elemchild, st.wantIndent, st.in_freeform, st.nlcount)
-            print "TOKEN: %d,%d-%d,%d:\t%s\t%s" % (srow, scol, erow, ecol, tok_name[type], repr(token))
+            print >>sys.stderr, "STATE: A %d, Ch %d nI %d Fr %d NL %d" % (st.in_attribs, st.in_elemchild, st.wantIndent, st.in_freeform, st.nlcount)
+            print >>sys.stderr, "TOKEN: %d,%d-%d,%d:\t%s\t%s" % (srow, scol, erow, ecol, tok_name[type], repr(token))
         if type == WHITESPACE:
             if not st.in_attribs and not st.in_elemchild:
-                handler.whitespace(token)
+                handler.whitespace(token.replace('<', ' '))
             return 
         if type == FREESTR:            
             st.in_freeform = 1
-            #each extra blank line __between__ wiki paragraphs closes one markup element
-            while st.nlcount:                
-                if  st.nlcount > 1 and elementStack:
-                    handler.endElement( elementStack.pop() )
-                    indents.pop()
+            
+            while st.nlcount:
+                #this can never happen now:
+                #if  st.nlcount > 1 and elementStack:
+                #    #each extra blank line __between__ wiki paragraphs closes one markup element
+                #    handler.endElement( elementStack.pop() )
+                #    indents.pop()
                 st.nlcount -= 1            
             handleWikiML(token) #handle wikiml 
             return
@@ -684,8 +1091,9 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False, rootEle
                 while st.wikiStack:
                     popWikiStack()                
                 handler.whitespace(token)
-                st.nlcount += 1
-                return
+                st.nlcount = 1 #used to be += 1 but we disabled this "feature"
+                if not line[:scol] or line[:scol].strip('<'):#if the 'whitespace' is all '<'s continue
+                    return
             elif type in [STRLINE, STRING]:
                 #encounting a string with no indention immediately after a FREESTR:
                 #just write out the string at the same markup level
@@ -704,17 +1112,20 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False, rootEle
             assert st.toClose == 0
 
         if type == NL: #skip blank lines
-            return
+            if not line[:scol] or line[:scol].strip('<'):#if the 'whitespace' is all '<'s continue
+                return
         
         if st.wantIndent and type != ENDMARKER: #newline, check for indention
-            if type == INDENT:
-                pass#handler.whitespace('\n' + token)
+            if type == INDENT or type == INDENT:
+                #handler.whitespace('\n' + token)
+                st.lineElems -= 1
             else:
-                while st.lineElems: #for future if we want to support multiple elements per line e.g. elem1: elem2: 'OK!'
+                #if we don't see an indent and we just encountered an element
+                #(e.g. elem:) then pop that elem from the stack
+                while st.lineElems: #support multiple elements per line e.g. elem1: elem2: 'OK!'
                     handler.endElement( elementStack.pop() )
                     st.lineElems -= 1
             st.wantIndent = 0
-            st.lineElems = 0
         
         if type == NAME:
             if st.in_attribs:
@@ -782,15 +1193,38 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False, rootEle
                 
             handler.whitespace(token)
         elif type == COMMENT:
+            if st.in_attribs:
+                #in attribs but never encountered the :
+                st.in_attribs = 0
+                handler.startElement( elementStack[-1])
+                normalizeAttribs(st.attribs,handler)
+                st.attribs = []
             handler.comment( token[1:] )
-        elif type ==  ENDMARKER:
+        elif type == PI:
+            split = token.split(None, 1)
+            name = split[0]
+            if name.lower().startswith('zml'):
+                if len(split) > 1:
+                    #look at each word in the PI for a URI
+                    uris = [x for x in split[1].split() if x.find(':') > -1]
+                    if uris:
+                        assert len(uris) == 1, 'malformed zml prologue'
+                        st.mm = mmf.getMarkupMap(uris[0])
+                        mmf.done = True
+            else:
+                if len(split) > 1:
+                    value = split[1]
+                else:
+                    value = ''
+                handler.pi(name, value)                
+        elif type == ENDMARKER:
             while st.wikiStack: popWikiStack()
             while elementStack:
                 handler.endElement( elementStack.pop() )
         elif type == ERRORTOKEN and not token.isspace(): #not sure why this happens
             raise "parse error %d,%d-%d,%d:\t%s\t%s" % (srow, scol, erow, ecol, tok_name[type], repr(token))
                     
-    rhizmltokenize.tokenize(fd.readline, tokeneater=tokenHandler)
+    tokenize(fd.readline, tokeneater=tokenHandler, useFreestr=mixed)
     handler.endDocument()
 
     if getMM:
@@ -802,23 +1236,188 @@ def rhizml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False, rootEle
       xml = output.getvalue()
 
     if prettyprint:
-        import Ft.Xml
-        xmlInputSrc = Ft.Xml.InputSource.DefaultFactory.fromString(xml)
-        prettyOutput = StringIO.StringIO()
-        reader = Ft.Xml.Domlette.NonvalidatingReader
-        xmlDom = reader.parse(xmlInputSrc)        
-        Ft.Xml.Lib.Print.PrettyPrint(xmlDom, stream=prettyOutput)
-        return prettyOutput.getvalue()
+        try:
+            import Ft.Xml.InputSource, Ft.Xml.Domlette, Ft.Xml.Lib.Print
+            xmlInputSrc = Ft.Xml.InputSource.DefaultFactory.fromString(xml)
+            prettyOutput = StringIO.StringIO()
+            reader = Ft.Xml.Domlette.NonvalidatingReader
+            xmlDom = reader.parse(xmlInputSrc)        
+            Ft.Xml.Lib.Print.PrettyPrint(xmlDom, stream=prettyOutput)
+            return prettyOutput.getvalue()
+        except ImportError:
+            print >>sys.stderr, 'Error. You need 4Suite installed to pretty print.'
+            return xml
     else:
         return xml
+
+##################################################################
+##  XML to ZML converter
+##################################################################    
+import HTMLParser
     
-if __name__ == '__main__':             
+class XML2ZML(HTMLParser.HTMLParser):
+    def __init__(self, out, indentwidth = 4, nl = '\n'):
+        HTMLParser.HTMLParser.__init__(self)
+        self.out = out
+        self.tagStack = []
+        self.indent = ''
+        self.indentwidth = indentwidth
+        self.nl = nl
+        self.preservespace = False
+    
+    def handle_starttag(self, tag, attrs):
+        self.tagStack.append(tag)        
+        self.out.write(self.indent+tag)
+        
+        for name, value in attrs:
+            if value is None: #'compact' attribute in HTML
+                self.out.write(' '+name)
+            else:
+                self.out.write(' '+name +'='+ repr(value))
+            
+        self.out.write(':'+self.nl)
+        self.indent += ' ' * self.indentwidth
+                
+    def handle_endtag(self, tag):
+        #weak handling of the minimized end tags found in html
+        while self.tagStack: 
+           lastTag = self.tagStack.pop()
+           self.indent = self.indent[:-self.indentwidth]
+           if lastTag == tag:
+               break        
+
+    def handle_charref(self, name):
+        #name should be a number
+        if name[0] == 'x':
+            num = int(name[1:],16)
+        else:
+            num = int(name)
+        self.out.write(self.indent + '"\\U%08x"'%num +self.nl)
+
+    def handle_entityref(self, name):
+        builtin = {'lt': '<', 'gt':'>', 'amp':'&'}
+        char = builtin.get(name)
+        if char:
+            self.out.write(self.indent + '`'+char+self.nl)
+        else:
+            self.out.write(self.indent + '"\&'+name+';"'+self.nl)    
+
+    def handle_data(self, data):
+        if not data.isspace() or self.preservespace:
+            lines = data.split('\n')
+            for data in lines:
+                if data or self.preservespace:
+                    self.out.write(self.indent + '`'+data+self.nl)         
+
+    def handle_comment(self, data):
+        lines = data.split('\n')
+        for data in lines:
+            self.out.write(self.indent + ';' +data+self.nl)  
+
+    def handle_decl(self, data):        
+        self.out.write(self.indent + "r'''<!"+data+">'''"+self.nl)
+
+    def handle_pi(self, data):
+        self.out.write(self.indent + '#?' + data.rstrip('?')+self.nl)         
+
+    # we need to override these internal functions because xml needs to preserve the case of tags and attributes
+    
+    # Internal -- handle starttag, return end or -1 if not terminated
+    def parse_starttag(self, i):
+        self.__starttag_text = None
+        endpos = self.check_for_whole_start_tag(i)
+        if endpos < 0:
+            return endpos
+        rawdata = self.rawdata
+        self.__starttag_text = rawdata[i:endpos]
+
+        # Now parse the data between i+1 and j into a tag and attrs
+        attrs = []
+        match = HTMLParser.tagfind.match(rawdata, i+1)
+        assert match, 'unexpected call to parse_starttag()'
+        k = match.end()
+        self.lasttag = tag = rawdata[i+1:k]
+
+        while k < endpos:
+            m = HTMLParser.attrfind.match(rawdata, k)
+            if not m:
+                break
+            attrname, rest, attrvalue = m.group(1, 2, 3)
+            if not rest:
+                attrvalue = None
+            elif attrvalue[:1] == '\'' == attrvalue[-1:] or \
+                 attrvalue[:1] == '"' == attrvalue[-1:]:
+                attrvalue = attrvalue[1:-1]
+                attrvalue = self.unescape(attrvalue)
+            attrs.append((attrname, attrvalue))
+            k = m.end()
+
+        end = rawdata[k:endpos].strip()
+        if end not in (">", "/>"):
+            lineno, offset = self.getpos()
+            if "\n" in self.__starttag_text:
+                lineno = lineno + self.__starttag_text.count("\n")
+                offset = len(self.__starttag_text) \
+                         - self.__starttag_text.rfind("\n")
+            else:
+                offset = offset + len(self.__starttag_text)
+            self.error("junk characters in start tag: %s"
+                       % `rawdata[k:endpos][:20]`)
+        if end.endswith('/>'):
+            # XHTML-style empty tag: <span attr="value" />
+            self.handle_startendtag(tag, attrs)
+        else:
+            self.handle_starttag(tag, attrs)
+            if tag in self.CDATA_CONTENT_ELEMENTS:
+                self.set_cdata_mode()
+        return endpos
+
+    #Internal -- parse endtag, return end or -1 if incomplete
+    def parse_endtag(self, i):
+        rawdata = self.rawdata
+        assert rawdata[i:i+2] == "</", "unexpected call to parse_endtag"
+        match = HTMLParser.endendtag.search(rawdata, i+1) # >
+        if not match:
+            return -1
+        j = match.end()
+        match = HTMLParser.endtagfind.match(rawdata, i) # </ + tag + >
+        if not match:
+            self.error("bad end tag: %s" % `rawdata[i:j]`)
+        self.endtag_text = match.string[match.start():match.end()]
+        tag = match.group(1)        
+        self.handle_endtag(tag)
+        return j
+
+def xml2zml(input, out, NL = os.linesep):
+    zml = XML2ZML(out, nl=NL)
+    out.write('#?zml0.9 markup'+ NL)
+    zml.feed( input )
+    zml.close()
+    
+if __name__ == '__main__':
+    if len(sys.argv) < 2 or (sys.argv[-1][0] == '-' and sys.argv[-1] != '-'):        
+        cmd_usage = '''usage: %s [options] (file | -)
+
+final argument is a file path or - for standard input
+
+-z convert from XML to ZML (if omitted: ZML to XML)
+-p pretty print
+-d show debug output
+
+ZML to XML options:
+-m               assume ZML source is in markup mode
+-r [rootelement] wrap in root element (default: "zml")
+-mm markupmap    Python class to use as markup map
+        ''' % sys.argv[0]
+        print cmd_usage
+        sys.exit(0)
+        
     def opt(opt, default):
         value = False
         try:
             i = sys.argv.index(opt)
             value = default
-            if sys.argv[i+1][0] != '-':
+            if i+1 < len(sys.argv)-2 and sys.argv[i+1][0] != '-':
                 value = sys.argv[i+1]
         except:
             pass
@@ -827,23 +1426,36 @@ if __name__ == '__main__':
     def switch(opt):
         switch = opt in sys.argv
         return switch
+
+    toZml = switch('-z')
+    if toZml:
+        if sys.argv[-1] == '-':
+            text = sys.stdin.read()
+        else:
+            text = open(sys.argv[-1]).read()
+        xml2zml(text, sys.stdout)
+        sys.exit(0)
         
-    import sys
     debug = switch('-d')
     prettyprint = switch('-p')
-    rootElement = opt('-r', 'rhizml')
+    rootElement = opt('-r', 'zml')
+    markupOnly = switch('-m')
     try:            
-        klass = opt('-m', '')
+        klass = opt('-mm', '')
         index = klass.rfind('.')
         if index > -1:
            module = klass[:index]
-           __import__(module)        
+           __import__(module)
+        if klass.find('(') == -1:
+            klass += '()'
         mmf= eval(klass) 
     except:
         mmf = None
     
-    if len(sys.argv) > 1 and sys.argv[-1][0] != '-':
-        print rhizml2xml(open(sys.argv[-1]), mmf, debug, prettyprint=prettyprint, rootElement = rootElement)
+    if sys.argv[-1] == '-':
+        file = sys.stdin
     else:
-        #print rhizml2xml(sys.stdin, mmf, debug, prettyprint=prettyprint, rootElement = rootElement)
-        print "usage: -d(ebug) -r [rootelement] -m markupmapclass -p(rettyprint) file"
+        file = open(sys.argv[-1])
+    print zml2xml(file, mmf, debug, prettyprint=prettyprint,
+                rootElement = rootElement, mixed=not markupOnly)    
+
