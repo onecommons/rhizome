@@ -248,12 +248,12 @@ if not globals().has_key('hotReload'):
     #rhizome change: make default page name configurable
     global _indexName
     _indexName= 'index'
-    try: _indexName=configFile.get('server', '_indexName')
+    try: _indexName=configFile.get('server', 'defaultPageName')
     except: pass
 
     global _usevdomain
     _usevdomain = False
-    try: _indexName=configFile.get('server', '_useSubDomainAsName')
+    try: _usevdomain=configFile.get('server', 'useSubDomainAsName')
     except: pass
      
     if _sessionStorageFileDir:#rhizome change
@@ -689,8 +689,8 @@ if not globals().has_key('hotReload'):
         #use virtual domain name in place of index
         #note: they still share the same set of page and also www.foo.com/bar == bar.foo.com/
         if not name or name == _indexName:            
-            if _usevdomain and headerMap['host'].count('.') > 1:
-                subdomain = headerMap['host'].split('.')[0]
+            if _usevdomain and request.headerMap['host'].count('.') > 1:
+                subdomain = request.headerMap['host'].split('.')[0]
                 if subdomain != 'www':
                     name= subdomain
                 else:
