@@ -1,12 +1,12 @@
 Rx4RDF and Rhizome Changelog
 ============================
 
-Changes in Version 0.3 (May 11, 2004)
+Changes in Version 0.3 (May 12, 2004)
 ---------------------------------------
 Major changes and bug fixes:
 
 Security related:
-* Raccoon:  Python content processor disabled by default
+* Raccoon: Python content processor disabled by default
 * Rhizome: creating python or RxUpdate pages require pre-defined access tokens 
            (see rhizome/save.xml)
 * Rhizome: admin password digest no longer stored in model 

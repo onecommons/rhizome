@@ -55,20 +55,26 @@
   * When using file-based sessionsm, the files aren't deleted when the session ends.
   
   Rhizome
-  * dynamic pages might not behave as expected since Rhizome doesn't set headers
+  * Dynamic pages might not behave as expected since Rhizome doesn't set headers
     such as Pragma NoCache or Expires -- if you need that you'll have set them 
     yourself (for example, by modifying site-template.xsl).
+  * You should not import files directly into the directory specified in the 
+    ALTSAVE_DIR setting (the default is "content") -- if you do the first 
+    revision of a file will overwrite the initial version. Instead import 
+    file into the directory specified by SAVE_DIR (the default is 
+    "content/.rzvs").
     
   Requirements
   ------------
     
   Rx4RDF requires Python 2.2 or later and 4Suite 1.0a1 or later (4Suite.org).
    
-  Rx4RDF and Rhizome are known to run on Linux, Windows 2000 and Cygwin 
+  Rx4RDF and Rhizome are known to run on Linux and Windows 2000  
   and should work on any platform that supports Python and 4Suite.
   
   On Windows, the Python Win32 Extensions (python.org/windows/win32all) 
-  must be installed or locking will be disabled.
+  must be installed or interprocess file locking will be disabled (which is 
+  only needed if you have multiple Raccoon processes accessing the same model).
   
   Installation
   ------------
@@ -88,9 +94,13 @@
   or run the local copy of the site found in the /site directory:
   
   cd <unzip dir>/site
-  <python scripts dir>/run-raccoon -a site-config.py
+  <Python scripts dir>/run-raccoon -a site-config.py
   browse to http://localhost:8000 (edit server.cfg to change the port).
-   
+  
+  where <Python scripts dir> is "<Python install dir>\Scripts" on 
+  Windows systems or on Unix-like systems usually "/usr/bin", 
+  "usr/local/bin", or "~/bin".
+  
   Licensing
   ---------
 

@@ -6,32 +6,32 @@
 _:docbook2documentxsl1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:docbook2documentxsl1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:docbook2documentxsl1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:docbook2documentxsl1Item.
-_:docbook2documentxsl1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-template> .
 _:docbook2documentxsl1Item <http://rx4rdf.sf.net/ns/wiki#doctype> <http://rx4rdf.sf.net/ns/wiki#doctype-document> .
 _:docbook2documentxsl1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:docbook2documentxsl1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:docbook2documentxsl1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-template> .
 _:docbook2documentxsl1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:docbook2documentxsl1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:docbook2documentxsl1Item <http://rx4rdf.sf.net/ns/archive#contents> _:docbook2documentxsl1Content.
-_:docbook2documentxsl1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:docbook2documentxsl1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://www.w3.org/1999/XSL/Transform> .
 _:docbook2documentxsl1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:docbook2documentxsl1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:docbook2document.xsl> .
 <path:docbook2document.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/confirm-delete> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-confirm-delete> .
-<http://rx4rdf.sf.net/site/confirm-delete> <http://rx4rdf.sf.net/ns/wiki#revisions> _:confirmdelete1List.
-<http://rx4rdf.sf.net/site/confirm-delete> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Any> .
 <http://rx4rdf.sf.net/site/confirm-delete> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/confirm-delete> <http://rx4rdf.sf.net/ns/wiki#revisions> _:confirmdelete1List.
 <http://rx4rdf.sf.net/site/confirm-delete> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/confirm-delete> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-confirm-delete> .
+<http://rx4rdf.sf.net/site/confirm-delete> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Any> .
 <http://rx4rdf.sf.net/site/confirm-delete> <http://rx4rdf.sf.net/ns/wiki#name> "confirm-delete" .
 _:confirmdelete1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:confirmdelete1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:confirmdelete1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:confirmdelete1Item.
 _:confirmdelete1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:confirmdelete1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:confirmdelete1Item <http://rx4rdf.sf.net/ns/archive#contents> _:confirmdelete1Content.
+_:confirmdelete1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:confirmdelete1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:confirmdelete1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:confirmdelete1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:confirmdelete1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:confirmdelete1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
 _:confirmdelete1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:confirmdelete1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:confirm-delete.xsl> .
@@ -48,21 +48,21 @@ _:confirmdelete1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:confirm
 <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> <http://www.w3.org/2000/01/rdf-schema#label> "RxML Template" .
 <http://rx4rdf.sf.net/ns/wiki#item-disposition-print> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#ItemDisposition> .
 <http://rx4rdf.sf.net/ns/wiki#item-disposition-print> <http://www.w3.org/2000/01/rdf-schema#label> "Printable" .
-<http://rx4rdf.sf.net/site/default-resource-viewer> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-view-metadata> .
-<http://rx4rdf.sf.net/site/default-resource-viewer> <http://rx4rdf.sf.net/ns/wiki#revisions> _:defaultresourceviewer1List.
-<http://rx4rdf.sf.net/site/default-resource-viewer> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Any> .
 <http://rx4rdf.sf.net/site/default-resource-viewer> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/default-resource-viewer> <http://rx4rdf.sf.net/ns/wiki#revisions> _:defaultresourceviewer1List.
 <http://rx4rdf.sf.net/site/default-resource-viewer> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/default-resource-viewer> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-view-metadata> .
+<http://rx4rdf.sf.net/site/default-resource-viewer> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Any> .
 <http://rx4rdf.sf.net/site/default-resource-viewer> <http://rx4rdf.sf.net/ns/wiki#name> "default-resource-viewer" .
 _:defaultresourceviewer1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:defaultresourceviewer1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:defaultresourceviewer1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:defaultresourceviewer1Item.
 _:defaultresourceviewer1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:defaultresourceviewer1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:defaultresourceviewer1Item <http://rx4rdf.sf.net/ns/archive#contents> _:defaultresourceviewer1Content.
+_:defaultresourceviewer1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:defaultresourceviewer1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:defaultresourceviewer1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:defaultresourceviewer1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:defaultresourceviewer1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:defaultresourceviewer1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
 _:defaultresourceviewer1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:defaultresourceviewer1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:default-resource-viewer.xsl> .
@@ -75,51 +75,51 @@ _:help1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org
 _:help1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:help1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:help1Item.
 _:help1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:help1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:help1Item <http://rx4rdf.sf.net/ns/archive#contents> _:help1Content.
+_:help1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:help1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:help1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:help1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:help1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:help1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:help1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:help1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:help/help.zml> .
 <path:help/help.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/new-doctype-template> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
-<http://rx4rdf.sf.net/site/new-doctype-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:newdoctypetemplate1List.
-<http://rx4rdf.sf.net/site/new-doctype-template> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#DocType> .
 <http://rx4rdf.sf.net/site/new-doctype-template> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/new-doctype-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:newdoctypetemplate1List.
 <http://rx4rdf.sf.net/site/new-doctype-template> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/new-doctype-template> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
+<http://rx4rdf.sf.net/site/new-doctype-template> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#DocType> .
 <http://rx4rdf.sf.net/site/new-doctype-template> <http://rx4rdf.sf.net/ns/wiki#name> "new-doctype-template" .
 _:newdoctypetemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:newdoctypetemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:newdoctypetemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:newdoctypetemplate1Item.
-_:newdoctypetemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
 _:newdoctypetemplate1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:newdoctypetemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:newdoctypetemplate1Item <http://rx4rdf.sf.net/ns/wiki#title> "Create New DocType" .
+_:newdoctypetemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:newdoctypetemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
+_:newdoctypetemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:newdoctypetemplate1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:newdoctypetemplate1Item <http://rx4rdf.sf.net/ns/archive#contents> _:newdoctypetemplate1Content.
-_:newdoctypetemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:newdoctypetemplate1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-text> .
 _:newdoctypetemplate1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:newdoctypetemplate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:new-doctype-template.txt> .
 <path:new-doctype-template.txt> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/new-role-template> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
-<http://rx4rdf.sf.net/site/new-role-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:newroletemplate1List.
-<http://rx4rdf.sf.net/site/new-role-template> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/auth#Role> .
 <http://rx4rdf.sf.net/site/new-role-template> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/new-role-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:newroletemplate1List.
 <http://rx4rdf.sf.net/site/new-role-template> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/new-role-template> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
+<http://rx4rdf.sf.net/site/new-role-template> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/auth#Role> .
 <http://rx4rdf.sf.net/site/new-role-template> <http://rx4rdf.sf.net/ns/wiki#name> "new-role-template" .
 _:newroletemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:newroletemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:newroletemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:newroletemplate1Item.
-_:newroletemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
 _:newroletemplate1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:newroletemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:newroletemplate1Item <http://rx4rdf.sf.net/ns/wiki#title> "Create New Role" .
+_:newroletemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:newroletemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
+_:newroletemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:newroletemplate1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:newroletemplate1Item <http://rx4rdf.sf.net/ns/archive#contents> _:newroletemplate1Content.
-_:newroletemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:newroletemplate1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-text> .
 _:newroletemplate1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:newroletemplate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:new-role-template.txt> .
@@ -133,11 +133,11 @@ _:wiki2htmlxsl1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://ww
 _:wiki2htmlxsl1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:wiki2htmlxsl1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:wiki2htmlxsl1Item.
 _:wiki2htmlxsl1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:wiki2htmlxsl1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:wiki2htmlxsl1Item <http://rx4rdf.sf.net/ns/archive#contents> _:wiki2htmlxsl1Content.
+_:wiki2htmlxsl1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:wiki2htmlxsl1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:wiki2htmlxsl1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:wiki2htmlxsl1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-complete> .
-_:wiki2htmlxsl1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:wiki2htmlxsl1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://www.w3.org/1999/XSL/Transform> .
 _:wiki2htmlxsl1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:wiki2htmlxsl1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:wiki2html.xsl> .
@@ -150,11 +150,11 @@ _:TextFormattingRules1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <ht
 _:TextFormattingRules1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:TextFormattingRules1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:TextFormattingRules1Item.
 _:TextFormattingRules1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:TextFormattingRules1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:TextFormattingRules1Item <http://rx4rdf.sf.net/ns/archive#contents> _:TextFormattingRules1Content.
+_:TextFormattingRules1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:TextFormattingRules1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:TextFormattingRules1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:TextFormattingRules1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:TextFormattingRules1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:TextFormattingRules1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:TextFormattingRules1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:TextFormattingRules1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:help/TextFormattingRules.zml> .
@@ -206,11 +206,11 @@ _:intermaptxt1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www
 _:intermaptxt1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:intermaptxt1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:intermaptxt1Item.
 _:intermaptxt1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:intermaptxt1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:intermaptxt1Item <http://rx4rdf.sf.net/ns/archive#contents> _:intermaptxt1Content.
+_:intermaptxt1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:intermaptxt1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:intermaptxt1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:intermaptxt1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-complete> .
-_:intermaptxt1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:intermaptxt1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-text> .
 _:intermaptxt1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:intermaptxt1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:intermap.txt> .
@@ -222,11 +222,11 @@ _:sidebar1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.
 _:sidebar1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:sidebar1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:sidebar1Item.
 _:sidebar1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:sidebar1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:sidebar1Item <http://rx4rdf.sf.net/ns/archive#contents> _:sidebar1Content.
+_:sidebar1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:sidebar1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:sidebar1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:sidebar1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-complete> .
-_:sidebar1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:sidebar1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:sidebar1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:sidebar1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:sidebar.txt> .
@@ -238,38 +238,38 @@ _:sidebar1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:sidebar.txt> 
 _:RhizomeManual1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:RhizomeManual1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:RhizomeManual1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:RhizomeManual1Item.
-_:RhizomeManual1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
 _:RhizomeManual1Item <http://rx4rdf.sf.net/ns/wiki#doctype> <http://rx4rdf.sf.net/ns/wiki#doctype-document> .
 _:RhizomeManual1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:RhizomeManual1Item <http://rx4rdf.sf.net/ns/wiki#title> "Rhizome Manual" .
+_:RhizomeManual1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:RhizomeManual1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
 _:RhizomeManual1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RhizomeManual1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
-_:RhizomeManual1Item <http://rx4rdf.sf.net/ns/wiki#title> "Rhizome Manual" .
 _:RhizomeManual1Item <http://rx4rdf.sf.net/ns/archive#contents> _:RhizomeManual1Content.
-_:RhizomeManual1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:RhizomeManual1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:RhizomeManual1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:RhizomeManual1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:help/RhizomeDoc.zml> .
 <path:help/RhizomeDoc.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/generic-new-template> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
-<http://rx4rdf.sf.net/site/generic-new-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:genericnewtemplate1List.
-<http://rx4rdf.sf.net/site/generic-new-template> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Any> .
-<http://rx4rdf.sf.net/site/generic-new-template> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-<http://rx4rdf.sf.net/site/generic-new-template> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
-<http://rx4rdf.sf.net/site/generic-new-template> <http://rx4rdf.sf.net/ns/wiki#name> "generic-new-template" .
-_:genericnewtemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
-_:genericnewtemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
-_:genericnewtemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:genericnewtemplate1Item.
-_:genericnewtemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
-_:genericnewtemplate1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:genericnewtemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
-_:genericnewtemplate1Item <http://rx4rdf.sf.net/ns/wiki#title> "Create New Resource" .
-_:genericnewtemplate1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
-_:genericnewtemplate1Item <http://rx4rdf.sf.net/ns/archive#contents> _:genericnewtemplate1Content.
-_:genericnewtemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
-_:genericnewtemplate1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-text> .
-_:genericnewtemplate1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:genericnewtemplate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:generic-new-template.txt> .
-<path:generic-new-template.txt> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+<http://rx4rdf.sf.net/site/save> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/save> <http://rx4rdf.sf.net/ns/wiki#revisions> _:save1List.
+<http://rx4rdf.sf.net/site/save> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/save> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-save> .
+<http://rx4rdf.sf.net/site/save> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-creation> .
+<http://rx4rdf.sf.net/site/save> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/save> <http://rx4rdf.sf.net/ns/wiki#name> "save" .
+_:save1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+_:save1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
+_:save1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:save1Item.
+_:save1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:save1Item <http://rx4rdf.sf.net/ns/archive#contents> _:save1Content.
+_:save1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:save1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
+_:save1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
+_:save1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-handler> .
+_:save1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate> .
+_:save1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
+_:save1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:save.xml> .
+<path:save.xml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/ZML> <http://rx4rdf.sf.net/ns/wiki#revisions> _:ZML1List.
 <http://rx4rdf.sf.net/site/ZML> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/ZML> <http://rx4rdf.sf.net/ns/wiki#name> "ZML" .
@@ -278,11 +278,11 @@ _:ZML1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/
 _:ZML1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:ZML1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:ZML1Item.
 _:ZML1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:ZML1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:ZML1Item <http://rx4rdf.sf.net/ns/archive#contents> _:ZML1Content.
+_:ZML1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:ZML1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:ZML1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:ZML1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:ZML1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:ZML1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:ZML1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:ZML1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:help/ZML.zml> .
@@ -294,12 +294,11 @@ _:index1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.or
 _:index1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:index1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:index1Item.
 _:index1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:index1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
-_:index1Item  <http://rx4rdf.sf.net/ns/wiki#title> "Rx4RDF" .
 _:index1Item <http://rx4rdf.sf.net/ns/archive#contents> _:index1Content.
+_:index1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:index1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:index1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:index1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:index1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:index1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:index1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:index1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:index.txt> .
@@ -311,22 +310,37 @@ _:index1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:index.txt> .
 _:administration1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:administration1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:administration1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:administration1Item.
-_:administration1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
 _:administration1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:administration1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:administration1Item <http://rx4rdf.sf.net/ns/wiki#title> "Administration" .
+_:administration1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:administration1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
+_:administration1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:administration1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:administration1Item <http://rx4rdf.sf.net/ns/archive#contents> _:administration1Content.
-_:administration1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:administration1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
 _:administration1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:administration1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:administer.xsl> .
 <path:administer.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/ns/wiki#label-draft> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Label> .
-<http://rx4rdf.sf.net/ns/wiki#label-draft> <http://www.w3.org/2000/01/rdf-schema#label> "Draft" .
-<http://rx4rdf.sf.net/ns/wiki#label-released> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Label> .
-<http://rx4rdf.sf.net/ns/wiki#label-released> <http://www.w3.org/2000/01/rdf-schema#label> "Released" .
-<http://rx4rdf.sf.net/ns/wiki#label-released> <http://rx4rdf.sf.net/ns/wiki#is-released> "" .
+<http://rx4rdf.sf.net/site/new-folder-template> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/new-folder-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:newfoldertemplate1List.
+<http://rx4rdf.sf.net/site/new-folder-template> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/new-folder-template> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
+<http://rx4rdf.sf.net/site/new-folder-template> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Folder> .
+<http://rx4rdf.sf.net/site/new-folder-template> <http://rx4rdf.sf.net/ns/wiki#name> "new-folder-template" .
+_:newfoldertemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+_:newfoldertemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
+_:newfoldertemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:newfoldertemplate1Item.
+_:newfoldertemplate1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:newfoldertemplate1Item <http://rx4rdf.sf.net/ns/wiki#title> "Create New Folder" .
+_:newfoldertemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:newfoldertemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
+_:newfoldertemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
+_:newfoldertemplate1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
+_:newfoldertemplate1Item <http://rx4rdf.sf.net/ns/archive#contents> _:newfoldertemplate1Content.
+_:newfoldertemplate1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-text> .
+_:newfoldertemplate1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
+_:newfoldertemplate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:new-folder-template.txt> .
+<path:new-folder-template.txt> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/RaccoonConfig> <http://rx4rdf.sf.net/ns/wiki#revisions> _:RaccoonConfig1List.
 <http://rx4rdf.sf.net/site/RaccoonConfig> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/RaccoonConfig> <http://rx4rdf.sf.net/ns/wiki#name> "RaccoonConfig" .
@@ -334,33 +348,33 @@ _:administration1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:admini
 _:RaccoonConfig1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:RaccoonConfig1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:RaccoonConfig1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:RaccoonConfig1Item.
-_:RaccoonConfig1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
 _:RaccoonConfig1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:RaccoonConfig1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RaccoonConfig1Item <http://rx4rdf.sf.net/ns/wiki#title> "Raccoon Config Settings" .
+_:RaccoonConfig1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:RaccoonConfig1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
+_:RaccoonConfig1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RaccoonConfig1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:RaccoonConfig1Item <http://rx4rdf.sf.net/ns/archive#contents> _:RaccoonConfig1Content.
-_:RaccoonConfig1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:RaccoonConfig1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-text> .
 _:RaccoonConfig1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:RaccoonConfig1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:help/RaccoonConfig.txt> .
 <path:help/RaccoonConfig.txt> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/new-label-template> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
-<http://rx4rdf.sf.net/site/new-label-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:newlabeltemplate1List.
-<http://rx4rdf.sf.net/site/new-label-template> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Label> .
 <http://rx4rdf.sf.net/site/new-label-template> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/new-label-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:newlabeltemplate1List.
 <http://rx4rdf.sf.net/site/new-label-template> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/new-label-template> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
+<http://rx4rdf.sf.net/site/new-label-template> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Label> .
 <http://rx4rdf.sf.net/site/new-label-template> <http://rx4rdf.sf.net/ns/wiki#name> "new-label-template" .
 _:newlabeltemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:newlabeltemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:newlabeltemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:newlabeltemplate1Item.
-_:newlabeltemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
 _:newlabeltemplate1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:newlabeltemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:newlabeltemplate1Item <http://rx4rdf.sf.net/ns/wiki#title> "Create New Label" .
+_:newlabeltemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:newlabeltemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
+_:newlabeltemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:newlabeltemplate1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:newlabeltemplate1Item <http://rx4rdf.sf.net/ns/archive#contents> _:newlabeltemplate1Content.
-_:newlabeltemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:newlabeltemplate1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-text> .
 _:newlabeltemplate1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:newlabeltemplate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:new-label-template.txt> .
@@ -372,11 +386,11 @@ _:SandBox1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.
 _:SandBox1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:SandBox1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:SandBox1Item.
 _:SandBox1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:SandBox1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:SandBox1Item <http://rx4rdf.sf.net/ns/archive#contents> _:SandBox1Content.
+_:SandBox1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:SandBox1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:SandBox1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:SandBox1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:SandBox1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:SandBox1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:SandBox1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:SandBox1Content <http://rx4rdf.sf.net/ns/archive#contents> "Feel free to [edit|?action=edit] this page to experiment with [ZML]..." .
@@ -387,14 +401,14 @@ _:SandBox1Content <http://rx4rdf.sf.net/ns/archive#contents> "Feel free to [edit
 _:RaccoonManual1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:RaccoonManual1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:RaccoonManual1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:RaccoonManual1Item.
-_:RaccoonManual1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
 _:RaccoonManual1Item <http://rx4rdf.sf.net/ns/wiki#doctype> <http://rx4rdf.sf.net/ns/wiki#doctype-document> .
 _:RaccoonManual1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:RaccoonManual1Item <http://rx4rdf.sf.net/ns/wiki#title> "Raccoon Manual" .
+_:RaccoonManual1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:RaccoonManual1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
 _:RaccoonManual1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RaccoonManual1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
-_:RaccoonManual1Item <http://rx4rdf.sf.net/ns/wiki#title> "Raccoon Manual" .
 _:RaccoonManual1Item <http://rx4rdf.sf.net/ns/archive#contents> _:RaccoonManual1Content.
-_:RaccoonManual1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:RaccoonManual1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:RaccoonManual1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:RaccoonManual1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:help/RaccoonDoc.zml> .
@@ -406,34 +420,17 @@ _:RaccoonManual1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:help/Ra
 _:RxML1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:RxML1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:RxML1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:RxML1Item.
-_:RxML1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
 _:RxML1Item <http://rx4rdf.sf.net/ns/wiki#doctype> <http://rx4rdf.sf.net/ns/wiki#doctype-document> .
 _:RxML1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:RxML1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:RxML1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
 _:RxML1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RxML1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:RxML1Item <http://rx4rdf.sf.net/ns/archive#contents> _:RxML1Content.
-_:RxML1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:RxML1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:RxML1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:RxML1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:help/RxML.zml> .
 <path:help/RxML.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/preview> <http://rx4rdf.sf.net/ns/wiki#revisions> _:preview1List.
-<http://rx4rdf.sf.net/site/preview> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
-<http://rx4rdf.sf.net/site/preview> <http://rx4rdf.sf.net/ns/wiki#name> "preview" .
-<http://rx4rdf.sf.net/site/preview> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-_:preview1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
-_:preview1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
-_:preview1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:preview1Item.
-_:preview1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:preview1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
-_:preview1Item <http://rx4rdf.sf.net/ns/archive#contents> _:preview1Content.
-_:preview1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
-_:preview1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-complete> .
-_:preview1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
-_:preview1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
-_:preview1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:preview1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:preview.xsl> .
-<path:preview.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/spec2html.xsl> <http://rx4rdf.sf.net/ns/wiki#handles-doctype> <http://rx4rdf.sf.net/ns/wiki#doctype-specification> .
 <http://rx4rdf.sf.net/site/spec2html.xsl> <http://rx4rdf.sf.net/ns/wiki#revisions> _:spec2htmlxsl1List.
 <http://rx4rdf.sf.net/site/spec2html.xsl> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
@@ -443,66 +440,66 @@ _:spec2htmlxsl1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://ww
 _:spec2htmlxsl1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:spec2htmlxsl1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:spec2htmlxsl1Item.
 _:spec2htmlxsl1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:spec2htmlxsl1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:spec2htmlxsl1Item <http://rx4rdf.sf.net/ns/archive#contents> _:spec2htmlxsl1Content.
+_:spec2htmlxsl1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:spec2htmlxsl1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:spec2htmlxsl1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:spec2htmlxsl1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-complete> .
-_:spec2htmlxsl1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:spec2htmlxsl1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://www.w3.org/1999/XSL/Transform> .
 _:spec2htmlxsl1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:spec2htmlxsl1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:spec2html.xsl> .
 <path:spec2html.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Model> .
 <http://rx4rdf.sf.net/site/> <http://rx4rdf.sf.net/ns/wiki#created-by-app> "Rhizome 0.3" .
-<http://rx4rdf.sf.net/site/> <http://rx4rdf.sf.net/ns/wiki#created-on> "1084307628.875" .
-<http://rx4rdf.sf.net/site/> <http://rx4rdf.sf.net/ns/wiki#initial-platform> "python 2.2.2 (#37, Oct 14 2002, 17:02:34) [MSC 32 bit (Intel)]" .
+<http://rx4rdf.sf.net/site/> <http://rx4rdf.sf.net/ns/wiki#created-on> "1084498438.968" .
+<http://rx4rdf.sf.net/site/> <http://rx4rdf.sf.net/ns/wiki#initial-platform> "python 2.3 (#46, Jul 29 2003, 18:54:32) [MSC v.1200 32 bit (Intel)]" .
 <http://rx4rdf.sf.net/site/> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/site-template> <http://rx4rdf.sf.net/ns/wiki#header-image> "Rx4RDFlogo.gif" .
 <http://rx4rdf.sf.net/site/site-template> <http://rx4rdf.sf.net/ns/wiki#header-text> "" .
 <http://rx4rdf.sf.net/site/ZML> <http://rx4rdf.sf.net/ns/wiki#alias> "zml" .
 <http://rx4rdf.sf.net/site/Rhizome> <http://rx4rdf.sf.net/ns/wiki#alias> "rhizome" .
-<http://rx4rdf.sf.net/site/index> <http://rx4rdf.sf.net/ns/auth#needs-token> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/index> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/index> <http://rx4rdf.sf.net/ns/wiki#alias> "rx4rdf" .
 <http://rx4rdf.sf.net/site/index> <http://rx4rdf.sf.net/ns/wiki#alias> "Rx4RDF" .
-<http://rx4rdf.sf.net/site/sidebar> <http://rx4rdf.sf.net/ns/auth#needs-token> <http://rx4rdf.sf.net/site/write-structure-token> .
-<http://rx4rdf.sf.net/site/save> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-save> .
-<http://rx4rdf.sf.net/site/save> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-creation> .
-<http://rx4rdf.sf.net/site/save> <http://rx4rdf.sf.net/ns/wiki#revisions> _:save1List.
-<http://rx4rdf.sf.net/site/save> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-<http://rx4rdf.sf.net/site/save> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-<http://rx4rdf.sf.net/site/save> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
-<http://rx4rdf.sf.net/site/save> <http://rx4rdf.sf.net/ns/wiki#name> "save" .
-_:save1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
-_:save1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
-_:save1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:save1Item.
-_:save1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:save1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
-_:save1Item <http://rx4rdf.sf.net/ns/archive#contents> _:save1Content.
-_:save1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
-_:save1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-handler> .
-_:save1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
-_:save1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate> .
-_:save1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:save1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:save.xml> .
-<path:save.xml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/rxml-template-handler> <http://rx4rdf.sf.net/ns/wiki#name> "rxml-template-handler" .
-<http://rx4rdf.sf.net/site/rxml-template-handler> <http://rx4rdf.sf.net/ns/wiki#revisions> _:rxmltemplatehandler1List.
-<http://rx4rdf.sf.net/site/rxml-template-handler> <http://rx4rdf.sf.net/ns/wiki#handles-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
-<http://rx4rdf.sf.net/site/rxml-template-handler> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
-<http://rx4rdf.sf.net/site/rxml-template-handler> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-_:rxmltemplatehandler1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
-_:rxmltemplatehandler1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
-_:rxmltemplatehandler1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:rxmltemplatehandler1Item.
-_:rxmltemplatehandler1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:rxmltemplatehandler1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
-_:rxmltemplatehandler1Item <http://rx4rdf.sf.net/ns/archive#contents> _:rxmltemplatehandler1Content.
-_:rxmltemplatehandler1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
-_:rxmltemplatehandler1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:rxmltemplatehandler1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
-_:rxmltemplatehandler1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
-_:rxmltemplatehandler1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:rxmltemplatehandler1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:rxml-template-handler.xsl> .
-<path:rxml-template-handler.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+_:index1Item <http://rx4rdf.sf.net/ns/wiki#title> "Rx4RDF" .
+<http://rx4rdf.sf.net/site/sidebar> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/preview> <http://rx4rdf.sf.net/ns/wiki#revisions> _:preview1List.
+<http://rx4rdf.sf.net/site/preview> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/preview> <http://rx4rdf.sf.net/ns/wiki#name> "preview" .
+<http://rx4rdf.sf.net/site/preview> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+_:preview1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+_:preview1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
+_:preview1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:preview1Item.
+_:preview1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:preview1Item <http://rx4rdf.sf.net/ns/archive#contents> _:preview1Content.
+_:preview1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:preview1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
+_:preview1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
+_:preview1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-complete> .
+_:preview1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
+_:preview1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
+_:preview1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:preview.xsl> .
+<path:preview.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+<http://rx4rdf.sf.net/site/signup> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/signup> <http://rx4rdf.sf.net/ns/wiki#revisions> _:signup1List.
+<http://rx4rdf.sf.net/site/signup> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/signup> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-edit> .
+<http://rx4rdf.sf.net/site/signup> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
+<http://rx4rdf.sf.net/site/signup> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#User> .
+<http://rx4rdf.sf.net/site/signup> <http://rx4rdf.sf.net/ns/wiki#name> "signup" .
+_:signup1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+_:signup1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
+_:signup1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:signup1Item.
+_:signup1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:signup1Item <http://rx4rdf.sf.net/ns/archive#contents> _:signup1Content.
+_:signup1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:signup1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
+_:signup1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
+_:signup1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
+_:signup1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
+_:signup1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
+_:signup1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:signup.xsl> .
+<path:signup.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/item-disposition-handler-template> <http://rx4rdf.sf.net/ns/wiki#name> "item-disposition-handler-template" .
 <http://rx4rdf.sf.net/site/item-disposition-handler-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:itemdispositionhandlertemplate1List.
 <http://rx4rdf.sf.net/site/item-disposition-handler-template> <http://rx4rdf.sf.net/ns/wiki#handles-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-handler> .
@@ -512,11 +509,11 @@ _:itemdispositionhandlertemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-n
 _:itemdispositionhandlertemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:itemdispositionhandlertemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:itemdispositionhandlertemplate1Item.
 _:itemdispositionhandlertemplate1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:itemdispositionhandlertemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:itemdispositionhandlertemplate1Item <http://rx4rdf.sf.net/ns/archive#contents> _:itemdispositionhandlertemplate1Content.
+_:itemdispositionhandlertemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:itemdispositionhandlertemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:itemdispositionhandlertemplate1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:itemdispositionhandlertemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:itemdispositionhandlertemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:itemdispositionhandlertemplate1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
 _:itemdispositionhandlertemplate1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:itemdispositionhandlertemplate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:item-disposition-handler.xsl> .
@@ -529,11 +526,11 @@ _:basestylescss1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://w
 _:basestylescss1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:basestylescss1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:basestylescss1Item.
 _:basestylescss1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:basestylescss1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:basestylescss1Item <http://rx4rdf.sf.net/ns/archive#contents> _:basestylescss1Content.
+_:basestylescss1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:basestylescss1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:basestylescss1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:basestylescss1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-complete> .
-_:basestylescss1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:basestylescss1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-text> .
 _:basestylescss1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:basestylescss1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:basestyles.css> .
@@ -546,96 +543,81 @@ _:basestylescss1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:basesty
 _:faq2documentxsl1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:faq2documentxsl1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:faq2documentxsl1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:faq2documentxsl1Item.
-_:faq2documentxsl1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-template> .
 _:faq2documentxsl1Item <http://rx4rdf.sf.net/ns/wiki#doctype> <http://rx4rdf.sf.net/ns/wiki#doctype-document> .
 _:faq2documentxsl1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:faq2documentxsl1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:faq2documentxsl1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-template> .
 _:faq2documentxsl1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:faq2documentxsl1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:faq2documentxsl1Item <http://rx4rdf.sf.net/ns/archive#contents> _:faq2documentxsl1Content.
-_:faq2documentxsl1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:faq2documentxsl1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://www.w3.org/1999/XSL/Transform> .
 _:faq2documentxsl1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:faq2documentxsl1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:faq2document.xsl> .
 <path:faq2document.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/new-folder-template> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
-<http://rx4rdf.sf.net/site/new-folder-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:newfoldertemplate1List.
-<http://rx4rdf.sf.net/site/new-folder-template> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Folder> .
-<http://rx4rdf.sf.net/site/new-folder-template> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-<http://rx4rdf.sf.net/site/new-folder-template> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
-<http://rx4rdf.sf.net/site/new-folder-template> <http://rx4rdf.sf.net/ns/wiki#name> "new-folder-template" .
-_:newfoldertemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
-_:newfoldertemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
-_:newfoldertemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:newfoldertemplate1Item.
-_:newfoldertemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
-_:newfoldertemplate1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:newfoldertemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
-_:newfoldertemplate1Item <http://rx4rdf.sf.net/ns/wiki#title> "Create New Folder" .
-_:newfoldertemplate1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
-_:newfoldertemplate1Item <http://rx4rdf.sf.net/ns/archive#contents> _:newfoldertemplate1Content.
-_:newfoldertemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
-_:newfoldertemplate1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-text> .
-_:newfoldertemplate1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:newfoldertemplate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:new-folder-template.txt> .
-<path:new-folder-template.txt> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+<http://rx4rdf.sf.net/site/generic-new-template> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/generic-new-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:genericnewtemplate1List.
+<http://rx4rdf.sf.net/site/generic-new-template> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/generic-new-template> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
+<http://rx4rdf.sf.net/site/generic-new-template> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Any> .
+<http://rx4rdf.sf.net/site/generic-new-template> <http://rx4rdf.sf.net/ns/wiki#name> "generic-new-template" .
+_:genericnewtemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+_:genericnewtemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
+_:genericnewtemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:genericnewtemplate1Item.
+_:genericnewtemplate1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:genericnewtemplate1Item <http://rx4rdf.sf.net/ns/wiki#title> "Create New Resource" .
+_:genericnewtemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:genericnewtemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
+_:genericnewtemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
+_:genericnewtemplate1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
+_:genericnewtemplate1Item <http://rx4rdf.sf.net/ns/archive#contents> _:genericnewtemplate1Content.
+_:genericnewtemplate1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-text> .
+_:genericnewtemplate1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
+_:genericnewtemplate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:generic-new-template.txt> .
+<path:generic-new-template.txt> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+<http://rx4rdf.sf.net/site/save-user> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/save-user> <http://rx4rdf.sf.net/ns/wiki#revisions> _:saveuser1List.
+<http://rx4rdf.sf.net/site/save-user> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/save-user> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-save> .
 <http://rx4rdf.sf.net/site/save-user> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-creation> .
-<http://rx4rdf.sf.net/site/save-user> <http://rx4rdf.sf.net/ns/wiki#revisions> _:saveuser1List.
 <http://rx4rdf.sf.net/site/save-user> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#User> .
-<http://rx4rdf.sf.net/site/save-user> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-<http://rx4rdf.sf.net/site/save-user> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/save-user> <http://rx4rdf.sf.net/ns/wiki#name> "save-user" .
 _:saveuser1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:saveuser1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:saveuser1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:saveuser1Item.
 _:saveuser1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:saveuser1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:saveuser1Item <http://rx4rdf.sf.net/ns/archive#contents> _:saveuser1Content.
+_:saveuser1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:saveuser1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:saveuser1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:saveuser1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-handler> .
-_:saveuser1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:saveuser1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate> .
 _:saveuser1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:saveuser1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:signup-handler.xml> .
 <path:signup-handler.xml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/save-metadata> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-save-metadata> .
-<http://rx4rdf.sf.net/site/save-metadata> <http://rx4rdf.sf.net/ns/wiki#revisions> _:savemetadata1List.
-<http://rx4rdf.sf.net/site/save-metadata> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Any> .
 <http://rx4rdf.sf.net/site/save-metadata> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/save-metadata> <http://rx4rdf.sf.net/ns/wiki#revisions> _:savemetadata1List.
 <http://rx4rdf.sf.net/site/save-metadata> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/save-metadata> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-save-metadata> .
+<http://rx4rdf.sf.net/site/save-metadata> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Any> .
 <http://rx4rdf.sf.net/site/save-metadata> <http://rx4rdf.sf.net/ns/wiki#name> "save-metadata" .
 _:savemetadata1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:savemetadata1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:savemetadata1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:savemetadata1Item.
 _:savemetadata1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:savemetadata1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:savemetadata1Item <http://rx4rdf.sf.net/ns/archive#contents> _:savemetadata1Content.
+_:savemetadata1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:savemetadata1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:savemetadata1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:savemetadata1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-handler> .
-_:savemetadata1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:savemetadata1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate> .
 _:savemetadata1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:savemetadata1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:save-metadata.xml> .
 <path:save-metadata.xml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/signup> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-edit> .
-<http://rx4rdf.sf.net/site/signup> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
-<http://rx4rdf.sf.net/site/signup> <http://rx4rdf.sf.net/ns/wiki#revisions> _:signup1List.
-<http://rx4rdf.sf.net/site/signup> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#User> .
-<http://rx4rdf.sf.net/site/signup> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-<http://rx4rdf.sf.net/site/signup> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
-<http://rx4rdf.sf.net/site/signup> <http://rx4rdf.sf.net/ns/wiki#name> "signup" .
-_:signup1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
-_:signup1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
-_:signup1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:signup1Item.
-_:signup1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:signup1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
-_:signup1Item <http://rx4rdf.sf.net/ns/archive#contents> _:signup1Content.
-_:signup1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
-_:signup1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:signup1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
-_:signup1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
-_:signup1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:signup1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:signup.xsl> .
-<path:signup.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+<http://rx4rdf.sf.net/ns/wiki#label-draft> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Label> .
+<http://rx4rdf.sf.net/ns/wiki#label-draft> <http://www.w3.org/2000/01/rdf-schema#label> "Draft" .
+<http://rx4rdf.sf.net/ns/wiki#label-released> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Label> .
+<http://rx4rdf.sf.net/ns/wiki#label-released> <http://www.w3.org/2000/01/rdf-schema#label> "Released" .
+<http://rx4rdf.sf.net/ns/wiki#label-released> <http://rx4rdf.sf.net/ns/wiki#is-released> "" .
 <http://rx4rdf.sf.net/site/_not_authorized> <http://rx4rdf.sf.net/ns/wiki#revisions> _:notauthorized1List.
 <http://rx4rdf.sf.net/site/_not_authorized> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/_not_authorized> <http://rx4rdf.sf.net/ns/wiki#name> "_not_authorized" .
@@ -644,49 +626,53 @@ _:notauthorized1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://w
 _:notauthorized1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:notauthorized1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:notauthorized1Item.
 _:notauthorized1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:notauthorized1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:notauthorized1Item <http://rx4rdf.sf.net/ns/archive#contents> _:notauthorized1Content.
+_:notauthorized1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:notauthorized1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:notauthorized1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:notauthorized1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:notauthorized1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:notauthorized1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-xml> .
 _:notauthorized1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:notauthorized1Content <http://rx4rdf.sf.net/ns/archive#contents> "<div class='message'>Error. You are not authorized to perform this operation on this page.</div>" .
-<http://rx4rdf.sf.net/site/showrevisions> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-showrevisions> .
-<http://rx4rdf.sf.net/site/showrevisions> <http://rx4rdf.sf.net/ns/wiki#revisions> _:showrevisions1List.
-<http://rx4rdf.sf.net/site/showrevisions> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 <http://rx4rdf.sf.net/site/showrevisions> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/showrevisions> <http://rx4rdf.sf.net/ns/wiki#revisions> _:showrevisions1List.
 <http://rx4rdf.sf.net/site/showrevisions> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/showrevisions> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-showrevisions> .
+<http://rx4rdf.sf.net/site/showrevisions> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 <http://rx4rdf.sf.net/site/showrevisions> <http://rx4rdf.sf.net/ns/wiki#name> "showrevisions" .
 _:showrevisions1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:showrevisions1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:showrevisions1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:showrevisions1Item.
 _:showrevisions1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:showrevisions1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:showrevisions1Item <http://rx4rdf.sf.net/ns/archive#contents> _:showrevisions1Content.
+_:showrevisions1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:showrevisions1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:showrevisions1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:showrevisions1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:showrevisions1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:showrevisions1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
 _:showrevisions1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:showrevisions1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:showrevisions.xsl> .
 <path:showrevisions.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/dump.xml> <http://rx4rdf.sf.net/ns/wiki#revisions> _:dumpxml1List.
-<http://rx4rdf.sf.net/site/dump.xml> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
-<http://rx4rdf.sf.net/site/dump.xml> <http://rx4rdf.sf.net/ns/wiki#name> "dump.xml" .
-<http://rx4rdf.sf.net/site/dump.xml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-_:dumpxml1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
-_:dumpxml1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
-_:dumpxml1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:dumpxml1Item.
-_:dumpxml1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:dumpxml1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
-_:dumpxml1Item <http://rx4rdf.sf.net/ns/archive#contents> _:dumpxml1Content.
-_:dumpxml1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
-_:dumpxml1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-complete> .
-_:dumpxml1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
-_:dumpxml1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-custom> .
-_:dumpxml1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:dumpxml1Content <http://rx4rdf.sf.net/ns/archive#contents> "dump" .
+<http://rx4rdf.sf.net/site/new-accesstoken-template> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/new-accesstoken-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:newaccesstokentemplate1List.
+<http://rx4rdf.sf.net/site/new-accesstoken-template> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/new-accesstoken-template> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
+<http://rx4rdf.sf.net/site/new-accesstoken-template> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/auth#AccessToken> .
+<http://rx4rdf.sf.net/site/new-accesstoken-template> <http://rx4rdf.sf.net/ns/wiki#name> "new-accesstoken-template" .
+_:newaccesstokentemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+_:newaccesstokentemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
+_:newaccesstokentemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:newaccesstokentemplate1Item.
+_:newaccesstokentemplate1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:newaccesstokentemplate1Item <http://rx4rdf.sf.net/ns/wiki#title> "Create New Access Token" .
+_:newaccesstokentemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:newaccesstokentemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
+_:newaccesstokentemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
+_:newaccesstokentemplate1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
+_:newaccesstokentemplate1Item <http://rx4rdf.sf.net/ns/archive#contents> _:newaccesstokentemplate1Content.
+_:newaccesstokentemplate1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-text> .
+_:newaccesstokentemplate1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
+_:newaccesstokentemplate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:new-accesstoken-template.txt> .
+<path:new-accesstoken-template.txt> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/edit-icon.png> <http://rx4rdf.sf.net/ns/wiki#revisions> _:editiconpng1List.
 <http://rx4rdf.sf.net/site/edit-icon.png> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/edit-icon.png> <http://rx4rdf.sf.net/ns/wiki#name> "edit-icon.png" .
@@ -695,11 +681,11 @@ _:editiconpng1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www
 _:editiconpng1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:editiconpng1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:editiconpng1Item.
 _:editiconpng1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:editiconpng1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:editiconpng1Item <http://rx4rdf.sf.net/ns/archive#contents> _:editiconpng1Content.
+_:editiconpng1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:editiconpng1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:editiconpng1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:editiconpng1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-complete> .
-_:editiconpng1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:editiconpng1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-binary> .
 _:editiconpng1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:editiconpng1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:edit.png> .
@@ -800,11 +786,11 @@ _:document2htmlxsl1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http:
 _:document2htmlxsl1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:document2htmlxsl1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:document2htmlxsl1Item.
 _:document2htmlxsl1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:document2htmlxsl1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:document2htmlxsl1Item <http://rx4rdf.sf.net/ns/archive#contents> _:document2htmlxsl1Content.
+_:document2htmlxsl1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:document2htmlxsl1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:document2htmlxsl1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:document2htmlxsl1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:document2htmlxsl1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:document2htmlxsl1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://www.w3.org/1999/XSL/Transform> .
 _:document2htmlxsl1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:document2htmlxsl1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:document2html.xsl> .
@@ -817,51 +803,47 @@ _:search1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.o
 _:search1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:search1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:search1Item.
 _:search1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:search1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:search1Item <http://rx4rdf.sf.net/ns/archive#contents> _:search1Content.
+_:search1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:search1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:search1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:search1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-complete> .
-_:search1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:search1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
 _:search1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:search1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:search.xsl> .
 <path:search.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/new-accesstoken-template> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
-<http://rx4rdf.sf.net/site/new-accesstoken-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:newaccesstokentemplate1List.
-<http://rx4rdf.sf.net/site/new-accesstoken-template> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/auth#AccessToken> .
-<http://rx4rdf.sf.net/site/new-accesstoken-template> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-<http://rx4rdf.sf.net/site/new-accesstoken-template> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
-<http://rx4rdf.sf.net/site/new-accesstoken-template> <http://rx4rdf.sf.net/ns/wiki#name> "new-accesstoken-template" .
-_:newaccesstokentemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
-_:newaccesstokentemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
-_:newaccesstokentemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:newaccesstokentemplate1Item.
-_:newaccesstokentemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
-_:newaccesstokentemplate1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:newaccesstokentemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
-_:newaccesstokentemplate1Item <http://rx4rdf.sf.net/ns/wiki#title> "Create New Access Token" .
-_:newaccesstokentemplate1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
-_:newaccesstokentemplate1Item <http://rx4rdf.sf.net/ns/archive#contents> _:newaccesstokentemplate1Content.
-_:newaccesstokentemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
-_:newaccesstokentemplate1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-text> .
-_:newaccesstokentemplate1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:newaccesstokentemplate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:new-accesstoken-template.txt> .
-<path:new-accesstoken-template.txt> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+<http://rx4rdf.sf.net/site/dump.xml> <http://rx4rdf.sf.net/ns/wiki#revisions> _:dumpxml1List.
+<http://rx4rdf.sf.net/site/dump.xml> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/dump.xml> <http://rx4rdf.sf.net/ns/wiki#name> "dump.xml" .
+<http://rx4rdf.sf.net/site/dump.xml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+_:dumpxml1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+_:dumpxml1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
+_:dumpxml1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:dumpxml1Item.
+_:dumpxml1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:dumpxml1Item <http://rx4rdf.sf.net/ns/archive#contents> _:dumpxml1Content.
+_:dumpxml1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:dumpxml1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
+_:dumpxml1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
+_:dumpxml1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-complete> .
+_:dumpxml1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-custom> .
+_:dumpxml1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
+_:dumpxml1Content <http://rx4rdf.sf.net/ns/archive#contents> "dump" .
+<http://rx4rdf.sf.net/site/edit> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/edit> <http://rx4rdf.sf.net/ns/wiki#revisions> _:edit1List.
+<http://rx4rdf.sf.net/site/edit> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/edit> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-edit> .
 <http://rx4rdf.sf.net/site/edit> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
-<http://rx4rdf.sf.net/site/edit> <http://rx4rdf.sf.net/ns/wiki#revisions> _:edit1List.
 <http://rx4rdf.sf.net/site/edit> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-<http://rx4rdf.sf.net/site/edit> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-<http://rx4rdf.sf.net/site/edit> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/edit> <http://rx4rdf.sf.net/ns/wiki#name> "edit" .
 _:edit1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:edit1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:edit1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:edit1Item.
 _:edit1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:edit1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:edit1Item <http://rx4rdf.sf.net/ns/archive#contents> _:edit1Content.
+_:edit1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:edit1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:edit1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:edit1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:edit1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:edit1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
 _:edit1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:edit1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:edit.xsl> .
@@ -874,35 +856,53 @@ _:notfound1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3
 _:notfound1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:notfound1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:notfound1Item.
 _:notfound1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:notfound1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:notfound1Item <http://rx4rdf.sf.net/ns/archive#contents> _:notfound1Content.
+_:notfound1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:notfound1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:notfound1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:notfound1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:notfound1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:notfound1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
 _:notfound1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:notfound1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:_not_found.xsl> .
 <path:_not_found.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+<http://rx4rdf.sf.net/site/edit-metadata> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/edit-metadata> <http://rx4rdf.sf.net/ns/wiki#revisions> _:editmetadata1List.
+<http://rx4rdf.sf.net/site/edit-metadata> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/edit-metadata> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-edit-metadata> .
 <http://rx4rdf.sf.net/site/edit-metadata> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-edit> .
-<http://rx4rdf.sf.net/site/edit-metadata> <http://rx4rdf.sf.net/ns/wiki#revisions> _:editmetadata1List.
 <http://rx4rdf.sf.net/site/edit-metadata> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Any> .
-<http://rx4rdf.sf.net/site/edit-metadata> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-<http://rx4rdf.sf.net/site/edit-metadata> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/edit-metadata> <http://rx4rdf.sf.net/ns/wiki#name> "edit-metadata" .
 _:editmetadata1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:editmetadata1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:editmetadata1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:editmetadata1Item.
 _:editmetadata1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:editmetadata1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:editmetadata1Item <http://rx4rdf.sf.net/ns/archive#contents> _:editmetadata1Content.
+_:editmetadata1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:editmetadata1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:editmetadata1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:editmetadata1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:editmetadata1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:editmetadata1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
 _:editmetadata1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:editmetadata1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:edit-metadata.xsl> .
 <path:edit-metadata.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+<http://rx4rdf.sf.net/site/rxml-template-handler> <http://rx4rdf.sf.net/ns/wiki#name> "rxml-template-handler" .
+<http://rx4rdf.sf.net/site/rxml-template-handler> <http://rx4rdf.sf.net/ns/wiki#revisions> _:rxmltemplatehandler1List.
+<http://rx4rdf.sf.net/site/rxml-template-handler> <http://rx4rdf.sf.net/ns/wiki#handles-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
+<http://rx4rdf.sf.net/site/rxml-template-handler> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/rxml-template-handler> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+_:rxmltemplatehandler1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+_:rxmltemplatehandler1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
+_:rxmltemplatehandler1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:rxmltemplatehandler1Item.
+_:rxmltemplatehandler1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:rxmltemplatehandler1Item <http://rx4rdf.sf.net/ns/archive#contents> _:rxmltemplatehandler1Content.
+_:rxmltemplatehandler1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:rxmltemplatehandler1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
+_:rxmltemplatehandler1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
+_:rxmltemplatehandler1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
+_:rxmltemplatehandler1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
+_:rxmltemplatehandler1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
+_:rxmltemplatehandler1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:rxml-template-handler.xsl> .
+<path:rxml-template-handler.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/site-template> <http://rx4rdf.sf.net/ns/wiki#name> "site-template" .
 <http://rx4rdf.sf.net/site/site-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:sitetemplate1List.
 <http://rx4rdf.sf.net/site/site-template> <http://rx4rdf.sf.net/ns/wiki#handles-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
@@ -912,54 +912,71 @@ _:sitetemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://ww
 _:sitetemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:sitetemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:sitetemplate1Item.
 _:sitetemplate1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:sitetemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:sitetemplate1Item <http://rx4rdf.sf.net/ns/archive#contents> _:sitetemplate1Content.
+_:sitetemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:sitetemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:sitetemplate1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:sitetemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-template> .
-_:sitetemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:sitetemplate1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
 _:sitetemplate1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:sitetemplate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:site-template.xsl> .
 <path:site-template.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/dir> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-view> .
-<http://rx4rdf.sf.net/site/dir> <http://rx4rdf.sf.net/ns/wiki#revisions> _:dir1List.
-<http://rx4rdf.sf.net/site/dir> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Folder> .
-<http://rx4rdf.sf.net/site/dir> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-<http://rx4rdf.sf.net/site/dir> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
-<http://rx4rdf.sf.net/site/dir> <http://rx4rdf.sf.net/ns/wiki#name> "dir" .
-_:dir1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
-_:dir1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
-_:dir1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:dir1Item.
-_:dir1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:dir1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
-_:dir1Item <http://rx4rdf.sf.net/ns/archive#contents> _:dir1Content.
-_:dir1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
-_:dir1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:dir1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
-_:dir1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
-_:dir1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:dir1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:dir.xsl> .
-<path:dir.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/new-disposition-template> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
-<http://rx4rdf.sf.net/site/new-disposition-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:newdispositiontemplate1List.
-<http://rx4rdf.sf.net/site/new-disposition-template> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#ItemDisposition> .
+<http://rx4rdf.sf.net/site/print-template> <http://rx4rdf.sf.net/ns/wiki#name> "print-template" .
+<http://rx4rdf.sf.net/site/print-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:printtemplate1List.
+<http://rx4rdf.sf.net/site/print-template> <http://rx4rdf.sf.net/ns/wiki#handles-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-print> .
+<http://rx4rdf.sf.net/site/print-template> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/print-template> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+_:printtemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+_:printtemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
+_:printtemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:printtemplate1Item.
+_:printtemplate1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:printtemplate1Item <http://rx4rdf.sf.net/ns/archive#contents> _:printtemplate1Content.
+_:printtemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:printtemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
+_:printtemplate1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
+_:printtemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-template> .
+_:printtemplate1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
+_:printtemplate1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
+_:printtemplate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:print-template.xsl> .
+<path:print-template.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/new-disposition-template> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/new-disposition-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:newdispositiontemplate1List.
 <http://rx4rdf.sf.net/site/new-disposition-template> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/new-disposition-template> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-new> .
+<http://rx4rdf.sf.net/site/new-disposition-template> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#ItemDisposition> .
 <http://rx4rdf.sf.net/site/new-disposition-template> <http://rx4rdf.sf.net/ns/wiki#name> "new-disposition-template" .
 _:newdispositiontemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:newdispositiontemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:newdispositiontemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:newdispositiontemplate1Item.
-_:newdispositiontemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
 _:newdispositiontemplate1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:newdispositiontemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:newdispositiontemplate1Item <http://rx4rdf.sf.net/ns/wiki#title> "Create New Disposition" .
+_:newdispositiontemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:newdispositiontemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template> .
+_:newdispositiontemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:newdispositiontemplate1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:newdispositiontemplate1Item <http://rx4rdf.sf.net/ns/archive#contents> _:newdispositiontemplate1Content.
-_:newdispositiontemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:newdispositiontemplate1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-text> .
 _:newdispositiontemplate1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:newdispositiontemplate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:new-disposition-template.txt> .
 <path:new-disposition-template.txt> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+<http://rx4rdf.sf.net/site/RxPathSpec> <http://rx4rdf.sf.net/ns/wiki#revisions> _:RxPathSpec1List.
+<http://rx4rdf.sf.net/site/RxPathSpec> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/RxPathSpec> <http://rx4rdf.sf.net/ns/wiki#name> "RxPathSpec" .
+<http://rx4rdf.sf.net/site/RxPathSpec> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+_:RxPathSpec1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+_:RxPathSpec1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
+_:RxPathSpec1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:RxPathSpec1Item.
+_:RxPathSpec1Item <http://rx4rdf.sf.net/ns/wiki#doctype> <http://rx4rdf.sf.net/ns/wiki#doctype-specification> .
+_:RxPathSpec1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:RxPathSpec1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:RxPathSpec1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-complete> .
+_:RxPathSpec1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
+_:RxPathSpec1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
+_:RxPathSpec1Item <http://rx4rdf.sf.net/ns/archive#contents> _:RxPathSpec1Content.
+_:RxPathSpec1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
+_:RxPathSpec1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
+_:RxPathSpec1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/.rzvs/RxPathSpec.zml> .
+<path:content/.rzvs/RxPathSpec.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/logout> <http://rx4rdf.sf.net/ns/wiki#revisions> _:logout1List.
 <http://rx4rdf.sf.net/site/logout> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/logout> <http://rx4rdf.sf.net/ns/wiki#name> "logout" .
@@ -968,11 +985,11 @@ _:logout1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.o
 _:logout1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:logout1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:logout1Item.
 _:logout1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:logout1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:logout1Item <http://rx4rdf.sf.net/ns/archive#contents> _:logout1Content.
+_:logout1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:logout1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:logout1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:logout1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-complete> .
-_:logout1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:logout1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
 _:logout1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:logout1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:logout.xsl> .
@@ -985,278 +1002,275 @@ _:login1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.or
 _:login1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:login1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:login1Item.
 _:login1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:login1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:login1Item <http://rx4rdf.sf.net/ns/archive#contents> _:login1Content.
+_:login1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:login1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:login1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:login1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-complete> .
-_:login1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:login1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
 _:login1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:login1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:login.xsl> .
 <path:login.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/print-template> <http://rx4rdf.sf.net/ns/wiki#name> "print-template" .
-<http://rx4rdf.sf.net/site/print-template> <http://rx4rdf.sf.net/ns/wiki#revisions> _:printtemplate1List.
-<http://rx4rdf.sf.net/site/print-template> <http://rx4rdf.sf.net/ns/wiki#handles-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-print> .
-<http://rx4rdf.sf.net/site/print-template> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
-<http://rx4rdf.sf.net/site/print-template> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-_:printtemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
-_:printtemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
-_:printtemplate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:printtemplate1Item.
-_:printtemplate1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:printtemplate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
-_:printtemplate1Item <http://rx4rdf.sf.net/ns/archive#contents> _:printtemplate1Content.
-_:printtemplate1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
-_:printtemplate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-template> .
-_:printtemplate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
-_:printtemplate1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
-_:printtemplate1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:printtemplate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:print-template.xsl> .
-<path:print-template.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/delete> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-delete> .
-<http://rx4rdf.sf.net/site/delete> <http://rx4rdf.sf.net/ns/wiki#revisions> _:delete1List.
-<http://rx4rdf.sf.net/site/delete> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Any> .
+<http://rx4rdf.sf.net/site/dir> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/dir> <http://rx4rdf.sf.net/ns/wiki#revisions> _:dir1List.
+<http://rx4rdf.sf.net/site/dir> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/dir> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-view> .
+<http://rx4rdf.sf.net/site/dir> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Folder> .
+<http://rx4rdf.sf.net/site/dir> <http://rx4rdf.sf.net/ns/wiki#name> "dir" .
+_:dir1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
+_:dir1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
+_:dir1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:dir1Item.
+_:dir1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:dir1Item <http://rx4rdf.sf.net/ns/archive#contents> _:dir1Content.
+_:dir1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:dir1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
+_:dir1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
+_:dir1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
+_:dir1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxslt> .
+_:dir1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
+_:dir1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:dir.xsl> .
+<path:dir.xsl> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/delete> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/delete> <http://rx4rdf.sf.net/ns/wiki#revisions> _:delete1List.
 <http://rx4rdf.sf.net/site/delete> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
+<http://rx4rdf.sf.net/site/delete> <http://rx4rdf.sf.net/ns/wiki#handles-action> <http://rx4rdf.sf.net/ns/wiki#action-delete> .
+<http://rx4rdf.sf.net/site/delete> <http://rx4rdf.sf.net/ns/wiki#action-for-type> <http://rx4rdf.sf.net/ns/wiki#Any> .
 <http://rx4rdf.sf.net/site/delete> <http://rx4rdf.sf.net/ns/wiki#name> "delete" .
 _:delete1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:delete1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:delete1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:delete1Item.
 _:delete1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:delete1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:delete1Item <http://rx4rdf.sf.net/ns/archive#contents> _:delete1Content.
+_:delete1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:delete1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:delete1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:delete1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-handler> .
-_:delete1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:delete1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate> .
 _:delete1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
 _:delete1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:delete.xml> .
 <path:delete.xml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/about> <http://rx4rdf.sf.net/ns/wiki#revisions> _:about1List.
-<http://rx4rdf.sf.net/site/about> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/about> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/about> <http://rx4rdf.sf.net/ns/wiki#name> "about" .
+<http://rx4rdf.sf.net/site/about> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 _:about1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:about1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:about1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:about1Item <http://rx4rdf.sf.net/ns/archive#contents> _:about1Content.
+_:about1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:about1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:about1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:about1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:about1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:about1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:about1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:about1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/about.zml> .
-<path:content/about.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "nylDEIJitvWwdTbhI5QIjYaxWaY=" .
-<path:content/about.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "394" .
-<path:content/about.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+_:about1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/.rzvs/about.zml> .
+<path:content/.rzvs/about.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "nylDEIJitvWwdTbhI5QIjYaxWaY=" .
+<path:content/.rzvs/about.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "394" .
+<path:content/.rzvs/about.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/Download> <http://rx4rdf.sf.net/ns/wiki#revisions> _:Download1List.
-<http://rx4rdf.sf.net/site/Download> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/Download> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/Download> <http://rx4rdf.sf.net/ns/wiki#name> "Download" .
+<http://rx4rdf.sf.net/site/Download> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 _:Download1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:Download1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:Download1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:Download1Item <http://rx4rdf.sf.net/ns/archive#contents> _:Download1Content.
+_:Download1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:Download1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:Download1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:Download1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:Download1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:Download1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:Download1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:Download1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/Download.zml> .
-<path:content/Download.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "haWvdEw7+lip7Z+DnhWrmc5PM9w=" .
-<path:content/Download.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "3037" .
-<path:content/Download.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+_:Download1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/.rzvs/Download.zml> .
+<path:content/.rzvs/Download.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "OrJQ4CpPshLRZktuxh6Zg/vVI58=" .
+<path:content/.rzvs/Download.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "3377" .
+<path:content/.rzvs/Download.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/FAQ> <http://rx4rdf.sf.net/ns/wiki#revisions> _:FAQ1List.
-<http://rx4rdf.sf.net/site/FAQ> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/FAQ> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/FAQ> <http://rx4rdf.sf.net/ns/wiki#name> "FAQ" .
+<http://rx4rdf.sf.net/site/FAQ> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 _:FAQ1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
-_:FAQ1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
 _:FAQ1Item <http://rx4rdf.sf.net/ns/wiki#doctype> <http://rx4rdf.sf.net/ns/wiki#doctype-faq> .
 _:FAQ1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
+_:FAQ1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:FAQ1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
 _:FAQ1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:FAQ1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:FAQ1Item <http://rx4rdf.sf.net/ns/archive#contents> _:FAQ1Content.
-_:FAQ1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:FAQ1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:FAQ1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:FAQ1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/FAQ.zml> .
-<path:content/FAQ.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "xs0Dv+wJ2SRY6JICIXo5XtKPR2w=" .
-<path:content/FAQ.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "1419" .
-<path:content/FAQ.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+_:FAQ1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/.rzvs/FAQ.zml> .
+<path:content/.rzvs/FAQ.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "IITE19r3T5CCAZRa1sRePT9loug=" .
+<path:content/.rzvs/FAQ.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "1971" .
+<path:content/.rzvs/FAQ.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/Raccoon> <http://rx4rdf.sf.net/ns/wiki#revisions> _:Raccoon1List.
-<http://rx4rdf.sf.net/site/Raccoon> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/Raccoon> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/Raccoon> <http://rx4rdf.sf.net/ns/wiki#name> "Raccoon" .
+<http://rx4rdf.sf.net/site/Raccoon> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 _:Raccoon1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:Raccoon1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:Raccoon1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:Raccoon1Item <http://rx4rdf.sf.net/ns/archive#contents> _:Raccoon1Content.
+_:Raccoon1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:Raccoon1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:Raccoon1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:Raccoon1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:Raccoon1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:Raccoon1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:Raccoon1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:Raccoon1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/Raccoon.zml> .
-<path:content/Raccoon.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "loXT+IqLb2Qf40Ply7wWedsTj3o=" .
-<path:content/Raccoon.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "2490" .
-<path:content/Raccoon.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+_:Raccoon1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/.rzvs/Raccoon.zml> .
+<path:content/.rzvs/Raccoon.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "VWPzL7lD3Mq5ReiLHyTSDmJN+vc=" .
+<path:content/.rzvs/Raccoon.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "2420" .
+<path:content/.rzvs/Raccoon.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/RaccoonStatus> <http://rx4rdf.sf.net/ns/wiki#revisions> _:RaccoonStatus1List.
-<http://rx4rdf.sf.net/site/RaccoonStatus> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/RaccoonStatus> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/RaccoonStatus> <http://rx4rdf.sf.net/ns/wiki#name> "RaccoonStatus" .
+<http://rx4rdf.sf.net/site/RaccoonStatus> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 _:RaccoonStatus1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:RaccoonStatus1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:RaccoonStatus1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RaccoonStatus1Item <http://rx4rdf.sf.net/ns/archive#contents> _:RaccoonStatus1Content.
+_:RaccoonStatus1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:RaccoonStatus1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RaccoonStatus1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:RaccoonStatus1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:RaccoonStatus1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:RaccoonStatus1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:RaccoonStatus1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:RaccoonStatus1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/RaccoonStatus.zml> .
-<path:content/RaccoonStatus.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "8QwWDib78EOd8iD8ngHm7W8ng6g=" .
-<path:content/RaccoonStatus.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "1244" .
-<path:content/RaccoonStatus.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+_:RaccoonStatus1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/.rzvs/RaccoonStatus.zml> .
+<path:content/.rzvs/RaccoonStatus.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "8QwWDib78EOd8iD8ngHm7W8ng6g=" .
+<path:content/.rzvs/RaccoonStatus.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "1244" .
+<path:content/.rzvs/RaccoonStatus.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/RDF> <http://rx4rdf.sf.net/ns/wiki#revisions> _:RDF1List.
-<http://rx4rdf.sf.net/site/RDF> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/RDF> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/RDF> <http://rx4rdf.sf.net/ns/wiki#name> "RDF" .
+<http://rx4rdf.sf.net/site/RDF> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 _:RDF1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:RDF1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:RDF1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RDF1Item <http://rx4rdf.sf.net/ns/archive#contents> _:RDF1Content.
+_:RDF1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:RDF1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RDF1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:RDF1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:RDF1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:RDF1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:RDF1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:RDF1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/RDF.zml> .
-<path:content/RDF.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "b1wnQMzJrD08Of8NYMnNyjxgyoo=" .
-<path:content/RDF.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "2958" .
-<path:content/RDF.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+_:RDF1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/.rzvs/RDF.zml> .
+<path:content/.rzvs/RDF.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "b1wnQMzJrD08Of8NYMnNyjxgyoo=" .
+<path:content/.rzvs/RDF.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "2958" .
+<path:content/.rzvs/RDF.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/RDFScribbler> <http://rx4rdf.sf.net/ns/wiki#revisions> _:RDFScribbler1List.
-<http://rx4rdf.sf.net/site/RDFScribbler> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/RDFScribbler> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/RDFScribbler> <http://rx4rdf.sf.net/ns/wiki#name> "RDFScribbler" .
+<http://rx4rdf.sf.net/site/RDFScribbler> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 _:RDFScribbler1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:RDFScribbler1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:RDFScribbler1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RDFScribbler1Item <http://rx4rdf.sf.net/ns/archive#contents> _:RDFScribbler1Content.
+_:RDFScribbler1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:RDFScribbler1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RDFScribbler1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:RDFScribbler1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:RDFScribbler1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:RDFScribbler1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:RDFScribbler1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:RDFScribbler1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/RDFScribbler.zml> .
-<path:content/RDFScribbler.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "Y2ARk+xJsQgv7ieGY9md9UDlgaI=" .
-<path:content/RDFScribbler.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "16" .
-<path:content/RDFScribbler.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+_:RDFScribbler1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/.rzvs/RDFScribbler.zml> .
+<path:content/.rzvs/RDFScribbler.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "Y2ARk+xJsQgv7ieGY9md9UDlgaI=" .
+<path:content/.rzvs/RDFScribbler.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "16" .
+<path:content/.rzvs/RDFScribbler.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/Rhizome> <http://rx4rdf.sf.net/ns/wiki#revisions> _:Rhizome1List.
-<http://rx4rdf.sf.net/site/Rhizome> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/Rhizome> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/Rhizome> <http://rx4rdf.sf.net/ns/wiki#name> "Rhizome" .
+<http://rx4rdf.sf.net/site/Rhizome> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 _:Rhizome1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:Rhizome1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:Rhizome1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:Rhizome1Item <http://rx4rdf.sf.net/ns/archive#contents> _:Rhizome1Content.
+_:Rhizome1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:Rhizome1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:Rhizome1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:Rhizome1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:Rhizome1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:Rhizome1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:Rhizome1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:Rhizome1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/Rhizome.zml> .
-<path:content/Rhizome.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "k88fv9QqjQ0u8Wcdjp+V95QcZYs=" .
-<path:content/Rhizome.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "4004" .
-<path:content/Rhizome.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+_:Rhizome1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/.rzvs/Rhizome.zml> .
+<path:content/.rzvs/Rhizome.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "847yJ8x5dI4H0fZVrQOi1EmuaAY=" .
+<path:content/.rzvs/Rhizome.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "4000" .
+<path:content/.rzvs/Rhizome.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/RhizomeStatus> <http://rx4rdf.sf.net/ns/wiki#revisions> _:RhizomeStatus1List.
-<http://rx4rdf.sf.net/site/RhizomeStatus> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/RhizomeStatus> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/RhizomeStatus> <http://rx4rdf.sf.net/ns/wiki#name> "RhizomeStatus" .
+<http://rx4rdf.sf.net/site/RhizomeStatus> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 _:RhizomeStatus1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:RhizomeStatus1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:RhizomeStatus1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RhizomeStatus1Item <http://rx4rdf.sf.net/ns/archive#contents> _:RhizomeStatus1Content.
+_:RhizomeStatus1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:RhizomeStatus1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RhizomeStatus1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:RhizomeStatus1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:RhizomeStatus1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:RhizomeStatus1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:RhizomeStatus1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:RhizomeStatus1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/RhizomeStatus.zml> .
-<path:content/RhizomeStatus.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "2keqTDTK/RLGhw4/oH0pm56EJOE=" .
-<path:content/RhizomeStatus.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "2323" .
-<path:content/RhizomeStatus.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+_:RhizomeStatus1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/.rzvs/RhizomeStatus.zml> .
+<path:content/.rzvs/RhizomeStatus.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "2keqTDTK/RLGhw4/oH0pm56EJOE=" .
+<path:content/.rzvs/RhizomeStatus.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "2323" .
+<path:content/.rzvs/RhizomeStatus.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/RxPath> <http://rx4rdf.sf.net/ns/wiki#revisions> _:RxPath1List.
-<http://rx4rdf.sf.net/site/RxPath> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/RxPath> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/RxPath> <http://rx4rdf.sf.net/ns/wiki#name> "RxPath" .
+<http://rx4rdf.sf.net/site/RxPath> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 _:RxPath1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:RxPath1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:RxPath1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RxPath1Item <http://rx4rdf.sf.net/ns/archive#contents> _:RxPath1Content.
+_:RxPath1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:RxPath1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RxPath1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:RxPath1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:RxPath1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:RxPath1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:RxPath1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:RxPath1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/RxPath.zml> .
-<path:content/RxPath.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "HndBlu1m1b9TpWzJIlMGnjSD2pE=" .
-<path:content/RxPath.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "3775" .
-<path:content/RxPath.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
-<http://rx4rdf.sf.net/site/RxPathSpec> <http://rx4rdf.sf.net/ns/wiki#revisions> _:RxPathSpec1List.
-<http://rx4rdf.sf.net/site/RxPathSpec> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-<http://rx4rdf.sf.net/site/RxPathSpec> <http://rx4rdf.sf.net/ns/wiki#name> "RxPathSpec" .
-_:RxPathSpec1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
-_:RxPathSpec1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-complete> .
-_:RxPathSpec1Item <http://rx4rdf.sf.net/ns/wiki#doctype> <http://rx4rdf.sf.net/ns/wiki#doctype-specification> .
-_:RxPathSpec1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:RxPathSpec1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
-_:RxPathSpec1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
-_:RxPathSpec1Item <http://rx4rdf.sf.net/ns/archive#contents> _:RxPathSpec1Content.
-_:RxPathSpec1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
-_:RxPathSpec1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
-_:RxPathSpec1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:RxPathSpec1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/RxPathSpec.zml> .
-<path:content/RxPathSpec.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "bUG6zd9aARLZn73Z/NLzZUqjhgE=" .
-<path:content/RxPathSpec.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "31677" .
-<path:content/RxPathSpec.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+_:RxPath1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/.rzvs/RxPath.zml> .
+<path:content/.rzvs/RxPath.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "HndBlu1m1b9TpWzJIlMGnjSD2pE=" .
+<path:content/.rzvs/RxPath.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "3775" .
+<path:content/.rzvs/RxPath.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/RxSLT> <http://rx4rdf.sf.net/ns/wiki#revisions> _:RxSLT1List.
-<http://rx4rdf.sf.net/site/RxSLT> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/RxSLT> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/RxSLT> <http://rx4rdf.sf.net/ns/wiki#name> "RxSLT" .
+<http://rx4rdf.sf.net/site/RxSLT> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 _:RxSLT1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:RxSLT1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:RxSLT1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RxSLT1Item <http://rx4rdf.sf.net/ns/archive#contents> _:RxSLT1Content.
+_:RxSLT1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:RxSLT1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RxSLT1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:RxSLT1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:RxSLT1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:RxSLT1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:RxSLT1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:RxSLT1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/RxSLT.zml> .
-<path:content/RxSLT.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "tfl8XLefeYUqJwn6XG0BqBThp2U=" .
-<path:content/RxSLT.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "343" .
-<path:content/RxSLT.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+_:RxSLT1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/.rzvs/RxSLT.zml> .
+<path:content/.rzvs/RxSLT.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "tfl8XLefeYUqJwn6XG0BqBThp2U=" .
+<path:content/.rzvs/RxSLT.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "343" .
+<path:content/.rzvs/RxSLT.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/RxUpdate> <http://rx4rdf.sf.net/ns/wiki#revisions> _:RxUpdate1List.
-<http://rx4rdf.sf.net/site/RxUpdate> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/RxUpdate> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/RxUpdate> <http://rx4rdf.sf.net/ns/wiki#name> "RxUpdate" .
+<http://rx4rdf.sf.net/site/RxUpdate> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 _:RxUpdate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:RxUpdate1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:RxUpdate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RxUpdate1Item <http://rx4rdf.sf.net/ns/archive#contents> _:RxUpdate1Content.
+_:RxUpdate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:RxUpdate1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:RxUpdate1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:RxUpdate1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:RxUpdate1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:RxUpdate1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:RxUpdate1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:RxUpdate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/RxUpdate.zml> .
-<path:content/RxUpdate.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "vOG5RdrFEM7GHD/EXeioX+yj1Lg=" .
-<path:content/RxUpdate.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "949" .
-<path:content/RxUpdate.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+_:RxUpdate1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/.rzvs/RxUpdate.zml> .
+<path:content/.rzvs/RxUpdate.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "vOG5RdrFEM7GHD/EXeioX+yj1Lg=" .
+<path:content/.rzvs/RxUpdate.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "949" .
+<path:content/.rzvs/RxUpdate.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 <http://rx4rdf.sf.net/site/Status> <http://rx4rdf.sf.net/ns/wiki#revisions> _:Status1List.
-<http://rx4rdf.sf.net/site/Status> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+<http://rx4rdf.sf.net/site/Status> <http://rx4rdf.sf.net/ns/auth#guarded-by> <http://rx4rdf.sf.net/site/write-structure-token> .
 <http://rx4rdf.sf.net/site/Status> <http://rx4rdf.sf.net/ns/wiki#name> "Status" .
+<http://rx4rdf.sf.net/site/Status> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
 _:Status1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#List> .
 _:Status1Item <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/wiki#Item> .
-_:Status1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:Status1Item <http://rx4rdf.sf.net/ns/archive#contents> _:Status1Content.
+_:Status1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
+_:Status1Item <http://rx4rdf.sf.net/ns/wiki#created-by> <http://rx4rdf.sf.net/site/users/admin> .
 _:Status1Item <http://rx4rdf.sf.net/ns/archive#created-on> "1057919732.750" .
 _:Status1Item <http://rx4rdf.sf.net/ns/wiki#item-disposition> <http://rx4rdf.sf.net/ns/wiki#item-disposition-entry> .
-_:Status1Item <http://rx4rdf.sf.net/ns/wiki#has-label> <http://rx4rdf.sf.net/ns/wiki#label-released> .
 _:Status1Content <http://rx4rdf.sf.net/ns/archive#transformed-by> <http://rx4rdf.sf.net/ns/wiki#item-format-zml> .
 _:Status1Content <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentTransform> .
-_:Status1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/Status.zml> .
-<path:content/Status.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "JHqEpVvgqpZ2r1krmsgXRK1ae34=" .
-<path:content/Status.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "713" .
-<path:content/Status.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
+_:Status1Content <http://rx4rdf.sf.net/ns/archive#contents> <path:content/.rzvs/Status.zml> .
+<path:content/.rzvs/Status.zml> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "JHqEpVvgqpZ2r1krmsgXRK1ae34=" .
+<path:content/.rzvs/Status.zml> <http://rx4rdf.sf.net/ns/archive#content-length> "713" .
+<path:content/.rzvs/Status.zml> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#ContentLocation> .
 _:about1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:about1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:about1Item.
 _:Download1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
@@ -1277,12 +1291,10 @@ _:RhizomeStatus1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://w
 _:RhizomeStatus1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:RhizomeStatus1Item.
 _:RxPath1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:RxPath1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:RxPath1Item.
-_:RxPathSpec1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
-_:RxPathSpec1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:RxPathSpec1Item.
 _:RxSLT1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:RxSLT1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:RxSLT1Item.
 _:RxUpdate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:RxUpdate1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:RxUpdate1Item.
 _:Status1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#rest> <http://www.w3.org/1999/02/22-rdf-syntax-ns#nil> .
 _:Status1List <http://www.w3.org/1999/02/22-rdf-syntax-ns#first> _:Status1Item.
-<http://rx4rdf.sf.net/site/> <http://rx4rdf.sf.net/ns/wiki#model-update-id> "x888ba0dfe1a441babaccbfe33d9c0045x1" .
+<http://rx4rdf.sf.net/site/> <http://rx4rdf.sf.net/ns/wiki#model-update-id> "x5349be6ef8c0452e9629403212189e2cx1" .

@@ -66,17 +66,18 @@ def createScript(scriptFile, sourceFile):
 
 data_files = [
 		   ('share/rx4rdf',[ 'changelog.txt', 'COPYING', 'README.txt'] ),
-		   ('share/rx4rdf/rhizome',glob.glob('rhizome/*') ),
-		   ('share/rx4rdf/rhizome',glob.glob('rhizome/help') ),
 		   ('share/rx4rdf/rdfscribbler',glob.glob('rdfscribbler/*') ),
 		   ('share/rx4rdf/docs',glob.glob('docs/*') ),
         ]
 
+#setup doesn't handle directory trees well, e.g. just using glob on each subtree doesn't work
 def _addFiles(data_files, dirname, names):     
     data_files.append( ( os.path.join('share/rx4rdf', dirname), 
        [os.path.join(dirname, name) for name in names if os.path.isfile(os.path.join(dirname, name))]) 
        )
+
 os.path.walk('site', _addFiles, data_files)
+os.path.walk('rhizome', _addFiles, data_files)
 
 setup(name=PACKAGE_NAME,
 #metadata:

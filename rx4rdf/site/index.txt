@@ -25,11 +25,11 @@ Version 0.3.0 of Rx4RDF and Rhizome released.
 
 This release is focused on making Rhizome usable for running small-scale web sites and includes much improved documentation, fine-grained authorization, and enough new features to put it on par with a full-featured Wiki. Plus a bunch of other stuff.
 
-[Download] it or view the [changelog|Rx4RDFChangelog]
+[Download] it or view the [changelog|../changelog.txt]
 
 \[29 February 2004]
 
-Version 0.2.0 of Rx4RDF and Rhizome released. [RxPath] has been completely reimplemented, much faster and robust. [Raccoon] is also now much faster with the introduction of extensive caching. And, of course, several enhancements were made to [Rhizome]. [Download] it or view the [changelog|Rx4RDFChangelog]
+Version 0.2.0 of Rx4RDF and Rhizome released. [RxPath] has been completely reimplemented, much faster and robust. [Raccoon] is also now much faster with the introduction of extensive caching. And, of course, several enhancements were made to [Rhizome]. [Download] it or view the [changelog|../changelog.txt]
 
 \[15 December 2003]
 

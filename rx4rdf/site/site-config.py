@@ -6,7 +6,7 @@ externalLinkIndicator=False
 interWikiLinkIndicator=False
 
 #override default template by adding or replacing pages
-__addItem__('RxPathSpec',loc='path:content/RxPathSpec.zml', format='zml', 
+__addItem__('RxPathSpec',loc='path:content/.rzvs/RxPathSpec.zml', format='zml', 
             disposition='complete', doctype='specification')
 
 __addSiteVars__(
@@ -23,7 +23,7 @@ __addSiteVars__(
  
  ;rhizome leaves the index and sidebar pages publicly editable, lock them down:
  base:index:
-   auth:needs-token: base:write-structure-token
+   auth:guarded-by: base:write-structure-token
    wiki:alias: `rx4rdf
    wiki:alias: `Rx4RDF
 
@@ -31,7 +31,7 @@ __addSiteVars__(
    wiki:title: `Rx4RDF
    
  base:sidebar:
-   auth:needs-token: base:write-structure-token 
+   auth:guarded-by: base:write-structure-token 
 ''')
 
 
