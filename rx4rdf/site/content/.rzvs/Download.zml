@@ -42,6 +42,8 @@ This installs:
 * shell scripts or .bat files for running Raccoon and ZML in the Python scripts directory (in the Python install directory on Windows or  or on Unix-like systems one of the standard "/usr/bin", "usr/local/bin", or "~/bin").
 * a directory named "rx4rdf" containing documentation, Rhizome pages, and other ancillary files in the Python "share" directory (in the Python install directory on Windows or on Unix-like systems one of the standard "/usr/share", "usr/local/share", or "~/share").
 
+(Actually, if you always run Python from the directory you unzipped to, you don't even need install it.)
+
 !Upgrading
 [Upgrading] contains notes on upgrading from the previous version.
 
@@ -57,10 +59,10 @@ Run a local copy of this site:
 11.^^python <python lib dir>/site-packages/rx/raccoon.py -a site-config.py
 1.Browse to [http://localhost:8000] (edit server.cfg to change the port).
 
-To start a fresh Rhizome site, just run Rhizome from the directory where you want the site to live:
+To start a fresh Rhizome site, copy the files in the ^^<unzip dir>/blank^^ directory (which is also installed to ^^<python share dir>/rx4rdf/blank^^) to the directory where you want to the site to live. Then edit ^^blank-config.py^^ to adjust the path to ^^rhizome-config.py^^. (There are other settings you should probably change to -- read the comments in ^^blank-config.py^^ or consult the [Rhizome manual].) Now you are ready to launch your new site:
 
 1.^^cd <directory of the new site>
-1.^^<python script dir>/run-raccoon -a <python share dir>/rx4rdf/rhizome/rhizome-config.py
+1.^^<python script dir>/run-raccoon -a blank-config.py
 
 !!RxPath
 To run a query on an RDF or NTriples file:

@@ -4,7 +4,7 @@ Compared to other query languages for RDF, it is much more expressive than SQL-l
 
 The formal definition of RxPath can be found in [RxPathSpec]. For more examples and a comparison with other RDF Query languages see [A Comparison of RDF Query Languages|http://www.aifb.uni-karlsruhe.de/WBS/pha/rdf-query/].
 
-Informally, RxPath is a XPath expression evaluated on RDF model as if it has been transformed into a XML document as follows:
+Informally, RxPath is a XPath expression evaluated on a RDF model as if it has been transformed into a XML document as follows:
 * the document has a root element for every resource in model, with the element name equal to the name of the ^^rdf:type^^ of the resource.
 Thus: 
 
@@ -47,12 +47,6 @@ Thus this expression finds the full name of all the people that are editors of a
 ^^/*/ex:members/rdf:List/rdf:first\[1]^^ (Find the first members of each of the membership lists)
 
 ^^/*/ex:members/rdf:List/rdf:first\[last()]^^ (Find the last members of each of the membership lists)
-
-* Similarly, RDF containers' (rdf:Seq, rdf:Bag, and rdf:Alt) ^^rdf:_//n//^^ predicate is replaced with ^^rdf:li^^:
-
-^^/*/ex:members/rdf:Seq/rdf:li\[1]^^ (Find the first members of each of the membership lists)
-
-^^/*/ex:members/rdf:Seq/rdf:li\[last()]^^ (Find the last members of each of the membership lists)
 
 * Additionally, RxPath also defines a few attributes that may appear on predicate elements -- ^^rdf:datatype^^, ^^xml:lang^^, ^^rdf:ID^^, ^^uri^^, and ^^listID^^ -- and one that must appear on all resource elements (^^rdf:about^^). It also defines several new XPath functions. See the [RxPathSpec] for more information.
 

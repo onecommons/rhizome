@@ -1,3 +1,19 @@
+!Upgrading to Rhizome version 0.4.3
+Any "rdf:li" psuedo-predicate that appeared in a RxPath expression should be replaced with "rdfs:member".
+Alternatively, you could add the statement "rdfs:member: rdfs:subPropertyOf: rdf:li" to any models that are
+used by those expressions (but this is an ugly hack).
+
+To upgrade an existing Rhizome store to this version you will need to make these modifications to the store:
+* replace references to ^^wiki:Any^^ with ^^rdfs:Resource^^
+* add the following statements:
+p'''
+ rdfs:member: rdfs:subPropertyOf: auth:requires-authorization-for
+ rdf:first: rdfs:subPropertyOf: auth:requires-authorization-for
+ wiki:revisions: rdfs:subPropertyOf: auth:requires-authorization-for
+ a:contents: rdfs:subPropertyOf: auth:requires-authorization-for
+'''
+If you set the ^^authPredicates^^ config variable, replace the above statements with the properties you listed there.
+
 !Upgrading to Rhizome version 0.4.2 
 
 To upgrade an existing store to this version you will need to add the theme resources to your store.

@@ -1,14 +1,27 @@
 Rx4RDF and Rhizome Changelog
 ============================
 
+Changes in Version 0.4.3 (Dec. 27, 2004)
+----------------------------------------
+Minor release:
+* RxPath:  add support for RDF Schema (see RxPath.RDFSSchema for more info)
+* RxPath:  remove use of rdf:li, use rdfs:member instead
+* Rhizome: various changes for RDF Schema support 
+* Rhizome: remove authPredicates config setting, use auth:requires-authorization-for 
+           predicate instead (see docs/Upgrading)
+* Rhizome: replace wiki:Any with rdfs:Resource 
+* RxPath:  fix bugs with comparing attributes to elements that have the same parent
+* setup:   fix install directories, added the "blank" site directory
+* Rhizome: various bugs fixes
+
 Changes in Version 0.4.2b (Nov. 26, 2004)
----------------------------------------
+-----------------------------------------
 Bug fix release:
 * utils:   fix embarrassing last-minute breaking of BlackListHTMLSanitizer
 * Raccoon: make request recording and playback cross platform (pickle as binary files) 
 
 Changes in Version 0.4.2 (Nov. 24, 2004)
----------------------------------------
+----------------------------------------
 Minor release:
 * Rhizome: fix login.zml
 * Raccoon: fix request pickling (for -r option)

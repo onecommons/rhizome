@@ -1,6 +1,6 @@
 Rx4RDF is a set of technologies designed to make W3C's [RDF] more accessible and easier to use. 
 
-[RxPath|RxPathSpec] is a specification and reference implementation for querying, transforming and updating [RDF] by specifying a deterministic mapping of the RDF model to the XML data model defined by [XPath|http://www.w3.org/TR/xpath]. Rx4RDF shields developers from the complexity of RDF by enabling you to use familar XML technologies like XPath, XSLT and XUpdate. We call their RDF equivalents [RxPath], [RxSLT], and [RxUpdate] respectively. 
+[RxPath] is a specification and reference implementation for querying, transforming and updating [RDF] by specifying a deterministic mapping of the RDF model to the XML data model defined by [XPath|http://www.w3.org/TR/xpath]. Rx4RDF shields developers from the complexity of RDF by enabling you to use familar XML technologies like XPath, XSLT and XUpdate. We call their RDF equivalents [RxPath], [RxSLT], and [RxUpdate] respectively. 
 
 [ZML] is a [Wiki|http://c2.com/cgi/wiki]-like text formatting language that lets you write arbitrary XML or HTML, enabling you to author XML documents with (nearly) the same ease as a Wiki entry.
 

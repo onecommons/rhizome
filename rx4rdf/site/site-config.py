@@ -1,4 +1,4 @@
-#see site/content/RaccoonConfig.txt for documentation on config file settings
+#see rhizome/help/RaccoonConfig.txt for documentation on config file settings
 BASE_MODEL_URI='http://rx4rdf.sf.net/site/'
 __include__('../rhizome/rhizome-config.py')
 
