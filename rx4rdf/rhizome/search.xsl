@@ -17,7 +17,7 @@
 <xsl:param name="_base-url" />
 <xsl:param name="_url" />
 <xsl:param name="_name" />
-
+<xsl:output indent='yes'/>
 <xsl:variable name="searchExp">     
      <xsl:choose>
         <xsl:when test="$searchType='Simple'">                     
@@ -88,6 +88,12 @@ No results found.
 <xsl:value-of disable-output-escaping='yes' select="wf:get-rdf-as-rxml($results, '', $fixup)" />
 </pre>
        </xsl:when>
+       <xsl:when test="$view = 'rdf'">
+<!-- 'application/rdf+xml' is more correct but browser display the xml mimetype better --> 
+<xsl:variable name='content-type' select="wf:assign-metadata('_contenttype', 'application/xml')" />               
+<xsl:copy-of select="wf:get-rdf-as-xml($results)" />
+       </xsl:when>
+       
        <xsl:when test="$view = 'edit'">
 <xsl:variable name='_disposition' select="wf:assign-metadata('_disposition', /*[.='http://rx4rdf.sf.net/ns/wiki#item-disposition-entry'])" />       
 <div class="title"><xsl:value-of select="$searchType" /> Search Results for "<xsl:value-of select="$search" />"</div>
@@ -178,8 +184,9 @@ No results found.
 <xsl:if test='not($results)'>
 No results found.
 </xsl:if>
-
-
+<br/>
+<a href='{$_base-url}search?view=rss&amp;search={f:escape-url($search)}' type="application/rss+xml">
+  <img border='0' src='site:///rss.png' alt='RSS .91 of this search'/></a>
       </xsl:otherwise>
       </xsl:choose> 
 

@@ -21,6 +21,7 @@
 <!-- note: the same template is used in search.xsl for the rxml output -->
 <a href="site:///{$_name}?action=edit-metadata&amp;about={f:escape-url($__resource)}">Edit Metadata</a>
 &#xa0;<a href='site:///search?search=%2F*%2F*%5B.%3D%27{f:escape-url($__resource)}%27%5D&amp;searchType=RxPath&amp;view=html'>Used By</a>
+&#xa0;<a href='site:///search?search=%2F*%5B.%3D%27{f:escape-url($__resource)}%27%5D&amp;searchType=RxPath&amp;view=rdf'>RDF/XML</a>
 <hr />
 <pre>
     <xsl:variable name='fixup' select="&quot;&lt;a href='site:///.?action=view-metadata&amp;amp;about=%(encodeduri)s'>%(res)s&lt;/a>&quot;" />

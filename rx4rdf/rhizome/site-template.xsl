@@ -182,6 +182,7 @@ Type<select name="searchType">
     <option value="html" selected='selected'>HTML</option>
     <option value="rss91" >RSS .91</option>
     <option value="rxml" >RxML</option>
+    <option value="rdf" >RDF/XML</option>
     <option value="edit" >Edit</option>
     <option value="rxpathdom" >RxPathDOM</option>    
     </select>

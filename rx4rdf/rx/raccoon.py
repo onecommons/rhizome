@@ -209,6 +209,28 @@ else:
             return []
         else:
             return parser.new().parse(Conversions.StringValue(v2)).evaluate(context)
+
+    def GetRDFXML(context, resultset = None):
+      '''Returns a nodeset containing a RDF/XML representation of the
+      RxPathDOM nodes contained in resultset parameter. If
+      resultset is None, it will be set to the context node '''
+      if resultset is None:
+            resultset = [ context.node ]
+      from Ft.Rdf.Serializers.Dom import Serializer as DomSerializer
+      serializer = DomSerializer()
+      stmts = []
+      for n in resultset:
+          stmts.extend(n.getModelStatements())
+      if resultset:
+          nsMap=resultset[0].ownerDocument.nsRevMap
+      else:
+          nsMap = None
+      outdoc = serializer.serialize(None, stmts = stmts, nsMap = nsMap)
+      return [outdoc]
+      #prettyOutput = StringIO.StringIO()
+      #from Ft.Xml.Lib.Print import PrettyPrint
+      #PrettyPrint(outdoc, stream=prettyOutput)
+      #return prettyOutput.getvalue()    
         
     def HasMetaData(kw, context, name):
         def _test(local, dict):
@@ -325,6 +347,7 @@ else:
     (RXWIKI_XPATH_EXT_NS, 'split'): Split,
     (RXWIKI_XPATH_EXT_NS, 'min'): Min,
     (RXWIKI_XPATH_EXT_NS, 'max'): Max,
+    (RXWIKI_XPATH_EXT_NS, 'get-rdf-as-xml'): GetRDFXML,
     }
 
     DefaultNsMap = { 'owl': 'http://www.w3.org/2002/07/owl#',
