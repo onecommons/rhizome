@@ -3,13 +3,15 @@
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
-__all__ = ["raccoon", "RxPathDom", "RxPath", "utils", 
-           "rxml", "rhizome", "zml",
+__all__ = ["raccoon", "RxPathDom", "RxPath", "utils", 'htmlfilter',
+           "rxml", "rhizome", "zml", 'ExtFunctions',
+           'Caching', 'ContentProcessors', 'UriResolvers', 'transactions',
+           'RhizomeContent', 'RxPathSchema', 'XhtmlWriter','DomStore',           
            #3rd party libraries with varying degrees of modifications:
            "Server", "XUpdate", 'MRUCache', "DomTree", 
            "glock", "metakitdriver", "htmldiff" ]
 
-__version__ = '0.4.3'
+__version__ = '0.5.0'
 
 try:
     import Ft
