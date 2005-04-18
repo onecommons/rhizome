@@ -6,20 +6,21 @@
     http://rx4rdf.sf.net    
 
     Raccoon uses several MRU (most recently used) caches:
-    XPath parser cache: This caches XPath expression strings so they don't
+
+    * XPath parser cache: This caches XPath expression strings so they don't
     need to be repeatedly parsed.
     
-    XPath processing cache: This caches the result of evaluating an
+    * XPath processing cache: This caches the result of evaluating an
     XPath expression. Certain XPath extension functions have side
     effects or can not be analyzed for dependencies and so any XPath
     expressions that references such a function is not cacheable. You
     can declare addition XPath functions as not cacheable by setting
     the NOT_CACHEABLE_FUNCTIONS config setting.
 
-    Stylesheet parser cache: This caches XSLT and
+    * Stylesheet parser cache: This caches XSLT and
     RxSLT stylesheets so they don't need to be repeatedly parsed.
 
-    Action cache: This caches the result of executing an Action. For
+    * Action cache: This caches the result of executing an Action. For
     an action to be cachable you must assign it a CacheKeyPredicate.
     Raccoon provides cache predicates for caching RxSLT and XSLT
     actions. See the documentation on the Action class for more
@@ -113,9 +114,8 @@ def getGetMetadataCacheKey(field, context, notCacheableXPathFunctions):
         #except XPath.RuntimeException: if e.code = XPath.RuntimeException.UNDEFINED_VARIABLE:
         except:
             raise MRUCache.NotCacheable
-        if isinstance(value, list):
-            value = tuple(value)                
-        return (varRef, value)
+
+        return (varRef._key, _getKeyFromValue(value))
     else:
         raise MRUCache.NotCacheable
 
@@ -215,9 +215,9 @@ def _getKeyFromValue(value):
             if not node.parentNode and node.nodeType == _Node.TEXT_NODE:
                 newValue.append(node.nodeValue)
             else:
-                getKey = getattr(node.ownerDocument, 'getKey', None)
+                getKey = getattr(node, 'getKey', None)
                 if getKey:
-                    newValue.append( getKey( node )  )
+                    newValue.append( getKey()  )
                 else:
                     newValue.append( id(node) )
         value = tuple(newValue)                    
@@ -240,12 +240,7 @@ def getKeyFromXPathExp(compExpr, context, notCacheableXPathFunctions):
             #and in this case we don't want them in the key since we add the stylesheet's params instead
             value = field.evaluate(context) #may raise RuntimeException.UNDEFINED_VARIABLE
             expanded = _splitKey(field._key, context)
-            if isinstance(value, list): #its a nodeset
-                value = tuple(value)    
-                DomDependent = True     #todo: but it could come from another DOM
-            elif isinstance(value, _Node): #this shouldn't happen
-                DomDependent = True                
-            key.append( (expanded, value) )
+            key.append( (expanded, _getKeyFromValue(value) ) )
         elif isinstance(field, XPath.ParsedExpr.FunctionCall):
             DomDependent = True #todo: we could check if its a 'static' function that doesn't access the dom
             expandedKey = _splitKey(field._key, context)
@@ -259,7 +254,11 @@ def getKeyFromXPathExp(compExpr, context, notCacheableXPathFunctions):
         elif not isinstance(field, XPath.ParsedExpr.ParsedLiteralExpr):            
             DomDependent = True
     if DomDependent and context.node:
-        key += [id(context.node), id(context.node.ownerDocument), getattr(context.node.ownerDocument, 'revision', None)]
+        getKey = getattr(context.node, 'getKey', None)
+        if getKey:
+            key.append( getKey() )
+        else:
+            key.append( (id(context.node), id(context.node.ownerDocument)) )
     #print 'returning key', tuple(key)
     return tuple(key)
 
@@ -353,7 +352,7 @@ def getXsltCacheKeyPredicate(styleSheetCache, styleSheetNotCacheableFunctions,
     Returns a key that uniquely identifies the result of processing this stylesheet
     considering the input source and referenced parameters.
     '''
-    revision = getattr(contextNode.ownerDocument, 'revision', None)            
+    revision = getattr(contextNode.ownerDocument, 'revision', None)
     key = [styleSheetContents, styleSheetUri, sourceContents, contextNode,
          id(contextNode.ownerDocument), revision]
 
@@ -421,8 +420,10 @@ def xsltSideEffectsFunc(cacheValue, sideEffects, resultNodeset, kw, contextNode,
                 
 def _addXPathExprCacheKey(compExpr, nsMap, key, notCacheableXPathFunctions):
     '''
-    Check if the XPath expression is cacheable and return a key representing the expression.
-    This is similar to getKeyFromXPathExp except it doesn't add variable references to key.
+    Check if the XPath expression is cacheable and return a key
+    representing the expression. This is similar to getKeyFromXPathExp
+    except it doesn't add any DOM nodes or variable references to the
+    key.
     '''
     #note: we don't know the contextNode now, keyfunc must be prepared to handle that
     context = XPath.Context.Context(None, processorNss = nsMap)    
