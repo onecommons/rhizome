@@ -10,12 +10,20 @@
 import os, time, cStringIO, sys, base64, mimetypes, types, traceback
 import urllib, re
 from rx import MRUCache
-from Ft.Lib import Uri, UriException
+from Ft.Lib import Uri
+
 try:
     #needed for 4Suite versions > 1.0a3
     import Ft.Lib.Resolvers
 except ImportError:
-    pass
+    from Ft.Lib import UriException
+else:
+    #import succeeded, use new-style UriException    
+    def UriException(error, uri, msg):
+        assert error == Ft.Lib.UriException.RESOURCE_ERROR
+        return Ft.Lib.UriException(error, loc=uri, msg=msg)
+    UriException.RESOURCE_ERROR = Ft.Lib.UriException.RESOURCE_ERROR
+    
 try:
     import cStringIO
     StringIO = cStringIO
@@ -73,7 +81,7 @@ class SiteUriResolver(Uri.SchemeRegistryResolver):
         return ''
 
     def OsPathToPathUri(path):
-        fileUri = Uri.OsPathToUri(path)
+        fileUri = Uri.OsPathToUri(path, attemptAbsolute=False)
         return 'path:' + fileUri[len('file:'):].lstrip('/')
     OsPathToPathUri = staticmethod(OsPathToPathUri)
 
