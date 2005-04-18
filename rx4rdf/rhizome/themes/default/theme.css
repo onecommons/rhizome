@@ -1,148 +1,404 @@
+/**********************************
+/ Rhizome Default Skin
+***********************************
+/ CSSNotes:
+/ * underscore before element '_element' is Internet Explorer-specific hack 
+***********************************/
+
 body {
-	margin: 0 1% 0 1%;
-	padding: 0;
-	font-size: 14px;
-	font-family:"Trebuchet MS",arial, helvetica, sans-serif;
+	margin:0px;padding:0px;
+	font-family:Verdana, Arial, Helvetica, sans-serif;color:#000;
+}
+img {
+	border:none;
+}
+a:link {
+	color:#000;
+}
+a:visited {
+	color:#003;
+}
+a:hover {
+	color:#006;
+}
+a:active {
+	color:#00C;
 }
 
-h1:first-child {margin-top: 0;}/*starts first heading in a TD flush top*/
-
-h2:first-child {margin-top: 0;}/*starts first heading in a TD flush top*/
-
-h1 { font-size: 140%; }
-
-h2 { font-size: 130%; }
-
-/* #maincontent is referenced by site-template.xsl */
-#maincontent {
-	font-size: 100%;
+h1 {
+	margin-top:5px;
+	font-size:13pt;font-family:"Trebuchet MS",Arial,Helvetica,sans-serif;
+}
+h2 {	
+	font-size:12pt;font-weight:bold;font-family:"Trebuchet MS",Arial,Helvetica,sans-serif;
+}
+h3 {
+	margin:0px;padding-bottom:3px;
+	font-size:9pt;font-weight:bold;
+}
+h4 {
+	font-size:10pt;
+}
+h5 {	
+	font-size:8pt;
+}
+/*----------------------------
+/ Layout 
+-----------------------------*/
+#body-table {
+	width:100%;vertical-align:top;
+	margin:0px;padding:0px;
+	border-spacing:0px;border-collapse:collapse;
+}
+#spacer-row {
+	padding:0px;
+	height:2px;_height:3px;
+	background-color:#fff;
+}
+.contentspacer {
+	height:1px;width:450px;
+}
+#content {
+	height:100%;vertical-align:top;
+	padding:0px 5px;
+	border-left:2px dotted #666;border-right:2px dotted #666;
+	font-size:9pt;
+	background-color:#fff;
+}
+.column-spacer {
+	height:1px;width:114px;
+}
+.column-spacer-height {
+	height:450px;width:1px;
+}
+#content-table {
+	height:100%;width:100%;vertical-align:top;
+	margin-left:1px;_margin-left:0px;margin-right:2px;_margin-right:0px;margin-bottom:12px;padding:0px;
+	border-spacing:0px;border-collapse:collapse;
+}
+#content-table-column {	
+	height:100%;vertical-align:top;
+	margin:0px;padding:0px;
+	border-spacing:0px;border-collapse:collapse;
+	background-color:#fff;
+}
+#page-content table {
+	border-spacing:0px;border-collapse:collapse;
+	border:1px solid #000;
+	font-size:10pt;
+}
+#page-content td, th {
+	padding:4px;
+	border:1px solid #000;
+}
+#page-content pre {
+	font-size:9pt;
+}
+#page-content {
+	height:100%;vertical-align:top;
+	margin:2px;margin-top:0px;_margin:2px;padding:0px;
+	background-color:#fff;
+}
+#page-title {	
+	height:1px;
+	white-space:nowrap;
+	padding:3px;
+	border-top:none;border:1px solid #000;
+	font-size:14pt;font-weight:bold;font-family:"Trebuchet MS",Arial,Helvetica,sans-serif;letter-spacing:0.02em;color:#000;
+	background-color:#fff;
+}
+/*----------------------------
+/ Header
+-----------------------------*/
+#header-container-row {	
+	margin:0px;padding:0px;
+	background-color:#fff;
+}
+#header-table {	
+	width:100%;
+	margin-bottom:-12px;_margin-bottom:0px;padding:0px;
+	border-spacing:0px;
+}
+#header-cell-left {
+	width:1%;vertical-align:top;
+	white-space:nowrap;
+	padding:0px;
+}
+#header-cell-right {
+	text-align:right;vertical-align:top;
+	padding-right:5px;
+}
+#header-title {
+	white-space:nowrap;
+	font-size:15pt;font-weight:bold;letter-spacing:-0.05em;
+}
+/*----------------------------
+/ Login Form
+-----------------------------*/
+#header-cell-right form {
+	float:right;
+	margin-top:2px;
+}
+#login-div {
+	position:relative;float:right;
+	height:50px;width:195px;_width:215px;
+	padding:3px;
+	border:1px solid #000;
+	font-size:7.5pt;
+	background-color:#fff;
+}
+#login-div a:link {
+	padding-bottom:1px;
+	border-bottom:1px dotted #333;
+	text-decoration:none;
+}
+#login-div a:hover {
+	border-bottom:1px solid #000;
+	color:#000;
+}
+#login-div input {
+	width:65px;_width:70px;
+	margin-left:2px;
+	font-size:7pt;_font-size:8pt;
 }
 
-#maincontent table {
-	border-spacing: 0px; 
-	border-collapse: collapse;
+#login-div-left {
+	position:absolute;float:left;
+	_left:-4px;
+	text-align:right;
+	padding:2px;_padding-left:14px;padding-right:0px;
+	line-height:2.1em;
 }
-
-/* entry content */
-
-/* this ids are referenced by default-theme.xsl */
-
-#mainTable {
-    background-color: white; 
-	border: 1px solid #000;
-	line-height: 1.25em; 
-
+#login-div-right {
+	position:absolute;float:right;
+	text-align:center;
+	right:5px;
+	line-height:2.4em;
 }
-
-#mainTable td, #mainTable th {
-	padding: 0px 0px 0px 0px; /*Pads each table cell in modern browsers: top, right, bottom, left*/
+/*----------------------------
+/ Feedback Messages
+-----------------------------*/
+.shortmessage {
+	position:relative;
+	height:12px;
+	margin:0px;padding:2px;
+	font-size:8pt;font-weight:bold;color:#000;
+	background-color:#ccc;
 }
-
-#contentTable td, #contentTable th {
-	padding: 20px 0px
+.alert  {
+	color:#fff;
+	background-color:#f00;
 }
-
-#maincontent td, #maincontent th {  
-  border: 1px solid black;
-  padding: 5px
+/*----------------------------
+/ Actionsbar
+-----------------------------*/
+#actionsbar a:link,#actionsbar a:visited,#actionsbar a:hover,#actionsbar a:active {
+	position:relative;
+	white-space:nowrap;
+	padding:2px;padding-bottom:0px;							
+	border:1px solid #000;border-bottom:1px solid #fff;
+	text-decoration:none;
+	color:#000;
+	background-color:#fff;
 }
-
-#contentTable {
-	border: 2px dotted #333;
-	border-spacing: 0px;
-	padding: 0px
+#actionsbar a:hover,#actionsbar a:active {
+	text-decoration:underline;
+	color:#c00;
 }
-
-.content { 
-padding: 5px 5px 5px 10px; 
-font : small Verdana, Helvetica, sans-serif;  
-font-size : 90%; 
+#actionsbar {
+	height:15px;width:100%;vertical-align:bottom;
+	text-align:right;white-space:nowrap;
+	padding:0px 5px 0px 0px;
+	border-bottom:1px solid #000;
+	font-size:7pt;
+	background-color:#fff;
 }
-
-#titlebar{
-    background-color: #ffcc66;
-	margin: 0 0;
-	border-bottom: 1px solid #000;
-	line-height: 1px; 
-	font-size: 120%;
-	font-weight: bold;
+.selected-action-tab {
+	font-weight:bold;
+	background-color:#fff!important;
 }
-
-#titlerow {
-	height:10px;
-	vertical-align:top;
-}	
-
-
-#header {
-	background-color: #EBEBB5; /* #EFE */
-	color: black;	
+/*----------------------------
+/ Navbar
+-----------------------------*/
+#navbar-column {
+	width:1px;vertical-align:top;
+	background-color:#fff;
 }
-
-#header * {
-	padding: 1px;
+#navbar {
+	vertical-align:middle;
+	text-align:left;
+	margin-left:2px;padding:0px;
+	font-size: 8pt;
+	background-color:#fff;
 }
-
-#login-box {
-    float: right;
-    font-size: 80%;
-    line-spacing: 0;
-    
-}
-
-#login-box form {
-    margin: 0 0 0 0;
-}
-
-#footer {
-	background-color: #EBEBB5;/* #294563 #333333 */
-	color: black;
-	font-size: smaller;
-}
-
-#footer a, #header a {
-  color: black
-}
-
-
-#sidebar {       
-    background-color: #EBEBB5;
-	font-size: 12px;
-	/*/*/font-size: 85%; /* */
-}
-
-#sidebar a {
-	/*/*/padding: 3px;
-	display: block;
-	border: 2px dotted #aaa;
+#navbar a {
+	display:block;
+	text-align:left;overflow:hidden;white-space:nowrap;
+	height:11px;_height:14px;width:106px;
+	margin:2px auto;margin-right:5px;padding:3px;padding-top:4px;_padding-top:1px;
+	border: 1px solid #333;
 	text-decoration: none;
-	line-height: 1em;
-	width: 100px; /* */
+	font-weight:bold;font-family:"Trebuchet MS",Arial,Helvetica,sans-serif;line-height:1em;color: #000;
+	background-color:#fff;
+}
+#navbar a:link {
+}
+#navbar a:visited {
+}
+#navbar a:hover {
+	border: 1px solid #000;
+	color:#fff;
+	background-color: #000;
+}
+#navbar a:active {
+	border: 1px solid #000;
+	color:#fff;
+	background-color: #fff;
+}
+#navbar ul {
+	_height:12px;
+	margin-top:2px;margin-left:-40px;_margin-left:0px;
+	list-style:none;
+}
+#navbar li {
+	padding:0px;
+	list-style-position:outside;list-style-type:none;
+}
+#navbar p {
+	margin:0px auto;padding:0px;
+	font-size:9pt;font-weight:bold;
+}
+/*----------------------------
+/ Linksbar
+-----------------------------*/
+#linksbar-column {
+	height:1%;width:1%;vertical-align:top;
+	white-space:nowrap;
+	padding-left:6px;
+	background-color:#fff;
+}
+/*----------------------------
+/ Quicklinks
+-----------------------------*/
+#quicklinks {
+	white-space:nowrap;text-align:left;
+	font-size:7pt;
+}
+#quicklinks a:link,#quicklinks a:visited,#quicklinks a:active {
+	text-decoration:underline;
+	color:#000;
+}
+#quicklinks a:hover {	
+	text-decoration:underline;
+	color:#c00;
+}
+/*----------------------------
+/ Search Form
+-----------------------------*/
+#searchform form {
+	width:107px;
+	margin:0px;margin-right:3px;padding:4px;
+	border:1px solid #000;
+	font-size:7.5pt;
+	background-color:#fff;
+}
+#searchform input {
+	width:100px;;vertical-align:top;
+	margin-bottom:1px;_margin-bottom:0px;
+	font-size:7pt;_font-size:8pt;
+}
+#searchform select {
+	height:1.5em;width:6em;_width:7.3em;vertical-align:middle;
+	font-size:9pt;_font-size:8pt;
+}
+/*----------------------------
+/ Footer
+-----------------------------*/
+#footer-row {
+	text-align:center;
+	padding:3px 0px;
+	border-top:2px dotted #666;
+	font-size:8pt;color: #666;
+	background-color:#fff;
 }
 
-#sidebar a:link, #sidebar a:visited {
+/*-------------------------------------------------------
+/ The following are used by system files
+------------------------------------------------------*/
+/*-------------------------
+/ used by diff-revisions.py (when comparing revisions)
+-------------------------*/
+table.diff {
+	border:medium;
+	font-family: "Courier New", Courier, monospace;
+		font-family:Courier;
+}
+#difflib_chg_to0__top th, #difflib_chg_to0__top td {
+	padding: 0px; 
+	border-spacing: 0px; 
+	border: 0px; 
+
+		font-size: smaller; 
+}  
+.diff_header {
+	background-color:#e0e0e0
+}
+td.diff_header {
+	text-align:right; 
+	border:0px;
+}
+.diff_next {
+	background-color:#c0c0c0;
+}
+.diff_add {
+	background-color:#aaffaa;
+}
+.diff_chg {
+	background-color:#ffff77;
+}
+.diff_sub {
+	background-color:#ffaaaa;
+}
+/*----------------------------------
+/ Used by document2html.xsl
+/-----------------------------------*/
+.pre {
+	white-space: pre;
+}
+
+table .title {
+	width:100%;
+	border:0px;
+	font-weight:bold;
+}
+
+.ForrestTable {
+	width:100%; 
+	background-color: #7099c5; 
+	font-size:90%;color:#ffffff;
+}
+.ForrestTable caption { 
+	text-align: left; 
+	font-weight: bold;color: black; 
+	}
+.ForrestTable th { 
+	text-align: center;
+}
+.ForrestTable td {
+	background-color: #f0f0ff; 
 	color: black;
 }
-
-#sidebar a:hover, #sidebar a:active {
-	color: black;
-	background-color: #ffcc66;
-	border: 2px solid #000;
+.codefrag {
+	font-family: "Courier New", Courier, monospace;
 }
 
-#current a {
-	color: #FFFFFF !important;
-	/*/*/background-color: #999999!important;
-	border: 2px dotted #999 !important; /* */
+/* used in search.xsl, showrevisions.xsl */
+div .title {
+	font-weight:bold;
 }
 
-#sidebar ul {
-	/*/*/padding-left: 0em;
-	list-style-type: none;
-	margin-left: 0em; /* */
+/* used by document2html.xls, edit-metadata.xsl, edit.xsl*/
+.code {
+	border: 1px solid #ccc;
+	line-height: 1.25em; 
 }
-
-#sidebar li {
-	/*/*/margin: 0px 0px 0px 0px; /* */
-}
-

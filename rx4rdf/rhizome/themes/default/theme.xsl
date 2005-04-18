@@ -14,84 +14,87 @@
 <!-- this template references templates in site-template.xsl and assumes it is imported by it -->
 <xsl:template name="theme-body" >
 
-<body id="bd">
-
-<!-- Main Layout Table -->
-<table align="center" cellpadding="0" cellspacing="0" id="mainTable">
-<tr>
-<!-- Header -->
-<td id="header" width="100%" colspan="2">
-<div id="login-box" > 
-      	<xsl:call-template name="login-form" >
-     	</xsl:call-template>         	
-</div>    
-
-<xsl:variable name='header-image' select="/*[wiki:name='site-template']/wiki:header-image"/>
-<xsl:if test="$header-image">
-<a href="site:///index"><img border="0" src="site:///{/*[wiki:name='site-template']/wiki:header-image}" /></a> 
-</xsl:if>
-<xsl:value-of disable-output-escaping='yes' select="/*[wiki:name='site-template']/wiki:header-text" />
-</td>
-</tr>
-
-<tr  id="titlerow"  >
-<!-- Sidebar -->
-<td id="sidebar" height="400" width="10" >
-    <table width="100%" height="100%" cellpadding = "0" cellspacing="10">
-    <tr>
-    <td valign="top">
-    <xsl:value-of disable-output-escaping='yes' select="wf:openurl('site:///sidebar')" />
-    </td>
-    </tr>
-
-    <tr>
-    <td valign="bottom">
-    <a href='http://rx4rdf.sf.net'><img width='100' height='33' style="padding: 0px" src='site:///rhizome.gif' alt='Powered by Rhizome' /></a>
-    </td>
-    </tr>
-    </table>
-</td>
-
-<td id='contentTableCell' width="100%" cellpadding="0" cellspacing="0" padding='0'>
-    <!-- nested table -->
-    <table id='contentTable' cellpadding="0" cellspacing="0" padding='0' height="100%" width="100%">
-    <!-- title bar -->
-    <tr>
-    <td valign="top" height='1' id="titlebar">
-    <xsl:value-of select="$title" />
-    </td>
-    </tr>
-
-    <!-- Main Content -->
-    <tr>
-    <td valign="top">        
-      	<xsl:call-template name="display-content" >
-     	</xsl:call-template>    
-    </td>
-    </tr>
-    </table>
-</td>
-</tr>
-<!-- Footer -->
-<tr>
-<td id="footer" width="100%" colspan="2">
-<xsl:if test="not($_static)" >
-<p>
-<div style='float: right'>
-    <xsl:call-template name='actions-bar' />    
-</div>
-&#xa0;<xsl:call-template name='quicklinks-bar' />    
-</p>
-
-<p>    
-<xsl:call-template name='search-form' />    
-</p>
-
-</xsl:if>
-</td>
-</tr>
-</table>
+<body>
+	<table id="body-table">
+  		<tr>
+  			<td colspan="3" id="header-container-row">
+  			<table id="header-table">
+  			<tr>
+	  			<td id="header-cell-left">
+	  				<xsl:variable name='header-image' select="/*[wiki:name='site-template']/wiki:header-image"/>
+					<xsl:if test="$header-image">
+					<a href="site:///index"><img src="site:///{/*[wiki:name='site-template']/wiki:header-image}" alt="logo" id="logo"/></a> 
+					</xsl:if>
+				</td>
+				<td>
+					<div id="header-title">
+						<xsl:value-of disable-output-escaping='yes' select="/*[wiki:name='site-template']/wiki:header-text" />
+					</div>
+				</td>
+				<td id="header-cell-right">
+					<xsl:call-template name="login-form" ></xsl:call-template>
+				</td>
+			</tr>
+			</table>
+			</td>
+		</tr>
+		<tr>
+			<td id="navbar-column">
+			<img src="site:///spacer.gif" alt="" class="column-spacer"/>
+			    <div id="navbar">
+    				<xsl:value-of disable-output-escaping='yes' select="wf:openurl('site:///sidebar')" />
+    			    </div>
+			</td>
+			<td id="content-table-column">
+				<xsl:if test="$session:message">
+			  	<div class="alert shortmessage">
+					<xsl:value-of select="$session:message" disable-output-escaping='yes' />
+				</div>
+				</xsl:if>
+				<table id="content-table">
+					<tr>
+						<td id="actionsbar">
+							<xsl:if test="not($_static)" >
+							<xsl:call-template name='actions-bar' />
+							</xsl:if>
+						</td>
+					</tr>
+					<tr>
+						<td id="page-title">
+							<xsl:value-of select="$title" />
+						</td>
+					</tr>
+					<tr>	
+						<td id="content"><xsl:call-template name="display-content" ></xsl:call-template>    
+						</td>
+					</tr>
+					<tr>
+						<td id="spacer-row">
+							<img src="site:///spacer.gif" alt="" class="contentspacer"/>
+						</td>
+					</tr>
+				</table>
+			</td>
+			<td id="linksbar-column">
+				<img src="site:///spacer.gif" alt="" class="column-spacer"/>
+				<br/>
+				<h3>Global Links</h3>
+				<div id="quicklinks">
+					<xsl:if test="not($_static)" ><xsl:call-template name='quicklinks-bar' /></xsl:if>
+				</div>
+				<br/>
+				<div id="searchform">
+					<xsl:if test="not($_static)" ><xsl:call-template name='search-form' /></xsl:if>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<td id="footer-row" colspan="3">
+				<xsl:value-of disable-output-escaping='yes' select="wf:openurl('site:///footer')" />
+			</td>
+		</tr>
+	</table>
 </body>
-
+  
 </xsl:template>
 </xsl:stylesheet>
