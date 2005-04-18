@@ -1,0 +1,154 @@
+/***********************************
+/ CSSNotes:
+/ * underscore before element '_element' is Internet Explorer-specific hack 
+***********************************/
+body {
+	color:#000;
+}
+a:link 	{
+	color:#000;
+}
+a:visited {
+	color:#003;
+}
+a:hover {
+	color:#006;
+}
+a:active {
+	color:#00C;
+}
+
+/*----------------------------
+/ Layout 
+-----------------------------*/
+#content {
+	border-left:2px dotted #666;border-right:2px dotted #666;
+	background-color: #fff;
+}
+#content-table-column {
+	background-color:#cde; /*use linksbar */
+}
+#page-title {
+	border-top:none;border:1px solid #666; /* use actionsbar color*/
+	color:#000;
+	background-color:#fed; /*use selected-action-tab color*/
+}
+#spacer-row {
+	background-color:#fff; /*use content color */
+}
+/*----------------------------
+/ Header
+-----------------------------*/
+#header-container-row {
+	background-color: #cde;
+}
+#header-title {
+	color:#000;
+}
+/*----------------------------
+/ Login Form
+-----------------------------*/
+#login-div {
+	border:1px solid #666;
+	background-color:#fed;
+}
+#login-div a:link {
+	border-bottom:1px dotted #333;
+}
+#login-div a:hover {
+	border-bottom:1px solid #c00;
+	color:#c00;
+}
+/*----------------------------
+/ Feedback Messages
+-----------------------------*/
+.shortmessage {
+	color:#000;
+	background-color:#CCC;
+}
+.alert  {
+	color:#FFF;
+	background-color:#F00;
+}
+/*----------------------------
+/ Actionsbar
+-----------------------------*/
+#actionsbar a:link,#actionsbar a:visited,#actionsbar a:hover,#actionsbar a:active {	
+	border:1px solid #666;/* use page-title border color*/
+	border-bottom:1px solid #fed; /*use page-title color*/
+	text-decoration:none;
+	color:#000;
+	background-color:#fff;
+}
+#actionsbar a:hover,#actionsbar a:active {
+	text-decoration:underline;
+	color:#c00;
+}
+#actionsbar {
+	border-bottom:1px solid #666;/* use page-title border color*/
+	border-left:1px solid #cde; /* uses header color*/
+	background-color:#cde; /* uses header color*/
+}
+.selected-action-tab {	
+	background-color:#fed!important; /*use page-title color*/
+}
+/*----------------------------
+/ Navbar
+-----------------------------*/
+#navbar-column {
+	background-color:#cde; /* see linksbar-column*/
+}
+#navbar {
+	background-color:#cde; /* see navbar-column*/
+}
+#navbar a {
+	border: 1px solid #666;
+	text-decoration: none;
+	font-weight:bold;font-family:"Trebuchet MS",Arial,Helvetica,sans-serif;line-height:1em;color: #000;
+	background-color:#fed;
+}
+
+#navbar a:link {}
+#navbar a:visited {}
+#navbar a:hover {
+	border: 1px solid #666;
+	color:#fff;
+	background-color: #c66;
+}
+#navbar a:active {
+	border: 1px solid #666;
+	color:fff;
+	background-color: #c66;
+}
+/*----------------------------
+/ Linksbar
+-----------------------------*/
+#linksbar-column {
+	background-color:#cde;
+}
+/*----------------------------
+/ Quicklinks
+-----------------------------*/
+#quicklinks a:link,#quicklinks a:visited,#quicklinks a:active {
+	text-decoration:underline;
+	color:#000
+}
+#quicklinks a:hover {
+	text-decoration:underline;
+	color:#c00;
+}
+/*----------------------------
+/ Search Form
+-----------------------------*/
+#searchform form {
+	border:1px solid #666;
+	background-color:#fed;
+}
+/*----------------------------
+/ Footer
+-----------------------------*/
+#footer-row {
+	border-top:2px dotted #666;
+	font-size:8pt;color: #666;
+	background-color:#fff;
+}
