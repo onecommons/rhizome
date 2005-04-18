@@ -19,6 +19,7 @@ from Ft.Xml.XPath.Conversions import StringValue, NumberValue
 from Ft.Xml import XPath, InputSource, SplitQName, EMPTY_NAMESPACE
 from Ft.Rdf.Statement import Statement
 from rx.utils import generateBnode
+from rx.RxPathSchema import *
 import os.path, sys, StringIO, traceback
 
 from rx import logging #for python 2.2 compatibility
@@ -39,16 +40,10 @@ def createDOM(model, nsRevMap = None):
 class Model(object):
     ### Transactional Interface ###
 
-    def begin(self):
-        '''multiple calls to begin() before calling commit() or rollback() should have no effect.'''
-        return
-
     def commit(self, **kw):
-        '''calling commit() before calling begin() should be a no-op'''
         return
 
     def rollback(self):
-        '''calling rollback() before calling begin() should be a no-op'''           
         return
 
     ### Operations ###
@@ -151,8 +146,11 @@ class FtModel(Model):
     def __init__(self, ftmodel):
         self.model = ftmodel
 
-    def begin(self):
-        self.model._driver.begin()
+    def _beginIfNecessary(self):
+        if not getattr(self.model._driver, '_db', None):
+            #all the 4Suite driver classes that require begin() set a _db attribute
+            #and for the ones that don't, begin() is a no-op
+            self.model._driver.begin()
 
     def commit(self, **kw):
         self.model._driver.commit()
@@ -163,23 +161,27 @@ class FtModel(Model):
     def getResources(self):
         '''All resources referenced in the model, include resources that only appear as objects in a triple.
            Returns a list of resources are sorted by their URI reference
-        '''        
+        '''
+        self._beginIfNecessary()
         return getResourcesFromStatements(self.model.complete(None, None, None))
         
     def getStatements(self, subject = None, predicate = None):
         ''' Return all the statements in the model that match the given arguments.
         Any combination of subject and predicate can be None, and any None slot is
         treated as a wildcard that matches any value in the model.'''
+        self._beginIfNecessary()
         statements = self.model.complete(subject, predicate, None)        
         statements.sort()
         return removeDupStatementsFromSortedList(statements)
                      
     def addStatement(self, statement ):
         '''add the specified statement to the model'''
+        self._beginIfNecessary()
         self.model.add( statement )
 
     def removeStatement(self, statement ):
         '''removes the statement'''
+        self._beginIfNecessary()
         self.model.remove( statement)
         
 class MultiModel(Model):
@@ -190,9 +192,6 @@ class MultiModel(Model):
     '''
     def __init__(self, writableModel, *readonlyModels):
         self.models = (writableModel,) + readonlyModels        
-
-    def begin(self):
-        self.models[0].begin()
 
     def commit(self, **kw):
         self.models[0].commit(**kw)
@@ -234,10 +233,6 @@ class MirrorModel(Model):
     def __init__(self, *models):
         self.models = models
 
-    def begin(self):
-        for model in self.models:
-            model.begin()
-
     def commit(self, **kw):
         for model in self.models:
             model.commit(**kw)
@@ -262,7 +257,7 @@ class MirrorModel(Model):
                 
 class TransactionModel(object):
     '''
-    Provides transaction functionality.
+    Provides transaction functionality for models that don't already have that.
     This class typically needs to be most derived; for example:
     
     MyModel(Model):
@@ -274,14 +269,9 @@ class TransactionModel(object):
     '''
     queue = None
     
-    def begin(self):
-       if self.queue is None:
-           self.queue = []
-
-    def commit(self, **kw):
-        if self.queue is None:
-            return 
-        super(TransactionModel, self).begin()
+    def commit(self, **kw):        
+        if not self.queue:
+            return     
         for stmt in self.queue:
             if stmt[0] is utils.Removed:
                 super(TransactionModel, self).removeStatement( stmt[1] )
@@ -289,10 +279,11 @@ class TransactionModel(object):
                 super(TransactionModel, self).addStatement( stmt[0] )
         super(TransactionModel, self).commit(**kw)
 
-        self.queue = None
+        self.queue = []
         
     def rollback(self):
-        self.queue = None
+        #todo: if self.autocommit: raise exception
+        self.queue = []
 
     def _match(self, stmt, subject = None, predicate = None):
         if subject and stmt.subject != subject:
@@ -308,7 +299,7 @@ class TransactionModel(object):
         Any combination of subject and predicate can be None, and any None slot is
         treated as a wildcard that matches any value in the model.'''
         statements = super(TransactionModel, self).getStatements(subject, predicate)
-        if self.queue is None: #not in a transaction
+        if not self.queue: 
             return statements
 
         #avoid phantom reads, etc.        
@@ -325,17 +316,15 @@ class TransactionModel(object):
 
     def addStatement(self, statement ):
         '''add the specified statement to the model'''
-        if self.queue is None: #not in a transaction
-            super(TransactionModel, self).addStatement( statement )
-        else:
-            self.queue.append( (statement,) )
+        if self.queue is None: 
+            self.queue = []    
+        self.queue.append( (statement,) )
         
     def removeStatement(self, statement ):
         '''removes the statement'''
-        if self.queue is None: #not in a transaction
-            super(TransactionModel, self).removeStatement( statement)
-        else:
-            self.queue.append( (utils.Removed, statement) )
+        if self.queue is None: 
+            self.queue = []    
+        self.queue.append( (utils.Removed, statement) )
 
 class NTriplesFileModel(FtModel):
     def __init__(self, inputfile, outputpath):        
@@ -458,9 +447,6 @@ try:
         def __init__(self, redlandModel):
             self.model = redlandModel
 
-        def begin(self):
-            pass
-
         def commit(self):
             self.model.sync()
 
@@ -570,9 +556,6 @@ try:
         def __init__(self, tripleStore):
             self.model = tripleStore
 
-        def begin(self):
-            pass
-
         def commit(self):
             pass
 
@@ -645,403 +628,6 @@ except ImportError:
 ##########################################################################
 ## public utility functions
 ##########################################################################
-class BaseSchema(object):
-    '''
-    A "null" schema that does nothing. Illustrates the minimum
-    interfaces that must be implemented.
-    '''
-    
-    def isCompatibleType(self, testType, wantType):
-        if wantType[-1] == '*':
-            return testType.startswith(wantType[:-1])
-        else:
-            return testType == wantType
-                         
-    def isCompatibleProperty(self, testProp, wantProp):
-        if wantProp[-1] == '*':
-            return testProp.startswith(wantProp[:-1])
-        else:
-            return testProp == wantProp
-
-    def findStatements(self, uri, stmts):
-        return []
-       
-    def addToSchema(self, stmts): pass
-    def removeFromSchema(self, stmts): pass
-    
-    def begin(self): pass
-    def commit(self, **kw): pass
-    def rollback(self): pass
-           
-class RDFSSchema(BaseSchema):
-    '''
-    This is a temporary approach that provides partial support of RDF Schema.
-
-    It does the following:
-
-    * Keeps track of subclasses and subproperties used by resource and predicate element name tests.
-    * infers a resource is a rdf:Property or a rdfs:Class if it appears as
-      either a predicate or as the object of a rdf:type statement
-    ** adds rdf:type statements for those resources if no rdf:type statement is present.
-    
-    The schema is only updated when the DOM is first initialized.
-    At that point we add all inferred resources into the DOM,
-    so that resources don't appear to be added non-deterministically
-    based on which nodes in the DOM were accessed. (Doing so would break
-    diffing and merging models, for example).
-    However inferred statements (via findStatements) are only added when
-    examining the resource. This is OK because it is basically deterministic
-    as you always have to navigate through the node to see those statements.
-    
-    Todo: This doesn't support type inference based on rdfs:range or rdfs:domain.
-    Todo: we don't fully support subproperties of rdf:type
-    '''
-    SUBPROPOF = u'http://www.w3.org/2000/01/rdf-schema#subPropertyOf'
-    SUBCLASSOF = u'http://www.w3.org/2000/01/rdf-schema#subClassOf'
-
-    #NTriples version of http://www.w3.org/2000/01/rdf-schema
-    schemaTriples = r'''<http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
-<http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://www.w3.org/2000/01/rdf-schema#comment> "The subject is a subproperty of a property." .
-<http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
-<http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
-<http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
-<http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://www.w3.org/2000/01/rdf-schema#label> "subPropertyOf" .
-<http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
-<http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/2000/01/rdf-schema#comment> "Further information about the subject resource." .
-<http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
-<http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Resource> .
-<http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#Resource> .
-<http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/2000/01/rdf-schema#label> "seeAlso" .
-<http://www.w3.org/2000/01/rdf-schema#member> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
-<http://www.w3.org/2000/01/rdf-schema#member> <http://www.w3.org/2000/01/rdf-schema#comment> "A member of the subject resource." .
-<http://www.w3.org/2000/01/rdf-schema#member> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
-<http://www.w3.org/2000/01/rdf-schema#member> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Resource> .
-<http://www.w3.org/2000/01/rdf-schema#member> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#Resource> .
-<http://www.w3.org/2000/01/rdf-schema#member> <http://www.w3.org/2000/01/rdf-schema#label> "member" .
-<http://www.w3.org/2000/01/rdf-schema#comment> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
-<http://www.w3.org/2000/01/rdf-schema#comment> <http://www.w3.org/2000/01/rdf-schema#comment> "A description of the subject resource." .
-<http://www.w3.org/2000/01/rdf-schema#comment> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
-<http://www.w3.org/2000/01/rdf-schema#comment> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Literal> .
-<http://www.w3.org/2000/01/rdf-schema#comment> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#Resource> .
-<http://www.w3.org/2000/01/rdf-schema#comment> <http://www.w3.org/2000/01/rdf-schema#label> "comment" .
-<http://www.w3.org/2000/01/rdf-schema#> <http://www.w3.org/2000/01/rdf-schema#seeAlso> <http://www.w3.org/2000/01/rdf-schema-more> .
-<http://www.w3.org/2000/01/rdf-schema#> <http://purl.org/dc/elements/1.1/title> "The RDF Schema vocabulary (RDFS)" .
-<http://www.w3.org/2000/01/rdf-schema#> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2002/07/owl#Ontology> .
-<http://www.w3.org/2000/01/rdf-schema#Datatype> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
-<http://www.w3.org/2000/01/rdf-schema#Datatype> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#Class> .
-<http://www.w3.org/2000/01/rdf-schema#Datatype> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> .
-<http://www.w3.org/2000/01/rdf-schema#Datatype> <http://www.w3.org/2000/01/rdf-schema#label> "Datatype" .
-<http://www.w3.org/2000/01/rdf-schema#Datatype> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of RDF datatypes." .
-<http://www.w3.org/2000/01/rdf-schema#ContainerMembershipProperty> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
-<http://www.w3.org/2000/01/rdf-schema#ContainerMembershipProperty> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
-<http://www.w3.org/2000/01/rdf-schema#ContainerMembershipProperty> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> .
-<http://www.w3.org/2000/01/rdf-schema#ContainerMembershipProperty> <http://www.w3.org/2000/01/rdf-schema#label> "ContainerMembershipProperty" .
-<http://www.w3.org/2000/01/rdf-schema#ContainerMembershipProperty> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of container membership properties, rdf:_1, rdf:_2, ...,\n                    all of which are sub-properties of 'member'." .
-<http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <http://www.w3.org/2000/01/rdf-schema#seeAlso> .
-<http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
-<http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#comment> "The defininition of the subject resource." .
-<http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
-<http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Resource> .
-<http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#Resource> .
-<http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#label> "isDefinedBy" .
-<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
-<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#comment> "The subject is a subclass of a class." .
-<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
-<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Class> .
-<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#Class> .
-<http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#label> "subClassOf" .
-<http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
-<http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> .
-<http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/2000/01/rdf-schema#label> "Resource" .
-<http://www.w3.org/2000/01/rdf-schema#Resource> <http://www.w3.org/2000/01/rdf-schema#comment> "The class resource, everything." .
-<http://www.w3.org/2000/01/rdf-schema#Container> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
-<http://www.w3.org/2000/01/rdf-schema#Container> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#Resource> .
-<http://www.w3.org/2000/01/rdf-schema#Container> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> .
-<http://www.w3.org/2000/01/rdf-schema#Container> <http://www.w3.org/2000/01/rdf-schema#label> "Container" .
-<http://www.w3.org/2000/01/rdf-schema#Container> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of RDF containers." .
-<http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
-<http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#comment> "A range of the subject property." .
-<http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
-<http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Class> .
-<http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
-<http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#label> "range" .
-<http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
-<http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#comment> "A domain of the subject property." .
-<http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
-<http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Class> .
-<http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
-<http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#label> "domain" .
-<http://www.w3.org/2000/01/rdf-schema#label> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/1999/02/22-rdf-syntax-ns#Property> .
-<http://www.w3.org/2000/01/rdf-schema#label> <http://www.w3.org/2000/01/rdf-schema#comment> "A human-readable name for the subject." .
-<http://www.w3.org/2000/01/rdf-schema#label> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
-<http://www.w3.org/2000/01/rdf-schema#label> <http://www.w3.org/2000/01/rdf-schema#range> <http://www.w3.org/2000/01/rdf-schema#Literal> .
-<http://www.w3.org/2000/01/rdf-schema#label> <http://www.w3.org/2000/01/rdf-schema#domain> <http://www.w3.org/2000/01/rdf-schema#Resource> .
-<http://www.w3.org/2000/01/rdf-schema#label> <http://www.w3.org/2000/01/rdf-schema#label> "label" .
-<http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
-<http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#Resource> .
-<http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> .
-<http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/2000/01/rdf-schema#label> "Class" .
-<http://www.w3.org/2000/01/rdf-schema#Class> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of classes." .
-<http://www.w3.org/2000/01/rdf-schema#Literal> <http://www.w3.org/2000/01/rdf-schema#isDefinedBy> <http://www.w3.org/2000/01/rdf-schema#> .
-<http://www.w3.org/2000/01/rdf-schema#Literal> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://www.w3.org/2000/01/rdf-schema#Resource> .
-<http://www.w3.org/2000/01/rdf-schema#Literal> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2000/01/rdf-schema#Class> .
-<http://www.w3.org/2000/01/rdf-schema#Literal> <http://www.w3.org/2000/01/rdf-schema#label> "Literal" .
-<http://www.w3.org/2000/01/rdf-schema#Literal> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of literal values, eg. textual strings and integers." .
-'''
-    rdfSchema = [Statement(unicode(stmt[0]), unicode(stmt[1]), unicode(stmt[2]),
-       objectType=unicode(stmt[3])) for stmt in utils.parseTriples(StringIO.StringIO(schemaTriples))]
-    
-    #statements about RDF resources are missing from the RDFS schema
-    rdfAdditions = [Statement(x[0], x[1], x[2], objectType=OBJECT_TYPE_RESOURCE)
-        for x in [
-    (RDF_MS_BASE+u'Alt', SUBCLASSOF, RDF_SCHEMA_BASE+u'Container'),
-    (RDF_MS_BASE+u'Bag', SUBCLASSOF, RDF_SCHEMA_BASE+u'Container'),
-    (RDF_MS_BASE+u'Seq', SUBCLASSOF, RDF_SCHEMA_BASE+u'Container'),
-    (RDF_MS_BASE+u'XMLLiteral', SUBCLASSOF, RDF_SCHEMA_BASE+u'Literal'),]
-    ]
-    
-    requiredProperties = [RDF_MS_BASE+u'type']
-    requiredClasses = [RDF_MS_BASE+u'Property', RDF_SCHEMA_BASE+u'Class']
-
-    inTransaction = False
-    
-    def __init__(self, stmts = None):
-        #dictionary of type : ancestors (including self)
-        self.supertypes = {}
-        self.superproperties = {}
-
-        #dictionary of type : descendants (including self)
-        self.subtypes = {}
-        self.subproperties = {} 
-
-        self.subClassPreds = [self.SUBCLASSOF]
-        self.subPropPreds =  [self.SUBPROPOF]
-        self.typePreds =     [RDF_MS_BASE+u'type']
-        
-        for predicate in self.requiredProperties:
-            self.subproperties.setdefault(predicate, [predicate])
-            self.superproperties.setdefault(predicate, [predicate])
-        for subject in self.requiredClasses:
-            self.subtypes.setdefault(subject, [subject]) 
-            self.supertypes.setdefault(subject, [subject])
-
-        self.currentSubProperties = self.subproperties
-        self.currentSubTypes = self.subtypes
-        self.currentSuperProperties = self.superproperties
-        self.currentSuperTypes = self.supertypes
-        
-        self.addToSchema(self.rdfAdditions)
-        self.addToSchema(self.rdfSchema)
-        if stmts:
-            self.addToSchema(stmts)        
-
-    def isCompatibleType(self, testType, wantType):
-        '''
-        Is the given testType resource compatible with (equivalent to or a subtype of) the specified wantType?
-        wantType can end in a * (to support the namespace:* node test in RxPath)
-        '''
-        if wantType == RDF_SCHEMA_BASE+'Resource': 
-            return True
-        return self._testCompatibility(self.currentSubTypes, testType, wantType)
-    
-    def isCompatibleProperty(self, testProp, wantProp):
-        '''
-        Is the given propery compatible with (equivalent to or a subpropery of) the specified property?
-        wantProp can end in a * (to support the namespace:* node test in RxPath)
-        '''
-        return self._testCompatibility(self.currentSubProperties, testProp, wantProp)
-    
-    def _testCompatibility(self, map, testType, wantType):        
-        #do the exact match test first in case we're calling this before we've completed setting up the schema            
-        if testType == wantType:
-            return True
-
-        if wantType[-1] == '*':
-            if testType.startswith(wantType[:-1]):
-                return True
-            for candidate in map:
-                if candidate.startswith(wantType[:-1]):
-                    subTypes = map[candidate]
-                    if testType in subTypes:
-                        return True
-            return False
-        else:            
-            subTypes = map.get(wantType, [wantType])            
-            return testType in subTypes
-            
-    def _makeClosure(self, map):
-        #for each sub class, get its subclasses and append them
-        def close(done, super, subs):
-            done[super] = dict([(x,1) for x in subs]) #a set really
-            for sub in subs:                
-                if not sub in done:                    
-                    close(done, sub, map[sub])                
-                done[super].update(done[sub])
-
-        closure = {}           
-        for key, value in map.items():
-            close(closure, key, value)
-        return dict([(x, y.keys()) for x, y in closure.items()])
-
-    def findStatements(self, uri, stmts):
-        stmts = []
-        isProp = uri in self.currentSuperProperties
-        isClass = uri in self.currentSuperTypes        
-        if isProp or isClass:
-            if RDF_MS_BASE+u'type' not in [x.predicate for x in stmts]:
-                #no type statement, so add one now
-                if isProp:
-                    stmts.append( Statement(uri, RDF_MS_BASE+u'type',
-                        RDF_MS_BASE+u'Property', objectType=OBJECT_TYPE_RESOURCE) )
-                if isClass:
-                    #print uri, stmts
-                    stmts.append( Statement(uri, RDF_MS_BASE+u'type',
-                        RDF_SCHEMA_BASE+u'Class', objectType=OBJECT_TYPE_RESOURCE) )
-                    
-        return stmts
-    
-    def addToSchema(self, stmts):
-        propsChanged = False
-        typesChanged = False
-
-        #you can declare subproperties to rdf:type, rdfs:subClassPropOf, rdfs:subPropertyOf
-        #but it will only take effect in the next call to addToSchema
-        #also they can not be removed consistently
-        #thus they should be declared in the initial schemas
-        for stmt in stmts:
-            if stmt.predicate in self.subPropPreds:
-                self.currentSubProperties.setdefault(stmt.object, [stmt.object]).append(stmt.subject)
-                #add this subproperty if this is the only reference to it so far
-                self.currentSubProperties.setdefault(stmt.subject, [stmt.subject])
-
-                self.currentSuperProperties.setdefault(stmt.subject, [stmt.subject]).append(stmt.object)
-                #add this superproperty if this is the only reference to it so far
-                self.currentSuperProperties.setdefault(stmt.object, [stmt.object])
-                
-                propsChanged = True
-            elif stmt.predicate in self.subClassPreds:                
-                self.currentSubTypes.setdefault(stmt.object, [stmt.object]).append(stmt.subject)
-                #add this subclass if this is the only reference to it so far
-                self.currentSubTypes.setdefault(stmt.subject, [stmt.subject])  
-
-                self.currentSuperTypes.setdefault(stmt.subject, [stmt.subject]).append(stmt.object)
-                #add this superclass if this is the only reference to it so far
-                self.currentSuperTypes.setdefault(stmt.object, [stmt.object])
-                
-                typesChanged = True
-            elif stmt.predicate in self.typePreds:
-                self.currentSubTypes.setdefault(stmt.object, [stmt.object])
-                self.currentSuperTypes.setdefault(stmt.object, [stmt.object])
-
-                if self.isCompatibleType(stmt.object, RDF_SCHEMA_BASE+u'Class'):
-                    self.currentSubTypes.setdefault(stmt.subject, [stmt.subject])
-                    self.currentSuperTypes.setdefault(stmt.subject, [stmt.subject])
-                elif self.isCompatibleType(stmt.object, RDF_MS_BASE+u'Property'):
-                    self.currentSubProperties.setdefault(stmt.subject, [stmt.subject])
-                    self.currentSuperProperties.setdefault(stmt.subject, [stmt.subject])
-            else:
-                self.currentSubProperties.setdefault(stmt.predicate, [stmt.predicate])
-                self.currentSuperProperties.setdefault(stmt.predicate, [stmt.predicate])
-
-        if typesChanged:
-            self.currentSubTypes = self._makeClosure(self.currentSubTypes)
-            if not self.inTransaction:
-                self.subtypes = self.currentSubTypes
-            
-        if propsChanged:
-            self.currentSubProperties = self._makeClosure(self.currentSubProperties)
-            if not self.inTransaction:
-                self.subproperties = self.currentSubProperties
-        
-            #just in case a subproperty of any of these were added
-            self.subClassPreds = self.currentSubProperties[self.SUBCLASSOF]
-            self.subPropPreds  = self.currentSubProperties[self.SUBPROPOF]
-            self.typePreds     = self.currentSubProperties[RDF_MS_BASE+u'type']        
-           
-    def removeFromSchema(self, stmts):
-        #todo: we don't remove resources from the properties or type dictionaries
-        #(because its not clear when we can safely do that)
-        #this means a formerly class or property resource can not be safely reused
-        #as another type of resource without reloading the model
-        propsChanged = False
-        typesChanged = False
-
-        for stmt in stmts:
-            if stmt.predicate in self.subPropPreds:
-                try:
-                    self.currentSubProperties[stmt.object].remove(stmt.subject)
-                    self.currentSuperProperties[stmt.subject].remove(stmt.object)
-                except KeyError, ValueError:
-                    pass#todo warn if not found                
-                propsChanged = True
-
-            if stmt.predicate in self.subClassPreds:
-                try: 
-                    self.currentSubTypes[stmt.object].remove(stmt.subject)
-                    self.currentSuperTypes[stmt.subject].remove(stmt.object)
-                except KeyError, ValueError:
-                    pass#todo warn if not found                
-                typesChanged = True            
-
-        if typesChanged:
-            newsubtypes = {}
-            for k, v in self.currentSuperTypes.items():
-                for supertype in v:
-                    newsubtypes.setdefault(supertype, []).append(k)
-
-            self.currentSubTypes = self._makeClosure(newsubtypes)
-            if not self.inTransaction:
-                self.subtypes = self.currentSubTypes
-            
-        if propsChanged:
-            newsubprops = {}
-            for k, v in self.currentSuperProperties.items():
-                for superprop in v:
-                    newsubprops.setdefault(superprop, []).append(k)
-            
-            self.currentSubProperties = self._makeClosure(newsubprops)
-            if not self.inTransaction:
-                self.subproperties = self.currentSubProperties
-
-            #just in case a subproperty of any of these were removed
-            self.subClassPreds = self.currentSubProperties[self.SUBCLASSOF]
-            self.subPropPreds  = self.currentSubProperties[self.SUBPROPOF]
-            self.typePreds     = self.currentSubProperties[RDF_MS_BASE+u'type']        
-        
-    def begin(self):
-        import copy
-        if not self.inTransaction:
-            self.currentSubProperties = copy.deepcopy(self.subproperties)
-            self.currentSubTypes = copy.deepcopy(self.subtypes)
-            self.currentSuperProperties = copy.deepcopy(self.superproperties)
-            self.currentSuperTypes = copy.deepcopy(self.supertypes)
-
-            self.inTransaction = True
-            
-    def commit(self, **kw):
-        if not self.inTransaction:
-            return
-        self.subproperties = self.currentSubProperties        
-        self.subtypes = self.currentSubTypes
-        self.superproperties = self.currentSuperProperties
-        self.supertypes = self.currentSuperTypes 
-        
-        self.inTransaction = False
-        
-    def rollback(self):
-        self.currentSubProperties = self.subproperties
-        self.currentSubTypes = self.subtypes
-        self.currentSuperProperties = self.superproperties
-        self.currentSuperTypes = self.supertypes
-
-        #just in case a subproperty of any of these changed
-        self.subClassPreds = self.currentSubProperties[self.SUBCLASSOF]
-        self.subPropPreds  = self.currentSubProperties[self.SUBPROPOF]
-        self.typePreds     = self.currentSubProperties[RDF_MS_BASE+u'type']        
-        
-        self.inTransaction = False
-
-#_baseSchema = RDFSSchema()            
     
 def splitUri(uri):
     '''
@@ -1153,7 +739,6 @@ def applyXUpdate(rdfdom, xup = None, vars = None, extFunctionMap = None, uri='fi
     processor.execute(rdfdom, xupdate, vars, extFunctionMap = extFunctionMap)
 
 def evalXPath(xpath, context, expCache=None, queryCache=None):
-    log.debug(xpath)
     context.functions.update(BuiltInExtFunctions)
     
     if expCache:
@@ -1217,7 +802,7 @@ def addStatements(rdfDom, stmts):
         stmt = containerItems[key]
         listid = stmt.predicate
         head = stmt.subject
-        stmt.predicate = RDF_SCHEMA_BASE+'member'
+        stmt.predicate = RDF_SCHEMA_BASE+u'member'
         subject = rdfDom.findSubject(stmt.subject) or rdfDom.addResource(stmt.subject)
         subject.addStatement(stmt, listid)
 
@@ -1655,13 +1240,14 @@ BuiltInExtFunctions = {
 }
 
 ##########################################################################
-## "patches" to Ft.XPath
+## "monkey patches" to Ft.XPath
 ##########################################################################
 
 #4suite 1.0a3 disables this function but we really need it 
 #as a "compromise" we only execute this function if getElementById is there
 #(though if its not they should look for xml:id)
 from Ft.Xml.Xslt import XsltFunctions, XsltContext
+from Ft.Lib import Set
 def Id(context, object):
     """Function: <node-set> id(<object>)"""
     id_list = []
@@ -1702,6 +1288,16 @@ def cmpStatements(self,other):
 Statement.__cmp__ = cmpStatements
 
 from xml.dom import Node
+from Ft.Xml.XPath import Types
+
+preNodeSorting4Suite = hasattr(XPath.Util, 'SortDocOrder') #4Suite versions prior to 1.0b1
+if preNodeSorting4Suite: 
+    def SortDocOrder(context, nodeset):
+        return XPath.Util.SortDocOrder(context, nodeset)
+else:
+    def SortDocOrder(context, nodeset):
+        nodeset.sort()
+        return nodeset
 
 def descendants(self, context, nodeTest, node, nodeSet, startNode=None):
     """Select all of the descendants from the context node"""
@@ -1749,31 +1345,19 @@ def isChildAxisSpecifier(step):
     else:
         return False
 
-_ParsedAbbreviatedRelativeLocationPath_oldEvaluate = XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath.evaluate.im_func
-def _ParsedAbbreviatedRelativeLocationPath_evaluate(self, context):    
-    if getattr(context.node, 'getSafeChildNodes', None):
-        step = findNextStep(self._right)
-        if isChildAxisSpecifier(step):
-            #change next step from child to descendant
-            #todo: bug if you reuse this parsed expression on a non-RxPath dom
-            step._axis = XPath.ParsedAxisSpecifier.ParsedAxisSpecifier('descendant')
-            #make _middle does no filtering
-            self._middle._axis = XPath.ParsedAxisSpecifier.ParsedAxisSpecifier('self')
-    return _ParsedAbbreviatedRelativeLocationPath_oldEvaluate(self, context)
-XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath.evaluate = _ParsedAbbreviatedRelativeLocationPath_evaluate
-XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath.select = XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath.evaluate
-            
-def _descendants(self, context, nodeset, startNode=None):
+def _descendants(self, context, nodeset, nextStepAttr, startNode=None):
     startNode = startNode or context.node
     childNodeFunc = getattr(context.node, 'getSafeChildNodes', None)
     if childNodeFunc:
         childNodes = childNodeFunc(startNode)
     else:
         childNodes = context.node.childNodes
+
+    nextStep = getattr(self, nextStepAttr)
     
     nodeTest = None
     if childNodeFunc:
-        step = findNextStep(self._rel)
+        step = findNextStep(nextStep)
         nodeTest = getattr(step, '_nodeTest', None)
 
     for child in childNodes:
@@ -1785,27 +1369,59 @@ def _descendants(self, context, nodeset, startNode=None):
                 if nodeTest: #no nodeTest is equivalent to node()
                     if not nodeTest.match(context, context.node, step._axis.principalType):
                         continue#we're a RxPath dom and the nodetest didn't match, don't examine the node's descendants
-                results = self._rel.select(context)
+                results = nextStep.select(context)
             else:
                 results = []
         else:
-            results = self._rel.select(context)
+            results = nextStep.select(context)
 
         # Ensure no duplicates
         if results:
-            nodeset.extend(filter(lambda n, s=nodeset: n not in s, results))
-                    
+            if preNodeSorting4Suite:
+                #need to do inplace filtering
+                nodeset.extend(filter(lambda n, s=nodeset: n not in s, results))
+            else:
+                nodeset.extend(results)
+                nodeset = Set.Unique(nodeset)
+                                
         if child.nodeType == Node.ELEMENT_NODE:
-            self._descendants(context, nodeset, startNode)
-XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath._descendants = _descendants
+            nodeset = self._descendants(context, nodeset, startNode)
+    return nodeset
 
-if hasattr(XPath.Util, 'SortDocOrder'): #4Suite versions prior to 1.0b1
-    def SortDocOrder(context, nodeset):
-        return XPath.Util.SortDocOrder(context, nodeset)
-else:
-    def SortDocOrder(context, nodeset):
-        nodeset.sort()
-        return nodeset
+_ParsedAbbreviatedRelativeLocationPath_oldEvaluate = XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath.evaluate.im_func
+def _ParsedAbbreviatedRelativeLocationPath_evaluate(self, context):    
+    if getattr(context.node, 'getSafeChildNodes', None):
+        step = findNextStep(self._right)
+        if isChildAxisSpecifier(step):
+            #change next step from child to descendant
+            #todo: bug if you reuse this parsed expression on a non-RxPath dom
+            step._axis = XPath.ParsedAxisSpecifier.ParsedAxisSpecifier('descendant')
+            if hasattr(self, '_middle'): #for older 4Suite versions
+                   #make _middle does no filtering
+                   self._middle._axis = XPath.ParsedAxisSpecifier.ParsedAxisSpecifier('self')
+            nodeset = self._left.select(context)
+
+            state = context.copy()
+            
+            size = len(nodeset)
+            result = []
+            for pos in range(size):
+                context.node, context.position, context.size = \
+                              nodeset[pos], pos + 1, size
+                subRt = self._right.select(context)
+                result = Set.Union(result, subRt)
+
+            context.set(state)
+            return result            
+    return _ParsedAbbreviatedRelativeLocationPath_oldEvaluate(self, context)
+
+XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath\
+    .evaluate = _ParsedAbbreviatedRelativeLocationPath_evaluate
+XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath\
+    .select = XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath.evaluate
+XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath\
+    ._descendants = lambda self, context, nodeset, startNode=None: \
+                         _descendants(self, context, nodeset, '_right', startNode)
         
 def _ParsedAbbreviatedAbsoluteLocationPath_evaluate(self, context):    
     state = context.copy()
@@ -1824,24 +1440,35 @@ def _ParsedAbbreviatedAbsoluteLocationPath_evaluate(self, context):
             return nodeset
 
     nodeset = self._rel.select(context)
-    self._descendants(context, nodeset)
+    _nodeset = self._descendants(context, nodeset)
+    if _nodeset is not None: 
+        nodeset = _nodeset #4suite 1.0b1 and later
 
     context.set(state)
     return SortDocOrder(context, nodeset)
 
-XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath.evaluate = _ParsedAbbreviatedAbsoluteLocationPath_evaluate
-XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath.select = XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath.evaluate
+XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath\
+    .evaluate = _ParsedAbbreviatedAbsoluteLocationPath_evaluate
+XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath\
+    .select = XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath.evaluate
+XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath\
+    ._descendants = lambda self, context, nodeset, startNode=None: \
+                         _descendants(self, context, nodeset, '_rel', startNode)
 
 _ParsedPathExpr_oldEvaluate = XPath.ParsedExpr.ParsedPathExpr.evaluate.im_func
-def _ParsedPathExpr_evaluate(self, context):    
-    if getattr(context.node, 'getSafeChildNodes', None) and self._step:                       
+def _ParsedPathExpr_evaluate(self, context):
+    descendant = getattr(self, '_step', getattr(self, '_descendant', None))
+    if getattr(context.node, 'getSafeChildNodes', None) and descendant:
         step = findNextStep(self._right)
         if isChildAxisSpecifier(step):
             #change next step from child to descendant
             #todo: bug if you reuse this parsed expression on a non-RxPath dom
             step._axis = XPath.ParsedAxisSpecifier.ParsedAxisSpecifier('descendant')
-            #make _step does no filtering
-            self._step._axis = XPath.ParsedAxisSpecifier.ParsedAxisSpecifier('self')
+            if getattr(self, '_step', None): #before 4Suite 1.0b1
+                #make _step do no filtering
+                self._step._axis = XPath.ParsedAxisSpecifier.ParsedAxisSpecifier('self')
+            else:
+                self._descendant = False #skip descendant checking
     return _ParsedPathExpr_oldEvaluate(self, context)
 XPath.ParsedExpr.ParsedPathExpr.evaluate = _ParsedPathExpr_evaluate
 
@@ -1871,7 +1498,6 @@ def _NamespaceTest_match(self, context, node, principalType=Node.ELEMENT_NODE):
         
 XPath.ParsedNodeTest.NamespaceTest.match = _NamespaceTest_match
 
-from Ft.Lib import Set
 def _FunctionCallEvaluate(self, context, oldFunc):
     #make XPath.ParsedExpr.FunctionCall*.evaluate have no side effects so we can cache them
     self._func = None
@@ -1879,8 +1505,8 @@ def _FunctionCallEvaluate(self, context, oldFunc):
     #todo: add authorize hook
     #authorize(self, context, split(self._name), self.args)
     retVal = oldFunc(self, context)    
-    #fix pretty bad 4Suite bug where expressions that just function calls
-    #can return nodesets with duplicate nodes
+    #prevent expressions that are just function calls
+    #from returning nodesets with duplicate nodes
     if type(retVal) == type([]):
        return Set.Unique(retVal)
     else:
