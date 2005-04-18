@@ -158,7 +158,7 @@ class Node(xml.dom.Node, object):
     def getSafeChildNodes(self, stopNode): #this also serves as marker that this node is in a RDFDom tree
         return self.childNodes
 
-    def _orderedInsert(self, key, ctor, cmpPredicate=None, lo=0, hi=None):
+    def _orderedInsert(self, key, ctor, cmpPredicate=None, lo=0, hi=None, notify=None):
         if len(self.childNodes):
             if cmpPredicate is None:
                 #ugh... the default comparison logic choose the right operand's __cmp__
@@ -178,6 +178,9 @@ class Node(xml.dom.Node, object):
                     raise IndexError("can't insert duplicate keys")                    
             
             newNode = ctor(key, self, nextSibling, previousSibling)
+            #we need to call this after the node os created but before it's added tree
+            if notify: 
+                notify(newNode)
             if nextSibling:
                 nextSibling.previousSibling = newNode
             if newNode.previousSibling:
@@ -189,6 +192,9 @@ class Node(xml.dom.Node, object):
                self._lastChild = self.childNodes[-1]
         else:
             newNode = ctor(key, self, None, None)
+            #we need to call this after the node os created but before it's added tree
+            if notify: 
+                notify(newNode)
             self._firstChild = self._lastChild = newNode
             self._childNodes = [ newNode ]
         return newNode
@@ -224,6 +230,15 @@ class Node(xml.dom.Node, object):
 
         oldChild.nextSibling = oldChild.previousSibling = None
         oldChild.parentNode = None                            
+
+    def getKey(self):
+        '''
+        This is used by the cache to return a key that uniquely
+        represents this node and current state of the DOM
+        '''
+        #todo: return a value that isn't tied to this in-node in memory representation
+        #e.g. its position in the DOM. 
+        return (id(self),  self.ownerDocument.getKey())
 
 def looksLikeObject(node):
     if node.nodeType == Node.TEXT_NODE:
@@ -362,15 +377,12 @@ class Resource(Element):
         #support for multiple rdf:types:        
         #note: doesn't support subproperties of rdf:type
         for n in self.childNodes:
-            if n.nodeType == Node.ELEMENT_NODE and n.localName == 'type' and n.namespaceURI == RDF_MS_BASE:
+            if (n.nodeType == Node.ELEMENT_NODE and n.localName == 'type'
+                    and n.namespaceURI == RDF_MS_BASE):
                 type = n.childNodes[0].uri
                 if self.ownerDocument.schema.isCompatibleType(type, 
                     namespaceURI + RxPath.getURIFragmentFromLocal(local)):
                         return True
-                #if local == '*' and type.startswith(namespaceURI):
-                #    return True
-                #elif type == (namespaceURI + RxPath.getURIFragmentFromLocal(local)): #schema.compatibleType(namespace+local, type)
-                #    return True
                 
         return False
 
@@ -388,7 +400,8 @@ class Resource(Element):
                 return RDF_MS_BASE + 'List'
             
         for p in self.childNodes:
-            #from the RDF/XML spec it doesn't appear that list has to specify its type is a list so also look for rdf:first
+            #from the RDF/XML spec it doesn't appear that list has to specify
+            #its type is a list so also look for rdf:first
             if p.stmt.predicate == RDF_MS_BASE + 'type':
                 if p.stmt.object in [RDF_MS_BASE + 'List', RDF_MS_BASE + 'Bag',
                         RDF_MS_BASE + 'Alt', RDF_MS_BASE + 'Seq']:
@@ -508,7 +521,7 @@ class Subject(Resource):
         for ordinal in ordinals:
             stmt = containerItems[ordinal]
             realPredicate = stmt.predicate
-            stmt.predicate = RDF_SCHEMA_BASE+'member'
+            stmt.predicate = RDF_SCHEMA_BASE+u'member'
             self._doAppendChild(children, Predicate(stmt, self, listID=realPredicate))            
         return children
 
@@ -621,6 +634,8 @@ class Subject(Resource):
                             RDF_MS_BASE+'rest', RDF_MS_BASE+'nil', objectType=OBJECT_TYPE_RESOURCE)
                         self.ownerDocument.model.removeStatement( oldPreviousRestStmt )
                     predicateNode = Predicate(stmt, self, None, self.lastChild, listID = listID)
+                    if self.ownerDocument.addTrigger:
+                        self.ownerDocument.addTrigger(predicateNode)
                     self._doAppendChild(self.childNodes, predicateNode)
                     self._firstChild = self._childNodes[0]
                     self._lastChild = self._childNodes[-1]
@@ -658,6 +673,8 @@ class Subject(Resource):
                         raise HierarchyRequestErr("model error: container statement %s already exists but in different order" % str(listID))
                 
                 predicateNode = Predicate(stmt, self, None, self.lastChild, listID = listID)
+                if self.ownerDocument.addTrigger:
+                    self.ownerDocument.addTrigger(predicateNode)
                 self._doAppendChild(self.childNodes, predicateNode)
                 self._firstChild = self._childNodes[0]
                 self._lastChild = self._childNodes[-1]
@@ -677,7 +694,8 @@ class Subject(Resource):
                             break
                 else:
                     hi = None
-                predicateNode = self._orderedInsert(stmt, Predicate, lambda x, y: cmp(x.stmt, y), hi = hi)
+                predicateNode = self._orderedInsert(stmt, Predicate,
+                    lambda x, y: cmp(x.stmt, y), hi = hi, notify=self.ownerDocument.addTrigger)
                 self.ownerDocument.model.addStatement( stmt )
                 self.ownerDocument.schema.addToSchema( [stmt] )
             self.revision += 1        
@@ -687,12 +705,15 @@ class Subject(Resource):
             log.debug('add statement failed: statement already exists: %s' % stmt)
             return None 
 
-    def removeChild(self, oldChild):
+    def removeChild(self, oldChild, removingResource=False):
         '''
             removes the statement identified by the child Predicate node oldChild.
             If the predicate is rdf:first then previous and next list item statements are adjusted.
             (Note: In the case of rdfs:member, sibling rdf:_n statements are not adjusted.)            
         '''
+        if not removingResource and self.ownerDocument.removeTrigger:
+           self.ownerDocument.removeTrigger(oldChild)
+        
         if oldChild.stmt.predicate == RDF_MS_BASE+'first': #if a list item
             assert oldChild.listID
             #check if there's item in the list preceeding this one
@@ -1299,12 +1320,16 @@ class Text(Node):
 
 class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invoked before this module's Node class
     '''
-    The factory functions create regular XML DOM nodes that create resources and statements when attached via appendChild(), etc.
+    Note: The factory functions create regular XML DOM nodes that create
+    resources and statements when attached via appendChild(), etc.
     '''
+
     _childNodes = None
     _firstChild = None
     _lastChild = None
     globalRecurseCheck = False
+    addTrigger = None
+    removeTrigger = None
 
     nextIndex = 0 #never used
     defaultNsRevMap = { RDF_MS_BASE : 'rdf', RDF_SCHEMA_BASE : 'rdfs' }
@@ -1400,6 +1425,9 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         (Don't use this option if more than one statement refer to the list.)
         '''
         #todo: what if the resource is reference by an object? -- model should throw an exception?
+        if self.removeTrigger:
+           self.removeTrigger(oldChild)
+
         for predicate in tuple(oldChild.childNodes):
             log.debug("removing statement %s" % predicate.stmt)
             list = None
@@ -1407,11 +1435,11 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
                 #if the object is a list 
                 isCompound = getattr(predicate.childNodes[0], 'isCompound', None)
                 if isCompound and isCompound() == RDF_MS_BASE + 'List':
-                    list = predicate.childNodes[0]            
-            oldChild.removeChild(predicate)
+                    list = predicate.childNodes[0]
+            oldChild.removeChild(predicate, removingResource=True)
             if list: #recursively remove the next item in the list
                 self.removeChild(list.source, True)
-            
+
         #self.model.removeResource(oldChild.uri)
         self._doRemoveChild(self._childNodes, oldChild)        
         self.revision += 1
@@ -1451,7 +1479,8 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
             log.debug('attempting to adding type statement %s for %s' % (typeName, uri))
             typeStmt = RxPath.Statement(uri, RDF_MS_BASE+'type', typeName, objectType=OBJECT_TYPE_RESOURCE)
             try:
-                predicateNode = subjectNode._orderedInsert(typeStmt, Predicate,lambda x, y: cmp(x.stmt, y)) 
+                predicateNode = subjectNode._orderedInsert(typeStmt, Predicate,
+                            lambda x, y: cmp(x.stmt, y), notify=self.addTrigger)
                 self.model.addStatement( typeStmt )
                 self.schema.addToSchema( [typeStmt] )
                 self.revision += 1
@@ -1497,9 +1526,14 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         #extModuleList = os.environ.get("EXTMODULES","").split(":"))
         return RxPath.evalXPath(xpath, context, expCache)
 
-    def begin(self):
-        self.model.begin()
-        self.schema.begin()
+    def getKey(self):
+        '''
+        This is used by the cache to return a key that uniquely
+        represents this node and current state of the DOM
+        '''
+        #todo: return a value that isn't tied to this in-node in memory representation
+        #e.g. the set of RDF contexts that comprise this model
+        return (id(self),  self.revision)
 
     def commit(self, **kw):
         self.model.commit(**kw)
@@ -1528,7 +1562,7 @@ def invokeRxSLT(RDFPath, stylesheetPath):
     _4suiteModel, db = utils.deserializeRDF( RDFPath )
     model = RxPath.FtModel(_4suiteModel)
     RxPathDom = RxPath.createDOM(model)
-    stylesheetContents = file(stylesheetPath).read()
+    stylesheetContents = file(stylesheetPath).read()    
     return RxPath.applyXslt(RxPathDom, stylesheetContents)
 
 def main(argv=sys.argv):
