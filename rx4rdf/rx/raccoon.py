@@ -17,7 +17,7 @@ if __name__ == '__main__':
     import sys
     raccoon.main(sys.argv[1:])
 else:
-    from rx import utils, glock, RxPath, MRUCache, XUpdate
+    from rx import utils, glock, RxPath, MRUCache, XUpdate, DomStore, transactions
     from Ft.Rdf.Drivers import Memory
     import os, time, sys, base64, mimetypes, types, traceback
     import urllib, re
@@ -49,10 +49,15 @@ else:
         exceptions derived from this class.
         '''
 
+    class ActionWrapperException(utils.NestedException):
+        def __init__(self):
+            return utils.NestedException.__init__(self,useNested=True)
+
     from rx.ExtFunctions import *
     from rx.Caching import *
     from rx.UriResolvers import *
     from rx import ContentProcessors
+    import rx.XhtmlWriter #adds the xhml method to xsl:output 
     
     def OsPath2PathUri(context, path):
         """
@@ -108,7 +113,7 @@ else:
             #defaultTriggerName let's us have different trigger type per thread
             #allowing site:/// urls to rely on the defaultTriggerName
             triggerName = self.triggerName or self.server.defaultRequestTrigger
-            result = self.server.runActions(triggerName, kw)
+            result = self.server.runActions(triggerName, kw, newTransaction=False)
             if result is not None: #'cause '' is OK
                 return (result, kw)
             else:
@@ -121,11 +126,15 @@ else:
             #else:raise AttributeError, name #we can't do this yet since we may need the parameters to figure out what to invoke (like a multimethod)
 
     def defaultActionCacheKeyPredicateFactory(action, cacheKeyPredicate):
-        '''    
-        returns a predicate to extract a key for the action out of a request
-        This function give an action a chance to customize the cacheKeyPredicate for the particulars of the action instance.
-        At the very least it must bind the action instance with the cacheKeyPredicate to disambiguate keys from different actions.
         '''
+        Returns a predicate to calculate a key for the action
+        based on a given request.
+        This function gives an action a chance to
+        customize the cacheKeyPredicate for the particulars of the
+        action instance. At the very least it should bind the action
+        instance with the cacheKeyPredicate to disambiguate keys from
+        different actions.
+        '''        
         actionid = id(action) #do this to avoid memory leaks
         return lambda resultNodeset, kw, contextNode, retVal: (
             actionid, cacheKeyPredicate(resultNodeset, kw, contextNode, retVal) )
@@ -232,8 +241,8 @@ onto the next Action in the sequence.
                     newvalue.append( ownerDocument.createTextNode(item))
             return newvalue
         else:
-            import Ft.Xml.XPath
-            assert isinstance(value, (str, Ft.Xml.XPath.boolean.BooleanType,
+            import Ft.Lib.boolean
+            assert isinstance(value, (str, Ft.Lib.boolean.BooleanType,
                                      bool, unicode, int, float, type(None)) )\
                    or getattr(value, 'nodeType', None), 'not a valid XPath datatype %s: ' % type(value)
             #todo: if is string: string = unicode(string,'utf8')
@@ -260,8 +269,13 @@ onto the next Action in the sequence.
         requestsRecord = None
         log = log        
         
-        def __init__(self,a=None, m=None, p=None, argsForConfig=None,
-                     appBase='/', model_uri=None, appName=''):
+        def __init__(self,
+                     #correspond to equivalentl command line args:
+                     a=None, m=None, p=None, argsForConfig=None,
+                     #correspond to equivalently named config settings
+                     appBase='/', model_uri=None, appName='',
+                     #dictionary of config settings, overrides the config
+                     appVars=None):
             self.requestContext = [{}] #stack of dicts
             configpath = a or self.DEFAULT_CONFIG_PATH
             self.source = m
@@ -273,10 +287,10 @@ onto the next Action in the sequence.
             self.appBase = appBase or '/'
             self.appName = appName
             self.cmd_usage = DEFAULT_cmd_usage
-            self.styleSheetCache = MRUCache.MRUCache(0, styleSheetValueCalc)
-            self.loadConfig(configpath, argsForConfig)
+            self.styleSheetCache = MRUCache.MRUCache(0, styleSheetValueCalc, digestKey=True)
+            self.loadConfig(configpath, argsForConfig, appVars)
             self.requestDispatcher = Requestor(self)            
-            self.resolver = SiteUriResolver(self)            
+            self.resolver = SiteUriResolver(self)
             self.loadModel()
             self.handleCommandLine(argsForConfig or [])
                     
@@ -292,27 +306,31 @@ onto the next Action in the sequence.
             kw['_cmdline'] = '"' + '" "'.join(argv) + '"' 
             self.runActions('run-cmds', kw)        
                 
-        def loadConfig(self, path, argsForConfig=None):
-            if not path:
+        def loadConfig(self, path, argsForConfig=None, appVars=None):
+            if not path and not appVars:
                 raise CmdArgError('you must specify a config file using -a') #path = self.DEFAULT_CONFIG_PATH
             if not os.path.exists(path):
                 raise CmdArgError('%s not found' % path) 
 
             kw = {}
-            if not self.BASE_MODEL_URI:
-                import socket            
-                self.BASE_MODEL_URI= 'http://' + socket.getfqdn() + '/'
-            
-            def includeConfig(path):
-                 kw['__configpath__'].append(os.path.abspath(path))
-                 execfile(path, globals(), kw)
-                 kw['__configpath__'].pop()
-                         
-            kw['__server__'] = self
-            kw['__argv__'] = argsForConfig or []
-            kw['__include__'] = includeConfig
-            kw['__configpath__'] = [os.path.abspath(path)]
-            execfile(path, globals(), kw)
+            if path:
+                if not self.BASE_MODEL_URI:
+                    import socket            
+                    self.BASE_MODEL_URI= 'http://' + socket.getfqdn() + '/'
+                
+                def includeConfig(path):
+                     kw['__configpath__'].append(os.path.abspath(path))
+                     execfile(path, globals(), kw)
+                     kw['__configpath__'].pop()
+                             
+                kw['__server__'] = self
+                kw['__argv__'] = argsForConfig or []
+                kw['__include__'] = includeConfig
+                kw['__configpath__'] = [os.path.abspath(path)]
+                execfile(path, globals(), kw)
+
+            if appVars:
+                kw.update(appVars)
 
             def initConstants(varlist, default):
                 return assignVars(self, kw, varlist, default)
@@ -321,7 +339,7 @@ onto the next Action in the sequence.
                              'NOT_CACHEABLE_FUNCTIONS', ], {} )
             initConstants( [ 'STORAGE_PATH', 'STORAGE_TEMPLATE', 'APPLICATION_MODEL',
                              'DEFAULT_MIME_TYPE', 'transactionLog'], '')
-            setattr(self, 'initModel', kw.get('initModel', RxPath.initFileModel))            
+
             initConstants( ['appBase'], self.appBase)
             assert self.appBase[0] == '/', "appBase must start with a '/'"
             initConstants( ['BASE_MODEL_URI'], self.BASE_MODEL_URI)
@@ -330,6 +348,12 @@ onto the next Action in the sequence.
             if not self.appName:            
                 self.appName = re.sub(r'\W','_', self.BASE_MODEL_URI)            
             self.log = logging.getLogger("raccoon." + self.appName)
+
+            self.txnSvc = transactions.RaccoonTransactionService(self)
+            domStoreFactory = kw.get('domStoreFactory', DomStore.RxPathDomStore)
+            self.domStore = domStoreFactory()                        
+            self.domStore.addTrigger = self.txnSvc.addHook
+            self.domStore.removeTrigger = self.txnSvc.removeHook
             
             self.defaultRequestTrigger = kw.get('DEFAULT_TRIGGER', 'http-request')
             initConstants( ['globalRequestVars'], [])
@@ -346,7 +370,8 @@ onto the next Action in the sequence.
             fileCache.maxFileSize = kw.get('MAX_CACHEABLE_FILE_SIZE', 0)                        
             self.expCache.capacity = self.XPATH_PARSER_CACHE_SIZE
             fileCache.capacity = self.FILE_CACHE_SIZE
-            fileCache.hashValue = lambda path: getFileCacheKey(path, fileCache.maxFileSize)
+            fileCache.hashValue = lambda path: getFileCacheKey(path,
+                                               fileCache.maxFileSize)
                     
             self.PATH = kw.get('PATH', self.PATH)
             
@@ -358,7 +383,8 @@ onto the next Action in the sequence.
             self.authorizeMetadata = kw.get('authorizeMetadata', lambda *args: True)
             self.validateExternalRequest = kw.get('validateExternalRequest', lambda *args: True)            
             self.getPrincipleFunc = kw.get('getPrincipleFunc', lambda kw: '')
-            self.authorizeXPathFuncs = kw.get('authorizeXPathFuncs', lambda self, funcMap, kw: funcMap)
+            self.authorizeXPathFuncs = kw.get('authorizeXPathFuncs',
+                                              lambda self, funcMap, kw: funcMap)
             
             self.MODEL_UPDATE_PREDICATE = kw.get('MODEL_UPDATE_PREDICATE')
             self.MODEL_RESOURCE_URI = kw.get('MODEL_RESOURCE_URI', self.BASE_MODEL_URI)
@@ -368,8 +394,13 @@ onto the next Action in the sequence.
             self.NOT_CACHEABLE_FUNCTIONS.update(DefaultNotCacheableFunctions)
             if self.LIVE_ENVIRONMENT:
                 self.NOT_CACHEABLE_FUNCTIONS.update( EnvironmentDependentFunctions )
+                #only cache stylesheets when they don't depend on external files
                 self.styleSheetCache.isValueCacheableCalc = isStyleSheetCacheable
             else:
+                #don't worry about files changing, the only thing we worry about is the
+                #store changing
+                #if the stylesheet has dependencies on other resources
+                #these functions to keep track of the state of the store                
                 self.styleSheetCache.sideEffectsFunc = self.styleSheetParserSideEffectsFunc
                 self.styleSheetCache.sideEffectsCalc = self.styleSheetParserSideEffectsCalc
                 
@@ -421,23 +452,15 @@ onto the next Action in the sequence.
                 lockName = 'r' + `hash(repr(source))` + '.lock'
                 self.lock = glock.GlobalLock(lockName)
                 
-            lock = self.getLock()            
-            model = self.initModel(source, StringIO.StringIO(self.STORAGE_TEMPLATE))
-                    
-            if self.APPLICATION_MODEL:
-                appmodel, appdb = utils.DeserializeFromN3File(StringIO.StringIO(self.APPLICATION_MODEL), scope='application')
-                model = RxPath.MultiModel(model, RxPath.FtModel(appmodel))
-                
-            if self.transactionLog:
-                model = RxPath.MirrorModel(model, RxPath.initFileModel(self.transactionLog, StringIO.StringIO('')) )
-                
-            self.revNsMap = dict(map(lambda x: (x[1], x[0]), self.nsMap.items()) )#reverse namespace map #todo: bug! revNsMap doesn't work with 2 prefixes one ns
-            self.rdfDom = RxPath.createDOM(model, self.revNsMap)
-            
-            self.rdfDom.queryCache = MRUCache.MRUCache(self.XPATH_CACHE_SIZE, lambda compExpr, context: compExpr.evaluate(context),
-                    lambda compExpr, context: getKeyFromXPathExp(compExpr, context, self.NOT_CACHEABLE_FUNCTIONS),
+            lock = self.getLock()
+            self.queryCache = MRUCache.MRUCache(self.XPATH_CACHE_SIZE,
+                    lambda compExpr, context: compExpr.evaluate(context),
+                    lambda compExpr, context: getKeyFromXPathExp(compExpr,
+                                    context, self.NOT_CACHEABLE_FUNCTIONS),
                     processXPathExpSideEffects, calcXPathSideEffects)
-            self.rdfDom.actionCache = MRUCache.MRUCache(self.ACTION_CACHE_SIZE)
+            self.actionCache = MRUCache.MRUCache(self.ACTION_CACHE_SIZE,digestKey=True)
+            
+            self.domStore.loadDom(self, source, StringIO.StringIO(self.STORAGE_TEMPLATE))
             lock.release()
     ##        outputfile = file('debug.xml', "w+", -1)
     ##        from Ft.Xml.Domlette import Print, PrettyPrint
@@ -453,7 +476,7 @@ onto the next Action in the sequence.
     ## request handling engine
     ###########################################
             
-        def runActions(self, triggerName, kw = None):
+        def runActions(self, triggerName, kw = None, newTransaction=True):
             '''        
             Retrieve the action sequences associated with the triggerName.    
             Each Action has a list of RxPath expressions that are evaluated after 
@@ -465,13 +488,16 @@ onto the next Action in the sequence.
             if kw is None: kw = {}            
             sequence = self.actions.get(triggerName)
             if sequence:
+                errorSequence = self.actions.get(triggerName+'-error')
                 try:
                     #this is a stack in case runActions is re-entrant
                     if self.previousResolvers is None:
                         self.previousResolvers = []                    
                     self.previousResolvers.append( InputSource.DefaultFactory.resolver )
                     InputSource.DefaultFactory.resolver = self.resolver
-                    return self.doActions(sequence, kw)
+                    
+                    return self.doActions(sequence, kw, errorSequence=errorSequence,
+                                                      newTransaction=newTransaction)
                 finally:
                     InputSource.DefaultFactory.resolver = self.previousResolvers.pop()
                     
@@ -492,7 +518,7 @@ onto the next Action in the sequence.
             })        
             #add most kws to vars (skip references to non-simple types):
             #todo: use of toXPathDataType is inconsistent -- should use throughout -- especially with prevkw
-            vars = dict( [( (None, x[0]), toXPathDataType(x[1], self.rdfDom) ) for x in kw.items()\
+            vars = dict( [( (None, x[0]), toXPathDataType(x[1], self.domStore.dom) ) for x in kw.items()\
                           if x[0] not in self.COMPLEX_REQUESTVARS and x[0] != '_metadatachanges'] )
             #magic constants:
             vars[(None, 'STOP')] = self.STOP_VALUE
@@ -530,7 +556,7 @@ onto the next Action in the sequence.
         def evalXPath(self, xpath,  vars=None, extFunctionMap = None, node = None):
             #print 'eval node', node        
             try:
-                node = node or self.rdfDom
+                node = node or self.domStore.dom
                 if extFunctionMap is None:
                     extFunctionMap = self.extFunctions
                 if vars is None:
@@ -539,8 +565,8 @@ onto the next Action in the sequence.
                     
                 context = XPath.Context.Context(node, varBindings = vars,
                             extFunctionMap = extFunctionMap, processorNss = self.nsMap)
-                return RxPath.evalXPath(xpath, context, expCache = self.expCache,
-                        queryCache=getattr(self.rdfDom, 'queryCache', None))
+                return self.domStore.evalXPath(xpath, context, expCache =
+                               self.expCache, queryCache = self.queryCache)
             except (RuntimeException), e:
                 if e.errorCode == RuntimeException.UNDEFINED_VARIABLE:                            
                     self.log.debug(e.message) #undefined variables are ok
@@ -560,18 +586,9 @@ onto the next Action in the sequence.
                 if assignEmpty or result:
                     AssignMetaData(kw, context, name, result, authorize=False)
                     #print name, result, contextNode
-                
-        def doActions(self, sequence, kw = None, contextNode = None, retVal = None):
-            if kw is None: kw = {}
+
+        def _doActionsBare(self, sequence, kw, contextNode, retVal):
             result = None
-            #todo: reexamine this logic
-            if isinstance(contextNode, type([])) and contextNode:
-                contextNode = contextNode[0]        
-
-            kw['__requestor__'] = self.requestDispatcher
-            kw['__server__'] = self
-            kw['__context'] = [ contextNode ]  #__context so access to the rdf database is available to xsl, xupdate, etc. processing
-
             try:
                 for action in sequence:            
                     if action.requiresContext:
@@ -607,14 +624,14 @@ onto the next Action in the sequence.
                                         #print '!!!res', contextNode.childNodes
                                     for node in result:
                                         if kw.get('_metadatachanges'): del kw['_metadatachanges']
-                                        retVal = self.rdfDom.actionCache.getOrCalcValue(action.action,
+                                        retVal = self.actionCache.getOrCalcValue(action.action,
                                             [node], kw, contextNode, retVal, hashCalc=action.cacheKeyPredicate,
                                             sideEffectsCalc=action.sideEffectsPredicate,
                                             sideEffectsFunc=action.sideEffectsFunc,
                                             isValueCacheableCalc=action.isValueCacheableCalc)
                                 else:
                                     if kw.get('_metadatachanges'): del kw['_metadatachanges']
-                                    retVal = self.rdfDom.actionCache.getOrCalcValue(action.action,
+                                    retVal = self.actionCache.getOrCalcValue(action.action,
                                                 result, kw, contextNode, retVal,
                                                 hashCalc=action.cacheKeyPredicate,
                                                 sideEffectsCalc=action.sideEffectsPredicate,
@@ -624,18 +641,64 @@ onto the next Action in the sequence.
                                 break
                     self.__assign(action.postVars, kw, contextNode)
             except:
+                exc = ActionWrapperException()
+                exc.state = (result, contextNode, retVal)
+                raise exc
+            return result, contextNode, retVal
+
+        def _doActionsTxn(self, sequence, kw, contextNode, retVal):
+            self.txnSvc.begin(source=self.getPrincipleFunc(kw))
+            self.txnSvc.state.kw = kw
+            self.txnSvc.state.contextNode = contextNode
+            self.txnSvc.state.retVal = retVal
+            try:
+                result, contextNode, retVal = self._doActionsBare(sequence, kw, contextNode, retVal)
+            except:
+                self.txnSvc.abort()
+                raise
+            else:
+                self.txnSvc.state.result = result
+                self.txnSvc.state.contextNode = contextNode
+                self.txnSvc.state.retVal = retVal
+                self.txnSvc.commit()            
+            return retVal
+                
+        def doActions(self, sequence, kw=None, contextNode=None,retVal=None,
+                      errorSequence=None, newTransaction=False):
+            if kw is None: kw = {}
+            result = None
+            #todo: reexamine this logic
+            if isinstance(contextNode, type([])) and contextNode:
+                contextNode = contextNode[0]        
+
+            kw['__requestor__'] = self.requestDispatcher
+            kw['__server__'] = self
+            kw['__context'] = [ contextNode ]  
+
+            try:
+                if newTransaction:
+                    retVal = self._doActionsTxn(sequence, kw, contextNode, retVal)
+                else:
+                    result, contextNode, retVal = self._doActionsBare(
+                                    sequence, kw, contextNode, retVal)
+            except:
+                exc_info = sys.exc_info()
+                if isinstance(exc_info[1], ActionWrapperException):
+                    result, contextNode, retVal = exc_info[1].state
+                    exc_info = exc_info[1].nested_exc_info
+
                 if self.inErrorHandler or kw.get('_noErrorHandling'):#avoid endless loops
-                    raise
+                    raise exc_info[1] or exc_info[0], None, exc_info[2]
                 else:
                     self.inErrorHandler += 1
                 try:
-                    if isinstance(sys.exc_info()[1], DoNotHandleException):
-                        raise
-                    errorSequence = self.actions.get('on-error')
+                    if isinstance(exc_info[1], DoNotHandleException):
+                        raise exc_info[1] or exc_info[0], None, exc_info[2]
+
                     if errorSequence and sequence is not errorSequence:
                         import traceback as traceback_module
                         def extractErrorInfo(type, value):
-                            #these maybe either the nested exception or the wrapper exception
+                            #value may be either the nested exception or the wrapper exception
                             message = str(value)
                             module = '.'.join( str(type).split('.')[:-1] )
                             name = str(type).split('.')[-1]
@@ -643,28 +706,35 @@ onto the next Action in the sequence.
                             return message, module, name, errorCode
                         
                         def getErrorKWs():                            
-                            type, value, traceback = sys.exc_info()
+                            type, value, traceback = exc_info
                             if isinstance(value, utils.NestedException) and value.useNested:
                                  message, module, name, errorCode = extractErrorInfo(
                                      value.nested_exc_info[0], value.nested_exc_info[1])
                             else:
                                 message, module, name, errorCode = extractErrorInfo(type, value)                            
                             #these should always be the wrapper exception:     
-                            fileName, lineNumber, functionName, text = traceback_module.extract_tb(traceback, 1)[0]
-                            details = ''.join( traceback_module.format_exception(type, value, traceback) )
+                            (fileName, lineNumber, functionName,
+                                text) = traceback_module.extract_tb(traceback, 1)[0]
+                            details = ''.join( traceback_module.format_exception(
+                                                        type, value, traceback) )
                             return locals()
                         kw['_errorInfo'] = getErrorKWs()
                         self.log.warning("invoking error handler on exception", exc_info=1)
                         #todo provide a protocol for mapping exceptions to XPath variables, e.g. line # for parsing errors
                         #kw['errorInfo'].update(self.extractXPathVars(kw['errorInfo']['value']) )
-                        return self.callActions(errorSequence, self.globalRequestVars, result, kw, contextNode, retVal)
+                        return self.callActions(errorSequence, result, kw,
+                                contextNode, retVal, self.globalRequestVars,
+                                    #if we're creating a new transaction, it has been aborted by now, so start a new one
+                                            newTransaction=newTransaction) 
                     else:
-                        raise
+                        #traceback.print_exception(*exc_info)
+                        raise exc_info[1] or exc_info[0], None, exc_info[2]
                 finally:
                     self.inErrorHandler -= 1
             return retVal
 
-        def callActions(self, actions, globalVars, resultNodeset, kw, contextNode, retVal):
+        def callActions(self, actions,resultNodeset, kw, contextNode, retVal,
+                        globalVars=None, errorSequence=None, newTransaction=False):
             '''
             process another set of actions using the current context as input,
             but without modified the current context.
@@ -672,7 +742,8 @@ onto the next Action in the sequence.
             '''
             prevkw = kw.get('_prevkw', {}).copy() #merge previous prevkw, overriding vars as necessary
             templatekw = {}
-
+            
+            globalVars = globalVars or []
             #globalVars are variables that should be present through out the whole request
             #so copy them into templatekw instead of _prevkw
             globalVars = self.COMPLEX_REQUESTVARS + globalVars
@@ -692,29 +763,11 @@ onto the next Action in the sequence.
             templatekw['_contents'] = retVal
             
             #nodeset containing current resource
-            templatekw['_previousContext'] = [ contextNode ]
+            templatekw['_previousContext'] = contextNode and [ contextNode ] or []
             templatekw['_originalContext'] = kw.get('_originalContext', templatekw['_previousContext'])
             #use the resultNodeset as the contextNode for call action
-            return self.doActions(actions, templatekw, resultNodeset) 
-
-        def Evaluate(self, context, expr):
-            ''' Like 4Suite's 'evaluate' extension function but adds
-            all the configured namespace mappings to the context. '''
-            
-            oldNss = context.processorNss.copy()
-            context.processorNss.update(self.nsMap)
-            DOMnsMap = dict([(y, x) for x,y in getattr(context.node.ownerDocument, 'nsRevMap', {}).items()] )
-            context.processorNss.update(DOMnsMap)
-            xpath = StringValue(expr)
-            #use if caches available
-            compExpr = self.expCache.getValue(xpath) #todo: nsMap should be part of the key -- until then clear the cache if you change that!        
-            queryCache= getattr(context.node.ownerDocument, 'queryCache', None)
-            if queryCache:
-                res = queryCache.getValue(compExpr, context)         
-            else:
-                res = compExpr.evaluate(context)
-            context.processorNss = oldNss    
-            return res
+            return self.doActions(actions, templatekw, resultNodeset,
+                errorSequence=errorSequence, newTransaction=newTransaction) 
                 
     ###########################################
     ## content processing 
@@ -759,8 +812,8 @@ onto the next Action in the sequence.
                         useCache = False                
                             
                 if useCache:
-                    kw['_preferStreamThreshhold'] = self.rdfDom.actionCache.maxValueSize
-                    retVal = self.rdfDom.actionCache.getOrCalcValue(                            
+                    kw['_preferStreamThreshhold'] = self.actionCache.maxValueSize
+                    retVal = self.actionCache.getOrCalcValue(                            
                         contentProcessor.processContents,
                         result, kw, contextNode, contents,
                         hashCalc=contentProcessor.getCachePredicate or notCacheableKeyPredicate,
@@ -781,12 +834,7 @@ onto the next Action in the sequence.
                     kw['__lastFormat']=formatType                    
                     return retVal
             return contents
-            
-            #trigger = kw.get('_update-trigger')
-            #if trigger:
-            #    del kw['_update-trigger']
-            #    self.runActions(trigger, kw)
-    
+                
         def authorizeByDigest(self, contents, *args):
             '''Raises a NotAuthorized exception if the SHA1 digest of
             the contents argument is not present in the dictionary
@@ -797,85 +845,25 @@ onto the next Action in the sequence.
                 raise NotAuthorized(
                  'This application is not configured to process the content with a SHA1 digest of '
                  + digest)
-
-        def processContentsXPath(self, context, contents, formatURI, *args):
-            ''' This XPath extention function lets you invoke the
-            content processors on an arbitrary string of content.
-            Because of potential security risks, it is not added by
-            default to the external function namespace and so needs to
-            be added to application's "extFunctions" dictionary. '''
-            
-            kw = {}
-            kw['__requestor__'] = self.requestDispatcher
-            kw['__server__'] = self
-
-            kwIter = iter(args)
-            try:
-                while 1:
-                    n, v = kwIter.next(), kwIter.next()
-                    kw[ n ] = v
-            except StopIteration:
-                pass
-            #print >>sys.stderr, 'kw', kw
-            
-            contextNode = kw.get('__context')
-            if contextNode:
-                contextNode = contextNode[0]
-            else:
-                contextNode = context.node
-            return self.processContents(formatURI, kw, contextNode, contents, True)    
             
         def processRxSLT(self, stylesheet, kw=None):
             '''
-            process RxSLT
+            apply a RxSLT to the store's DOM. Actually, if the DOM isn't an RxPath DOM,
+            stylesheet will be treated as standard XSLT.
             '''
             if kw is None: kw = {}        
             vars, funcs = self.mapToXPathVars(kw)
+
             self.authorizeXPathFuncs(self, funcs, kw)
             
-            processor = RxPath.RxSLTProcessor()
-            contents = RxPath.applyXslt(self.rdfDom, stylesheet, vars, funcs,
-                        baseUri='path:',styleSheetCache=self.styleSheetCache,
-                                        processor=processor)
+            contents, stylesheet = self.domStore.applyXslt(stylesheet, vars, funcs,
+                        baseUri='path:',styleSheetCache=self.styleSheetCache)
             format = kw.get('_nextFormat')            
             if format is None:
-                format = self._getFormatFromStyleSheet(processor.stylesheet)
+                format = self._getFormatFromStyleSheet(stylesheet)
             else:
                 del kw['_nextFormat']
-            return (contents, format)
-                    
-        def executePython(self, cmds, kw = None):
-            if kw is None: kw = {}
-            #todo: thread synchronize
-            #print cmds
-            output = StringIO.StringIO()
-            sys_stdout = sys.stdout
-            sys.stdout = output
-            try:        
-                #exec only likes unix-line feeds
-                exec cmds.strip().replace('\r', '\n')+'\n' in globals(), kw
-                contents = output.getvalue()
-            except:
-                sys.stdout = sys_stdout
-                self.log.exception('got this far before exception %s', output.getvalue())
-                raise
-            else:   #can't have a finally here
-                sys.stdout = sys_stdout
-            return contents
-
-        def processPython(self, contents, kw):
-            locals = {}
-            locals['__requestor__'] = self.requestDispatcher
-            locals['__server__'] = self
-            locals['__kw__'] = kw
-            
-            contents = self.executePython(contents, locals)             
-            if '_nextFormat' in kw: #doc
-                nextFormat = kw['_nextFormat']
-                del kw['_nextFormat']
-                return contents, nextFormat
-            else:
-                return contents
+            return (contents, format)                    
 
         def _getFormatFromStyleSheet(self,styleSheet):
             '''
@@ -885,7 +873,7 @@ onto the next Action in the sequence.
                 if child.expandedName[0] == XSL_NAMESPACE and \
                     child.expandedName[1] == 'output' and child._method]
            
-            if outputElements and outputElements[-1]._method[1] not in ('xml', 'html'):
+            if outputElements and outputElements[-1]._method[1] not in ('xml', 'html', 'xhtml'):
                 return None #text or unknown output method -- no further processing
             else:
                 return 'http://rx4rdf.sf.net/ns/wiki#item-format-xml'
@@ -940,15 +928,14 @@ onto the next Action in the sequence.
                 #if the stylesheet relies on other files (e.g. through xsl:import)
                 #we want to include the state of the store so that when it changes we invalidate this key
                 #and recalculate the value -- just in case one of those referenced files have changed                
-                key = [id(self.rdfDom), getattr(self.rdfDom, 'revision', None)]
+                key = self.domStore.getStateKey()
             else:
                 key = None
             return key
 
         def styleSheetParserSideEffectsFunc(self, cacheValue, sideEffects, *args):                    
-            if sideEffects:
-                key = [id(self.rdfDom), getattr(self.rdfDom, 'revision', None)]
-                if sideEffects != key:
+            if sideEffects:                
+                if sideEffects != self.domStore.getStateKey():
                     #if the model has changed, raise a KeyError so we reparse the stylesheet
                     raise KeyError
             else:
@@ -957,7 +944,6 @@ onto the next Action in the sequence.
     ###########################################
     ## update processing (to be refactored)
     ###########################################        
-
         def addUpdateStatement(self, rdfDom):
             '''
             Add a statement representing the current state of the model.
@@ -983,32 +969,128 @@ onto the next Action in the sequence.
             vars, funcs = self.mapToXPathVars(kw)
             #don't do an authorization check for the XPath functions
             #because we don't other authorization for xupdate and
-            #we need to call XUpdate on behalf of others 
+            #we need to call XUpdate on behalf of others
+
+            #todo!            
             #self.authorizeXPathFuncs(self, funcs, kw)
             output = StringIO.StringIO()
-            rdfDom.begin()        
-            try:
-                RxPath.applyXUpdate(rdfDom, xupdate, vars, funcs,
-                                    uri=baseUri, msgOutput=output)
-                if self.MODEL_UPDATE_PREDICATE:
-                    self.addUpdateStatement(rdfDom)            
-            except:
-                rdfDom.rollback()
-                raise
-            else:
-                rdfDom.commit(source=self.getPrincipleFunc(kw))
+            RxPath.applyXUpdate(rdfDom, xupdate, vars, funcs,
+                                uri=baseUri, msgOutput=output)
             return output.getvalue()            
             
         def processXUpdate(self, xupdate=None, kw=None, uri=None):
             '''execute the xupdate script, updating the server's model
-            '''        
-            lock = self.getLock()        
-            try:
-                return self.xupdateRDFDom(self.rdfDom, xupdate, kw, uri)
-            finally:
-                lock.release()
+            '''
+            self.txnSvc.join(self.domStore)
+            return self.xupdateRDFDom(self.domStore.dom, xupdate, kw, uri)
+                                        
+        def updateDom(self, addStmts, removedNodes=None, source='', authorize=None):
+            '''update our DOM
+            addStmts is a list of Statements to add
+            removedNodes is a list of RxPath nodes (either subject or predicate nodes) to remove
+            '''
+            removedNodes = removedNodes or []
+            #log.debug('removing %s' % removeResources)
+            self.txnSvc.join(self.domStore)
+
+            if authorize and source and self.authorizeRemovals:
+                #we must authorize the removes while their still in the DOM
+                #(the authorize function needs to know their relations with the DOM)
+                self.authorizeRemovals(authorize[0],authorize[1],authorize[2], source)            
+            #delete the statements or whole resources from the dom:            
+            for node in removedNodes:
+                node.parentNode.removeChild(node)
+
+            if authorize and source and self.authorizeAdditions:
+                #we must authorize the add before they've been added to the DOM
+                #to prevent the addition from messing with the authorizatin logic
+                #note: even though whole list and containers have been removed,
+                #we can still traverse through them if needed because the list resource
+                #should still be present if referenced as the object of a statement
+                self.authorizeAdditions(authorize[0],authorize[1],authorize[2], source)            
                 
-        def processRxML(self, xml, resources=None, source=''):
+            #and add the statements
+            RxPath.addStatements(self.domStore.dom, addStmts)
+
+            #todo: invoke 'before' triggers
+            #todo: invoke validation
+            
+            if self.MODEL_UPDATE_PREDICATE:
+                self.addUpdateStatement(self.domStore.dom) 
+
+    ###########################################
+    ## XPath extension functions                
+    ###########################################
+        def Evaluate(self, context, expr):
+            ''' Like 4Suite's 'evaluate' extension function but adds
+            all the configured namespace mappings to the context. '''
+            
+            oldNss = context.processorNss.copy()
+            context.processorNss.update(self.nsMap)
+            DOMnsMap = dict([(y, x) for x,y in getattr(context.node.ownerDocument, 'nsRevMap', {}).items()] )
+            context.processorNss.update(DOMnsMap)
+            xpath = StringValue(expr)
+            #use if caches available
+            compExpr = self.expCache.getValue(xpath) #todo: nsMap should be part of the key -- until then clear the cache if you change that!        
+            queryCache= getattr(context.node.ownerDocument, 'queryCache', None)
+            if queryCache:
+                res = queryCache.getValue(compExpr, context)         
+            else:
+                res = compExpr.evaluate(context)
+            context.processorNss = oldNss    
+            return res
+
+        def processContentsXPath(self, context, contents, formatURI, *args):
+            ''' This XPath extention function lets you invoke the
+            content processors on an arbitrary string of content.
+            Because of potential security risks, it is not added by
+            default to the external function namespace and so needs to
+            be added to application's "extFunctions" dictionary. '''
+            
+            kw = {}
+            kw['__requestor__'] = self.requestDispatcher
+            kw['__server__'] = self
+
+            kwIter = iter(args)
+            try:
+                while 1:
+                    n, v = kwIter.next(), kwIter.next()
+                    kw[ n ] = v
+            except StopIteration:
+                pass
+            #print >>sys.stderr, 'kw', kw
+            
+            contextNode = kw.get('__context')
+            if contextNode:
+                contextNode = contextNode[0]
+            else:
+                contextNode = context.node
+            return self.processContents(formatURI, kw, contextNode, contents, True)    
+                
+        def saveRxML(self, context, contents, user=None, about=None):
+          ''' XPath extension function for saving RxML. Because of
+          potential security risks, it is not added by default to the
+          external function namespace and so needs to be added to
+          application's "extFunctions" dictionary. '''
+          
+          try:
+              import zml
+              xml = zml.zmlString2xml(contents, mixed=False, URIAdjust = True)#parse the zml to xml
+                        
+              if isinstance(about, ( types.ListType, types.TupleType ) ):            
+                  #about may be a list of text nodes, convert to a list of strings
+                  about = [StringValue(x) for x in about]
+              elif about is not None:
+                  about = [ about ]
+              xml ='<rx:rx>'+ xml+'</rx:rx>'
+              self._processRxML(xml, about, source=user)
+          except NotAuthorized:
+            raise
+          except:
+            self.log.exception("metadata save failed")
+            raise
+
+        def _processRxML(self, xml, resources=None, source=''):
             '''        
             Update the model with the RxML document.
             
@@ -1028,89 +1110,23 @@ onto the next Action in the sequence.
 
             if resources is None:
                 #no resources specified -- just add all the statements            
-                newStatements, removedNodes = RxPath.addDOM(self.rdfDom, rxmlDom,
+                newStatements, removedNodes = RxPath.addDOM(self.domStore.dom, rxmlDom,
                                                             authorizeHook)
             else:
-                newStatements, removedNodes = RxPath.mergeDOM(self.rdfDom, rxmlDom,
+                newStatements, removedNodes = RxPath.mergeDOM(self.domStore.dom, rxmlDom,
                                                 resources, authorizeHook)
             return self.updateDom(newStatements, removedNodes, source, authorizeTuple[0])
 
-        def saveRxML(self, context, contents, user=None, about=None):
-          ''' XPath extension function for saving RxML. Because of
-          potential security risks, it is not added by default to the
-          external function namespace and so needs to be added to
-          application's "extFunctions" dictionary. '''
-          
-          try:
-              import zml
-              xml = zml.zmlString2xml(contents, mixed=False, URIAdjust = True)#parse the zml to xml
-                        
-              if isinstance(about, ( types.ListType, types.TupleType ) ):            
-                  #about may be a list of text nodes, convert to a list of strings
-                  about = [StringValue(x) for x in about]
-              elif about is not None:
-                  about = [ about ]
-              xml ='<rx:rx>'+ xml+'</rx:rx>'
-              self.processRxML(xml, about, source=user)
-          except NotAuthorized:
-            raise
-          except:
-            self.log.exception("metadata save failed")
-            raise
-                
-        def updateDom(self, addStmts, removedNodes=None, source='', authorize=None):
-            '''update our DOM
-            addStmts is a list of Statements to add
-            removedNodes is a list of RxPath nodes (either subject or predicate nodes) to remove
-            '''
-            removedNodes = removedNodes or []
-            lock = self.getLock()        
-            self.rdfDom.begin()
-            #log.debug('removing %s' % removeResources)
-            try:
-                if authorize and source and self.authorizeRemovals:
-                    #we must authorize the removes while their still in the DOM
-                    #(the authorize function needs to know their relations with the DOM)
-                    self.authorizeRemovals(authorize[0],authorize[1],authorize[2], source)            
-                #delete the statements or whole resources from the dom:            
-                for node in removedNodes:
-                    node.parentNode.removeChild(node)
-
-                if authorize and source and self.authorizeAdditions:
-                    #we must authorize the add before they've been added to the DOM
-                    #to prevent the addition from messing with the authorizatin logic
-                    #note: even though whole list and containers have been removed,
-                    #we can still traverse through them if needed because the list resource
-                    #should still be present if referenced as the object of a statement
-                    self.authorizeAdditions(authorize[0],authorize[1],authorize[2], source)            
-                    
-                #and add the statements
-                RxPath.addStatements(self.rdfDom, addStmts)
-
-                #todo: invoke 'before' triggers
-                #todo: invoke validation
-                
-                if self.MODEL_UPDATE_PREDICATE:
-                    self.addUpdateStatement(self.rdfDom) 
-            except:
-                self.rdfDom.rollback()
-                lock.release()
-                raise
-            else:
-                self.rdfDom.commit(source=source)
-                lock.release()
-            #todo: invoke 'after' triggers
-
-        #dignostic utility
+    #dignostic utility
         def dump(self):
             '''returns a xml representation of the rdf model'''
-            oldVal = self.rdfDom.globalRecurseCheck
-            self.rdfDom.globalRecurseCheck=True
+            oldVal = self.domStore.dom.globalRecurseCheck
+            self.domStore.dom.globalRecurseCheck=True
             try:
                 strIO = StringIO.StringIO()        
-                PrettyPrint(self.rdfDom, strIO, asHtml=1) #asHtml to suppress <?xml ...>
+                PrettyPrint(self.domStore.dom, strIO, asHtml=1) #asHtml to suppress <?xml ...>
             finally:
-                self.rdfDom.globalRecurseCheck=oldVal
+                self.domStore.dom.globalRecurseCheck=oldVal
             return '<RxPathDOM>'+strIO.getvalue() +'</RxPathDOM>'
             #this is faster than the equivalent:
             styleSheet=r'''<?xml version="1.0" ?>        
@@ -1225,7 +1241,7 @@ onto the next Action in the sequence.
             test = result[:30].strip().lower()
             if test.startswith("<html") or result.startswith("<!doctype html"):
                 return "text/html"
-            elif test.startswith("<?xml"):
+            elif test.startswith("<?xml") or test[2:].startswith("<?xml"): 
                 return "text/xml"
             elif self.DEFAULT_MIME_TYPE:
                 return self.DEFAULT_MIME_TYPE
@@ -1348,7 +1364,8 @@ onto the next Action in the sequence.
                         raise ValueError
                 except (IndexError, ValueError):
                     debugFileName = 'debug-wiki.pkl'
-                requests = pickle.load(file(debugFileName, 'rb'))
+                flags = sys.version_info[:2] < (2, 3) and 'b' or 'U'
+                requests = pickle.load(file(debugFileName, 'r'+flags))
                 for request in requests:
                     root.handleHTTPRequest(request[0], request[1])
             elif '-x' not in mainArgs: #if -x (execute cmdline and exit) we're done
