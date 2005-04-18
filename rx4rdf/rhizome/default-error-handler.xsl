@@ -16,6 +16,7 @@
     <xsl:param name="error:details" />
     <xsl:param name="_previousContext" />
     
+<xsl:output method='xhtml' omit-xml-declaration="yes" encoding="UTF-8" indent='no' />    
 <xsl:template match="/">  
     <xsl:variable name='_robots' select="wf:assign-metadata('_robots', 'nofollow,noindex')" />
     <!-- use the same item template as the page that contained the error; 

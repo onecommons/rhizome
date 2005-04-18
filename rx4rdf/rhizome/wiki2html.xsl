@@ -10,7 +10,7 @@ As an optimization it only set when one of these config options are set:
  (see rhizome.processZMLSideEffects() )
 -->
 <x:param name='_APP_BASE'/>
-<x:output method='html' encoding="UTF-8" indent='no' />
+<x:output method='xhtml' omit-xml-declaration="yes" encoding="UTF-8" indent='no' />
 
 <x:template match='a'>
 <!--

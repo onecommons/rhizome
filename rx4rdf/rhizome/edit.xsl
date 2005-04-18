@@ -10,7 +10,7 @@
 		xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
 		xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
 		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header auth" >
-<xsl:output method='html' encoding="UTF-8" indent='no' />
+<xsl:output method='xhtml' omit-xml-declaration="yes" encoding="UTF-8" indent='no' />
 <xsl:param name="about" />
 <xsl:param name="_name" />
 <xsl:param name="__account" />
