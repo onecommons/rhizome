@@ -51,21 +51,22 @@
     <xsl:param name="previous:_template" />
     <xsl:param name="previous:__resource" />
     
-<xsl:output method='html' encoding="UTF-8" indent='no' />
+<xsl:output method='xhtml' omit-xml-declaration="yes" encoding="UTF-8" indent='no' 
+doctype-public="-//W3C//DTD XHTML 1.0 Transitional//EN" 
+doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd" 
+/>
 
 <xsl:variable name='prev-content-type' select="$response-header:content-type" />
 <xsl:variable name='title' select="f:if($previous:title, $previous:title, f:if($_originalContext/wiki:title, $_originalContext/wiki:title, $_name) )" />
 
 <xsl:template match="/">
-<!-- html template based on http://www.projectseven.com/tutorials/css_t/example.htm 
-    (well, not much anymore, gave up and started using nested tables)    
--->
 <html>
 <head>
 <title><xsl:value-of select="$title" /></title>
 
 <link href="site:///basestyles.css" rel="stylesheet" type="text/css" />
 <link href="site:///{$previous:_template/wiki:uses-theme/*/wiki:uses-css-stylesheet/*/wiki:name}" rel="stylesheet" type="text/css" />
+<link href="site:///user.css" rel="stylesheet" type="text/css" />
 
 <xsl:if test="wf:file-exists('favicon.ico')"> <!-- performance hack (assumes favicon.ico is external) -->
   <link rel="icon" href="site:///favicon.ico" />
@@ -90,7 +91,7 @@
 <xsl:param name="content-type" select="$prev-content-type" />
 <xsl:param name="action" select="f:if($previous:action, $previous:action, 'view')" />
 
-   <div id='maincontent'>
+   <div id='page-content'>
      <xsl:choose>
      <xsl:when test="(contains($content-type,'xml')
                   or starts-with($content-type,'text/html')) and $action != 'view-source'">
@@ -121,60 +122,21 @@
 <xsl:if test="not($_static)" >
          <xsl:choose>
             <xsl:when test="$session:login">
-<form action='site:///logout' method='POST' accept-charset='UTF-8' >
-Welcome <a href="site:///accounts/{$session:login}?action=edit"><xsl:value-of select="$session:login" /></a>
-<input TYPE="hidden" NAME="redirect" value="{$_url}" />
-<input type="submit" value="logout" name="logout"/>  
-<br/><xsl:value-of select="$session:message" disable-output-escaping='yes' />  
+<form action='site:///logout' method='post' accept-charset='UTF-8' >&#xa0;Welcome <a href="site:///accounts/{$session:login}?action=edit"><xsl:value-of select="$session:login" /></a>&#xa0;<input TYPE="hidden" NAME="redirect" value="{$_url}" /><input type="submit" value="Log Out" name="logout"/><br/>
 </form>            
             </xsl:when>
             <xsl:otherwise>
-<form action='site:///login' method='POST' accept-charset='UTF-8'>
-Name<input TYPE="text" NAME="loginname" SIZE="10" />
-Password<input TYPE="password" NAME="password" SIZE="10" />
-<input TYPE="hidden" NAME="redirect" value="{$_url}" />
-<input type="submit" value="login" name="login"/>    
-Or <a href="site:///accounts/?about={f:escape-url('http://xmlns.com/foaf/0.1/OnlineAccount')}&amp;action=new">signup</a>
-<br/><xsl:value-of select="$session:message" disable-output-escaping='yes' />
-</form>            
+<form action='site:///login' method='post' accept-charset='UTF-8'><div id="login-div"><div id="login-div-left">Name<input TYPE="text" NAME="loginname" SIZE="10" /><br/>Password<input TYPE="password" NAME="password" SIZE="10" /><input TYPE="hidden" NAME="redirect" value="{$_url}" /></div><div id="login-div-right"><input type="submit" value="Log in" name="login"/><br/><a href="site:///accounts/?about={f:escape-url('http://xmlns.com/foaf/0.1/OnlineAccount')}&amp;action=new">Register</a></div></div></form>            
            </xsl:otherwise>
         </xsl:choose>        
 </xsl:if>
 </xsl:template>
 
+
 <xsl:template name="search-form" >
 <xsl:param name="edit-width" select="40" />
-<form action='site:///search' accept-charset='UTF-8' method="GET">
-<label for="search">Search</label><input type="text" name="search" value="{$previous:search}" size="$edit-width" />
-<label for="searchType">Type</label><select name="searchType">    
-    <option value="Simple">
-	<xsl:if test='not($previous:searchType) or $previous:searchType = "Simple"'>
-		<xsl:attribute name='selected'>selected</xsl:attribute>
-	</xsl:if>    
-    Simple</option>
-    <option value="RxPath" >
-	<xsl:if test='$previous:searchType = "RxPath"'>
-		<xsl:attribute name='selected'>selected</xsl:attribute>
-	</xsl:if>        
-    RxPath</option>
-    <option value="RegEx" >
-	<xsl:if test='$previous:searchType = "RegEx"'>
-		<xsl:attribute name='selected'>selected</xsl:attribute>
-	</xsl:if>            
-    Regex</option>
-    </select>
-<label for="view">View</label><select name="view">
-    <option value="list" selected='selected'>List</option>
-    <option value="summary">Summary</option>
-    <option value="rss20" >RSS 2.0</option>
-    <option value="rxml" >RxML</option>
-    <option value="rdf" >RDF/XML</option>
-    <option value="edit" >Edit</option>
-    <option value="rxpathdom" >RxPathDOM</option>    
-    </select>
-&#xa0;<input type="submit" value="search" name="Search"/>    
-</form>
-</xsl:template>
+<form action='site:///search' accept-charset='UTF-8' method="get">
+<label for="search">Search</label><br/><input type="text" name="search" value="{$previous:search}" size="$edit-width" /><br/><label for="searchType">Type</label>&#xa0;<select name="searchType"><option value="Simple"><xsl:if test='not($previous:searchType) or $previous:searchType = "Simple"'><xsl:attribute name='selected'>selected</xsl:attribute></xsl:if>Simple</option><option value="RxPath" ><xsl:if test='$previous:searchType = "RxPath"'><xsl:attribute name='selected'>selected</xsl:attribute></xsl:if>RxPath</option><option value="RegEx" ><xsl:if test='$previous:searchType = "RegEx"'><xsl:attribute name='selected'>selected</xsl:attribute></xsl:if>Regex</option></select><br/><label for="view">View</label>&#xa0;&#xa0;<select name="view"><option value="list" selected='selected'>List</option><option value="summary">Summary</option><option value="rss20" >RSS 2.0</option><option value="rxml" >RxML</option><option value="rdf" >RDF/XML</option><option value="edit" >Edit</option><option value="rxpathdom" >RxPathDOM</option></select><br/><input type="submit" value="Search" name="Search"/></form></xsl:template>
 
 <xsl:template name="quicklinks-bar" >
     <!-- note: keep in sync with the recent-items template below -->
@@ -182,45 +144,42 @@ Or <a href="site:///accounts/?about={f:escape-url('http://xmlns.com/foaf/0.1/Onl
 "&quot;wf:sort(/a:NamedContent[not(wiki:appendage-to)][(wiki:revisions/*/rdf:first/*)[last()]/a:created-on != 1057919732.750],'(wiki:revisions/*/rdf:first/*)[last()]/a:created-on','number','descending')&quot;"
     />
 
-    <a href="site:///edit">New</a>
-    &#xa0;<a href="site:///keyword-browser">Browse</a>
-    &#xa0;<a href="site:///search?search={f:escape-url($recent-pages-query)}&amp;searchType=RxPath&amp;view=list&amp;title=Recently%20Changed%20Pages">Recent</a>
-    &#xa0;<a href="site:///administration">Admin</a>
-    &#xa0;<a href="site:///help">Help</a>
+    <a href="site:///edit">New Page</a><br/><a href="site:///keyword-browser">Browse by Keyword</a><br/><a href="site:///search?search={f:escape-url($recent-pages-query)}&amp;searchType=RxPath&amp;view=list&amp;title=Recently%20Changed%20Pages">Recent Changes</a><br/><a href="site:///administration">Administration</a><br/><a href="site:///help">Help and FAQ</a>
 </xsl:template>
 
 <xsl:template name="actions-bar" >
     <xsl:variable name='aboutparam' select="f:if($previous:about, concat('&amp;about=', f:escape-url($previous:about)), '')" />
     <xsl:variable name='path' select="f:if($previous:itemname, $previous:itemname, $_name)" />
-    <a href="site:///{$path}?{$aboutparam}">View</a>
-    &#xa0;<a href="site:///comments?parent={f:escape-url($previous:__resource)}"
-    onclick="window.open(this.href,'small-action-popup','directories=0,height=450,width=550,location=0,resizable=1,scrollbars=1,toolbar=0');return false;">
-    Comments (<xsl:value-of select='count(/*[wiki:comments-on = $previous:__resource])'/>)</a>
-    &#xa0;<a rel='nofollow' href="site:///{$path}?action=edit{$aboutparam}">Edit</a>
-    &#xa0;<a href="site:///{$path}?action=showrevisions">Revisions</a>
-    &#xa0;<a href="site:///{$path}?action=view-metadata{$aboutparam}">Metadata</a>
-    &#xa0;<a rel='nofollow' href="site:///{$path}?action=confirm-delete{$aboutparam}">Delete</a>
-    &#xa0;<a href="site:///{$path}?action=view-source{$aboutparam}">Source</a>
-    &#xa0;<a rel='nofollow' href="site:///{$path}?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-print{$aboutparam}">Print</a>
-</xsl:template>
+    <xsl:variable name='action' select="f:if($previous:action, $previous:action, 'view')" />
+    <a href="site:///{$path}?{$aboutparam}" class="action-tab {f:if($action='view', ' selected-action-tab', '')}" title="View">View</a>&#xa0;<!--     
+  --><a href="site:///comments?parent={f:escape-url($previous:__resource)}" onclick="window.open(this.href,'smallActionPopup','height=450,width=550,location=0,resizable=1,scrollbars=1,toolbar=0');return false;"
+  title="Comments">Comments (<xsl:value-of select='count(/*[wiki:comments-on = $previous:__resource])'/>)</a>&#xa0;<!--  
+  --><a rel='nofollow' href="site:///{$path}?action=edit{$aboutparam}" class="action-tab {f:if($action='edit', ' selected-action-tab', '')}" title="Edit">Edit</a>&#xa0;<!--  
+   --><a href="site:///{$path}?action=showrevisions" class="action-tab {f:if($action='showrevisions', ' selected-action-tab', '')}" title="Revisions">Revisions</a>&#xa0;<!--  
+    --><a href="site:///{$path}?action=view-metadata{$aboutparam}" class="action-tab {f:if($action='view-metadata', ' selected-action-tab', '')}" title="Metadata">Metadata</a>&#xa0;<!--  
+    --><a rel='nofollow' href="site:///{$path}?action=confirm-delete{$aboutparam}" class="action-tab {f:if($action='confirm-delete', ' selected-action-tab', '')}" title="Delete">Delete</a>&#xa0;<!--  
+    --><a href="site:///{$path}?action=view-source{$aboutparam}" class="action-tab {f:if($action='view-source', ' selected-action-tab', '')}" title="Source">Source</a>&#xa0;<!--  
+    --><a rel='nofollow' href="site:///{$path}?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-print{$aboutparam}" title="Print">Print</a>
+ </xsl:template>
+
 
 <xsl:template name="recent-items" >
 <xsl:param name="max" select="21" />
-<ul>
-<xsl:for-each select="/a:NamedContent[not(wiki:appendage-to)][(wiki:revisions/*/rdf:first/*)[last()]/a:created-on !=1057919732.750]">
-<xsl:sort select="(wiki:revisions/*/rdf:first/*)[last()]/a:created-on" data-type='number' order='descending' />
-<xsl:if test="position()&lt;$max">
-<li>
-<a href="{$_base-url}site:///{./wiki:name}">
-<xsl:value-of select='f:if( (./wiki:revisions/*/rdf:first/*)[last()]/wiki:title, 
-                (./wiki:revisions/*/rdf:first/*)[last()]/wiki:title,
-               f:if(./wiki:name-type = uri("wiki:name-type-anonymous")
-                 and (./wiki:revisions/*/rdf:first/*)[last()]/wiki:auto-summary, 
-                (./wiki:revisions/*/rdf:first/*)[last()]/wiki:auto-summary, ./wiki:name))' />  
-</a></li>
-</xsl:if>
-</xsl:for-each>
-</ul>
+ <ul>
+ <xsl:for-each select="/a:NamedContent[not(wiki:appendage-to)][(wiki:revisions/*/rdf:first/*)[last()]/a:created-on !=1057919732.750]">
+   <xsl:sort select="(wiki:revisions/*/rdf:first/*)[last()]/a:created-on" data-type='number' order='descending' />
+   <xsl:if test="position()&lt;$max">
+     <li>
+     <a href="{$_base-url}site:///{./wiki:name}">
+     <xsl:value-of select='f:if( (./wiki:revisions/*/rdf:first/*)[last()]/wiki:title, 
+                    (./wiki:revisions/*/rdf:first/*)[last()]/wiki:title,
+                   f:if(./wiki:name-type = uri("wiki:name-type-anonymous")
+                     and (./wiki:revisions/*/rdf:first/*)[last()]/wiki:auto-summary, 
+                    (./wiki:revisions/*/rdf:first/*)[last()]/wiki:auto-summary, ./wiki:name))' />  
+     </a>
+     </li>
+   </xsl:if>
+ </xsl:for-each>
+ </ul>
 </xsl:template>
-
 </xsl:stylesheet>
