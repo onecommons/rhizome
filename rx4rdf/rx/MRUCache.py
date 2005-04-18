@@ -9,12 +9,17 @@ Use per Python Software Foundation (PSF) license.
 '''
 
 from rx import utils
+import weakref, md5, repr as Repr
+
 _defexception = utils.DynaExceptionFactory(__name__)
 _defexception('not cacheable')
 
 class UseNode(object):
     """For linked list kept in most-recent .. least-recent *use* order"""
-    __slots__ = ['value','hkey','older','newer', 'sideEffects']
+
+    #we can't use slots if we want weak refs to this object (needs to add __weakrefs__)
+    #__slots__ = ['value','hkey','older','newer', 'sideEffects', 'size', ]
+
     def __init__(self, value, hkey, older=None, newer=None):
         self.value = value  # as returned by user valueCalc function
         self.hkey = hkey    # defaults to arg tuple for valueCalc, or else
@@ -22,6 +27,22 @@ class UseNode(object):
         self.older = older  # link to node not as recently used as current
         self.newer = newer  # Note that list is circular: mru.newer is lru
                             # and lru.older is mru, which is the reference point.
+                            
+    def __repr__(self):
+        return str(self.size) + ','+ str(self.hkey) + ',' + str(self.value)
+
+class InvalidationKey(tuple):
+    '''
+    Sub-class of tuple used for marking that a part of a key should be added to a validation cache.
+    Only works when digestKey=True.
+    '''
+    exclude = False
+    
+    def __new__(cls, seq, exclude=False):
+        it = tuple.__new__(cls, seq)
+        if exclude:
+            it.exclude = exclude
+        return it
                             
 class MRUCache:
     """
@@ -41,7 +62,8 @@ class MRUCache:
         sideEffectsCalc=None, #calculate the sideEffects when we calculate the value
         isValueCacheableCalc=None, #calculate if the value should be cached
         capacityCalc = lambda k, v: 1, #calculate the capacity of the value
-        maxValueSize=None
+        maxValueSize=None,
+        digestKey=False, #use a (md5) digest of the key instead of the key itself
     ):
         '''
         Takes capacity, a valueCalc function, and an optional hashCalc
@@ -59,10 +81,9 @@ class MRUCache:
         self.mru = None
         self.nodeSize = 0
         self.nodeDict = dict()
-        if maxValueSize is None:
-            self.maxValueSize = capacity
-        else:
-            self.maxValueSize = maxValueSize
+        self.invalidateDict = weakref.WeakValueDictionary()
+        self.maxValueSize = maxValueSize
+        self.digestKey = digestKey
         
     def getValue(self, *args, **kw):  # magically hidden whether lookup or calc
         """
@@ -71,8 +92,10 @@ class MRUCache:
         the least recently used if cache is full.
         """    
         return self.getOrCalcValue(self.valueCalc, hashCalc=self.hashCalc,
-                sideEffectsFunc=self.sideEffectsFunc, sideEffectsCalc=self.sideEffectsCalc,
-                                isValueCacheableCalc=self.isValueCacheableCalc,*args, **kw)
+                                sideEffectsFunc=self.sideEffectsFunc,
+                                sideEffectsCalc=self.sideEffectsCalc,
+                                isValueCacheableCalc=self.isValueCacheableCalc,
+                                *args, **kw)
     
     def getOrCalcValue(self, valueCalc, *args, **kw):
         '''
@@ -108,19 +131,32 @@ class MRUCache:
 
         if self.capacity == 0: #no cache, so just execute valueCalc
             return valueCalc(*args, **kw)
-            
+        
+        invalidateKeys = []
         if hashCalc:
             try: 
-                hkey = hashCalc(*args, **kw)
+                keydigest = hkey = hashCalc(*args, **kw)
             except NotCacheable: #can't calculate a key
+                if self.debug:
+                    import traceback
+                    traceback.print_exc()
                 return valueCalc(*args, **kw)
         else:
-            hkey = args # use tuple of args as default key for first stage LU
+            keydigest = hkey = args # use tuple of args as default key for first stage LU            
             #warning: kw args will not be part of key
+
+        if self.digestKey:                   
+            digester = md5.new()
+            _getKeyDigest(hkey, invalidateKeys, digester)
+            keydigest = digester.hexdigest()
+        else:
+            #we still want to find invalidatation keys
+            _getKeyDigest(hkey, invalidateKeys, None)
+
         try:
-            node = self.nodeDict[hkey]
-            if self.debug: print 'found key', hkey, 'value', node.value
-            assert node.hkey == hkey
+            node = self.nodeDict[keydigest]
+            if self.debug: print 'found key', Repr.repr(hkey), 'value', Repr.repr(node.value)
+            assert node.hkey == keydigest
             #if node.invalidate and node.invalidate(node.value, *args, **kw):
             #    self.removeNode(node)
             #    raise KeyError 
@@ -129,58 +165,74 @@ class MRUCache:
                 sideEffectsFunc(node.value, node.sideEffects, *args, **kw)            
             value = node.value
         except KeyError:
-            # here we know we can't get to value
+            # we can't retrieve value
             # calculate new value
             value = valueCalc(*args, **kw)
 
             newValueSize = self.capacityCalc(hkey, value)
-            if newValueSize > self.maxValueSize:
+            if newValueSize > (self.maxValueSize or self.capacity):                
+                if self.debug: print newValueSize, 'bigger than', (self.maxValueSize or self.capacity)
                 return value #too big to be cached
             #note this check doesn't take into account the current
             #nodeSize so the cache can grow to just less than double the capacity
             
             if isValueCacheableCalc and not isValueCacheableCalc(hkey, value, *args, **kw):
+                if self.debug: print 'value is not cachable', Repr.repr(value)
                 return value #value isn't cacheable
-            
+                        
             if sideEffectsCalc:
                 sideEffects = sideEffectsCalc(value, *args, **kw)
             else:
                 sideEffects = None
 
-            # get mru use node if cache is full, else make new node            
+            # update the circular list
             if self.nodeSize + newValueSize <= self.capacity:
-                if self.mru is None:
-                    self.mru = UseNode(value, hkey)
+                #not yet full, add a new node
+                if self.mru is None: #no nodes yet
+                    self.mru = UseNode(value, keydigest)
                     self.mru.sideEffects = sideEffects
-                    self.nodeSize += newValueSize
+                    self.mru.size = newValueSize
                     self.mru.older = self.mru.newer = self.mru  # init circular list
                 else:                    
                     # put new node between existing lru and mru
                     lru = self.mru.newer # newer than mru circularly goes to lru node
-                    node = UseNode(value, hkey, self.mru, lru)
+                    node = UseNode(value, keydigest, self.mru, lru)
                     node.sideEffects = sideEffects
-                    self.nodeSize +=self.capacityCalc(hkey, value)
+                    node.size = newValueSize
                     # update links on both sides
                     self.mru.newer = node     # newer from old mru is new mru
                     lru.older = node    # older than lru poits circularly to mru
                     # make new node the mru
-                    self.mru = node
+                    self.mru = node                
             else:
                 #cache full, replace the lru node
                 lru = self.mru.newer; #newer than mru circularly goes to lru node
-                lruValueSize = self.capacityCalc(lru.hkey, lru.value)                
                 # position of lru node is correct for becoming mru so
                 # just replace value and hkey #                
-                self.nodeSize -= self.capacityCalc(lru.hkey, lru.value)
+                self.nodeSize -= lru.size
                 #print lru.hkey
                 lru.value = value
                 lru.sideEffects = sideEffects
+                lru.size = newValueSize
                 # delete invalidated key->node mapping
                 del self.nodeDict[lru.hkey]
-                lru.hkey = hkey
-                self.nodeSize += self.capacityCalc(lru.hkey, lru.value)
+                lru.hkey = keydigest
                 self.mru = lru # new lru is next newer from before
-            self.nodeDict[hkey] = self.mru      # add new key->node mapping
+
+            self.nodeSize += newValueSize
+            self.nodeDict[keydigest] = self.mru      # add new key->node mapping
+            
+            if invalidateKeys:
+                #we can associate invalidation keys with many nodes to enable cache invalidation
+                for ikey in invalidateKeys:
+                    newWeakrefDict = weakref.WeakKeyDictionary()
+                    weakrefDict = self.invalidateDict.setdefault(ikey, newWeakrefDict)
+                    #we assign weakrefDict as the item value because invalidateDict is a WeakValueDictionary
+                    #so the only strong reference to the weakrefDict are the items themselves
+                    #this way, when the last key is remove from the weak key dictionary,
+                    #the dictionary will be garbage collected too
+                    weakrefDict[self.mru] = weakrefDict 
+
             return value
             
         # Here we have a valid node. Just update its position in linked lru list
@@ -204,11 +256,41 @@ class MRUCache:
         self.mru = node                 # new node is new mru
         return value
 
-    def removeNode(self, node):
-        assert node.older is not None #can't remove the first node
-        node.older.newer = node.newer
-        self.nodeSize -= self.capacityCalc(node.hkey, node.value)
+    def invalidate(self, key):
+        currentNodes = self.invalidateDict.get(key)    
+        if currentNodes is not None:
+            for node in currentNodes.keys(): #we need a copy since currentNodes may change
+                self.removeNode(node)
+            try:
+                del self.invalidateDict[key]
+            except KeyError:
+                pass #there's a slim chance it got deleted already by the garbage collector
+
+    def removeNode(self, node):            
+        if node.older is node:
+            #there's only one node and we're removing it
+            assert self.mru is node
+            self.mru = None
+        else:
+            if self.mru is node:
+                self.mru = node.older
+            node.older.newer = node.newer   # older neighbor points to newer neighbor
+            node.newer.older = node.older   # newer neighbor points to older neighbor            
+        self.nodeSize -= node.size
         del self.nodeDict[node.hkey]                
+
+    def countNodes(self):
+        #much slower than len(self.nodeDict)
+        #exists for diagnostic use
+        prev = self.mru
+        if not prev:
+            return 0
+        count = 1
+        while prev:            
+            if prev.older is self.mru:
+                return count
+            prev = prev.older
+            count+=1        
 
     def clear(self):
         """
@@ -232,8 +314,24 @@ class MRUCache:
         this.older = this.newer = None
         del this
         self.nodeDict.clear()
+        self.invalidateDict.clear()
         # re-init
         self.mru = None
         self.nodeSize = 0
 
+def _getKeyDigest(keys, invalidateKeys, keyDigest):
+    if isinstance(keys, tuple):
+        if isinstance(keys, InvalidationKey):
+            invalidateKeys.append(keys)
+            keyDigest = not keys.exclude and keyDigest
+        if keyDigest: keyDigest.update( '(' )
+        for key in keys:
+            _getKeyDigest(key, invalidateKeys, keyDigest)
+            if keyDigest: keyDigest.update( ',' )
+        if keyDigest: keyDigest.update( ')' )
+    elif keyDigest:
+        if isinstance(keys, unicode):
+            keyDigest.update( keys.encode('utf8'))
+        else:
+            keyDigest.update( str(keys) )
 
