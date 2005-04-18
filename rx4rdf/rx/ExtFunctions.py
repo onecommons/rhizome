@@ -33,25 +33,29 @@ RXWIKI_XPATH_EXT_NS = 'http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'
 #first delete insecure functions from FT's built-in extensions
 from Ft.Xml.XPath import BuiltInExtFunctions
 from Ft.Xml.Xslt import XsltFunctions, XsltContext, Exslt
+
+extFuncDicts = [BuiltInExtFunctions.ExtFunctions, XPath.Context.Context.functions,
+                         XsltContext.XsltContext.functions]
+
 if BuiltInExtFunctions.ExtFunctions.has_key((FT_EXT_NAMESPACE, 'spawnv')):
-    for functionDict in [BuiltInExtFunctions.ExtFunctions, XPath.Context.Context.functions,
-                         XsltContext.XsltContext.functions]:
+    for functionDict in extFuncDicts:
         del functionDict[(FT_EXT_NAMESPACE, 'spawnv')]
         del functionDict[(FT_EXT_NAMESPACE, 'system')]
         del functionDict[(FT_EXT_NAMESPACE, 'env-var')]
-        #1.0a4 version of 4Suite deleted deprecated functions, so re-add it
+
+#1.0a4 version of 4Suite deleted deprecated functions, so re-add the ones we still use
+if not BuiltInExtFunctions.ExtFunctions.has_key((FT_EXT_NAMESPACE, 'escape-url')):
+    for functionDict in extFuncDicts:
         #4Suite 1.0a4's pytime-to-exslt is broken, reimplement it:
         functionDict[(FT_EXT_NAMESPACE, 'pytime-to-exslt')] = lambda context, t=None:\
             t and unicode(Time.FromPythonTime(NumberValue(t))) or unicode(Time.FromPythonTime())
+        #todo: we should stop using this and use exslt:string's encode-uri
+        functionDict[(FT_EXT_NAMESPACE, 'escape-url')] = lambda context, uri: urllib.quote(StringValue(uri))
 
 if Exslt.ExtElements.has_key(("http://exslt.org/common", 'document')):
     #document only can write to the local files system and does use our secure URI resolver
     del Exslt.ExtElements[("http://exslt.org/common", 'document')]
-    
-#todo: we should stop using this and use exslt:string's encode-uri
-functionDict[(FT_EXT_NAMESPACE, 'escape-url')] = lambda context, uri: urllib.quote(StringValue(uri))
-
-         
+             
 def SystemProperty(context, qname):
     '''
     disable the 'http://xmlns.4suite.org/xslt/env-system-property'
@@ -129,21 +133,36 @@ def String2NodeSet(context, string):
     return [context.node.ownerDocument.createTextNode(string)]
 
 def Split(context, string, pattern=u' '):
-    '''Similar to Ft.Xml.Xslt.Exslt.String.Split but returns a node set of text nodes not 'token' elements.
-    Also doesn't depend on a XSLT processor -- any XPath context will do.
+    '''
+    Similar to Ft.Xml.Xslt.Exslt.String.Split but doesn't depend
+    on a XSLT processor -- any XPath context will do.    
     '''
     string = StringValue(string)
     pattern = StringValue(pattern)        
-    nodeset = []
+    nodeset = []    
+
+    frag = context.node.ownerDocument.createDocumentFragment()
+    def addToNodeset(token):
+        text = context.node.ownerDocument.createTextNode(token)        
+        nodeset.append( text )
+        return
+        #the following causes a seg fault in cdomlette the second time around
+        elem = context.node.ownerDocument.createElementNS(None, 'token')
+        frag.appendChild(elem)
+        text = context.node.ownerDocument.createTextNode(token)
+        elem.appendChild(text)
+        nodeset.append( elem )
+        
     if pattern:
         if string:
             if pattern == ' ':
                 pattern = None #python normalizes whitespace if pattern is None
+            #addToNodeset(string.split(pattern)[0])
             for token in string.split(pattern):
-                nodeset.append( context.node.ownerDocument.createTextNode(token) )
+                addToNodeset(token)
     else:
         for ch in string:
-            nodeset.append( context.node.ownerDocument.createTextNode(ch) )
+            addToNodeset(token)
     return nodeset
 
 def GenerateBnode(context, name=None):
@@ -212,8 +231,9 @@ def Sort(context, nodeset, key='string(.)', dataType='text', order='ascending',
     se = Xslt.SortElement.SortElement(None, '','','')
     se._select = raccoon.RequestProcessor.expCache.getValue(key)
     se._comparer = se.makeComparer(order,dataType, caseOrder)
-    return Xslt.XPathExtensions.SortedExpression(
+    sortednodeset = Xslt.XPathExtensions.SortedExpression(
         DummyExpression(nodeset), [se]).evaluate(context)
+    return sortednodeset
 
 def If(context, cond, v1, v2=None):
     """
@@ -243,6 +263,7 @@ def Map(context, nodeset, string):
     if type(nodeset) != type([]):
         raise RuntimeException(RuntimeException.WRONG_ARGUMENTS, 'map', "expected node set argument")
     from Ft.Xml.XPath import parser
+    from Ft.Lib import Set
     from rx import raccoon
     mapContext = context.clone()
     mapContext.size = len(nodeset)
@@ -265,9 +286,9 @@ def Map(context, nodeset, string):
             result = String2NodeSet(mapContext, result)
         l.extend( result  )
         return l
-    #note: our XPath function wrapper will remove duplicate nodes
-    return reduce(eval, nodeset, [])        
-
+    nodeset = reduce(eval, nodeset, [])        
+    return Set.Unique(nodeset)
+    
 def GetRDFXML(context, resultset = None):
   '''Returns a nodeset containing a RDF/XML representation of the
   RxPathDOM nodes contained in resultset parameter. If
@@ -409,7 +430,7 @@ def instanceof(context, test, cmptype):
     elif cmptype == 'string':
        result = isinstance(test, (unicode, str)) #string
     elif cmptype == 'node-set':
-       result = isinstance(value, list ) #node-set
+       result = isinstance(test, list ) #node-set
     elif cmptype == 'boolean':
        #result = isinstance(test, (bool, XPath.boolean.BooleanType)) #boolean
        result = test == 1 or test == 0
