@@ -28,7 +28,49 @@ nsMap = { 'config' : 'http://rx4rdf.sf.net/ns/raccoon/config#' }
 #   config:hostname: 'foo.net'
 #   config:disabled: '' #not disabled
 #''')
-import sys
+
+if locals().get('xmlConfig'):
+ from rx.DomStore import XMLDomStore
+ domStoreFactory = XMLDomStore 
+ findAppAction = Action(
+            ['''/config:server/config:host[not(@disabled)][@config-path]
+                [not(@appBase) or starts-with($_name, substring(@appBase,2) )]
+                [not(config:hostname) or config:hostname[f:ends-with(wf:split($request-header:host,':')[1], .)]]''', 
+            "/config:server/config:host[@default-app][not(@disabled)]",            
+            ],   
+            action = lambda result, kw, contextNode, retVal, __argv__=__argv__: 
+               HTTPRequestProcessor(
+                     a= kw['__server__'].evalXPath('string(@config-path)', node=result[0]), 
+                     p= os.path.abspath(kw['__server__'].evalXPath('string(@path)', node=result[0])),
+                     appBase = kw['__server__'].evalXPath('string(@appBase)', node=result[0]),
+                     appName=kw['__server__'].evalXPath('string(@appName)', node=result[0]),                     
+                     model_uri = str(kw['__server__'].evalXPath('string(@model-uri)', node=result[0])), 
+                     argsForConfig=__argv__
+                      ),
+            cachePredicate = lambda resultNodeset, kw, contextNode, retVal: 
+                kw['__server__'].evalXPath('string(@model-uri)', node=resultNodeset[0]),
+            )
+
+else:
+  findAppAction = Action(
+            [
+            '''/*[not(config:disabled)][config:config-path][not(config:appBase) or starts-with($_name, substring(config:appBase,2) )]
+                                     [not(config:hostname) or config:hostname[f:ends-with(wf:split($request-header:host,':')[1], .)]]''',
+                        
+            "/*[config:default-app][not(config:disabled)]",            
+            ],   
+            action = lambda result, kw, contextNode, retVal, __argv__=__argv__: 
+               HTTPRequestProcessor(
+                  a= kw['__server__'].evalXPath('string(config:config-path)', node=result[0]), 
+                  p= os.path.abspath(kw['__server__'].evalXPath('string(config:path)', node=result[0])),
+                  appBase = kw['__server__'].evalXPath('string(config:appBase)', node=result[0]),
+                  appName=kw['__server__'].evalXPath('string(config:appName)', node=result[0]),
+                  model_uri = str(StringValue(result)), argsForConfig=__argv__
+                 ),
+            cachePredicate = lambda resultNodeset, kw, contextNode, retVal: 
+                                                  StringValue(resultNodeset),            
+            )
+
 def delegateRequest(result, kw, contextNode, retVal): 
     if retVal:  
         result = retVal.handleHTTPRequest(kw['_name'], kw['_request'].paramMap)
@@ -42,23 +84,7 @@ def delegateRequest(result, kw, contextNode, retVal):
     return None
 
 actions = { 'http-request' : [
-        Action(
-            [
-            '''/*[not(config:disabled)][config:config-path][not(config:appBase) or starts-with($_name, substring(config:appBase,2) )]
-                                     [not(config:hostname) or config:hostname[f:ends-with(wf:split($request-header:host,':')[1], .)]]''',
-                        
-            "/*[config:default-app][not(config:disabled)]",            
-            ],   
-            action = lambda result, kw, contextNode, retVal, __argv__=__argv__: 
-               HTTPRequestProcessor(a= kw['__server__'].evalXPath('string(config:config-path)', node=result[0]), 
-                     p= os.path.abspath(kw['__server__'].evalXPath('string(config:path)', node=result[0])),
-                     appBase = kw['__server__'].evalXPath('string(config:appBase)', node=result[0]),
-                     appName=kw['__server__'].evalXPath('string(config:appName)', node=result[0]),
-                     model_uri = str(StringValue(result)), argsForConfig=__argv__
-                      ),
-            cachePredicate = lambda resultNodeset, kw, contextNode, retVal: StringValue(resultNodeset),            
-            ),
-
+        findAppAction,
         FunctorAction(delegateRequest, [0,1,2,3]),        
         #note: if no match raccoon.default_not_found() will be invoked
     ] }
