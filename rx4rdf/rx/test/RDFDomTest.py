@@ -90,7 +90,7 @@ class RDFDomTestCase(unittest.TestCase):
     def loadFtModel(self, source, type='nt'):
         if type == 'rdf':
             #assume relative file
-            model, self.db = Util.DeserializeFromUri('file:'+source)
+            model, self.db = Util.DeserializeFromUri('file:'+source, scope='')
         else:
             model, self.db = utils.DeserializeFromN3File( source )
         return FtModel(model)
@@ -270,8 +270,9 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         res6 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless(not res6)
 
-        #modify the DOM and make sure the schema is updated properly        
-        self.rdfDom.begin()        
+        #modify the DOM and make sure the schema is updated properly
+        self.rdfDom.commit()
+
         xpath = "/*/rdfs:subPropertyOf[.=uri('a:C')]"
         res7 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         #remove the statement that A is a subproperty of C
@@ -498,7 +499,15 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
                 
     def testXUpdate(self):       
         '''test xupdate'''
+        from rx import RxPathDom
+        adds = []    
+        def addTrigger(node):
+            #we only expect predicate, not resource nodes
+            self.failUnless( RxPathDom.looksLikePredicate(node) )
+            adds.append(node)
         self.rdfDom = self.getModel("rdfdomtest1.rdf",'rdf')
+        self.rdfDom.addTrigger = addTrigger
+        
         xupdate=r'''<?xml version="1.0" ?> 
         <xupdate:modifications version="1.0" xmlns:xupdate="http://www.xmldb.org/xupdate" 
         xmlns="http://rx4rdf.sf.net/ns/archive#" 
@@ -507,13 +516,15 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         >
             <xupdate:append select='/'>
                 <Contents rdf:about='urn:sha:2jmj7l5rSw0yVb/vlWAYkK/YBwk='>
-                <content-length>0</content-length>
-                <hasContent />
+                    <content-length>0</content-length>
+                    <hasContent />
                 </Contents>        
             </xupdate:append>        
         </xupdate:modifications>
         '''               
         applyXUpdate(self.rdfDom,xupdate)
+        self.failUnless(len(adds) == 3) #2 statements plus the type statement
+
         if newRDFDom:
             db = self.db
         else:

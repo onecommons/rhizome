@@ -7,7 +7,7 @@
 """
 
 from rx import raccoon, utils, logging, rhizome
-import unittest, os, os.path, shutil, glob
+import unittest, os, os.path, shutil, glob, time, pprint, repr as Repr
 
 RHIZOMEDIR = '../../rhizome'
 
@@ -30,7 +30,7 @@ class RhizomeTestCase(unittest.TestCase):
         logging.BASIC_FORMAT = "%(asctime)s %(levelname)s %(name)s:%(message)s"        
         logLevel = DEBUG and logging.DEBUG or logging.INFO
         logging.root.setLevel(logLevel)
-        logging.basicConfig()
+        logging.basicConfig()        
         raccoon.DEFAULT_LOGLEVEL = logLevel
 
     def testNoSpamFixer(self):
@@ -79,7 +79,7 @@ class RhizomeTestCase(unittest.TestCase):
         The script:
         1. logs in as admin
         1. add a page called testminoredit,
-        1. modifies it several times with and without the minor edit
+        1. modifies it several times with and without the minor edit flag
         1. then asserts that the correct number revisions and checks the expected first
         character of the final revision
         '''
@@ -152,6 +152,7 @@ class RhizomeTestCase(unittest.TestCase):
         name = urllib.unquote(request.path)
         
         newkw = request.paramMap.copy()
+        requestProcessor.log.info(method + ' ' + url)
         return requestProcessor.handleHTTPRequest(name, newkw) 
 
     def testLocalLinks(self):
@@ -162,10 +163,9 @@ class RhizomeTestCase(unittest.TestCase):
         #because hasPage() will fail
         #also, because these uses the default template with the sidebar
         #we also test link generation with content generated through internal link resolution
-
         
         argsForConfig = ['--rhizomedir', os.path.abspath(RHIZOMEDIR)]
-        root = raccoon.RequestProcessor(a='test-links.py',
+        root = raccoon.HTTPRequestProcessor(a='test-links.py',
                                 argsForConfig=argsForConfig)
 
         self.doHTTPRequest(root, {}, 'http://www.foo.com/page1')
@@ -177,7 +177,11 @@ class RhizomeTestCase(unittest.TestCase):
 
         self.doHTTPRequest(root, {}, 'http://www.foo.com:8000')
         
-        root = raccoon.RequestProcessor(a='test-root-config.py',
+    def _testRootConfigLocalLinks(self, config):
+        #the main point of this test is to test virtual hosts
+        
+        argsForConfig = ['--rhizomedir', os.path.abspath(RHIZOMEDIR)]
+        root = raccoon.HTTPRequestProcessor(a=config,
                                 argsForConfig=argsForConfig)
 
         def not_found(kw):
@@ -226,8 +230,47 @@ class RhizomeTestCase(unittest.TestCase):
         result = self.doHTTPRequest(root, {}, 'http://www.anyolddomain.org/page1')
         self.failUnless(result == 'notfound')
 
+    def testLocalLinksRootConfig(self):
+        self._testRootConfigLocalLinks('test-root-config.py')
 
+    def testLocalLinksXMLRootConfig(self):
+        self._testRootConfigLocalLinks('test-xml-root-config.py')
+    
+    def _testCaches(self, live):
+        argsForConfig = ['--rhizomedir', os.path.abspath(RHIZOMEDIR)]
+        root = raccoon.HTTPRequestProcessor(a='test-links.py',
+            argsForConfig=argsForConfig, appVars= {'LIVE_ENVIRONMENT': live})
+
+        #root.styleSheetCache.debug = 1
+        repr1 = Repr.Repr() 
+        repr1.maxtuple = 100
+        #import sets
+        #comparesets = []
+        cacheSizes = []
+        for i in range(4):
+            start = time.time()
+            self.doHTTPRequest(root, {}, 'http://www.foo.com/page1')
+            #print time.time() - start
+            cacheSizes.append( (root.actionCache.nodeSize, root.styleSheetCache.nodeSize,
+             root.queryCache.nodeSize, root.expCache.nodeSize, raccoon.fileCache.nodeSize) )
+            #comparesets.append( sets.Set(root.queryCache.nodeDict.keys() ) )
+        return cacheSizes 
+        #pprint.pprint(list(comparesets[2] - comparesets[1]))
                 
+    def testCaches(self):        
+        cacheSizes = self._testCaches(False)
+        #print cacheSizes[-1]
+        #make sure the cache isn't erroneously growing
+        self.failUnless(cacheSizes[-1] == cacheSizes[-2])
+        #yes, this is quite a fragile test:
+        self.failUnless(cacheSizes[-1][:-1] == (7, 3, 132, 59))#, 14509L)) 
+
+        cacheSizes = self._testCaches(True)
+        #make sure the cache isn't erroneously growing
+        self.failUnless(cacheSizes[-1] == cacheSizes[-2])
+        #yes, this is quite a fragile test:
+        self.failUnless(cacheSizes[-1][:-1] == (6, 1, 120, 59))#, 14509L))
+        
 SAVE_WORK=False
 DEBUG = False
 

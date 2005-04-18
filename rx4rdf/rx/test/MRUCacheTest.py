@@ -14,7 +14,7 @@ class MRUCacheTestCase(unittest.TestCase):
         self.cache = MRUCache.MRUCache(12, lambda arg: arg, capacityCalc=lambda k,v: len(v))
        
     def tearDown(self):
-        pass
+        self.cache = None
 
     def test1(self):
         v1 = self.cache.getValue('a'*5)
@@ -50,7 +50,7 @@ class MRUCacheTestCase(unittest.TestCase):
         #but the first item is not
         v10 = self.cache.getValue('a'*5)
         self.failUnless(v10 == v1)
-        self.failUnless(v10 is not v1)     
+        self.failUnless(v10 is not v1)
         self.failUnless(self.cache.nodeSize == 12)
         
         #the second item is in the cache
@@ -69,11 +69,47 @@ class MRUCacheTestCase(unittest.TestCase):
         self.failUnless(v12 is not v5)
         self.failUnless(self.cache.nodeSize == 7)
 
+    def testDigestKey(self):
+        self.cache.digestKey = True
+        self.test1()
+
+    def testInvalidation(self):
+        #create an invalidation key based on whether the value is even or not
+        self.cache.hashCalc = lambda arg: (arg, MRUCache.InvalidationKey( [int(arg)%2], exclude=True) )
+        v1 = self.cache.getValue('1')
+        v2 = self.cache.getValue('2')
+        v3 = self.cache.getValue('3')
+        self.failUnless(self.cache.nodeSize == 3)
+        #remove odd values from cache
+
+        self.cache.invalidate( (1,) )
+        self.failUnless(self.cache.nodeSize == 1)
+        v4 = self.cache.getValue('2')        
+        self.failUnless(v2 is v4) #should be still in the cache
+        self.failUnless( len(self.cache.invalidateDict) == 1)
+
+        self.cache.removeNode( self.cache.mru )
+        self.failUnless(self.cache.countNodes() == 0)
+        import gc
+        gc.collect()
+        self.failUnless( len(self.cache.invalidateDict) == 0)
+
+    def testRemove(self):
+        v1 = self.cache.getValue('b'*7)
+        v1 = self.cache.getValue('c'*5)
+        self.failUnless(self.cache.nodeSize == 12)
+        self.failUnless(self.cache.countNodes() == 2)
+
+        self.cache.removeNode( self.cache.mru ) #remove the last node ('c')
+        self.failUnless(self.cache.nodeSize == 7)
+        self.failUnless(self.cache.countNodes() == 1)
+
     def testClear(self):
         #test clear on empty cache
         self.cache.clear()
         self.failUnless(self.cache.nodeSize == 0)
-
+        self.failUnless(self.cache.countNodes() == 0)
+        
         v1 = self.cache.getValue('a'*7)
         self.failUnless(self.cache.nodeSize == 7)
 
@@ -88,6 +124,7 @@ class MRUCacheTestCase(unittest.TestCase):
 
         self.cache.clear()
         self.failUnless(self.cache.nodeSize == 0)
+        self.failUnless(self.cache.countNodes() == 0)
     
 if __name__ == '__main__':
     import sys    

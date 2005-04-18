@@ -31,16 +31,16 @@ class RaccoonTestCase(unittest.TestCase):
         
     def testAuth(self):
         root = raccoon.RequestProcessor(a='testAuthAction.py')
-        unauthorized = root.rdfDom.findSubject( 'http://rx4rdf.sf.net/ns/auth#Unauthorized' )
+        unauthorized = root.domStore.dom.findSubject( 'http://rx4rdf.sf.net/ns/auth#Unauthorized' )
         #the guest user has no rights
-        user = root.rdfDom.findSubject( root.BASE_MODEL_URI+'users/guest' )
-        start = root.rdfDom.findSubject( root.BASE_MODEL_URI+'test-resource1' )        
+        user = root.domStore.dom.findSubject( root.BASE_MODEL_URI+'users/guest' )
+        start = root.domStore.dom.findSubject( root.BASE_MODEL_URI+'test-resource1' )        
         assert user
         result = root.runActions('test', utils.kw2dict(__user=[user], start=[start]))
         #print result, unauthorized 
         self.failUnless( unauthorized == result)
         #the super user always get in
-        user = root.rdfDom.findSubject( root.BASE_MODEL_URI+'users/admin' )
+        user = root.domStore.dom.findSubject( root.BASE_MODEL_URI+'users/admin' )
         assert user
         result = root.runActions('test', utils.kw2dict(__user=[user], start=[start]))
         #print result, start 
@@ -84,8 +84,20 @@ class RaccoonTestCase(unittest.TestCase):
         
     def testStreaming(self):
         '''
-        test actions pipeline whose retVal is a file-like object
+        test an action pipeline whose retVal is a file-like object
         '''
+        from StringIO import StringIO
+        testString = "a stream of text"
+        
+        root = raccoon.RequestProcessor(a='testMinimalApp.py')        
+        root.actions={ 'test' : [
+            raccoon.FunctorAction(lambda *args: StringIO(testString)),
+            #assume the content is text
+            raccoon.Action(["'http://rx4rdf.sf.net/ns/wiki#item-format-text'"],
+                   root.processContents, canReceiveStreams=True),
+            ]}
+        result = root.runActions('test', {})
+        self.failUnless( result.read() == testString )
         
     def testXPathSecurity(self):
         '''

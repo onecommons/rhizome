@@ -120,7 +120,15 @@ class utilsTestCase(unittest.TestCase):
         </span>
         </body>
         </html>'''
-        self.runLinkFixer(BlackListHTMLSanitizer, contents, result)        
+        #self.runLinkFixer(BlackListHTMLSanitizer, contents, result)
+        #test malformed entity references
+        #see http://weblogs.mozillazine.org/gerv/archives/007538.html
+        #todo: still broken inside PCDATA
+        #contents = '''<style>background-image: url(&#106ava&#115cript&#58aler&#116&#40&#39Oops&#39&#41&#59)</style>
+        contents = '''<img src="&#106ava&#115cript&#58aler&#116&#40&#39Oops&#39&#41&#59" />'''
+        #results = '''<style></style>
+        result = '''<img src="" />'''
+        self.runLinkFixer(BlackListHTMLSanitizer, contents, result)
 
     def testHTMLTruncator(self):        
         def makeTruncator(out):
