@@ -27,7 +27,7 @@
 <div id="left">
 
 <div class="sidebar">
-<xsl:value-of disable-output-escaping='yes' select="wf:openurl(concat('site:///sidebar?_docpath=',$_path))" />
+<xsl:value-of disable-output-escaping='yes' select="wf:openurl('site:///sidebar')" />
 
 </div> <!-- /sidebar -->
 </div> <!-- /left -->
