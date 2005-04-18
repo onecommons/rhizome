@@ -213,7 +213,7 @@ actions = { 'http-request' : handleRequestSequence,
                            Action(['$export', '$e'], lambda result, kw, contextNode, retVal, rhizome=rhizome: rhizome.doExport(result, **kw)),
                         ],
             'load-model' : [ FunctorAction(rhizome.initIndex) ],
-            'on-error': [errorAction] + handleRequestSequence[3:]
+            'http-request-error': [errorAction] + handleRequestSequence[3:]
           }
 
 #if any of the parameters listed here exist they will preserved during template processing (see rhizome.processTemplateAction)
@@ -244,8 +244,9 @@ cmd_usage = '''\n\nrhizome-config.py specific:
 # we define a couple of content processors here instead of in Raccoon because
 # they make assumptions about the underlying schema 
 contentProcessors = [
-    rx.rhizome.RhizomeXMLContentProcessor(sanitizeToken=rhizome.BASE_MODEL_URI+'create-unsanitary-content-token',
-              nospamToken=rhizome.BASE_MODEL_URI+'create-nospam-token'),
+    rx.rhizome.RhizomeXMLContentProcessor(sanitizeToken=
+               rhizome.BASE_MODEL_URI+'create-unsanitary-content-token',
+               nospamToken=rhizome.BASE_MODEL_URI+'create-nospam-token'),
     rx.rhizome.raccoon.ContentProcessors.XSLTContentProcessor(),
     rhizome.zmlContentProcessor,
     rx.rhizome.PatchContentProcessor(rhizome),   
@@ -318,6 +319,7 @@ templateList = [rhizome._addItemTuple('_not_found',loc='path:_not_found.xsl', fo
  rhizome._addItemTuple('delete', loc='path:delete.xml', format='rxupdate', disposition='handler', 
                         handlesAction=['delete'], actionType='rdfs:Resource'),
  rhizome._addItemTuple('basestyles.css',format='text', loc='path:basestyles.css'),
+ rhizome._addItemTuple('user.css',format='text', loc='path:user.css'),
  rhizome._addItemTuple('edit-icon.png',format='binary',loc='path:edit.png'),
  #rhizome._addItemTuple('list',loc='path:list-pages.xsl', format='rxslt', disposition='entry'),
  rhizome._addItemTuple('showrevisions',loc='path:showrevisions.xsl', format='rxslt', disposition='entry',handlesAction=['showrevisions']),
@@ -401,6 +403,7 @@ rhizome._addItemTuple('docbook2document.xsl', loc='path:docbook2document.xsl', f
 templateList += [rhizome._addItemTuple('index',loc='path:index.zml', format='zml', label=None, 
                 title="Home", disposition='entry', accessTokens=None, keywords=None),
 rhizome._addItemTuple('sidebar',loc='path:sidebar.zml', format='zml', label=None, accessTokens=None, keywords=None),
+rhizome._addItemTuple('footer',loc='path:footer.xml', format='xml', label=None, accessTokens=None, keywords=None),
 rhizome._addItemTuple('ZMLSandbox', format='zml', label=None, disposition='entry', accessTokens=None, keywords=None,
 	contents="Feel free to [edit|?action=edit] this page to experiment with [ZML]..."),
 rhizome._addItemTuple('RxMLSandbox',loc='path:RxMLSandbox.xsl', format='rxslt', label=None, keywords=None,
@@ -840,8 +843,10 @@ readProtectAll =\
  base:index: auth:guarded-by: base:override-general-read-token 
  base:login: auth:guarded-by: base:override-general-read-token 
  base:sidebar: auth:guarded-by: base:override-general-read-token 
+ base:footer: auth:guarded-by: base:override-general-read-token 
  base:intermap.txt: auth:guarded-by: base:override-general-read-token  
  base:basestyle.css: auth:guarded-by: base:override-general-read-token 
+ base:user.css: auth:guarded-by: base:override-general-read-token 
  {%(base)smovabletype/theme.css}: auth:guarded-by: base:override-general-read-token 
  {%(base)smovabletype/theme.xsl}: auth:guarded-by: base:override-general-read-token 
  {%(base)sdefault/theme.css}: auth:guarded-by: base:override-general-read-token 
