@@ -259,17 +259,16 @@ class RhizomeTestCase(unittest.TestCase):
                 
     def testCaches(self):        
         cacheSizes = self._testCaches(False)
-        #print cacheSizes[-1]
         #make sure the cache isn't erroneously growing
         self.failUnless(cacheSizes[-1] == cacheSizes[-2])
         #yes, this is quite a fragile test:
-        self.failUnless(cacheSizes[-1][:-1] == (7, 3, 132, 59))#, 14509L)) 
+        self.failUnless(cacheSizes[-1][:-1] == (6, 3, 107, 57))#, 13523L)) #14695
 
         cacheSizes = self._testCaches(True)
         #make sure the cache isn't erroneously growing
         self.failUnless(cacheSizes[-1] == cacheSizes[-2])
         #yes, this is quite a fragile test:
-        self.failUnless(cacheSizes[-1][:-1] == (6, 1, 120, 59))#, 14509L))
+        self.failUnless(cacheSizes[-1][:-1] == (5, 1, 97, 57))#, 13523L))
         
 SAVE_WORK=False
 DEBUG = False
