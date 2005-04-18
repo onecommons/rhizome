@@ -1,18 +1,35 @@
 Rx4RDF and Rhizome Changelog
 ============================
 
-Changes in Version 0.4.4 (March xx, 2005)
+Changes in Version 0.5 (April xx, 2005)
 ----------------------------------------
 Major changes and bug fixes:
-* Raccoon: allow multiple applications
-** cookies (including session) are set to the app's path
-** fixed and renamed ROOT_PATH to appBase
-** separate loggers per application created (see log.config)
+* Raccoon: allow multiple applications to be run in one instance
 ** added root-config.py application for configuring multiple applications
+** fixed and renamed ROOT_PATH to appBase
+** cookies (including session) are set to the app's path
+** separate loggers per application created (see log.config)
 ** moved defaultPageName from server.cfg to application config
 ** changed link fixups to uses absolute paths
 * Rhizome: fixed spurious 'admin password not set' warning
-* various: support for 4Suite 1.0b1 
+* utils: more HTML sanitizer fixes
+* various: support for 4Suite 1.0b1 (CVS snapshot on Apr 10)
+* Rhizome: added global check to authorization expression
+* Rhizome: added optional templates for global read and write protection
+* Raccoon: refactored raccoon.py: extension functions, content processors 
+           and caching into separate modules
+* Raccoon: basic support for streaming actions and content processors
+* Raccoon: added DomStore interface, allow Raccoon to work with XML DOMs
+* RxPath:  added "before triggers" for nodes being added and removed
+* Raccoon: replaced global on-error trigger with separate ones per trigger
+* Raccoon: use 2-phase commit transaction coordinator with requests
+* Raccoon: added 'before-prepare', 'before-commit', and 'after-commit' triggers
+* utils:   added invalidation keys and digest keys to MRUCache
+* utils:   added 'xhtml' XSLT output methods based on XSLT 2.0's xhtml output method
+* Rhizome: fix Javascript error when using IE to open the comments popup 
+* Rhizome: new, much more polished default theme
+* Rhizome: pages (mostly, nearly) valid XHTML
+* setup:   enable setup.py to be run on files checked straight out of CVS
 
 Changes in Version 0.4.3 (Jan 25, 2005)
 ----------------------------------------
