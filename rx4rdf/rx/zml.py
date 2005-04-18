@@ -1165,7 +1165,7 @@ class ParseState:
             return
 
         pos = 0                                
-        if lead in '*:-!+|'+OLCHAR:
+        if lead in '*:!+|'+OLCHAR:
             while string[pos] == lead:
                 pos += 1
             done = False
@@ -1768,18 +1768,23 @@ ZML to XML options:
     prettyprint = switch('-p', '--pretty')
     rootElement = opt('-r', 'zml')
     markupOnly = switch('-m')
-    try:            
-        klass = opt('-mm', '')
-        index = klass.rfind('.')
+
+    klass = opt('-mm', '')
+    if klass:
+        index = klass.rfind('.')        
         if index > -1:
-           module = klass[:index]
-           __import__(module)
+           module = klass[:index]           
+           mod = __import__(module)
+           localdict = { module : mod }
+        else:
+           localdict = {}
+        
         if klass.find('(') == -1:
             klass += '()'
-        mmf= eval(klass) 
-    except:
+            mmf= eval(klass, globals(), localdict)
+    else:
         mmf = None
-    
+            
     if switch('-u', '--upgrade'):
         upgrade(sys.argv[-1], markupOnly)
     else:
