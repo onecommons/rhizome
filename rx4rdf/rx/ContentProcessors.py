@@ -5,7 +5,7 @@
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
-import base64
+import base64, sys
 from rx import utils, Caching, MRUCache
 try:
     import cStringIO
@@ -173,10 +173,15 @@ class XMLContentProcessor(ContentProcessor):
             return out.getvalue()
 
 class RxSLTContentProcessor(ContentProcessor):
+    '''
+    Treat the contents as a RxSLT stylesheet and apply it to the RequestProcessor's DOM.    
+    '''
+    
     uri = 'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt'
     label = 'RxSLT'
 
-    def processContents(self, result, kw, contextNode, contents):        
+    def processContents(self, result, kw, contextNode, contents):
+        #return 
         return kw['__server__'].processRxSLT(str(contents.strip()), kw)
 
     def getCachePredicate(self, result, kw, contextNode, styleSheetContents):
@@ -204,11 +209,42 @@ class PythonContentProcessor(ContentProcessor):
     uri = 'http://rx4rdf.sf.net/ns/wiki#item-format-python'
     label = 'Python'
 
-    def processContents(self, result, kw, contextNode, contents):
-        return kw['__server__'].processPython(contents, kw)
-
     def authorize(self, contents, formatType, kw, dynamicFormat):
         return kw['__server__'].authorizeByDigest(contents, formatType, kw, dynamicFormat)
+
+    def executePython(self, cmds, kw = None):
+        if kw is None: kw = {}
+        #todo: thread synchronize
+        #print cmds
+        output = StringIO.StringIO()
+        sys_stdout = sys.stdout
+        sys.stdout = output
+        try:        
+            #exec only likes unix-line feeds
+            exec cmds.strip().replace('\r', '\n')+'\n' in globals(), kw
+            contents = output.getvalue()
+        except:
+            sys.stdout = sys_stdout
+            if kw.get('__server__'):
+                kw['__server__'].log.exception('got this far before exception %s', output.getvalue())
+            raise
+        else:   #can't have a finally here
+            sys.stdout = sys_stdout
+        return contents
+
+    def processContents(self, result, kw, contextNode, contents):
+        locals = {}
+        locals['__requestor__'] = kw['__server__'].requestDispatcher
+        locals['__server__'] = kw['__server__']
+        locals['__kw__'] = kw
+        
+        contents = self.executePython(contents, locals)             
+        if '_nextFormat' in kw: #doc
+            nextFormat = kw['_nextFormat']
+            del kw['_nextFormat']
+            return contents, nextFormat
+        else:
+            return contents
 
 class CombinedReadOnlyStream:
     def __init__(self, left, right):
@@ -246,6 +282,11 @@ DefaultContentProcessors = [
 # we define a couple of content processors here instead of in Raccoon because
 # they make assumptions about the underlying schema
 class XSLTContentProcessor(ContentProcessor):
+    '''
+    Treat the contents as an XSLT stylesheet and apply it to the string 
+    stored in $_contents
+    '''
+    
     uri = 'http://www.w3.org/1999/XSL/Transform' 
     label = 'XSLT'
 
