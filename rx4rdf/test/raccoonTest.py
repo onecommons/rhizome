@@ -68,19 +68,11 @@ class RaccoonTestCase(unittest.TestCase):
         result = root.runActions('http-request', utils.kw2dict(_name='authorized'))
         self.failUnless( result == 'authorized code executed\n')
 
-        try:
-            result = root.runActions('http-request', utils.kw2dict(_name='unauthorized'))
-        except raccoon.NotAuthorized:
-            pass
-        else:
-            self.failUnless(False) #NotAuthorized should have been raised            
+        self.failUnlessRaises(raccoon.NotAuthorized,lambda: root.runActions(
+                'http-request', utils.kw2dict(_name='unauthorized')) )
 
-        try:
-            result = root.runActions('http-request', utils.kw2dict(_name='dynamic unauthorized'))
-        except raccoon.NotAuthorized:
-            pass
-        else:
-            self.failUnless(False) #NotAuthorized should have been raised            
+        self.failUnlessRaises(raccoon.NotAuthorized,lambda: root.runActions(
+                'http-request', utils.kw2dict(_name='dynamic unauthorized')) )
         
     def testStreaming(self):
         '''

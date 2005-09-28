@@ -40,14 +40,18 @@ class ZMLTestCase(unittest.TestCase):
             #print repr(result), '\n', repr(expected)
             #strip trailing LFs
             self.failUnless(result.rstrip() == expected.rstrip(), f + ':\n' +
-                    '\n'.join(difflib.ndiff(result.rstrip().splitlines(), expected.rstrip().splitlines())) ) 
+                    '\n'.join(difflib.ndiff(result.rstrip().splitlines(),
+                                            expected.rstrip().splitlines())) ) 
 
     def testCopyZML(self):
-        for f in glob.glob('z2x-test*.zml'):                        
-            result = zml.copyZML(file(f,'rb')).rstrip()
-            orginal = open(f,'rb').read().rstrip()
+        for f in glob.glob('z2x-test*.zml'):
+            from rx import zml09
+            result = zml09.copyZML(file(f,'rb')).rstrip()
+            orginal = open(f,'rb').read().rstrip()            
             print f, len(result), len(orginal)
-            self.failUnless(orginal == result, 'copy does not match orginal: '+f)
+            self.failUnless(orginal == result, f + ':\n' +
+                    '\n'.join(difflib.ndiff(result.rstrip().splitlines(),
+                                            orginal.rstrip().splitlines())) ) 
 
     def generateX2Z(self):
         for f in glob.glob('x2z-test*.xml'):

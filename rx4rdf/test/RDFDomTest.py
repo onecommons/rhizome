@@ -257,6 +257,10 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         res3 = self.rdfDom.evalXPath(xpath3,  self.model1NsMap)
         self.failUnless(len(res3) == 3)        
 
+        xpath = "(.)/self::a:D"
+        res = self.rdfDom.evalXPath( xpath,  self.model1NsMap, node=res1[0])
+        self.failUnless(len(res) == 1)
+        
         xpath = "is-subproperty-of(/*/a:A/@uri, uri('a:B'))" 
         res4 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless(res4 )
@@ -266,9 +270,10 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         self.failUnless(not res5)
 
         xpath = "is-subproperty-of(/*/a:D/@uri, uri('a:A'))"
-        #only some nodes match, return false
+        #only some nodes match, but since we follow
+        #nodeset equality semantics we still return true
         res6 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-        self.failUnless(not res6)
+        self.failUnless(res6)
 
         #modify the DOM and make sure the schema is updated properly
         self.rdfDom.commit()
@@ -498,7 +503,7 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         self.failUnless( not statements and not nodesToRemove )
                 
     def testXUpdate(self):       
-        '''test xupdate'''
+        '''test RxUpdate (and addTriggers)'''
         from rx import RxPathDom
         adds = []    
         def addTrigger(node):

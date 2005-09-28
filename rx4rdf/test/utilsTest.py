@@ -9,9 +9,9 @@ import unittest
 from rx import utils
 from rx.utils import *
 
-class TestLinkFixer(utils.LinkFixer):
+class TestLinkFixer(utils.HTMLFilter):
     def __init__(self, out):
-        utils.LinkFixer.__init__(self, out)
+        utils.HTMLFilter.__init__(self, out)
                     
     def needsFixup(self, tag, name, value):
         return value and value.startswith('foo')
@@ -290,6 +290,29 @@ class utilsTestCase(unittest.TestCase):
         old = [0, 2, 3]
         new = [0, 2, 3]
         self._testSortedDiff(old,new)
+
+    def testMonkeyPatcher(self):
+        class NeedsPatching(object):
+            def buggy(self):
+                return 1
+            
+        class unusedname(NeedsPatching):
+            __metaclass__ = MonkeyPatcher
+
+            def buggy(self):                          
+               return self.newFunc()
+               
+            def newFunc(self):
+                return 2
+
+            def addedFunc(self):
+                return self.__class__.__name__
+
+        test = NeedsPatching()
+
+        self.failUnless(test.buggy() == 2)
+        self.failUnless(test.buggy_old_() == 1) 
+        self.failUnless(test.addedFunc() == 'NeedsPatching')
         
 if __name__ == '__main__':
     import sys

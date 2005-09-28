@@ -7,9 +7,9 @@
 """
 
 from rx import raccoon, utils, logging, rhizome
-import unittest, os, os.path, shutil, glob, time, pprint, repr as Repr
+import unittest, os, os.path, shutil, glob, time, pprint, sys, repr as Repr
 
-RHIZOMEDIR = '../../rhizome'
+RHIZOMEDIR = '../rhizome'
 
 class RhizomeTestCase(unittest.TestCase):
     '''
@@ -155,6 +155,238 @@ class RhizomeTestCase(unittest.TestCase):
         requestProcessor.log.info(method + ' ' + url)
         return requestProcessor.handleHTTPRequest(name, newkw) 
 
+    def testContentAuthorization(self):
+        from rx.transactions import OutsideTransaction
+        
+        root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
+                                            appVars = { 'useIndex':0} )
+
+        guestAccount = root.evalXPath("/*[foaf:accountName = 'guest']")
+        guestKw = { '__account' : guestAccount } 
+        vars, extFunMap = root.mapToXPathVars(guestKw)
+        guestKw['__accountTokens'] = root.evalXPath(root.rhizome.accountTokens, vars, extFunMap)
+        vars, extFunMap = root.mapToXPathVars(guestKw)
+            
+        xpath=('''wf:process-contents('print 1', 'http://rx4rdf.sf.net/ns/wiki#item-format-python')''')        
+        self.failUnlessRaises(raccoon.NotAuthorized, lambda: root.evalXPath(xpath, vars, extFunMap))
+
+        #now don't require a blanket authorization for xupdate 
+        xpath=('''wf:process-contents('<foo/>', 'http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate')''')                
+        self.failUnlessRaises(OutsideTransaction, lambda: root.evalXPath(xpath, vars, extFunMap))  
+
+        adminAccount = root.evalXPath("/*[foaf:accountName = 'admin']")
+        adminKw = { '__account' : adminAccount } 
+        vars, extFunMap = root.mapToXPathVars(adminKw)
+        adminKw['__accountTokens'] = root.evalXPath(root.rhizome.accountTokens, vars, extFunMap)
+        vars, extFunMap = root.mapToXPathVars(adminKw)
+        
+        #even though we're the super-user here this won't succeed because there's no authorization digest
+        xpath=('''wf:process-contents('print 1', 'http://rx4rdf.sf.net/ns/wiki#item-format-python')''')                        
+        self.failUnlessRaises(raccoon.NotAuthorized, lambda: root.evalXPath(xpath, vars, extFunMap))
+
+        #this XUpdate should be authorized and tries to process the content
+        #(but throws an OutsideTransaction exception since we're not inside a request)
+        xpath=('''wf:process-contents('<foo/>', 'http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate')''')
+        self.failUnlessRaises(OutsideTransaction, lambda: root.evalXPath(xpath, vars, extFunMap))                        
+
+    def _fineGrainedCheck(self, root, account, contents, expectNotAuthorized,
+                resourcesExp=None, kw=None, exceptionType=raccoon.NotAuthorized):
+        kw = kw or {}
+        kw['contents'] = contents
+        kw['__account'] = account        
+        vars, extFunMap = root.mapToXPathVars(kw)
+        kw['__accountTokens'] = root.evalXPath(root.rhizome.accountTokens, vars, extFunMap)
+
+        root.txnSvc.begin()
+        root.txnSvc.state.kw = kw
+
+        if resourcesExp:
+            #replacing resource -- merge statements with matching bnodes
+            xpath='''wf:save-metadata($contents, %s)''' % resourcesExp
+        else:
+            #all new -- matching bnodes labels will be renamed
+            xpath='''wf:save-metadata($contents)'''
+                
+        try:            
+            vars, extFunMap = root.mapToXPathVars(kw, doAuth=True)
+            root.evalXPath(xpath, vars, extFunMap)
+            root.txnSvc._prepareToVote() #we don't want to actually commit
+        except exceptionType:            
+            if not expectNotAuthorized:                
+                self.fail('raised %s: %s' % (exceptionType, sys.exc_info()[1])) 
+        except:
+            raise #unexpected
+        else:
+            if expectNotAuthorized:
+                self.fail('unexpectedly succeeded')
+
+        if root.txnSvc.isActive(): #else already aborted
+            root.txnSvc.abort()        
+        
+    def testFineGrainedAuthorization(self):
+        root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
+                            model_uri = 'test:', appVars = { 'useIndex':0,} )
+
+        guestAccount = root.evalXPath("/*[foaf:accountName = 'guest']")
+        self.failUnless(guestAccount)
+        adminAccount = root.evalXPath("/*[foaf:accountName = 'admin']")
+        self.failUnless(adminAccount)
+        
+        #test add -- the guest shouldn't have permission to add a role
+        contents = '''
+        prefixes:        
+            auth: `http://rx4rdf.sf.net/ns/auth#
+            base: `test:
+        
+        {base:a-new-resource}:
+          auth:has-role: auth:role-superuser
+        '''                
+        self._fineGrainedCheck(root, guestAccount, contents, True)
+        #admin can do anything
+        self._fineGrainedCheck(root, adminAccount, contents, False)
+        
+        #test remove
+        #this rxml removes the auth:guarded statement and so will raise NotAuthorized
+        contents = '''
+        prefixes:
+            wiki: `http://rx4rdf.sf.net/ns/wiki#
+            base: `test:
+
+        base:TextFormattingRules:
+            wiki:about: 
+                wiki:help
+        '''
+        self._fineGrainedCheck(root, guestAccount, contents, True,
+                               "/*[wiki:name='TextFormattingRules']")
+
+        #should be able to add this innocuous statement about a new resource
+        contents = '''
+        prefixes:
+            wiki: `http://rx4rdf.sf.net/ns/wiki#
+            base: `test:
+
+        base:newresource:
+            wiki:about: 
+                wiki:help
+        '''
+        self._fineGrainedCheck(root, guestAccount, contents, False)
+
+        #but all wiki:DocType is protected (by a class access token)
+        #so we can't make any statements about them
+        contents = '''
+        prefixes:
+            wiki: `http://rx4rdf.sf.net/ns/wiki#
+            base: `test:
+
+        base:newresource:
+            rdf:type: wiki:DocType
+            wiki:about: 
+                wiki:help
+        '''
+        self._fineGrainedCheck(root, guestAccount, contents, True)
+        self._fineGrainedCheck(root, adminAccount, contents, False)
+
+        #test transitive authorization base:diffrevisions is protected by base:save-only-token
+        saveOnlyProtectedcontents = '''
+        prefixes:        
+            auth: `http://rx4rdf.sf.net/ns/auth#
+            base: `test:
+        
+        {bnode:diffrevisions1Content}:
+          base:my-prop: "test"
+        '''
+        self._fineGrainedCheck(root, guestAccount, saveOnlyProtectedcontents, True, "''")
+        
+        #test recheckAuthorization:
+        #bnode:diffrevisions1Item already exists
+        #but because a:contents is a subproperty of auth:requires-authorization-for
+        #this adding that will trigger a recheckAuthorization which will transitively 
+        #test all statements including the unauthorized statement
+        #"bnode:diffrevisions1Content: a:transformed-by: wiki:item-format-python"
+        contents = '''
+        prefixes:
+            wiki: `http://rx4rdf.sf.net/ns/wiki#
+            a:    `http://rx4rdf.sf.net/ns/archive#
+            base: `test:
+
+        base:newresource:
+            rdf:type: a:NamedContent
+            a:contents: {bnode:diffrevisions1Item}
+        '''
+        self._fineGrainedCheck(root, guestAccount, contents, True, "''")
+        self._fineGrainedCheck(root, adminAccount, contents, False, "''")
+
+        #test auth:with-value-greater-than -- this will invoke base:limit-priority-guard
+        contents = '''
+        prefixes:
+            auth: `http://rx4rdf.sf.net/ns/auth#
+            base: `test:
+
+        base:newresource:
+            rdf:type: auth:AccessToken
+            auth:priority: %s
+        '''
+        self._fineGrainedCheck(root, guestAccount, contents % '1', False)
+        self._fineGrainedCheck(root, guestAccount, contents % '100', True)
+
+        #test extraPrivileges 
+        #saveRes auth:grants-rights-to save-only-override-token
+        saveRes = root.evalXPath("/*[wiki:name = 'save']")
+        assert saveRes
+        kw = { '__handlerResource' : saveRes }        
+        self._fineGrainedCheck(root, guestAccount, saveOnlyProtectedcontents, False, "''", kw)
+
+        #test auth:with-guard-that-user-can-assign
+        contents = '''
+        prefixes:
+            auth: `http://rx4rdf.sf.net/ns/auth#
+            base: `test:
+
+        base:diffrevisions:
+            auth:guarded-by: {test:testUser/private-rw}
+        '''
+        #self._fineGrainedCheck(root, testAccount, contents, False)
+        
+    def testXPathFuncAuthorization(self):
+        root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
+                            model_uri = 'test:', appVars = { 'useIndex':0,} )
+
+        kw = {}        
+        kw['__account'] = root.evalXPath("/*[foaf:accountName = 'guest']")       
+        vars, extFunMap = root.mapToXPathVars(kw)
+        kw['__accountTokens'] = root.evalXPath(root.rhizome.accountTokens, vars, extFunMap)
+
+        vars, extFunMap = root.mapToXPathVars(kw, doAuth=True)        
+
+        #calling this function requires base:execute-function-token
+        xpath = "wf:generate-patch('adfadsf')"
+        self.failUnlessRaises(raccoon.NotAuthorized, lambda: root.evalXPath(xpath, vars, extFunMap))        
+
+        #try to trick request() into giving us administrator rights
+        xpath = '''wf:request('Sandbox', 'action', 'delete', '__account', /*[foaf:accountName = 'admin'],
+                    '_noErrorHandling', 1)'''
+        self.failUnlessRaises(raccoon.XPathUserError, lambda: root.evalXPath(xpath, vars, extFunMap))
+
+    def testValidation(self):
+        root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
+                            model_uri = 'test:', appVars = { 'useIndex':0,} )
+
+        #print root.evalXPath('/*/auth:requires-authorization-for[.= "bnode:diffrevisions1Content"]')
+        #return
+        guestAccount = root.evalXPath("/*[foaf:accountName = 'guest']")
+        self.failUnless(guestAccount)
+
+        #trigger validation error
+        contents = '''
+        prefixes:
+            wiki: `http://rx4rdf.sf.net/ns/wiki#
+            base: `test:
+
+        base:newresource:
+            wiki:name: 'index'
+        '''        
+        self._fineGrainedCheck(root, guestAccount, contents, True,exceptionType=raccoon.XPathUserError)
+        
     def testLocalLinks(self):
         #the main point of this test is to test virtual hosts
         

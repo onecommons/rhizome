@@ -4,8 +4,8 @@
     http://rx4rdf.sf.net    
 """
 __all__ = ['glockTest', 'testmodpatching','raccoonTest', 'RDFDomTest', 
-            'MRUCacheTest', 'rhizomeTest', 'transactionsTest', 'utilsTest', 
-            'zmlTest', ]
+            'MRUCacheTest', 'transactionsTest', 'utilsTest', 
+            'zmlTest', 'rhizomeTest', ]
 
 import unittest
 class TestProgram(unittest.TestProgram):

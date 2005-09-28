@@ -1,4 +1,26 @@
 !Latest News
+\[28 Sep 2005]
+Version 0.5.0 of Rx4RDF and Rhizome released. 
+
+Changes include:
+
+Major changes to the Raccoon application server:
+* enable URL namespace to be mapped to multiple applications
+* allow applications to use XML (instead of RDF) data stores
+* added SQL-like triggers
+* added two-phase commit transaction coordinator
+
+Major changes to Rhizome:
+* Added a new, more polished and usable default theme.
+* Made fine-grained authentication of changes to the model ubiquitous, made authorization schema much more flexible and expressive.
+* Now uses Schematron (via RxPath) to validate the RDF model.
+
+Refactored and cleaned-up code base.
+
+Plus many other enhancements.
+
+[Download] it or view the [changelog|changelog.txt]
+
 \[25 Jan 2005]
 Version 0.4.3 of Rx4RDF and Rhizome released. 
 

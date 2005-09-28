@@ -1,7 +1,7 @@
 Rx4RDF and Rhizome Changelog
 ============================
 
-Changes in Version 0.5 (April xx, 2005)
+Changes in Version 0.5 (Sept 28, 2005)
 ----------------------------------------
 Major changes and bug fixes:
 * Raccoon: allow multiple applications to be run in one instance
@@ -13,10 +13,11 @@ Major changes and bug fixes:
 ** changed link fixups to uses absolute paths
 * Rhizome: fixed spurious 'admin password not set' warning
 * utils: more HTML sanitizer fixes
-* various: support for 4Suite 1.0b1 (CVS snapshot on Apr 10)
+* utils: added white list HTML sanitizer
+* various: support for 4Suite 1.0b1 
 * Rhizome: added global check to authorization expression
 * Rhizome: added optional templates for global read and write protection
-* Raccoon: refactored raccoon.py: extension functions, content processors 
+* Raccoon: refactored raccoon.py: move extension functions, content processors 
            and caching into separate modules
 * Raccoon: basic support for streaming actions and content processors
 * Raccoon: added DomStore interface, allow Raccoon to work with XML DOMs
@@ -24,12 +25,43 @@ Major changes and bug fixes:
 * Raccoon: replaced global on-error trigger with separate ones per trigger
 * Raccoon: use 2-phase commit transaction coordinator with requests
 * Raccoon: added 'before-prepare', 'before-commit', and 'after-commit' triggers
+* Raccoon: removed authorization hooks (use triggers instead)
 * utils:   added invalidation keys and digest keys to MRUCache
 * utils:   added 'xhtml' XSLT output methods based on XSLT 2.0's xhtml output method
 * Rhizome: fix Javascript error when using IE to open the comments popup 
 * Rhizome: new, much more polished default theme
 * Rhizome: pages (mostly, nearly) valid XHTML
 * setup:   enable setup.py to be run on files checked straight out of CVS
+* utils:   get MonkeyPatcher metaclass working
+* Rhizome: added XPath function authorization 
+* RxPath:  add StringValue for Document nodes, change createDOM api to pass model URI
+* Raccoon: made request kw to XPath variable mapping configurable
+* Rhizome: add support for validation of RDF model using Schematron
+* RxPath:  make is-subproperty-of and is-instance-of follow nodeset equality semantics
+* RxPath:  added is-subclass-of XPath function
+* Rhizome: refactored Rhizome.py: move authorization, content processing 
+           and commands into separate modules
+* Rhizome: add "request" and "fixup-urls" XPath extension functions
+* Rhizome: add site-theme.xsl, eliminates the need for a "theme.xsl" alias
+* Rhizome: Always use fine-grained authentication, including with RxUpdate.
+  To support this, enhance authorization:
+** Add new fine-grained permission: auth:permission-new-resource-statement 
+** Moved class based authorization to a separate step after updates are complete. 
+   This eliminates changes with class inferencing during change authorization 
+   thus simplying authorization behavior and makes it harder to create privilege escalation holes. 
+** reauthorize all the properties for all dependent resources when a 
+   subproperty of auth:requires-authorization-for is added or removed 
+** Add several property-value predicates and allow custom property-value 
+   predicates to be created (via the new 'auth-value-matches' XPath function).
+** The new with-new-resource-value property-value predicate allows for access 
+   tokens to only be applied to new resources created during the transaction. 
+   This can be used for example, to allow a guest account to create a new user
+   for herself, but not modify or create other objects.   
+** Add a can-assign-guard property for users and roles and a corresponding
+   with-value-user-can-assign-guard property value predicate.
+** Add a auth:grants-rights-to property to allow specific resources to execute
+   with extra privileges
+** replaced find-unauthorized XPath function with authorize-statements 
 
 Changes in Version 0.4.3 (Jan 25, 2005)
 ----------------------------------------

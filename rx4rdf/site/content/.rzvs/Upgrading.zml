@@ -1,3 +1,19 @@
+!Upgrading to Rhizome version 0.5
+The following changes may require changes to your application.
+
+The ^^find-unauthorized^^ XPath function has been replaced with ^^authorize-statements^^.
+
+The following config settings have changed:
+* The ^^defaultPageName^^ setting has been moved from server.cfg to the application config.
+* ^^initModel^^ is replaced with ^^domStoreFactory^^
+* ^^unAuthorizedExpr^^ is no longer used, modify ^^rhizome-config.py^^ directly.
+* ^^authorizeAdditions^^ and ^^authorizeRemovals^^ have been replaced by ^^before-add^^ and ^^before-remove^^ triggers.
+* ^^authorizeXPathFuncs^^ signature and usage has changed
+
+To upgrade an existing Rhizome store to this version you will need to make these modifications to the store:
+* Add the pages found in ^^rhizome-config.py^^ after the comment "#added in 0.5.0:"
+* Add the RxML defined by the ^^authStructure^^ variable in ^^rhizome-config.py^^ 
+
 !Upgrading to Rhizome version 0.4.3
 Any ^^rdf:li^^ psuedo-predicates that appeared in a RxPath expression should be replaced with ^^rdfs:member^^.
 Alternatively, you could add the statement "rdfs:member: rdfs:subPropertyOf: rdf:li" to any model that
