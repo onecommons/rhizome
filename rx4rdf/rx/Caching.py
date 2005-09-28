@@ -106,16 +106,24 @@ def getGetMetadataCacheKey(field, context, notCacheableXPathFunctions):
     for the get-metadata() XPath function
     Handles the most common case where the first argument is a literal.
     '''
-    if isinstance(field._args[0], XPath.ParsedExpr.ParsedLiteralExpr):            
-        literal = field._args[0].evaluate(context) #returns field._literal
+    args = field._args
+    if isinstance(args[0], XPath.ParsedExpr.ParsedLiteralExpr):            
+        literal = args[0].evaluate(context) #returns field._literal
         varRef =  XPath.ParsedExpr.ParsedVariableReferenceExpr('$'+literal)
         try:
             value = varRef.evaluate(context)
-        #except XPath.RuntimeException: if e.code = XPath.RuntimeException.UNDEFINED_VARIABLE:
+        except XPath.RuntimeException, e:
+            if e.errorCode == XPath.RuntimeException.UNDEFINED_VARIABLE:
+                #note we don't need to worry about the default arg if present
+                #because it will be covered by the rest of the exp's key
+                #(actually this is suboptimal if the variable is found)
+                value = XFalse #the default default
+            else:
+                raise MRUCache.NotCacheable
         except:
             raise MRUCache.NotCacheable
 
-        return (varRef._key, _getKeyFromValue(value))
+        return (varRef._key, getKeyFromValue(value))
     else:
         raise MRUCache.NotCacheable
 
@@ -147,7 +155,16 @@ def evaluateKey(paramNums, field, context, notCacheableXPathFunctions):
                 raise MRUCache.NotCacheable
     return tuple(key)
 
-DefaultNotCacheableFunctions = dict([(x, None) for x in [                                    
+def site2httpCacheKey(field, context, notCacheableXPathFunctions):
+    if context.node: 
+        #this variables is referenced by site2http         
+        value = context.varBindings.get((None, '_APP_BASE'))
+        if value is not None: 
+            return getKeyFromValue(value)
+    #else: not specified when getting XSLT (which relying on params)
+    return ()
+    
+DefaultNotCacheableFunctions = dict([(x, None) for x in [ 
         (FT_EXT_NAMESPACE, 'iso-time'),        
         (RXWIKI_XPATH_EXT_NS, 'current-time'),            
         ('http://exslt.org/dates-and-times', 'date-time'),            
@@ -158,20 +175,24 @@ DefaultNotCacheableFunctions = dict([(x, None) for x in [
         (RXWIKI_XPATH_EXT_NS, 'error'),
         #xslt extension elements:
         (FT_EXT_NAMESPACE, 'chain-to'),
-        ('http://exslt.org/common', 'document'), #this element is banned actually
+        ('http://exslt.org/common','document'),#this element is banned actually
         ]])
 
-DefaultNotCacheableFunctions[(RXWIKI_XPATH_EXT_NS, 'get-metadata')] = getGetMetadataCacheKey
-DefaultNotCacheableFunctions[(RXWIKI_XPATH_EXT_NS, 'has-metadata')] = getHasMetadataCacheKey
-#note: assign/remove-metadata are handle by the side-effect capturing functions
-#functions that dynamically evaluate expressions: 
-DefaultNotCacheableFunctions[(RXWIKI_XPATH_EXT_NS, 'if')] = lambda *args: evaluateKey( (1,2), *args)
-DefaultNotCacheableFunctions[(RXWIKI_XPATH_EXT_NS, 'sort')] = lambda *args: evaluateKey( (1,), *args)
-DefaultNotCacheableFunctions[(RXWIKI_XPATH_EXT_NS, 'evaluate')] = lambda *args: evaluateKey( (0,), *args)
-DefaultNotCacheableFunctions[(FT_EXT_NAMESPACE, 'evaluate')] = lambda *args: evaluateKey( (0,), *args)
-DefaultNotCacheableFunctions[('http://exslt.org/dynamic', 'evaluate')] = lambda *args: evaluateKey( (0,), *args)
-DefaultNotCacheableFunctions[(RXWIKI_XPATH_EXT_NS, 'map')] = lambda *args: evaluateKey( (1,), *args)    
-DefaultNotCacheableFunctions[(RXWIKI_XPATH_EXT_NS, 'format-pytime')] = zeroArgsCheck
+DefaultNotCacheableFunctions.update({
+    #assign/remove-metadata are handle by the side-effect capturing functions
+    (RXWIKI_XPATH_EXT_NS, 'get-metadata') : getGetMetadataCacheKey,
+    (RXWIKI_XPATH_EXT_NS, 'has-metadata') : getHasMetadataCacheKey,
+    (RXWIKI_XPATH_EXT_NS, 'format-pytime') : zeroArgsCheck,
+    #functions that dynamically evaluate expressions: 
+    (RXWIKI_XPATH_EXT_NS, 'if') : lambda *args: evaluateKey( (1,2), *args),
+    (RXWIKI_XPATH_EXT_NS, 'sort'): lambda *args: evaluateKey( (1,), *args),
+    (RXWIKI_XPATH_EXT_NS, 'evaluate') : lambda *args: evaluateKey( (0,),*args),
+    (FT_EXT_NAMESPACE, 'evaluate') : lambda *args: evaluateKey( (0,), *args),
+    ('http://exslt.org/dynamic','evaluate'):lambda*args:evaluateKey((0,),*args),
+    (RXWIKI_XPATH_EXT_NS, 'map') : lambda *args: evaluateKey( (1,), *args),
+    (RXWIKI_XPATH_EXT_NS, 'fixup-urls'): site2httpCacheKey,
+})
+
 for functionName in ['date','time', 'year', 'leap-year', 'month-in-year',
         'month-name','month-abbreviation','week-in-year', 'day-in-year',
         'day-in-month','day-of-week-in-month', 'day-in-week','day-name',
@@ -206,8 +227,8 @@ def _splitKey(key, context):
         expanded = key
     return expanded
 
-def _getKeyFromValue(value):
-    assert not isinstance(value, _Node) #this shouldn't happen
+def getKeyFromValue(value):    
+    assert not isinstance(value, _Node), '%s is a _Node, but it shouldn\'t be' % repr(value)    
     if isinstance(value, list): #its a nodeset
         newValue = []
         for node in value:
@@ -220,12 +241,15 @@ def _getKeyFromValue(value):
                     newValue.append( getKey()  )
                 else:
                     newValue.append( id(node) )
-        value = tuple(newValue)                    
+        value = tuple(newValue)    
+    elif isinstance(value, Ft.Lib.boolean.BooleanType):
+        return bool(value) #4suite bug: Ft.Lib.boolean isn't cacheable
     return value        
     
 def getKeyFromXPathExp(compExpr, context, notCacheableXPathFunctions):
     '''
-    Returns the key uniquely representing the result of evaluating an expression given a context.
+    Returns the key uniquely representing the result of
+    evaluating an expression given a context.
     The key consists of:
         expr, context.node, (var1, value1), (var2, value2), etc.
           for each variable referenced in the expression
@@ -233,21 +257,23 @@ def getKeyFromXPathExp(compExpr, context, notCacheableXPathFunctions):
     key = [ repr(compExpr) ]
     DomDependent = False
     for field in compExpr:
-        if context.node and isinstance(field, XPath.ParsedExpr.ParsedVariableReferenceExpr):
+        if context.node and isinstance(field,
+                XPath.ParsedExpr.ParsedVariableReferenceExpr):
             #when getting the key for a stylesheet we don't have
             #the variables available for examination                
             #(nor the context.node and that's easier to test for)
-            #and in this case we don't want them in the key since we add the stylesheet's params instead
+            #and in this case we don't want them in the key
+            #since we add the stylesheet's params instead
             value = field.evaluate(context) #may raise RuntimeException.UNDEFINED_VARIABLE
             expanded = _splitKey(field._key, context)
-            key.append( (expanded, _getKeyFromValue(value) ) )
+            key.append( (expanded, getKeyFromValue(value) ) )
         elif isinstance(field, XPath.ParsedExpr.FunctionCall):
             DomDependent = True #todo: we could check if its a 'static' function that doesn't access the dom
             expandedKey = _splitKey(field._key, context)
             if expandedKey in notCacheableXPathFunctions:
                 keyfunc = notCacheableXPathFunctions[expandedKey]
                 if keyfunc:
-                   key += keyfunc(field, context, notCacheableXPathFunctions)
+                   key.extend( keyfunc(field, context, notCacheableXPathFunctions) )
                 else:
                    raise MRUCache.NotCacheable
             #else: log.debug("%s cacheable! not in %s" % (str(expandedKey), str(notCacheableXPathFunctions) ) )
@@ -283,46 +309,44 @@ def processXPathExpSideEffects(cacheValue, callList, compExpr, context):
     Re-assign or remove metadata using the list created by calcXPathSideEffects()
     '''
     for function in callList:
-        log.debug("performing side effect for %s with args %s" % (function._name, str(function._args) ) )
+        log.debug("performing side effect for %s with args %s" % (
+                                function._name, str(function._args) ) )
         function.evaluate(context) #invoke the function with a side effect
     return cacheValue
 
-#this is not used right now since we monkey patch FunctionCall evaluate
-def _resetFunctions(compiledExp, *ignoreArgs):
-    '''because the function map is not part of the key for the
-       expression cache we need to clear out _func field after retrieving
-       the expression from the cache, thus forcing _func to be recalculated
-       in order to guard against the function map values changing.
-    '''
-    for field in compiledExp:
-        if isinstance(field, XPath.ParsedExpr.FunctionCall):                
-            field._func = None
-
 ###########################################################################################
-## The following functions and classes are used by the XSLT stylesheet parsing cache
-## If the stylesheet has dependencies on external files, then parsing will not be cacheable
-## Sample usage:    MRUCache.MRUCache(STYLESHEET_CACHE_SIZE, styleSheetValueCalc,
-##                            isValueCacheableCalc = isStyleSheetCacheable)
-## If you are not worried about the dependent files changing, don't set isValueCacheableCalc
+## The following functions and classes are used by the XSLT stylesheet
+## parsing cache If the stylesheet has dependencies on external files,
+## then parsing will not be cacheable
+## Sample usage:
+## MRUCache.MRUCache(STYLESHEET_CACHE_SIZE, styleSheetValueCalc,
+##                  isValueCacheableCalc = isStyleSheetCacheable)
+##If you are not worried about the dependent files changing, don't set
+## isValueCacheableCalc
 ##########################################################################################
 import Ft.Xml.Xslt.StylesheetReader 
 class StylesheetReader(Ft.Xml.Xslt.StylesheetReader.StylesheetReader):
+    '''    
+    Subclass StylesheetReader so we can tell if the stylesheet had
+    dependencies on external resources
     '''
-    Subclass StylesheetReader so we can tell if the stylesheet had dependencies on external resources
-    '''
+    
     standAlone = True
     
     def externalEntityRef(self, context, base, sysid, pubid):
         self.standAlone = False
-        return Ft.Xml.Xslt.StylesheetReader.StylesheetReader.externalEntityRef(self, context, base, sysid, pubid)
+        return Ft.Xml.Xslt.StylesheetReader.StylesheetReader.externalEntityRef(
+                                              self, context, base, sysid, pubid)
         
     def _handle_xinclude(self, attribs):
         self.standAlone = False
-        return Ft.Xml.Xslt.StylesheetReader.StylesheetReader._handle_xinclude(self, attribs)
+        return Ft.Xml.Xslt.StylesheetReader.StylesheetReader._handle_xinclude(
+                                                                 self, attribs)
         
     def _combine_stylesheet(self, href, is_import):
         self.standAlone = False
-        return Ft.Xml.Xslt.StylesheetReader.StylesheetReader._combine_stylesheet(self, href, is_import)
+        return Ft.Xml.Xslt.StylesheetReader.StylesheetReader._combine_stylesheet(
+                                                            self, href, is_import)
         
 def styleSheetValueCalc(source, uri):
     '''
@@ -397,7 +421,8 @@ def getXsltCacheKeyPredicate(styleSheetCache, styleSheetNotCacheableFunctions,
 
 def xsltSideEffectsCalc(cacheValue, resultNodeset, kw, contextNode, retVal):
     '''
-    Calculate a value that represents the side effects that occurred while processing this.    
+    Calculate a value that represents the side effects that occurred
+    while processing this.
     '''
     #assign-metadata and remove-metadata record the changes they made in _metadatachanges
     return kw.get('_metadatachanges', [])
@@ -437,11 +462,13 @@ def _addXPathExprCacheKey(compExpr, nsMap, key, notCacheableXPathFunctions):
           if expanded in notCacheableXPathFunctions:
                keyfunc = notCacheableXPathFunctions[expanded]
                if keyfunc:
-                   key.append( keyfunc(field, context, notCacheableXPathFunctions) ) #may raise MRUCache.NotCacheable
+                   #may raise MRUCache.NotCacheable
+                   key.append( keyfunc(field, context,
+                            notCacheableXPathFunctions) ) 
                else:
                    raise MRUCache.NotCacheable    
 
-def getStylesheetCacheKey(nodes, styleSheetNotCacheableFunctions, key = None):
+def getStylesheetCacheKey(nodes, styleSheetNotCacheableFunctions, key=None):
     '''
     Walk through the elements in the stylesheet looking for
     elements that reference XPath expressions; then iterate through each 
@@ -454,38 +481,47 @@ def getStylesheetCacheKey(nodes, styleSheetNotCacheableFunctions, key = None):
         for node in nodes:
             #is this element cachable?
             if node.expandedName in styleSheetNotCacheableFunctions:                
-                keyfunc = notCacheableXPathFunctions[expandedKey]
+                keyfunc = styleSheetNotCacheableFunctions[node.expandedName]
                 if keyfunc:
-                   context = XPath.Context.Context(None, processorNss = nsMap)    
-                   key.extend( keyfunc(node, context, notCacheableXPathFunctions) )
+                   context = XPath.Context.Context(None,processorNss=nsMap)
+                   key.extend(keyfunc(node,context,
+                                      notCacheableXPathFunctions))
                 else:
                    #stylesheet uses an uncacheable extension element
                    raise MRUCache.NotCacheable                    
             attrDict = getattr(node, 'legalAttrs', None)
             if attrDict is not None:
                 for name, value in attrDict.items():
-                    if isinstance(value, (AttributeInfo.Expression, AttributeInfo.Avt)):
+                    if isinstance(value, (AttributeInfo.Expression,
+                                          AttributeInfo.Avt)):
                         #this attribute may have an expression in it
-                        attributeName = '_' + SplitQName(name)[1].replace('-', '_') #see Ft.Xml.Xslt.StylesheetHandler
+                        #see Ft.Xml.Xslt.StylesheetHandler
+                        attributeName = '_' + SplitQName(
+                                name)[1].replace('-', '_')
                         attributeValue = getattr(node, attributeName, None)
-                        if isinstance(attributeValue, AttributeInfo.ExpressionWrapper):
+                        if isinstance(attributeValue,
+                                      AttributeInfo.ExpressionWrapper):
                             _addXPathExprCacheKey(attributeValue.expression,
-                                node.namespaces, key, styleSheetNotCacheableFunctions)                                
-                        elif isinstance(attributeValue, AttributeValueTemplate.AttributeValueTemplate):
+                                node.namespaces, key,
+                                styleSheetNotCacheableFunctions)
+                        elif isinstance(attributeValue,
+                            AttributeValueTemplate.AttributeValueTemplate):
                             for expr in attributeValue._parsedParts:
                                 _addXPathExprCacheKey(expr, node.namespaces,
-                                                key, styleSheetNotCacheableFunctions)
+                                        key, styleSheetNotCacheableFunctions)
             #handle LiteralElements
             outputAttrs = getattr(node, '_output_attrs', None) 
             if outputAttrs is not None:
                 for (qname, namespace, value) in outputAttrs:
-                    if isinstance(value, AttributeValueTemplate.AttributeValueTemplate):                           
+                    if isinstance(value,
+                        AttributeValueTemplate.AttributeValueTemplate):                           
                         for expr in value._parsedParts:
                             _addXPathExprCacheKey(expr, node.namespaces,
-                                             key, styleSheetNotCacheableFunctions)                
+                                    key, styleSheetNotCacheableFunctions)                
 
             if node.children is not None:
-                key = getStylesheetCacheKey(node.children, styleSheetNotCacheableFunctions, key)
+                key = getStylesheetCacheKey(node.children,
+                        styleSheetNotCacheableFunctions, key)
                 if isinstance(key, MRUCache.NotCacheable):
                     return key
     except MRUCache.NotCacheable, e:

@@ -87,6 +87,13 @@ class TransactionService(object):
         else:
             raise TransactionInProgress
 
+    def isDirty(self):
+        '''return True if any of the transaction participants were modified'''    
+        for p in self.state.participants:
+            if p.isDirty(self):
+                return True
+        return False
+
     def _prepareToVote(self):
 
         """Get votes from all participants
@@ -136,6 +143,7 @@ class TransactionService(object):
 
         self._prepareToVote()
         self._vote()
+        #bug? vote failed will raise the participant's error and _cleanup will never get called
         
         for p in self.state.participants:
             try:
@@ -203,6 +211,10 @@ class TransactionService(object):
 
 class TransactionParticipant(object):
     inTransaction = False
+
+    def isDirty(self,txnService):
+        '''return True if this transaction participant was modified'''    
+        return True #default to True if we don't know one way or the other
     
     def readyToVote(self, txnService):
         return True
@@ -224,7 +236,9 @@ class RaccoonTransactionState(TransactionState):
         super(RaccoonTransactionState, self).__init__()        
         self.additions = []
         self.removals = []
+        self.newResources = []
         self.result = []
+        self.kw = {}
         self.contextNode = None
         self.retVal = None
 
@@ -236,13 +250,24 @@ class RaccoonTransactionService(TransactionService):
         self.server = server
         super(RaccoonTransactionService, self).__init__(server.log.name)
 
+    def newResourceHook(self, node):
+        '''
+        This is intended to be set as the DOMStore's newResourceTrigger
+        '''
+        if self.isActive():            
+            self.state.newResources.append(node)
+            self._runActions('before-new', {'_newResources' : [node]})
+
     def addHook(self, node):
         '''
         This is intended to be set as the DOMStore's addTrigger
         '''
         if self.isActive():            
             self.state.additions.append(node)
-            self._runActions('before-add', {'_added' : [node]})
+            isnew = node.parentNode in self.state.newResources
+            kw = {'_added' : [node], '_isnew' : isnew,
+                  '_newResources': self.state.newResources}
+            self._runActions('before-add', kw)
 
     def removeHook(self, node):
         '''
@@ -250,7 +275,10 @@ class RaccoonTransactionService(TransactionService):
         '''
         if self.isActive():
             self.state.removals.append(node)
-            self._runActions('before-remove', {'_removed' : [node]})
+            isnew = node.parentNode in self.state.newResources
+            kw = {'_removed' : [node], '_isnew' : isnew,
+                  '_newResources': self.state.newResources}
+            self._runActions('before-remove', kw)
                 
     def _runActions(self, trigger, morekw=None):      
        actions = self.server.actions.get(trigger)       
@@ -258,12 +286,13 @@ class RaccoonTransactionService(TransactionService):
             kw = self.state.kw.copy()
             if morekw is None: 
                 morekw = { '_added' : self.state.additions,
-                           '_removed' : self.state.removals }
+                           '_removed' : self.state.removals,
+                           '_newResources': self.state.newResources}
             kw.update(morekw)
-            errorSequence= self.server.actions.get(trigger+'-error') 
-            self.server.callActions(sequence,self.state.result, self.state.kw,
+            errorSequence= self.server.actions.get(trigger+'-error')
+            self.server.callActions(actions,self.state.result, kw,
                     self.state.contextNode,  self.state.retVal,
-                    globalVars=morekw.keys(),
+                    globalVars= self.server.globalRequestVars + morekw.keys(),
                     errorSequence=errorSequence)
 
     def join(self, participant):
@@ -278,16 +307,21 @@ class RaccoonTransactionService(TransactionService):
         if success:
             self._runActions('after-commit')
 
-        super(RaccoonTransactionService, self)._cleanup(committed)
-
-        if self.lock:  #hmm, can we release the lock earlier?
-            self.lock.release()
-            self.lock = None
+        try:
+            super(RaccoonTransactionService, self)._cleanup(committed)
+        finally:
+            if self.lock:  #hmm, can we release the lock earlier?
+                self.lock.release()
+                self.lock = None
         
     def _prepareToVote(self):
+        #todo: treating these two actions as transaction participants either end of the list
+        #with the action running in voteForCommit() would be more elegant
+        #but right now the txn doesn't clean up if a vote fails
+        
         #we're about to complete the transaction,
         #here's the last chance to modify it
-        try: 
+        try:
             self._runActions('before-prepare')
         except:
             self.abort()
@@ -348,6 +382,7 @@ class FileFactory(object):
 class TxnFileFactory(TransactionParticipant, FileFactory):
     """Transacted file (stream factory)"""
     isDeleted = False
+    _isDirty = False
 
     def __init__(self, filename):
         super(TxnFileFactory, self).__init__(filename)  
@@ -358,6 +393,9 @@ class TxnFileFactory(TransactionParticipant, FileFactory):
             "Can't use autocommit with transaction in progress"
         )
 
+    def isDirty(self,txnService):
+        return self._isDirty or self.isDeleted
+    
     def delete(self, autocommit=False):
         if self.inTransaction:
             if autocommit:
@@ -375,10 +413,11 @@ class TxnFileFactory(TransactionParticipant, FileFactory):
     def _open(self, mode, flags, ac):
         if mode not in ('t','b','U'):
             raise TypeError("Invalid open mode:", mode)
-
         elif self.inTransaction:
             if ac:
                 self._txnInProgress()
+            if flags!='r':
+                self._isDirty = True
             return open(self.tmpName, flags+mode)
         # From here down, we're not currently in a transaction...
         elif ac or flags=='r':
@@ -420,7 +459,8 @@ class TxnFileFactory(TransactionParticipant, FileFactory):
             os.rename(self.tmpName, self.filename)
 
     def abortTransaction(self, txnService):
-        if not self.isDeleted:
+        #todo: what if the file is open? (esp. on windows)
+        if not self.isDeleted and os.path.exists(self.tmpName):
             os.unlink(self.tmpName)
 
     def finishTransaction(self, txnService, committed):

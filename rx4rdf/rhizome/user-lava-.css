@@ -1,9 +1,9 @@
 .page_style {	/*rarely seen in normal size-to-browser-width layout (except with small page heights), seen much in fixed width layout*/
-	background-color:#000!important;
+	background-color:#FFF!important;
 }
 
 .header_style {/* commonly uses sidebar or footer color */
-	background-color:#cc3!important;
+	background-color:#933!important;
 	color:#FFF!important;
 }
 .header_style a:link, .header_style a:visited {
@@ -14,34 +14,34 @@
 }
 
 .sidebar_style { /* commonly uses header or footer color */
-	background-color:#cc3!important;
-	color:#333;
+	background-color:#933!important;
+	color:#FFC;
 }
 
 .quicklinks_style a:link, .quicklinks_style a:visited {
-	color:#666!important;
+	color:#FFC!important;
 }
 #quicklinks a:hover,#quicklinks a:active {
 	padding:3px;
-	color:#fff!important;
+	color:#000!important;
 	font-weight:bold;
-	background-color:#690!important;
+	background-color:#FF9!important;
 	text-decoration:none;
 }
-.actionstab_style {
+.actionstab_style {	
 	background-color:#FFF;
 	border-bottom-color:#FFF;
 }
 
 #actionsbar a:hover {
-	background-color:#690!important;
+	background-color:#336;
 	color:#FFF;
 	text-decoration:none!important;
 }
 .selected-action-tab_style {	/* use page-title color */
-	background-color:#690!important;
-	border-bottom-color:#690!important;
-	color:#fff!important;
+	background-color:#FF9!important;
+	border-bottom-color:#FF9!important;
+	color:#003!important;
 }
 
 .selected-action-tab a:hover{
@@ -52,8 +52,8 @@
 }
 
 .page-title_style { /* matched to selected actiontab*/
-	background-color:#690!important;
-	color:#fff!important;
+	background-color:#FF9!important;
+	color:#003!important;
 }
 .content_style {
 	background-color:#FFF!important;
@@ -70,35 +70,24 @@
 
 
 .form_style {
-	background-color:#690!important;
+	background-color:#FF9!important;
 	color:#003!important;
 }
-
-#login-div {
-    color:#fff!important;
-}
-#login-div a {
-    color:#fff!important;
-}
 #login-div a:hover {
-	background-color:#666!important;
+	background-color:#336!important;
 }
 
 .navbar_style a {
-	background-color:#690!important;
-	color:#fff!important;
+	background-color:#FF9!important;
 }
 .navbar_style a:hover {
-	background-color:#cc6!important;
-	color:#333!important;
+	background-color:#336!important;
+	color:#FFF!important;
 }
 
 .footer_style {	/*commonly uses header or sidebar color*/
-	background-color:#003!important;
+	background-color:#933!important;
 	color:#FFF!important;
 	font-weight:bold;
 }
 
-#searchform form{
-    color:#fff!important;
-}

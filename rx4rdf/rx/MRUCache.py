@@ -137,9 +137,9 @@ class MRUCache:
             try: 
                 keydigest = hkey = hashCalc(*args, **kw)
             except NotCacheable: #can't calculate a key
-                if self.debug:
-                    import traceback
-                    traceback.print_exc()
+                #if self.debug:
+                #    import traceback
+                #    traceback.print_exc()
                 return valueCalc(*args, **kw)
         else:
             keydigest = hkey = args # use tuple of args as default key for first stage LU            
@@ -155,7 +155,8 @@ class MRUCache:
 
         try:
             node = self.nodeDict[keydigest]
-            if self.debug: print 'found key', Repr.repr(hkey), 'value', Repr.repr(node.value)
+            if self.debug: self.debug('found key '+ Repr.repr(hkey)+' value '
+                                                      + Repr.repr(node.value))
             assert node.hkey == keydigest
             #if node.invalidate and node.invalidate(node.value, *args, **kw):
             #    self.removeNode(node)
@@ -171,13 +172,15 @@ class MRUCache:
 
             newValueSize = self.capacityCalc(hkey, value)
             if newValueSize > (self.maxValueSize or self.capacity):                
-                if self.debug: print newValueSize, 'bigger than', (self.maxValueSize or self.capacity)
+                if self.debug: self.debug(newValueSize + ' bigger than '+
+                                          (self.maxValueSize or self.capacity))
                 return value #too big to be cached
             #note this check doesn't take into account the current
             #nodeSize so the cache can grow to just less than double the capacity
             
-            if isValueCacheableCalc and not isValueCacheableCalc(hkey, value, *args, **kw):
-                if self.debug: print 'value is not cachable', Repr.repr(value)
+            if isValueCacheableCalc and not isValueCacheableCalc(
+                                            hkey, value, *args, **kw):
+                if self.debug: self.debug('value is not cachable'+Repr.repr(value))
                 return value #value isn't cacheable
                         
             if sideEffectsCalc:
@@ -220,6 +223,8 @@ class MRUCache:
                 self.mru = lru # new lru is next newer from before
 
             self.nodeSize += newValueSize
+            if self.debug:
+                self.debug('adding key '+ Repr.repr(keydigest)+' value '+Repr.repr(value))
             self.nodeDict[keydigest] = self.mru      # add new key->node mapping
             
             if invalidateKeys:

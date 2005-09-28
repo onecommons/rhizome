@@ -6,7 +6,8 @@
 __all__ = ["raccoon", "RxPathDom", "RxPath", "utils", 'htmlfilter',
            "rxml", "rhizome", "zml", 'ExtFunctions',
            'Caching', 'ContentProcessors', 'UriResolvers', 'transactions',
-           'RhizomeContent', 'RxPathSchema', 'XhtmlWriter','DomStore',           
+           'RxPathSchema', 'XhtmlWriter','DomStore',
+           'RhizomeBase', 'RhizomeContent','RhizomeAuth','RhizomeCmds',
            #3rd party libraries with varying degrees of modifications:
            "Server", "XUpdate", 'MRUCache', "DomTree", 
            "glock", "metakitdriver", "htmldiff" ]

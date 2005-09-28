@@ -117,6 +117,7 @@ def DocumentAsText(context, url):
         return [] #return an empty nodeset    
     #file = urllib2.urlopen(urlString) #use InputSource instead so our SiteUriResolver get used
     #print "urlstring", urlString
+    #todo: set baseURI = this current context's $_path, have site resolver use this as the docbase
     file = InputSource.DefaultFactory.fromUri(urlString)
     bytes = file.read()
     #print bytes[0:100]
@@ -328,9 +329,10 @@ def HasMetaData(kw, context, name):
             return XFalse
     return _onMetaData(kw, context, name, _test, 'has')
 
-def GetMetaData(kw, context, name, default=False):
+def GetMetaData(kw, context, name, default=XFalse):
     '''
-    the advantage of using this instead of a variable reference is that it just returns 0 if the name doesn't exist, not an error
+    The advantage of using this instead of a variable reference is
+    that it just returns 0 if the name doesn't exist, not an error
     '''
     def _get(local, dict):
         if dict and dict.has_key(local):
@@ -341,7 +343,7 @@ def GetMetaData(kw, context, name, default=False):
 
 def AssignMetaData(kw, context, name, val, recordChange = None, authorize=True):
     '''
-    new variable and values don't affect corresponding xpath variable 
+    Note: new variable and values don't affect corresponding xpath variable 
     '''
     def _assign(local, dict):
         #oldval = dict.get(local, None)
@@ -384,36 +386,14 @@ def _onMetaData(kw, context, name, func, opname, value=None, authorize=True):
         raise raccoon.NotAuthorized('%s-metadata with %s:%s %s' % (opname, namespace, name, value))
 
     dict = None
+    kwdicts = kw['__server__'].kw2varsMap
     if not namespace:
         dict = kw
-    elif namespace == RXIKI_HTTP_REQUEST_HEADER_NS:
-        r = kw.get('_request')
-        if r:
-            dict = r.headerMap
-    elif namespace == RXIKI_HTTP_RESPONSE_HEADER_NS:
-        r = kw.get('_response')
-        if r:
-            dict = r.headerMap        
-    elif namespace == RXIKI_REQUEST_COOKIES_NS: #assigning values will be automatically converted to a Morsel
-        r = kw.get('_request')
-        if r:
-            dict = r.simpleCookie
-    elif namespace == RXIKI_RESPONSE_COOKIES_NS: #assigning values will be automatically converted to a Morsel
-        r = kw.get('_response')
-        if r:
-            dict = r.simpleCookie 
-    elif namespace == RXIKI_SESSION_NS:
-        r = kw.get('_session')
-        if r is not None:
-            dict = r        
-    elif namespace == RXIKI_PREV_NS:
-        r = kw.get('_prevkw')
-        if r is not None:
-            dict = r
-    elif namespace == RXIKI_ERROR_NS:
-        r = kw.get('_errorInfo')
-        if r is not None:
-            dict = r
+    elif kwdicts.get(namespace):
+        dictname, attrib, filter = kwdicts[namespace]
+        dict = kw.get(dictname)
+        if dict and attrib:
+            dict = getattr(dict, attrib, None)        
     else:
         raise raccoon.UnusableNamespaceError( '%s uses unusable namespace: %s' % (local, namespace) )
     #if dict is None:

@@ -237,8 +237,12 @@ class Node(xml.dom.Node, object):
         represents this node and current state of the DOM
         '''
         #todo: return a value that isn't tied to this in-node in memory representation
-        #e.g. its position in the DOM. 
-        return (id(self),  self.ownerDocument.getKey())
+        #e.g. its position in the DOM.
+        if self.parentNode:
+            parentKey = self.parentNode.getKey()
+        else:
+            parentKey = None        
+        return (id(self), parentKey)
 
 def looksLikeObject(node):
     if node.nodeType == Node.TEXT_NODE:
@@ -372,6 +376,17 @@ class Resource(Element):
         return self._lastChild
     
     lastChild = property(_get_lastChild)
+
+    def getKey(self):
+        '''
+        This is used by the cache to return a key that uniquely
+        represents this node and current state of the DOM
+        '''
+        if self.parentNode:
+            parentKey = self.parentNode.getKey()
+        else:
+            parentKey = None        
+        return (self.uri, parentKey)
                             
     def matchName(self, namespaceURI, local):
         #support for multiple rdf:types:        
@@ -1041,6 +1056,19 @@ class BasePredicate(Element):
                 return tuple(listStmts)
         else:
             return (self.stmt, )
+
+    def getKey(self):
+        '''
+        This is used by the cache to return a key that uniquely
+        represents this node and current state of the DOM
+        '''
+        stmts = self.getModelStatements()
+        unique = [stmts[0].predicate] + [x.subject for x in stmts[1:]]
+        if self.parentNode:
+            parentKey = self.parentNode.getKey()
+        else:
+            parentKey = None
+        return (tuple(unique), parentKey)
             
     def cmpSiblingOrder(self, other):
         '''
@@ -1147,7 +1175,9 @@ class BasePredicate(Element):
     stringValue = property(_get_stringValue)
     
     def __repr__(self):
-        object = self.stmt.object[:DomTree.CDATA_REPR_LIMIT]
+        object = self.stmt.object
+        if len(object) > DomTree.CDATA_REPR_LIMIT:
+            object = object[:DomTree.CDATA_REPR_LIMIT] + '...'
         if isinstance(object, unicode):
             object = object.encode('utf8') 
 
@@ -1290,6 +1320,17 @@ class Attr(Node):
             return 0 #attributes are unordered, so all siblings are equal
         else: #attributes come before child nodes
             return -1
+
+    def getKey(self):
+        '''
+        This is used by the cache to return a key that uniquely
+        represents this node and current state of the DOM
+        '''
+        if self.parentNode:
+            parentKey = self.parentNode.getKey()
+        else:
+            parentKey = None        
+        return ((self.namespaceURI, self.localName, self.nodeValue), parentKey)
         
     def __repr__(self):
         return "<pAttr at %X: name %s, value %s>" % (id(self),
@@ -1311,6 +1352,17 @@ class Text(Node):
         self.parentNode = parent
         self.ownerDocument = self.rootNode = parent.ownerDocument
 
+    def getKey(self):
+        '''
+        This is used by the cache to return a key that uniquely
+        represents this node and current state of the DOM
+        '''
+        if self.parentNode:
+            parentKey = self.parentNode.getKey()
+        else:
+            parentKey = None        
+        return (self.nodeValue, parentKey)
+
     def __repr__(self):
         if len(self.data) > DomTree.CDATA_REPR_LIMIT:
             data = self.data[:DomTree.CDATA_REPR_LIMIT] + '...'
@@ -1330,11 +1382,12 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     globalRecurseCheck = False
     addTrigger = None
     removeTrigger = None
-
+    newResourceTrigger = None
+    
     nextIndex = 0 #never used
     defaultNsRevMap = { RDF_MS_BASE : 'rdf', RDF_SCHEMA_BASE : 'rdfs' }
     
-    def __init__(self, model, nsRevMap = None, schemaClass = RxPath.RDFSSchema):        
+    def __init__(self, model, nsRevMap = None, modelUri=None, schemaClass = RxPath.RDFSSchema):
         self.rootNode = self
         self.ownerDocument = self #todo: this violates the W3C DOM spec i think but fixes some bugs
         self.model = model
@@ -1346,7 +1399,13 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
 
         self.revision = 0
         self.schemaClass = schemaClass
-        self.schema = None
+        #we need to set the schema up now so that the schema from the model isn't
+        #added as part of a transaction that may get rolled by
+        self.schema = schemaClass(model.getStatements())
+        if modelUri: 
+            self.stringValue=self.modelUri=modelUri
+        else:
+            self.stringValue =self.modelUri=RxPath.generateBnode()
     
     def _get_childNodes(self):
         if self._childNodes is None:
@@ -1470,7 +1529,8 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         log.debug('attempting to adding resource %s' % uri)
         subjectNode = self.findSubject(uri)
         if not subjectNode:
-            subjectNode = self._orderedInsert(uri, Subject, lambda x, y: cmp(x.uri, y)) #todo: catch this exception?
+            subjectNode = self._orderedInsert(uri, Subject, lambda x, y: cmp(x.uri, y),
+                                            notify=self.newResourceTrigger) #todo: catch this exception?
             #self.model.addResource(uri)
             self.revision += 1
         if not (newChild.namespaceURI == RDF_MS_BASE and newChild.localName == 'Description'):
@@ -1504,7 +1564,8 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         Add a new resource to the model and return the new Subject node
         Raises IndexError if the resource is already part of the model.
         '''
-        subjectNode = self._orderedInsert(uri, Subject, lambda x, y: cmp(x.uri, y))
+        subjectNode = self._orderedInsert(uri, Subject, lambda x, y: cmp(x.uri, y),
+                                                notify=self.newResourceTrigger)
         #self.model.addResource(uri)
         return subjectNode
 

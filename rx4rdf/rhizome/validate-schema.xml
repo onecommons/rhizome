@@ -1,0 +1,43 @@
+<schema xmlns="http://www.ascc.net/xml/schematron"
+defaultPhase='revalidate' >
+<!-- iso ns: http://purl.oclc.org/dsdl/schematron -->
+<ns prefix="wf" uri="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#" />
+<ns prefix="wiki" uri="http://rx4rdf.sf.net/ns/wiki#" />
+<ns prefix="auth" uri="http://rx4rdf.sf.net/ns/auth#" />
+<ns prefix="foaf" uri="http://xmlns.com/foaf/0.1/" />
+<ns prefix="previous" uri='http://rx4rdf.sf.net/ns/raccoon/previous#' />
+
+<let name='previous:_added' value='/*/*'   />
+<let name='previous:_removed' value='/..' />
+
+<title>Validate Model</title>
+
+<phase name='revalidate' id='revalidate'>
+ <active pattern='uniqueness' />
+</phase>
+
+<phase name='incremental' id='incremental'>
+ <active pattern='uniqueness' />
+</phase>
+
+ <pattern name='Uniqueness Tests' id='uniqueness'> 
+    <rule context='$previous:_added/self::wiki:name'>
+      <!-- iso schematron -->
+       <let name='wikiName' value='.' />
+       <assert test='count(/*[wiki:name = $wikiName]) = 1' >   
+          <!-- 1.5: too slow 
+           <key name='wikiName' match='/*/wiki:name' path='.' />
+           <assert test="count(key('wikiName', .)) = 1" >
+          -->      
+      Resource names must be unique.
+      </assert>
+    </rule>
+    
+    <rule context='$previous:_added/self::foaf:holdsAccount'>
+      <let name='foafName' value='.' />
+      <assert test='count(/*[foaf:holdsAccount = $foafName]) = 1' >   
+      Account names must be unique.
+      </assert>
+    </rule>
+ </pattern>
+</schema>

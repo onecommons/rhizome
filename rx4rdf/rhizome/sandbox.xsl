@@ -13,7 +13,7 @@
 <xsl:output method='html' indent='no' encoding="UTF-8" />
 <xsl:template match="/" >
 <p>This page lets you execute content in Rhizome and see the results without having to save the content. </p>
-<p>WARNING: even though the content isn't saved depending on the Source Format it may modify the system (e.g. using Python or RxUpdate).</p>
+<p>WARNING: even though the content isn't saved depending on the Source Format it may modify the system (e.g. using Python).</p>
 <p>Note: Resulting content is displayed without invoking any templates, so the resulting page may be blank (e.g. with RxUpdate).</p>
 <form method="POST" action="site:///process-contents" accept-charset='UTF-8' enctype="multipart/form-data">	         
     Upload File:<input TYPE='file' name='file' /> OR enter text here:<br />

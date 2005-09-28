@@ -20,7 +20,13 @@
 <xsl:param name="_url" />
 <xsl:param name="_name" />
 <xsl:param name="BASE_MODEL_URI" />
-<xsl:output indent='yes' encoding="UTF-8" />
+
+<xsl:param name="sortKey" select="'position()'" />
+<xsl:param name="sortKeyType" select="'text'" />
+<xsl:param name="sortKeyOrder" select="'ascending'" />
+<xsl:param name="sortKeyCaseOrder" select="'upper-first'" />
+
+<xsl:output method='xhtml' indent='yes' encoding="UTF-8" />
 <xsl:variable name="searchExp">     
      <xsl:choose>
         <xsl:when test="$searchType='Simple'">                     
@@ -123,7 +129,7 @@ function resizeForIframe(iframeWin, iframeId)
     </xsl:if>
     <xsl:if test='wiki:about'>
      ( 
-     <xsl:for-each select='wiki:about'>
+     <xsl:for-each select='wiki:about'>       
        <a taget='{$target}' href='site:///keywords/{local-name-from-uri(.)}?about={f:escape-url(.)}' >
        <xsl:value-of select='f:if(namespace-uri-from-uri(.)=concat($BASE_MODEL_URI,"kw#"),local-name-from-uri(.), name-from-uri(.))'/>
        </a>&#xa0;
@@ -160,6 +166,8 @@ on <xsl:value-of select="$_base-url" />
 <link><xsl:value-of select="$_url" /></link>
 
 <xsl:for-each select="$results">
+    <xsl:sort select="wf:evaluate($sortKey)" data-type="{$sortKeyType}" 
+             order="{$sortKeyOrder}" case-order="{$sortKeyCaseOrder}"/> 
     <item>
        <xsl:variable name='relUrl' select="f:if(self::a:NamedContent, concat(./wiki:name, '?'), concat('.?about=', f:escape-url(.)))" />
        <title><xsl:value-of select="f:if(./wiki:name, ./wiki:name, f:if(./rdfs:label,./rdfs:label, name-from-uri(.)))" /></title>       
@@ -198,8 +206,8 @@ No results found.
 <form method="POST" action="site:///save-metadata" accept-charset='UTF-8' enctype="multipart/form-data">	
     <input TYPE="hidden" NAME="itemname" VALUE="save-metadata" />
     <input TYPE="hidden" NAME="action" VALUE="save-metadata" />    
-    <xsl:for-each select="$results">
-        	<input TYPE="hidden" NAME="resource" VALUE="{.}" />
+    <xsl:for-each select="$results">    
+        <input TYPE="hidden" NAME="resource" VALUE="{.}" />
     </xsl:for-each>
         Edit Metadata
          <br/>
@@ -225,6 +233,8 @@ No results found.
 <xsl:call-template name='add-summary-javascript'/>
 <div id='fixeddiv' >
 <xsl:for-each select="$results">
+  <xsl:sort select="wf:evaluate($sortKey)" data-type="{$sortKeyType}" 
+       order="{$sortKeyOrder}" case-order="{$sortKeyCaseOrder}"/> 
   <xsl:call-template name='make-summary'/>
 </xsl:for-each>
 </div>
@@ -257,6 +267,9 @@ No results found.
         <tr><th>Resource </th><th>Property</th><th>Value</th></tr> 
     </xsl:if>    
 <xsl:for-each select="$results">
+  <xsl:sort select="wf:evaluate($sortKey)" data-type="{$sortKeyType}" 
+        order="{$sortKeyOrder}" case-order="{$sortKeyCaseOrder}"/> 
+
   <xsl:if test='not($properties-table)'>
     <xsl:variable name='relUrl' select="f:if(self::a:NamedContent, concat(./wiki:name, '?'), concat('.?about=', f:escape-url(.)))" />
     <xsl:variable name='resName' select="f:if(./wiki:name, ./wiki:name, f:if(./rdfs:label,./rdfs:label, name-from-uri(.)))" />

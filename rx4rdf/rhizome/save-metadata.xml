@@ -3,12 +3,12 @@
 xmlns:wf="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#" 
 xmlns:f="http://xmlns.4suite.org/ext" >
   <xu:if test="wf:has-metadata('resource')">
-    <xu:variable name="dummy" select="wf:save-metadata($metadata, $__account, $resource)"/>
+    <xu:variable name="dummy" select="wf:save-metadata($metadata, $resource)"/>
   </xu:if>
   
   <xu:if test="not(wf:has-metadata('resource'))">
     <!-- no resource, add new content -->
-    <xu:variable name="dummy" select="wf:save-metadata($metadata, $__account)"/>
+    <xu:variable name="dummy" select="wf:save-metadata($metadata)"/>
   </xu:if>
 </xu:modifications>
 

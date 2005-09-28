@@ -5,10 +5,7 @@
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
-import re
-from rx import zml, rxml, raccoon, utils, RxPath
-from rx import logging #for python 2.2 compatibility
-log = logging.getLogger("rhizome")
+from rx.RhizomeBase import *
 
 class RhizomeBaseMarkupMap(zml.LowerCaseMarkupMap):
     def __init__(self, rhizome):
@@ -16,10 +13,13 @@ class RhizomeBaseMarkupMap(zml.LowerCaseMarkupMap):
         self.rhizome = rhizome
         
     def mapLinkToMarkup( self, link, name, annotations, isImage, isAnchorName):
-        #any link that just a name turn into a site:/// url
-        if not isAnchorName and link and link[0] not in './#?' and link.find(':') == -1:
-            link = 'site:///' + link        
-        tag, attribs, text = super(RhizomeBaseMarkupMap, self).mapLinkToMarkup(
+        rhizome = self.rhizome
+        #any link that is just a plain name turn into a site:/// url
+        if (not isAnchorName and link and link[0] not in './#?'
+            and link.find(':') == -1):
+            link = 'site:///' + link
+        tag, attribs, text = super(
+            RhizomeBaseMarkupMap, self).mapLinkToMarkup(
                 link, name, annotations, isImage, isAnchorName)
 
         if tag != self.A:
@@ -34,7 +34,7 @@ class RhizomeBaseMarkupMap(zml.LowerCaseMarkupMap):
 
         value = zml.xmlquote('IgnorableMetadata')
         if url.startswith('site:'):
-            if self.rhizome.undefinedPageIndicator:
+            if rhizome and rhizome.undefinedPageIndicator:
                 attribDict['undefined']=value            
                 return tag, attribDict.items(), text
             else:#unchanged 
@@ -48,24 +48,29 @@ class RhizomeBaseMarkupMap(zml.LowerCaseMarkupMap):
                 if schemeIndex == -1:
                     schemeIndex = url[schemeIndex+1:].find('/')
                 scheme = url[:schemeIndex]
-            replacement = self.rhizome.getInterWikiMap().get(scheme.lower())
-            if replacement:
-                if name is None: #don't include the interlink scheme in the name
+            replacement = rhizome and rhizome.getInterWikiMap().get(
+                scheme.lower())
+            if replacement:                
+                if name is None:
+                    #don't include the interlink scheme in the name
                     text = url[schemeIndex+1:]
                 url = replacement + url[schemeIndex+1:]
-                attribDict['href'] = zml.xmlquote(url)
-                if self.rhizome.interWikiLinkIndicator:
-                    if replacement[0] != '.' and not replacement.startswith('site:'):
+                attribDict['href'] = zml.xmlquote(url, escape=False)
+                if rhizome and rhizome.interWikiLinkIndicator:
+                    if replacement[0] != '.' and not replacement.startswith(
+                        'site:'):
                         attribDict['interwiki']=value                
                 return tag, attribDict.items(), text
                 
-        external = (url.find(':') > -1 or url[0] == '/') and not url.startswith('site:')
+        external = (url.find(':') > -1 or url[0] == '/'
+                    ) and not url.startswith('site:')
 
         if external:
-            if self.rhizome.externalLinkIndicator:
+            if rhizome and rhizome.externalLinkIndicator:
                 attribDict['external']=value
-        elif not url.startswith('#') or not url.startswith('..'): #todo: normalize with $url
-            if self.rhizome.undefinedPageIndicator:
+        elif not url.startswith('#') or not url.startswith('..'):
+            #todo: normalize with $url
+            if rhizome and rhizome.undefinedPageIndicator:
                 attribDict['undefined']=value
                 
         return tag, attribDict.items(), text
@@ -87,15 +92,28 @@ class DocumentMarkupMap(RhizomeBaseMarkupMap):
 class TodoMarkupMap(RhizomeBaseMarkupMap):
     pass #todo
 
+class DocBookMarkupMap(DocumentMarkupMap):
+    P = 'para'
+    PRE = 'programlisting' #todo: should be literallayout but first fix xsl
+    IMG = 'graphic' #todo: src : fileref, alt : srccredit (sort of)
+    A = 'ulink' #todo: url instead of href
+    TT = 'computeroutput' #todo: should be literal but first fix xsl
+    TABLE = 'informaltable'
+    LI = 'listitem'
+    UL = 'itemizedlist'
+    OL = 'orderedlist' 
+    
 class SpecificationMarkupMap(DocumentMarkupMap):
     SECTION = 's'
     
     def __init__(self, rhizome):
-        super(SpecificationMarkupMap, self).__init__('http://rx4rdf.sf.net/ns/wiki#doctype-specification',rhizome)
+        super(SpecificationMarkupMap, self).__init__(
+            'http://rx4rdf.sf.net/ns/wiki#doctype-specification',rhizome)
         self.wikiStructure['!'] = (self.SECTION, None)
 
     def canonizeElem(self, elem):
-        if isinstance(elem, type(()) ) and elem[0][0] == 's' and elem[0][-1:].isdigit():
+        if isinstance(
+            elem, type(()) ) and elem[0][0] == 's' and elem[0][-1:].isdigit():
             return 's' #map section elems to s
         else:
             return elem
@@ -104,13 +122,17 @@ class SpecificationMarkupMap(DocumentMarkupMap):
         return ('s'+`level`, (('title',zml.xmlquote(line)),) )
     
 class MarkupMapFactory(zml.DefaultMarkupMapFactory):
-    def __init__(self, rhizome):
+    def __init__(self, rhizome=None):
         self.rhizome = rhizome        
 
-        faqMM = DocumentMarkupMap('http://rx4rdf.sf.net/ns/wiki#doctype-faq', rhizome)
-        documentMM = DocumentMarkupMap('http://rx4rdf.sf.net/ns/wiki#doctype-document', rhizome)
+        faqMM = DocumentMarkupMap(
+            'http://rx4rdf.sf.net/ns/wiki#doctype-faq', rhizome)
+        documentMM = DocumentMarkupMap(
+            'http://rx4rdf.sf.net/ns/wiki#doctype-document', rhizome)
         specificationMM = SpecificationMarkupMap(rhizome)
         todoMM = TodoMarkupMap(rhizome)
+        docbookMM = DocBookMarkupMap(
+            'http://rx4rdf.sf.net/ns/wiki#doctype-docbook', rhizome)
         
         self.elemMap = {
             'faq' : faqMM,
@@ -118,13 +140,19 @@ class MarkupMapFactory(zml.DefaultMarkupMapFactory):
             'document' : documentMM,
             'specification' : specificationMM,
             'todo' : todoMM,
+            
+            'set' : docbookMM,
+            'book' : docbookMM,
+            'chapter' : docbookMM,
+            'article' : docbookMM,
             }
 
         self.mmMap = {
-            'http://rx4rdf.sf.net/ns/wiki#doctype-faq': faqMM,
-            'http://rx4rdf.sf.net/ns/wiki#doctype-document': documentMM,
-            'http://rx4rdf.sf.net/ns/wiki#doctype-specification': specificationMM,
-            }
+        'http://rx4rdf.sf.net/ns/wiki#doctype-faq': faqMM,
+        'http://rx4rdf.sf.net/ns/wiki#doctype-document': documentMM,
+        'http://rx4rdf.sf.net/ns/wiki#doctype-specification': specificationMM,
+        'http://rx4rdf.sf.net/ns/wiki#doctype-docbook': docbookMM,
+        }
         
     def startElement(self, elem):
         return self.elemMap.get(elem)
@@ -139,41 +167,49 @@ class MarkupMapFactory(zml.DefaultMarkupMapFactory):
         else:
             return mm
 
-class SanitizeHTML(utils.BlackListHTMLSanitizer, raccoon.ContentProcessors.SiteLinkFixer):
+class SanitizeHTML(utils.BlackListHTMLSanitizer,
+                   raccoon.ContentProcessors.SiteLinkFixer):
     _BlackListHTMLSanitizer__super = raccoon.ContentProcessors.SiteLinkFixer
 
     addRelNofollow = True
     
     def handle_starttag(self, tag, attrs):
         '''
-        Add support for google's anti-comment spam system 
-        see http://www.google.com/googleblog/2005/01/preventing-comment-spam.html
-        since we assume the user is untrusted if we're santizing the html
+        Add support for google's anti-comment spam system (see
+        http://www.google.com/googleblog/2005/01/preventing-comment-spam.html)
+        since we assume the user is untrusted if we're santizing the
+        html
         '''
         if self.addRelNofollow and tag == 'a':
             needsNoFollow = [name for (name,value) in attrs
                     if name == 'href' and value.strip().startswith('http')]
             if needsNoFollow:
                 relValue = [value for name,value in attrs if name=='rel']
+                #ugly: modify private HTMLParser variable
                 if relValue:
+                    #replace the existing rel value with 'nofollow'
                     relValue = relValue[0]
                     attrs[attrs.index(('rel', relValue))] = ('rel', 'nofollow')                        
                     #we don't know how the value was quoted but this hack
                     #should work in almost any real world cases:
-                    self._HTMLParser__starttag_text = self._HTMLParser__starttag_text.replace(
-                        '"'+relValue+'"', '"nofollow"').replace("'"+relValue+"'", '"nofollow"')
+                    newStartTagText=self._HTMLParser__starttag_text.replace(
+                        '"'+relValue+'"', '"nofollow"').replace(
+                            "'"+relValue+"'", '"nofollow"')                    
+                    self._HTMLParser__starttag_text = newStartTagText
                 else:
                     attrs.append(('rel', 'nofollow'))
                     starttaglist = list(self._HTMLParser__starttag_text)                                                
-                    starttaglist.insert(self._HTMLParser__starttag_text[-2] == '/' and -2 or -1, 
-                                       ' rel="nofollow" ') 
+                    starttaglist.insert(
+                        self._HTMLParser__starttag_text[-2] == '/' and -2 or -1, 
+                        ' rel="nofollow" ') 
                     self._HTMLParser__starttag_text = ''.join(starttaglist) 
         return utils.BlackListHTMLSanitizer.handle_starttag(self, tag, attrs)        
 
     def onStrip(self, tag, name, value):
         #should we raise an exception instead?
         if name:
-            log.warning('Stripping dangerous HTML attribute: ' + name + '=' + value)
+            log.warning('Stripping dangerous HTML attribute: '
+                        + name + '=' + value)
         elif value:
             if tag:
                 log.warning('Stripping dangerous content from: ' + tag)
@@ -182,16 +218,20 @@ class SanitizeHTML(utils.BlackListHTMLSanitizer, raccoon.ContentProcessors.SiteL
         elif tag:
             log.warning('Stripping dangerous HTML element: ' + tag)    
         else:
-            log.warning('Stripping dangerous ??: %s, %s, %s' % tag, name, value)    
+            log.warning('Stripping dangerous ??: %s, %s, %s'
+                        % tag, name, value)    
 
 class TruncateHTML(utils.HTMLTruncator, SanitizeHTML):
     _HTMLTruncator__super = SanitizeHTML
     
     def onStrip(self, tag, name, value):
-        #DoNotHandleException cause we don't the action error handler to catch this
-        raise raccoon.DoNotHandleException('Contains HTML that can not be safely embedded in another HTML page')
+        #use DoNotHandleException because we don't the action error handler
+        #to catch this
+        raise raccoon.DoNotHandleException(
+        'Contains HTML that can not be safely embedded in another HTML page')
 
-class RhizomeXMLContentProcessor(raccoon.ContentProcessors.XMLContentProcessor):
+class RhizomeXMLContentProcessor(
+    raccoon.ContentProcessors.XMLContentProcessor):
     '''
     Replaces the xml/html content processor with one that sanitizes
     the markup if the user doesn't have the proper access token
@@ -208,9 +248,14 @@ class RhizomeXMLContentProcessor(raccoon.ContentProcessors.XMLContentProcessor):
     def linkFixerFactory(self, sanitize, addNoFollow, args, kwargs):
         fixer = SanitizeHTML(*args, **kwargs)        
         fixer.addRelNofollow = addNoFollow
-        fixer.blacklistedElements = sanitize and self.blacklistedElements or []
-        fixer.blacklistedContent = sanitize and self.blacklistedContent or {}
-        fixer.blacklistedAttributeNames = sanitize and self.blacklistedAttributes or {}
+        if sanitize:
+            fixer.blacklistedElements = self.blacklistedElements
+            fixer.blacklistedContent = self.blacklistedContent
+            fixer.blacklistedAttributeNames = self.blacklistedAttributes
+        else:
+            fixer.blacklistedElements = []
+            fixer.blacklistedContent = {}
+            fixer.blacklistedAttributeNames = {}            
         return fixer
 
     def truncateHTMLFactory(self, maxwords, maxlines, args, kwargs):
@@ -224,21 +269,32 @@ class RhizomeXMLContentProcessor(raccoon.ContentProcessors.XMLContentProcessor):
         if maxlines:
             fixer.maxLineCount = int(maxlines)
         return fixer
+
+    def getMaxes(self,kw):
+        return (kw.get('maxwords') or (kw.get('_prevkw')
+                        and kw.get('_prevkw').get('maxwords')),
+                kw.get('maxlines') or (kw.get('_prevkw')
+                        and kw.get('_prevkw').get('maxlines')))
         
     def processContents(self, result, kw, contextNode, contents):
-        #if the content was not created by an user with a 
-        #trusted author token we need to strip out any dangerous HTML.
-        #Because html maybe generated dynamically we need to check this while spitting out the HTML.
-        maxwords = kw.get('maxwords') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxwords'))
-        maxlines = kw.get('maxlines') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxlines'))
+        '''If the content was not created by an user with a trusted
+        author token we need to strip out any dangerous HTML. Because
+        html maybe generated dynamically, we need to check this while
+        spitting out the HTML.
+        '''
+        maxwords, maxlines = self.getMaxes(kw)
         if maxwords or maxlines:
             #we always santize the HTML when rendering HTML for a summary
-            linkFixerFactory = lambda *args, **kwargs: self.truncateHTMLFactory(maxwords, maxlines, args, kwargs)
+            linkFixerFactory = lambda *args,**kwargs: self.truncateHTMLFactory(
+                maxwords, maxlines, args, kwargs)
         else:
             sanitize = nofollow = True
             #get the accessTokens granted to the author of the content            
-            result = kw['__server__'].evalXPath('''$__context/wiki:created-by/*/auth:has-role/*[.='http://rx4rdf.sf.net/ns/auth#role-superuser']
-            | $__context/wiki:created-by/*/auth:has-rights-to/* | $__context/wiki:created-by/*/auth:has-role/*/auth:has-rights-to/*''',
+            result = kw['__server__'].evalXPath(
+           '''$__context/wiki:created-by/*/auth:has-role/*
+               [.='http://rx4rdf.sf.net/ns/auth#role-superuser']
+            | $__context/wiki:created-by/*/auth:has-rights-to/*
+            | $__context/wiki:created-by/*/auth:has-role/*/auth:has-rights-to/*''',
                                            node=contextNode)
             for token in result:                
                 if token.uri == 'http://rx4rdf.sf.net/ns/auth#role-superuser':
@@ -251,19 +307,20 @@ class RhizomeXMLContentProcessor(raccoon.ContentProcessors.XMLContentProcessor):
                     nofollow = False
 
             if sanitize or nofollow:
-                linkFixerFactory = lambda *args, **kwargs: self.linkFixerFactory(sanitize, nofollow, args, kwargs)
+                linkFixerFactory = lambda *args, **kwargs: self.linkFixerFactory(
+                    sanitize, nofollow, args, kwargs)
             else: #permission to generate any kind of html/xml -- so use the default                        
                 linkFixerFactory = None
 
-        return self.processMarkup(contents,kw['__server__'].appBase,
+        return self.processMarkup(contents,kw.get('_APP_BASE',
+                                  kw['__server__'].appBase),
                                   linkFixerFactory=linkFixerFactory)
 
     def processMarkupCachePredicate(self, result, kw, contextNode, contents):
-        return (contents, contextNode, id(contextNode.ownerDocument),
+        return (contents, contextNode, contextNode.ownerDocument.getKey(),
                 contextNode.ownerDocument.revision,
-                kw.get('maxwords') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxwords')),
-                kw.get('maxlines') or (kw.get('_prevkw') and kw.get('_prevkw').get('maxlines'))
-                )
+                kw.get('_APP_BASE', kw['__server__'].appBase),
+                self.getMaxes(kw))
 
 class PatchContentProcessor(raccoon.ContentProcessors.ContentProcessor):
     uri = 'http://rx4rdf.sf.net/ns/content#pydiff-patch-transform'
@@ -274,3 +331,68 @@ class PatchContentProcessor(raccoon.ContentProcessors.ContentProcessor):
         
     def processContents(self,result, kw, contextNode, contents):
         return self.rhizome.processPatch(contents, kw, result)
+
+class RhizomeContent(RhizomeBase):
+    def __init__(self, server):
+        self.server = server
+        #this is just like findContentAction except we don't want
+        #to try to retrieve alt-contents' ContentLocation        
+        self.findPatchContentAction = raccoon.Action([
+            './/a:contents/text()',
+            #contents stored externally
+            'wf:openurl(.//a:contents/a:ContentLocation)', 
+        ], lambda result, kw, contextNode, retVal:
+            isinstance(result, str) and result or raccoon.StringValue(result),
+                                    requiresContext = True) #get its content
+        self.interWikiMap = None
+        self.zmlContentProcessor=raccoon.ContentProcessors.ZMLContentProcessor()
+        self.zmlContentProcessor.getInterWikiMap = self.getInterWikiMap
+        self.mmf = MarkupMapFactory(self.zmlContentProcessor)
+        self.zmlContentProcessor.markupMapFactory = self.mmf
+
+    def getInterWikiMap(self):
+        if self.interWikiMap is not None:
+            return self.interWikiMap
+        #in case this is call before configuration is completed
+        interWikiMapURL = getattr(self, 'interWikiMapURL', None) 
+        if interWikiMapURL:
+           self.interWikiMap = zml.interWikiMapParser(
+               InputSource.DefaultFactory.fromUri(interWikiMapURL).stream)
+           return self.interWikiMap
+        return {}
+
+    ######content processing####    
+    def processTemplateAction(self, resultNodeset, kw, contextNode, retVal):
+        #the resultNodeset is the template resource
+        #so skip the first few steps that find the page resource
+        actions = self.handleRequestSequence[3:]
+
+        #so we can reference the template resource
+        #(will be placed in the the 'previous' namespace)
+        self.log.debug('calling template resource: %s' % resultNodeset)
+        kw["_template"] = resultNodeset
+
+        errorSequence = self.server.actions.get('http-request-error')
+        return self.server.callActions(actions, resultNodeset, kw,
+                    contextNode, retVal,
+                    globalVars=self.server.globalRequestVars,
+                    errorSequence=errorSequence)
+
+    def processPatch(self, contents, kw, result):
+        #we assume result is a:ContentTransform/a:transformed-by/*,
+        #set context to the parent a:ContentTransform
+        patchBaseResource =  self.server.evalXPath(
+            '../../a:pydiff-patch-base/*', node = result[0])
+        #print 'b', patchBaseResource
+        #print 'type c', type(contents)
+        #print 'c', contents
+        
+        #get the contents of the resource which this patch
+        #will use as the base to run its patch against
+        #todo: issue kw.copy() is not a deep copy -- what to do?
+        base = self.server.doActions([self.findPatchContentAction,
+                    self.processContentAction], kw.copy(), patchBaseResource)
+        assert base, "patch failed: couldn't find contents for %s" % repr(base)
+        patch = pickle.loads(str(contents)) 
+        return utils.patch(base,patch)
+    

@@ -855,23 +855,22 @@ class Singleton(type):
             cls.instance=super(Singleton,cls).__call__(*args,**kw)
         return cls.instance
 
-class Patcher(type):
-    '''
-    Note: untested!! Probably have to deal with Method._im_func for __old_ methods
-    
-    This metaclass provides a convenient way to patch an existing instead of defining a subclass.
+class MonkeyPatcher(type):
+    '''    
+    This metaclass provides a convenient way to patch an existing class instead of defining a subclass.
     This is useful when you need to fix bugs or add critical functionality to a library without
-    modifying its source code.
+    modifying its source code. It also can be use to write aspect-oriented programming style code where
+    methods for a class are defined in separate modules.
     
     usage:
     given a class named NeedsPatching that needs the method 'buggy' patched.
     'unused' never needs to be instantiated, the patching occurs as soon as the class statement is executed.
     
     class unused(NeedsPatching):
-        __metaclass__ = Patcher
+        __metaclass__ = MonkeyPatcher
 
         def buggy(self):           
-           self.__old_buggy() 
+           self.buggy_old_() 
            self.newFunc()
            
         def newFunc(self):
@@ -882,14 +881,16 @@ class Patcher(type):
         assert len(bases) == 1
         self.base = bases[0]
         for name, value in dic.items():
+            if name in ['__metaclass__', '__module__']:
+                continue
             try:
                 oldValue = getattr(self.base,name)
                 hasOldValue = True
             except:
                 hasOldValue = False
             setattr(self.base, name, value)
-            if hasOldValue:
-                setattr(self.base, '__old_' + name, oldValue)
+            if hasOldValue:                
+                setattr(self.base, name+'_old_', oldValue)
 
     def __call__(self,*args,**kw):
         '''instantiate the base object'''        
@@ -990,7 +991,7 @@ try:
     XPath.ParsedExpr.ParsedAdditiveExpr.visit = _additiveVisit
     XPath.ParsedExpr.ParsedUnaryExpr.visit = lambda self, visitor: _visit(self, [self._exp], pre, post)
     XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath.visit = \
-                    lambda self, pre=None, post=None: _visit(self, [_rel], pre, post)
+                    lambda self, pre=None, post=None: _visit(self, [self._rel], pre, post)
     XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath.visit = \
                     lambda self, pre=None, post=None: _visit(self, [self._left, self._right], order='pre')
     XPath.ParsedAbsoluteLocationPath.ParsedAbsoluteLocationPath.visit = \
@@ -1046,7 +1047,7 @@ try:
     XPath.ParsedExpr.ParsedAdditiveExpr.__iter__ = _additiveIter
     XPath.ParsedExpr.ParsedUnaryExpr.__iter__ = lambda self: _iter(self, [self._exp])
     XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath.__iter__ = \
-                    lambda self: _iter(self, [_rel])
+                    lambda self: _iter(self, [self._rel])
     XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath.__iter__ = \
                     lambda self: _iter(self, [self._left, self._right])
     XPath.ParsedAbsoluteLocationPath.ParsedAbsoluteLocationPath.__iter__ = \

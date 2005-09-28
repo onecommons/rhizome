@@ -14,10 +14,10 @@
 <!-- this template references templates in site-template.xsl and assumes it is imported by it -->
 <xsl:template name="theme-body" >
 
-<body>
+<body class="page_style">
 	<table id="body-table">
   		<tr>
-  			<td colspan="3" id="header-container-row">
+  			<td colspan="3" id="header-container-row" class="header_style">
   			<table id="header-table">
   			<tr>
 	  			<td id="header-cell-left">
@@ -39,47 +39,56 @@
 			</td>
 		</tr>
 		<tr>
-			<td id="navbar-column">
+			<td id="navbar-column" class="sidebar_style">
 			<img src="site:///spacer.gif" alt="" class="column-spacer"/>
-			    <div id="navbar">
+			    <div id="navbar" class="sidebar_style navbar_style">
     				<xsl:value-of disable-output-escaping='yes' select="wf:openurl('site:///sidebar')" />
     			    </div>
 			</td>
-			<td id="content-table-column">
-				<xsl:if test="$session:message">
+			<td id="main-table-column" class="sidebar_style">
+				<xsl:if test="$message">
 			  	<div class="alert shortmessage">
-					<xsl:value-of select="$session:message" disable-output-escaping='yes' />
+					<xsl:value-of select="$message" disable-output-escaping='yes' />
 				</div>
 				</xsl:if>
-				<table id="content-table">
+				<table id="main-table">
 					<tr>
-						<td id="actionsbar">
+						<td id="actionsbar" class="header_style">
 							<xsl:if test="not($_static)" >
 							<xsl:call-template name='actions-bar' />
 							</xsl:if>
 						</td>
 					</tr>
 					<tr>
-						<td id="page-title">
+						<td id="page-title" class="page-title_style">
 							<xsl:value-of select="$title" />
 						</td>
 					</tr>
 					<tr>	
-						<td id="content"><xsl:call-template name="display-content" ></xsl:call-template>    
-						</td>
-					</tr>
-					<tr>
-						<td id="spacer-row">
-							<img src="site:///spacer.gif" alt="" class="contentspacer"/>
+						<td id="content" class="content_style">
+						<table id="content-body-table">
+						<tr>
+							<td>
+								<img src="site:///spacer.gif" alt="" class="column-spacer-height"/>
+							</td>
+							<td id="content-display-cell"><xsl:call-template name="display-content" ></xsl:call-template>    
+							</td>
+						</tr>
+						<tr>
+							<td colspan="2">
+								<img src="site:///spacer.gif" alt="" class="row-spacer"/>
+							</td>
+						</tr>
+						</table>
 						</td>
 					</tr>
 				</table>
 			</td>
-			<td id="linksbar-column">
+			<td id="linksbar-column" class="sidebar_style">
 				<img src="site:///spacer.gif" alt="" class="column-spacer"/>
 				<br/>
 				<h3>Global Links</h3>
-				<div id="quicklinks">
+				<div id="quicklinks" class="quicklinks_style">
 					<xsl:if test="not($_static)" ><xsl:call-template name='quicklinks-bar' /></xsl:if>
 				</div>
 				<br/>
@@ -89,7 +98,7 @@
 			</td>
 		</tr>
 		<tr>
-			<td id="footer-row" colspan="3">
+			<td id="footer-row" colspan="3" class="footer_style">
 				<xsl:value-of disable-output-escaping='yes' select="wf:openurl('site:///footer')" />
 			</td>
 		</tr>

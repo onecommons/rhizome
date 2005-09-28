@@ -205,10 +205,9 @@
 <xsl:comment>
 function resizeForIframe(iframeWin, iframeId)
 {	
-    var width = iframeWin.document.body.scrollWidth
-    var height = iframeWin.document.body.scrollHeight
-    
-    document.getElementById('previewFrame').style.height=height+20;//change the height of the iframe
+    var width = iframeWin.document.body.scrollWidth;
+    var height = iframeWin.document.body.scrollHeight;    
+    document.getElementById('previewFrame').style.height=(height+20)+'px';//change the height of the iframe
     if (iframeId != 'previewFrame')
     { //a gross little hack
       //save.xml sets the frameid variable used by the iframe-display-handler
@@ -283,7 +282,7 @@ function OnSubmitEditForm()
     <xsl:otherwise>
     	<xsl:variable name="contents" select="wf:get-contents($item)" />
     	 OR edit text here: <br />
-    	<textarea NAME="contents" ROWS="20" COLS="65" STYLE="width:100%" WRAP="virtual">
+    	<textarea name="contents" rows="20" cols="65" style="width:100%" wrap="virtual">
     	<xsl:value-of select="$contents" />
     	</textarea>
 	</xsl:otherwise>
@@ -344,7 +343,7 @@ function OnSubmitEditForm()
 	</select>
 	Sharing:
 	<select name="authtoken" size="1" width="100">	
-	    <xsl:variable name="tokens" select="$__account/auth:has-rights-to/* | $__account/auth:has-role/*/auth:has-rights-to/*" />
+	    <xsl:variable name="tokens" select="($__account | $__account/auth:has-role/*)/auth:can-assign-guard/* | $namedContent/auth:guarded-by/*" />
 	    <xsl:call-template name="add-option" >
 	        <xsl:with-param name="text">Public</xsl:with-param>
 	        <xsl:with-param name="value" />
@@ -353,12 +352,10 @@ function OnSubmitEditForm()
             <xsl:call-template name="add-option" >
                 <xsl:with-param name="text" select="rdfs:label/text()" />
                 <xsl:with-param name="value" select="." />
-                <xsl:with-param name="selected" select=". = ($namedContent/auth:guarded-by/*)" />
                 <xsl:with-param name="selected" select="f:if($namedContent, 
                     . = ($namedContent/auth:guarded-by/*), 
                     . = f:if($__account/wiki:default-edit-token, $__account/wiki:default-edit-token, 
-                        $__account/auth:has-role/*/wiki:default-edit-token))" />
-                
+                        $__account/auth:has-role/*/wiki:default-edit-token))" />                
             </xsl:call-template>
 	    </xsl:for-each>
 	</select>

@@ -2,7 +2,7 @@ ZML is an alternative syntax for XML; you can create any XML construct in ZML (a
 ZML is line-oriented and relies on indentation to specify the tree structure of the document. 
 Here's an example: 
 p'''
-#?zml0.9 markup
+#?zml0.7 markup
 html 
  header
    title: `some raw text here
@@ -10,7 +10,7 @@ html
 '''
 The "markup" declaration in the first line of this example specifies that the document consists entirely of markup. By default, ZML documents can also contain lines of formatted text, which aren't indented and use special [text formatting rules] to create the XML markup. In this mixed mode, lines of markup must start with a "<". Here the same example again with some added lines of formatted text:
 p'''
-#?zml0.9
+#?zml0.7
 <html 
 <<header
 <<<<title: `some raw text here
@@ -79,9 +79,9 @@ that's why we set the indentation level here as a sibling of <note>.
 
 !!!!The ZML Prolog
 ZML documents //should// begin with the ZML Prolog as its first line after any internal comments ("#!" -- see below). Its syntax is:
-p'''#?zml[0.9] [markup] [<markupmap URI>]'''
+p'''#?zml[0.7] [markup] [<markupmap URI>]'''
 
-The optional version number immediately follows the 'zml' (no spaces) and indicates the version number of the ZML specification. It is currently set to "0.9" -- no changes are expected between this and "1.0", except maybe minor changes to the text formatting rules and the handling of different character encodings.
+The optional version number immediately follows the 'zml' (no spaces) and indicates the version number of the ZML specification. It is currently set to "0.7" -- no changes are expected between this and "1.0", except maybe minor changes to the text formatting rules and the handling of different character encodings.
 
 If the "markup" declaration is omitted from the prolog (or the prolog isn't present) the document is assumed to be in mixed mode as described above. You can switch in and out of markup mode throughout a document by interspersing it with ^^#?zml^^ directives with and without the ^^markup^^ declaration.
 

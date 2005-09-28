@@ -67,9 +67,7 @@ class XhtmlPrinter(Lib.XmlPrinter.XmlPrinter):
         def endElement(self, namespaceUri, tagName):
             return self._endElement(namespaceUri, tagName)
 
-class XhtmlPrettyPrinter(Lib.XmlPrettyPrinter.XmlPrettyPrinter):
-    emptyContentModel = XhtmlPrinter.emptyContentModel
-    attrEntitiesApos = XhtmlPrinter.attrEntitiesApos
+class XhtmlPrettyPrinter(Lib.XmlPrettyPrinter.XmlPrettyPrinter, XhtmlPrinter):
 
     if _oldPrinterInterface:
         def endElement(self, tagName):
@@ -87,7 +85,7 @@ class XhtmlPrettyPrinter(Lib.XmlPrettyPrinter.XmlPrettyPrinter):
             # Do not break short tag form (<tag/>)
             if self._canIndent and not self._inElement:
                 self.writeAscii('\n' + (self.indent * self._level))
-            XmlPrinter.endElement(self, namespaceUri, tagName)
+            XhtmlPrinter.endElement(self, namespaceUri, tagName)
             # Allow indenting after endtags
             self._canIndent = True
             return

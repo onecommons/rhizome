@@ -12,12 +12,12 @@
 """
 import HTMLParser, re, sys
     
-class LinkFixer(HTMLParser.HTMLParser, object):
+class HTMLFilter(HTMLParser.HTMLParser, object):
     def __init__(self, out):
         HTMLParser.HTMLParser.__init__(self)
         self.out = out
         self.tagStack = []
-
+                
     def needsFixup(self, tag, name, value):
         '''
         This method is called for each attribute, element content,
@@ -44,19 +44,104 @@ class LinkFixer(HTMLParser.HTMLParser, object):
         See needsFixup for an explanation of the parameters.
         '''
         return value
-    
+
+    def fixupStartTag(self, tag, attrs, tagtext):
+        '''
+        Implement this if you need to process the full start tag instead each attribute.
+        Returns a pair:
+            The first returns value is the new tag.
+            The second return value is a boolean that indicates whether each attribute should be processed.
+        '''
+        return tagtext, True
+
+    def fixupEndTag(self, tag, tagtext):
+        return tagtext
+        
     def handle_starttag(self, tag, attrs):
         self.tagStack.append(tag)
-        changes = []
-        for name, value in attrs:
-            hint = self.needsFixup(tag, name, value)
-            if hint:
-                newvalue = self.doFixup(tag, name, value, hint)
-                changes.append( (value, newvalue) )
-        tagtext = self.get_starttag_text()        
-        for old, new in changes:            
-            tagtext = tagtext.replace(old, new) #todo: might lead to unexpected results
+        tagtext = self.get_starttag_text()
+        tagtext, fixupAttributes = self.fixupStartTag(tag, attrs, tagtext)
+        if fixupAttributes:
+            changes = []
+            for name, value in attrs:
+                hint = self.needsFixup(tag, name, value)
+                if hint:
+                    newvalue = self.doFixup(tag, name, value, hint)
+                    changes.append( (value, newvalue) )
+            for old, new in changes:            
+                tagtext = tagtext.replace(old, new) #todo: might lead to unexpected results
         self.out.write(tagtext)
+
+    # Overridable -- finish processing of start+end tag: <tag.../>
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        if self.tagStack:
+            self.tagStack.pop()
+        
+    # Overridable -- handle end tag
+    def handle_endtag(self, tag):
+        #for html missing end tags:
+        while self.tagStack:
+           lastTag = self.tagStack.pop()
+           if lastTag == tag:
+               break
+        tagtext = self.fixupEndTag(tag, self.endtag_text)
+        self.out.write(tagtext)    
+
+    # Overridable -- handle data
+    def handle_data(self, data):
+        if self.tagStack:
+            tag = self.tagStack[-1]
+        else:
+            tag = None
+        hint = self.needsFixup(tag, None, data)
+        if hint:
+            data = self.doFixup(tag, None, data, hint)
+        self.out.write(data)    
+
+    # Overridable -- handle character reference
+    def handle_charref(self, name):
+        data = '&#'+name+';'
+        hint = self.needsFixup(None, None, data)
+        if hint:
+            data = self.doFixup(None, None, data, hint)                
+        self.out.write(data)    
+
+    # Overridable -- handle entity reference
+    def handle_entityref(self, name):
+        data = '&'+name+';'
+        hint = self.needsFixup(None, None, data)
+        if hint:
+            data = self.doFixup(None, None, data, hint)                
+        self.out.write(data)    
+
+    # Overridable -- handle comment
+    def handle_comment(self, data):
+        if self.tagStack:
+            tag = self.tagStack[-1]
+        else:
+            tag = None
+        data = '<!--'+data+'-->'
+        hint = self.needsFixup(tag, None, data)
+        if hint:
+            data = self.doFixup(tag, None, data, hint)                
+        self.out.write(data)    
+
+    # Overridable -- handle declaration
+    def handle_decl(self, data):
+        data = '<!'+data+'>'
+        hint = self.needsFixup(None, None, data)
+        if hint:
+            data = self.doFixup(None, None, data, hint)        
+        self.out.write(data)    
+
+    # Overridable -- handle processing instruction
+    def handle_pi(self, data):
+        data = '<?'+data+'>' #final ? is included in data 
+        hint = self.needsFixup(None, None, data)
+        if hint:
+            data = self.doFixup(None, None, data, hint)        
+        self.out.write(data)    
 
     def unescape(self, s):
         '''
@@ -78,12 +163,6 @@ class LinkFixer(HTMLParser.HTMLParser, object):
                 return unichr(int(val))
         s = re.sub(self.charref, getRefValue, s)
         return s    
-        
-    # Overridable -- finish processing of start+end tag: <tag.../>
-    def handle_startendtag(self, tag, attrs):
-        self.handle_starttag(tag, attrs)
-        if self.tagStack:
-            self.tagStack.pop()
 
     # we need to override this internal function because xml needs to preserve the case of the end tag
     #Internal -- parse endtag, return end or -1 if incomplete
@@ -103,34 +182,6 @@ class LinkFixer(HTMLParser.HTMLParser, object):
         if sys.version_info[:2] > (2,2):
             self.clear_cdata_mode() #this line is in the 2.3 version of HTMLParser.parse_endtag
         return j
-        
-    # Overridable -- handle end tag
-    def handle_endtag(self, tag):
-        #for html missing end tags:
-        while self.tagStack:
-           lastTag = self.tagStack.pop()
-           if lastTag == tag:
-               break
-        self.out.write(self.endtag_text)    
-
-    # Overridable -- handle character reference
-    def handle_charref(self, name):
-        self.out.write('&#'+name+';')    
-
-    # Overridable -- handle entity reference
-    def handle_entityref(self, name):
-        self.out.write('&'+name+';')    
-
-    # Overridable -- handle data
-    def handle_data(self, data):
-        if self.tagStack:
-            tag = self.tagStack[-1]
-        else:
-            tag = None
-        hint = self.needsFixup(tag, None, data)
-        if hint:
-            data = self.doFixup(tag, None, data, hint)
-        self.out.write(data)    
 
     in_cdata_section = False
     def updatepos(self, i, j):
@@ -147,36 +198,8 @@ class LinkFixer(HTMLParser.HTMLParser, object):
             self.in_cdata_section = True
         else:
             return HTMLParser.HTMLParser.unknown_decl(self, data)
-        
-    # Overridable -- handle comment
-    def handle_comment(self, data):
-        if self.tagStack:
-            tag = self.tagStack[-1]
-        else:
-            tag = None
-        data = '<!--'+data+'-->'
-        hint = self.needsFixup(tag, None, data)
-        if hint:
-            data = self.doFixup(None, None, data, hint)                
-        self.out.write(data)    
 
-    # Overridable -- handle declaration
-    def handle_decl(self, data):
-        data = '<!'+data+'>'
-        hint = self.needsFixup(None, None, data)
-        if hint:
-            data = self.doFixup(None, None, data, hint)        
-        self.out.write(data)    
-
-    # Overridable -- handle processing instruction
-    def handle_pi(self, data):
-        data = '<?'+data+'>' #final ? is included in data 
-        hint = self.needsFixup(None, None, data)
-        if hint:
-            data = self.doFixup(None, None, data, hint)        
-        self.out.write(data)    
-
-class BlackListHTMLSanitizer(LinkFixer):
+class BlackListHTMLSanitizer(HTMLFilter):
     '''
     Filters outs attribute and elements that match the blacklist.
     If an element's name matches the element black list, its begin and end tags will be stripped out;
@@ -191,7 +214,7 @@ class BlackListHTMLSanitizer(LinkFixer):
     However, external stylesheets are banned because they may can contain
     Javascript (in the form of a javascript: URLs or IE's "behavior" and "expression()" and Mozilla's "-moz-binding" rules)
     '''
-    __super = LinkFixer #set this (_BlackListHTMLSanitizer__super) let us chain to another LinkFixer using inheritance        
+    __super = HTMLFilter #setting this (_BlackListHTMLSanitizer__super) let us chain to another HTMLFilter using inheritance        
     
     SANITIZE = 'sanitize'
     allowPIs = False
@@ -258,13 +281,13 @@ class BlackListHTMLSanitizer(LinkFixer):
         else:
             return self.__super.doFixup(self, tag, name, value, hint)
 
-class WhiteListHTMLSanitizer(LinkFixer):
+class WhiteListHTMLSanitizer(HTMLFilter):
     '''
     Filters outs attribute and elements that don't match the whitelist.
     If an element's name matches the element black list, its begin and end tags will be stripped out;
     however, the element's content will remain.
     '''
-    __super = LinkFixer #set this (_BlackListHTMLSanitizer__super) let us chain to another LinkFixer using inheritance        
+    __super = HTMLFilter #setting this (_WhiteListHTMLSanitizer__super) let us chain to another HTMLFilter using inheritance        
     
     SANITIZE = 'sanitize'
     allowPIs = False
@@ -337,14 +360,14 @@ def truncateText(text, maxwords, maxlines=-1, wordCount=0, lineCount=0):
        text =  ''.join(words)
     return text, wordCount, lineCount, reachedMax
 
-class HTMLTruncator(LinkFixer):
+class HTMLTruncator(HTMLFilter):
     '''
     In addition, HTMLTruncator will look for a tag pattern to allow 
     the html to explicitly declare what to include in the summary
     (by default, <div class='summary'> ).
     To disable this, set self.summaryTag = ''
     '''
-    __super = LinkFixer #set this (_HTMLTruncator__super) let us chain to another LinkFixer using inheritance
+    __super = HTMLFilter #setting this (_HTMLTruncator__super) let us chain to another HTMLFilter using inheritance
     maxWordCount = 0xFFFFF
     maxLineCount = 0xFFFFF
     summaryTag = 'div'

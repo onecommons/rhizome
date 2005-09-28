@@ -30,7 +30,7 @@ exclude-result-prefixes="f wf a wiki rdf rdfs" version="1.0">
           </x:when>
          
           <x:otherwise>You can not preview content in the <x:value-of select="/*[.=$format]/rdfs:label" /> format. 
-          Try using the <a href='site:///Sandbox'>Sandbox</a>.
+          Try using the <a target='_parent' href='site:///Sandbox'>Sandbox</a>.
           </x:otherwise>
         </x:choose>
   </x:template>

@@ -33,9 +33,9 @@ OBJECT_TYPE_XMLLITERAL='http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral'
 #this is set to True if RDFLib is installed 
 useRDFLibParser = False
 
-def createDOM(model, nsRevMap = None):
+def createDOM(model, nsRevMap = None, modelUri=None, schemaClass = RDFSSchema):
     from rx import RxPathDom
-    return RxPathDom.Document(model, nsRevMap)
+    return RxPathDom.Document(model, nsRevMap,modelUri,schemaClass)
 
 class Model(object):
     ### Transactional Interface ###
@@ -53,10 +53,14 @@ class Model(object):
            Returns a list of resources are sorted by their URI reference
         '''
         
-    def getStatements(self, subject = None, predicate = None):
+    def getStatements(self, subject = None, predicate = None, object=None, objecttype=None):
         ''' Return all the statements in the model that match the given arguments.
-        Any combination of subject and predicate can be None, and any None slot is
-        treated as a wildcard that matches any value in the model.'''
+        Any combination of subject, predicate or object can be None, and any None slot is
+        treated as a wildcard that matches any value in the model.
+        If objectype is specified, it should be one of:
+        OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, an ISO language code or an URL representing the datatype.
+        '''
+        assert object is not None or objecttype
         
     def addStatement(self, statement ):
         '''add the specified statement to the model'''
@@ -93,12 +97,15 @@ def getReifiedStatements(stmts):
         #else: log.warning('incomplete reified statement')
     return reifiedDict
 
-def removeDupStatementsFromSortedList(aList):       
+def removeDupStatementsFromSortedList(aList, pred=None):       
     def removeDups(x, y):
+        if pred and not pred(y):
+            return x
         if not x or x[-1] != y:            
             x.append(y)
         else: #x[-1] == y but Statement.__cmp__ doesn't consider the reified URI
-            if y.uri: #the reified statement URI
+            #its a duplicate statement but second one has a reified URI
+            if x and y.uri: #the reified statement URI
                 x[-1].uri = y.uri #note: we only support one reification per statement
         return x
     return reduce(removeDups, aList, [])
@@ -165,14 +172,18 @@ class FtModel(Model):
         self._beginIfNecessary()
         return getResourcesFromStatements(self.model.complete(None, None, None))
         
-    def getStatements(self, subject = None, predicate = None):
+    def getStatements(self, subject = None, predicate = None, object = None, objecttype=None):
         ''' Return all the statements in the model that match the given arguments.
         Any combination of subject and predicate can be None, and any None slot is
         treated as a wildcard that matches any value in the model.'''
-        self._beginIfNecessary()
-        statements = self.model.complete(subject, predicate, None)        
+        self._beginIfNecessary()        
+        statements = self.model.complete(subject, predicate, object)        
         statements.sort()
-        return removeDupStatementsFromSortedList(statements)
+        #4Suite doesn't support selecting based on objectype so filter here
+        def matchType(stmt):
+            return stmt.objectType == objecttype
+        pred = objecttype and matchType or None
+        return removeDupStatementsFromSortedList(statements, pred)
                      
     def addStatement(self, statement ):
         '''add the specified statement to the model'''
@@ -206,13 +217,13 @@ class MultiModel(Model):
         resources.sort()
         return utils.removeDupsFromSortedList(resources)
                     
-    def getStatements(self, subject = None, predicate = None):
+    def getStatements(self, subject = None, predicate = None, object = None, objecttype=None):
         ''' Return all the statements in the model that match the given arguments.
         Any combination of subject and predicate can be None, and any None slot is
         treated as a wildcard that matches any value in the model.'''
         statements = []
         for model in self.models:
-            statements += model.getStatements(subject, predicate)
+            statements += model.getStatements(subject, predicate,object, objecttype)
         statements.sort()
         return removeDupStatementsFromSortedList(statements)
                      
@@ -244,8 +255,8 @@ class MirrorModel(Model):
     def getResources(self):
         return self.models[0].getResources()
                             
-    def getStatements(self, subject = None, predicate = None):
-        return self.models[0].getStatements(subject, predicate)
+    def getStatements(self, subject = None, predicate = None, object = None, objecttype=None):
+        return self.models[0].getStatements(subject, predicate, object, objecttype)
                      
     def addStatement(self, statement ):
         for model in self.models:
@@ -285,30 +296,31 @@ class TransactionModel(object):
         #todo: if self.autocommit: raise exception
         self.queue = []
 
-    def _match(self, stmt, subject = None, predicate = None):
+    def _match(self, stmt, subject = None, predicate = None, object = None, objecttype=None):
         if subject and stmt.subject != subject:
             return False
         if predicate and stmt.predicate != predicate:
             return False
-        #if object is not None and stmt.object != object:
-        #    return False        
+        if object is not None and stmt.object != object:
+            return False
+        #todo: handle objecttype
         return True
         
-    def getStatements(self, subject = None, predicate = None):
+    def getStatements(self, subject = None, predicate = None, object = None, objecttype=None):
         ''' Return all the statements in the model that match the given arguments.
         Any combination of subject and predicate can be None, and any None slot is
         treated as a wildcard that matches any value in the model.'''
-        statements = super(TransactionModel, self).getStatements(subject, predicate)
+        statements = super(TransactionModel, self).getStatements(subject, predicate, object, objecttype)
         if not self.queue: 
             return statements
 
         #avoid phantom reads, etc.        
         for stmt in self.queue:
             if stmt[0] is utils.Removed:
-                if self._match(stmt[1], subject, predicate):
+                if self._match(stmt[1], subject, predicate, object, objecttype):
                     statements.remove( stmt[1] )
             else:
-                if self._match(stmt[0], subject, predicate):
+                if self._match(stmt[0], subject, predicate, object, objecttype):
                     statements.append( stmt[0] )
         
         statements.sort()
@@ -417,16 +429,19 @@ try:
         else:
             return RDF.Node(uri_string=uri)
 
-    def statement2Redland(statement):
-        if statement.objectType == OBJECT_TYPE_RESOURCE:            
-            object = URI2node(statement.object)
+    def object2node(object, objectType):
+        if objectType == OBJECT_TYPE_RESOURCE:            
+            return URI2node(object)
         else:
-            kwargs = { 'literal':statement.object}
-            if statement.objectType.find(':') > -1:
-                kwargs['datatype'] = statement.objectType
-            elif len(statement.objectType) > 1: #must be a language id
-                kwargs['language'] = statement.objectType
-            object = RDF.Node(**kwargs)            
+            kwargs = { 'literal':object}
+            if objectType.find(':') > -1:
+                kwargs['datatype'] = objectType
+            elif len(objectType) > 1: #must be a language id
+                kwargs['language'] = objectType
+            return RDF.Node(**kwargs)            
+        
+    def statement2Redland(statement):
+        object = object2node(statement.object, statement.objectType)
         return RDF.Statement(URI2node(statement.subject), URI2node(statement.predicate), object)
 
     def redland2Statements(redlandStatements):
@@ -460,15 +475,18 @@ try:
             stmts = redland2Statements( self.model.find_statements(RDF.Statement()) )
             return getResourcesFromStatements(stmts)
         
-        def getStatements(self, subject = None, predicate = None):
+        def getStatements(self, subject = None, predicate = None, object = None, objecttype=None):
             ''' Return all the statements in the model that match the given arguments.
             Any combination of subject and predicate can be None, and any None slot is
             treated as a wildcard that matches any value in the model.'''
             if subject:
                 subject = URI2node(subject)
             if predicate:
-                predicate = URI2node(predicate)                
-            statements = list( redland2Statements( self.model.find_statements(RDF.Statement(subject, predicate)) ) )
+                predicate = URI2node(predicate)
+            if object is not None:
+                object = object2node(object, objectType)
+            statements = list( redland2Statements( self.model.find_statements(
+                                RDF.Statement(subject, predicate, object)) ) )
             statements.sort()
             return removeDupStatementsFromSortedList(statements)
                          
@@ -552,6 +570,18 @@ try:
             else:
                 return URIRef(uri)
         URI2node = staticmethod(URI2node)
+
+        def object2node(object, objectType):
+            if objectType == OBJECT_TYPE_RESOURCE:            
+                return URI2node(object)
+            else:
+                kwargs = {}
+                if objectType.find(':') > -1:
+                    kwargs['datatype'] = objectType
+                elif len(objectType) > 1: #must be a language id
+                    kwargs['lang'] = objectType
+                return Literal(object, **kwargs)                                
+        object2node = staticmethod(object2node)
         
         def __init__(self, tripleStore):
             self.model = tripleStore
@@ -569,15 +599,17 @@ try:
             stmts = rdflib2Statements( self.model.triples( (None, None, None)) ) 
             return getResourcesFromStatements(stmts)
         
-        def getStatements(self, subject = None, predicate = None):
+        def getStatements(self, subject = None, predicate = None, object = None, objecttype=None):
             ''' Return all the statements in the model that match the given arguments.
             Any combination of subject and predicate can be None, and any None slot is
             treated as a wildcard that matches any value in the model.'''
             if subject:
                 subject = self.URI2node(subject)
             if predicate:
-                predicate = self.URI2node(predicate)                
-            statements = list( rdflib2Statements( self.model.triples((subject, predicate, None)) ) )
+                predicate = self.URI2node(predicate)
+            if object is not None:
+                object = object2node(object, objectType)
+            statements = list( rdflib2Statements( self.model.triples((subject, predicate, object)) ) )
             statements.sort()
             return removeDupStatementsFromSortedList(statements)
                          
@@ -948,14 +980,12 @@ def mergeDOM(sourceDom, updateDOM, resources, authorize=None):
     newNodes = []
     removeResources = []            
     resourcesToDiff = []
-
     for resUri in resources:
         resNode = updateDOM.findSubject(resUri)
         if resNode: #do a diff on this resource
             #print 'diff', resUri
             resourcesToDiff.append(resNode)
         else:#a resource no longer in the rxml has all their statements removed
-            #print 'remove', resUri
             removeNode = sourceDom.findSubject(resUri)
             if removeNode:
                 removeResources.append(removeNode)
@@ -1157,13 +1187,19 @@ def isInstanceOf(context, candidate, test):
     second argument, where each string is treated as the URI reference
     of a resource.
     '''
-    classResource = StringValue(test)    
-    candidate = StringValue(candidate)
-    resource = context.node.ownerDocument.findSubject( candidate )
-    if resource:        
-        return Xbool( resource.matchName(classResource, '') )
-    else:
-        return XFalse        
+    #design note: follow equality semantics for nodesets
+    if not isinstance(test, list):
+        test = [ test ]
+    if not isinstance(candidate, list):
+        candidate = [ candidate ]
+    for node in test:
+        classResource = StringValue(node)
+        for candidateNode in candidate:
+            resource = context.node.ownerDocument.findSubject(
+                                     StringValue(candidateNode))
+            if resource and resource.matchName(classResource, ''):
+                return XTrue
+    return XFalse
                
 def isProperty(context, candidate, test):
     '''    
@@ -1172,9 +1208,38 @@ def isProperty(context, candidate, test):
     argument, where each string is treated as the URI reference of a
     property resource.
     '''
-    propertyURI = StringValue(test)
-    return Xbool(context.node.ownerDocument.schema.isCompatibleProperty
-                            (StringValue(candidate), propertyURI) )
+    #design note: follow equality semantics for nodesets
+    if not isinstance(test, list):
+        test = [ test ]
+    if not isinstance(candidate, list):
+        candidate = [ candidate ]
+    for node in test:
+        propertyURI = StringValue(node)
+        for candidateNode in candidate:
+            if context.node.ownerDocument.schema.isCompatibleProperty(
+                            StringValue(candidateNode), propertyURI):
+                return XTrue
+    return XFalse
+
+def isType(context, candidate, test):
+    '''    
+    This function returns true if the class specified in the first
+    argument is a subtype of the class specified in the second
+    argument, where each string is treated as the URI reference of a
+    class resource.
+    '''
+    #design note: follow equality semantics for nodesets
+    if not isinstance(test, list):
+        test = [ test ]
+    if not isinstance(candidate, list):
+        candidate = [ candidate ]
+    for node in test:
+        classURI = StringValue(node)
+        for candidateNode in candidate:
+            if context.node.ownerDocument.schema.isCompatibleType(
+                            StringValue(candidateNode), classURI):
+                return XTrue
+    return XFalse
 
 def getQNameFromURI(context, uri=None):
     return _getNamesFromURI(context, uri)[0]
@@ -1231,6 +1296,7 @@ BuiltInExtFunctions = {
 
 (RFDOM_XPATH_EXT_NS, 'is-instance-of'): isInstanceOf,
 (RFDOM_XPATH_EXT_NS, 'is-subproperty-of'): isProperty,
+(RFDOM_XPATH_EXT_NS, 'is-subclass-of'): isType,
 
 (RFDOM_XPATH_EXT_NS, 'name-from-uri'): getQNameFromURI,
 (RFDOM_XPATH_EXT_NS, 'prefix-from-uri'): getPrefixFromURI,
@@ -1498,39 +1564,38 @@ def _NamespaceTest_match(self, context, node, principalType=Node.ELEMENT_NODE):
         
 XPath.ParsedNodeTest.NamespaceTest.match = _NamespaceTest_match
 
-def _FunctionCallEvaluate(self, context, oldFunc):
-    #make XPath.ParsedExpr.FunctionCall*.evaluate have no side effects so we can cache them
-    self._func = None
-    
-    #todo: add authorize hook
-    #authorize(self, context, split(self._name), self.args)
-    retVal = oldFunc(self, context)    
-    #prevent expressions that are just function calls
-    #from returning nodesets with duplicate nodes
-    if type(retVal) == type([]):
-       return Set.Unique(retVal)
-    else:
-       return retVal
-    
-XPath.ParsedExpr.FunctionCall.evaluate = lambda self, context, \
-    func = XPath.ParsedExpr.FunctionCall.evaluate.im_func: \
-        _FunctionCallEvaluate(self, context, func)
+if preNodeSorting4Suite: #if prior to 4suite b1
+    def _FunctionCallEvaluate(self, context, oldFunc):
+        #make XPath.ParsedExpr.FunctionCall*.evaluate have no side effects so we can cache them
+        self._func = None
+        
+        retVal = oldFunc(self, context)    
+        #prevent expressions that are just function calls
+        #from returning nodesets with duplicate nodes
+        if type(retVal) == type([]):
+           return Set.Unique(retVal)
+        else:
+           return retVal
+        
+    XPath.ParsedExpr.FunctionCall.evaluate = lambda self, context, \
+        func = XPath.ParsedExpr.FunctionCall.evaluate.im_func: \
+            _FunctionCallEvaluate(self, context, func)
 
-XPath.ParsedExpr.FunctionCall1.evaluate = lambda self, context, \
-    func = XPath.ParsedExpr.FunctionCall1.evaluate.im_func: \
-        _FunctionCallEvaluate(self, context, func)
+    XPath.ParsedExpr.FunctionCall1.evaluate = lambda self, context, \
+        func = XPath.ParsedExpr.FunctionCall1.evaluate.im_func: \
+            _FunctionCallEvaluate(self, context, func)
 
-XPath.ParsedExpr.FunctionCall2.evaluate = lambda self, context, \
-    func = XPath.ParsedExpr.FunctionCall2.evaluate.im_func: \
-        _FunctionCallEvaluate(self, context, func)
+    XPath.ParsedExpr.FunctionCall2.evaluate = lambda self, context, \
+        func = XPath.ParsedExpr.FunctionCall2.evaluate.im_func: \
+            _FunctionCallEvaluate(self, context, func)
 
-XPath.ParsedExpr.FunctionCall3.evaluate = lambda self, context, \
-    func = XPath.ParsedExpr.FunctionCall3.evaluate.im_func: \
-        _FunctionCallEvaluate(self, context, func)
+    XPath.ParsedExpr.FunctionCall3.evaluate = lambda self, context, \
+        func = XPath.ParsedExpr.FunctionCall3.evaluate.im_func: \
+            _FunctionCallEvaluate(self, context, func)
 
-XPath.ParsedExpr.FunctionCallN.evaluate = lambda self, context, \
-    func = XPath.ParsedExpr.FunctionCallN.evaluate.im_func: \
-        _FunctionCallEvaluate(self, context, func)
+    XPath.ParsedExpr.FunctionCallN.evaluate = lambda self, context, \
+        func = XPath.ParsedExpr.FunctionCallN.evaluate.im_func: \
+            _FunctionCallEvaluate(self, context, func)
 
 #patch this function so that higher-level code has
 #access to the underlying exception

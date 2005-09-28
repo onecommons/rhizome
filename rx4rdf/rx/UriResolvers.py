@@ -212,6 +212,8 @@ class SiteUriResolver(Uri.SchemeRegistryResolver):
             #print 'to resolve!', name, ' ', uri, paramMap
             contents = self.server.requestDispatcher.invoke__(name, **paramMap)
             #print 'resolved', name, ': ', contents
+            if hasattr(contents, 'read'): #if its a stream
+                return contents            
             if isinstance(contents, unicode):
                 contents = contents.encode('utf8')
             return StringIO.StringIO( contents )

@@ -21,6 +21,7 @@ class DomStore(transactions.TransactionParticipant):
 
     addTrigger = None
     removeTrigger = None
+    newResourceTrigger = None
         
     def loadDom(self,requestProcessor, location, defaultDOM):
         ''' Load the DOM located at location (a filepath).
@@ -134,9 +135,13 @@ class RxPathDomStore(DomStore):
             
         #reverse namespace map #todo: bug! revNsMap doesn't work with 2 prefixes one ns            
         revNsMap = dict(map(lambda x: (x[1], x[0]), requestProcessor.nsMap.items()) )        
-        self.dom = RxPath.createDOM(model, revNsMap)
+        self.dom = RxPath.createDOM(model, revNsMap, modelUri=requestProcessor.MODEL_RESOURCE_URI)
         self.dom.addTrigger = self.addTrigger
         self.dom.removeTrigger = self.removeTrigger
+        self.dom.newResourceTrigger = self.newResourceTrigger
+        #we need to set this up now so that the schema from the model isn't
+        #added as part of a transaction that may get rolled by
+        self.dom.schema = self.dom.schemaClass(self.dom.model.getStatements())                
         
         #associate the queryCache with the DOM Document
         self.dom.queryCache = requestProcessor.queryCache 
@@ -151,12 +156,18 @@ class RxPathDomStore(DomStore):
     def evalXPath(self, xpath, context, expCache=None, queryCache=None):
         self.log.debug(xpath)
         return RxPath.evalXPath(xpath, context, expCache, queryCache)
+
+    def isDirty(self, txnService):
+        '''return True if this transaction participant was modified'''    
+        return txnService.state.additions or txnService.state.removals
         
     def commitTransaction(self, txnService):
         self.dom.commit(**txnService.getInfo())
 
     def abortTransaction(self, txnService):
-        key = id(self.dom)
+        if not self.isDirty(txnService):
+            return
+        #key = id(self.dom)
         self.dom.rollback()
         #if txnService.server.actionCache:
         #    txnService.server.actionCache.invalidate(key)

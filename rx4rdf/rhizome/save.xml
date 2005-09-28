@@ -14,21 +14,6 @@
                 number($startTime) &lt; /*[wiki:name=$itemname]/a:last-modified'>
         <xu:message text="Conflict: Item has been modified after you started editing this item!" terminate="yes" />
     </xu:if>
-
-    <xu:if test="not($__account/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser')">        
-        <!-- we don't support fine-grained authentication yet for RxUpdate yet so let's block the most egrarious security holes 
-            you can remove this check if you trust your users, etc.
-         -->
-        <xu:if test="$format = 'http://rx4rdf.sf.net/ns/wiki#item-format-python' and
-             not(/*[.=concat($BASE_MODEL_URI, 'execute-python-token')][.=$__account/auth:has-rights-to/* or .=$__account/auth:has-role/*/auth:has-rights-to/*])">
-            <xu:message text="You ({$__account/foaf:accountName}) don't have permission to create a page with format {$format}" terminate="yes" />
-        </xu:if>
-    
-        <xu:if test="$format = 'http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate' and
-             not(/*[.=concat($BASE_MODEL_URI, 'execute-rxupdate-token')][.=$__account/auth:has-rights-to/* or .=$__account/auth:has-role/*/auth:has-rights-to/*])">
-            <xu:message text="You ({$__account/foaf:accountName}) don't have permission to create a page with format {$format}" terminate="yes" />
-        </xu:if>
-    </xu:if>
     
     <xu:variable name='current-time' select="wf:current-time()"/>
 
@@ -116,16 +101,12 @@
           </xu:append>          
         </xu:if>
     </xu:if>
-    
-    <!-- do this check now, before we call a function that might save content or patches to disk -->
-    <xu:if test='wf:get-metadata("label")'>
-      <xu:if test='wf:find-unauthorized($__account, "http://rx4rdf.sf.net/ns/auth#permission-add-statement", 
-              $resource, "http://rx4rdf.sf.net/ns/wiki#has-label", $label)' >
-        <xu:message terminate='yes'
-          text='Authorization error: you do not have rights to set this label: "{/*[.=$label]/rdfs:label}" - go back and choose another (or none).' />
-      </xu:if>            
-    </xu:if>            
-        
+
+    <xu:if test='wf:has-metadata("metadata")'>
+         <!-- hack for now: replace #this# with the resource -->
+        <xu:variable name='save-metadata' select="wf:save-metadata(f:replace('#this#', concat('{',$resource,'}'), $metadata))" />
+    </xu:if>
+            
     <!-- add or update last modified -->
     <xu:remove select='$resource/a:last-modified'/> 
     <xu:append select='$resource'>
@@ -346,18 +327,6 @@
          <wiki:Item>
             <xu:variable name="itemURI" select="wf:generate-bnode()"/>
             <xu:attribute name="rdf:about"><xu:value-of select="$itemURI"/></xu:attribute>
-            <a:contents>
-                <a:ContentTransform>
-                   <xu:attribute name="rdf:about"><xu:value-of select="$formatTransformURI"/></xu:attribute>
-                   <a:transformed-by><xu:attribute name="rdf:resource"><xu:value-of select="$format"/></xu:attribute>
-                   </a:transformed-by>
-                   <a:contents>
-                     <xu:copy-of select="wf:save-contents($itemname, $format, $contents,
-                                    count($resource/wiki:revisions/*/rdf:first)+1, $resource, 
-                                    $title, string($lastContents), string($lastContentsDigest))"/> 
-                   </a:contents>
-               </a:ContentTransform>
-           </a:contents>
             
             <wiki:item-disposition>
                 <xu:attribute name="rdf:resource"><xu:value-of select="$disposition"/></xu:attribute>
@@ -390,21 +359,29 @@
             </xu:if>
             <xu:if test='not($replaceRevision) and wf:get-metadata("minor_edit")'>
                 <wiki:minor-edit>1</wiki:minor-edit>
-            </xu:if>            
+            </xu:if>    
+            <!-- we do this last in case, after we know we were authorized to add the above properties-->        
+            <a:contents>
+                <a:ContentTransform>
+                   <xu:attribute name="rdf:about"><xu:value-of select="$formatTransformURI"/></xu:attribute>
+                   <a:transformed-by><xu:attribute name="rdf:resource"><xu:value-of select="$format"/></xu:attribute>
+                   </a:transformed-by>
+                   <a:contents>
+                     <xu:copy-of select="wf:save-contents($itemname, $format, $contents,
+                                    count($resource/wiki:revisions/*/rdf:first)+1, $resource, 
+                                    $title, string($lastContents), string($lastContentsDigest))"/> 
+                   </a:contents>
+               </a:ContentTransform>
+           </a:contents>
         </wiki:Item>
        </rdf:first>
     </xu:append>
     
-    <xu:if test='wf:has-metadata("metadata")'>
-         <!-- hack for now: replace #this# with the resource -->
-        <xu:variable name='save-metadata' select="wf:save-metadata(f:replace('#this#', concat('{',$resource,'}'), $metadata), $__account)" />
-    </xu:if>
-
+    <!-- todo need to assign $revision  
     <xu:if test='wf:has-metadata("revision-metadata")'>
-         <!-- hack for now: replace #this# with the revision -->
-        <xu:variable name='save-metadata' select="wf:save-metadata(f:replace('#this#', concat('{',$revision,'}'), $revision-metadata), $__account)" />
+        <xu:variable name='save-metadata' select="wf:save-metadata(f:replace('#this#', concat('{',$revision,'}'), $revision-metadata))" />
     </xu:if>
-    
+    -->
     <xu:variable name='frameid' select="wf:assign-metadata('frameid', $current-time)" /> <!-- used by the iframe-display-handler -->                            
 
     <xu:if test='$format = "http://rx4rdf.sf.net/ns/wiki#item-format-binary"'>

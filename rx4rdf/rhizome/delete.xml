@@ -4,9 +4,12 @@
     xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"
     xmlns:wf="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#" 
     xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >    
+    
+    <xu:remove select="$__resource" />
     <!-- do it this way (instead of <xu:remove select="$__resource" />) 
-         in order to use fine-grained authentication -->
-    <xu:variable name="dummy" select="wf:save-metadata('', $__account,$__resource)"/>
+       in order to use fine-grained authentication 
+       <xu:variable name="dummy" select="wf:save-metadata('',$__resource)"/>
+    -->
     <!-- remove the has-child statement if its a child of a folder -->
     <xu:remove select="/*/wiki:has-child[.=$__resource]" />
     <!-- delete external contents if necessary 

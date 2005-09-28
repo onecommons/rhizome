@@ -51,7 +51,8 @@ version="1.0">
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/auth#permission-add-statement"/>
         <auth:priority>1</auth:priority>
       </auth:AccessToken>
-      <!-- adding group access-tokens enables us to easily allow access to only those that are a member of one of the groups the user is a member of: -->
+      <!-- adding group access-tokens enables us to easily allow access to only those that are 
+            a member of one of the groups the user is a member of: -->
       <!-- when the user joins a group, add her group access tokens to the group's corresponding role  -->
       <auth:AccessToken rdf:about="{$BASE_MODEL_URI}accounts/{$loginname}/group-rw">
         <rdfs:label>Group</rdfs:label>
@@ -100,15 +101,20 @@ version="1.0">
         <auth:has-rights-to rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/private-w"/>
         <auth:has-rights-to rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/group-rw"/>
         <auth:has-rights-to rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/group-w"/>
+
+        <auth:can-assign-guard rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/private-rw"/>
+        <auth:can-assign-guard rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/private-w"/>
+        <auth:can-assign-guard rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/group-rw"/>
+        <auth:can-assign-guard rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/group-w"/>
         
         <auth:guarded-by rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/private-rw"/>
       </foaf:OnlineAccount>
     </xu:append>
-
+<!--
     <xu:append select="/wiki:Folder[wiki:name='accounts']">
       <wiki:has-child rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}"/>
     </xu:append>
-    
+-->    
     <!-- 
     for now, always create a foaf:Person too 
     (in the future, the account could be associated with any foaf:Person resource)
@@ -130,10 +136,11 @@ version="1.0">
       </foaf:Person>      
     </xu:append>
 
+<!--
     <xu:append select="/wiki:Folder[wiki:name='users']">
       <wiki:has-child rdf:resource="{$BASE_MODEL_URI}users/{$loginname}"/>
     </xu:append>
-        
+    -->    
   </xu:if>
   
   <xu:if test="not($action='creation')">
