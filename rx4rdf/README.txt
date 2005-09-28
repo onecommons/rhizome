@@ -1,8 +1,8 @@
                             README
 
                          Rx4RDF and Rhizome
-                         Version 0.4.3
-                         Jan 25, 2005
+                         Version 0.5.0
+                         Sep 28, 2005
  
   Introduction
   ------------
@@ -21,17 +21,22 @@
   
   What's new in this release?
   ---------------------------    
-  Major changes since last announced release (0.4.1):
-  
-  Support for RDF Schema (subclasses and subproperties)
-  New UI for adding comments and several other UI improvements
-  Added a notion of themes to ease customization of look and feel.
-  More security enhancements including sanitizing HTML and adding rel="nofollow"
-  Smoother installation and command line handling.
-  Compatibility with 4Suite 1.0a4 (enables OS X support).
-  Many other bug fixes.
+  Major changes since last announced release (0.4.3):
+
+  Major changes to the Raccoon application server:
+  * enable URL namespace to be mapped to multiple applications
+  * allow applications to use XML (instead of RDF) data stores
+  * added SQL-like triggers
+  * added two-phase commit transaction coordinator
+  Major changes to Rhizome:
+  * Added a new, more polished and usable default theme.
+  * Made fine-grained authentication of changes to the model ubiquitous, 
+    made authorization schema much more flexible and expressive.
+  * Now uses Schematron (via RxPath) to validate the RDF model.  
+  Refactored and cleaned-up code base.
+  Plus many other enhancements.
       
-  For a list of all major changes see docs/changelog.txt for more details.
+  For a detailed list of all major changes see docs/changelog.txt.
           
   Requirements
   ------------

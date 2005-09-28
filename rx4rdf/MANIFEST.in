@@ -9,7 +9,7 @@ exclude site/test-config*.py
 include blank/*
 include docs/*
 global-exclude .cvsignore
-global-exclude *.bak *.bk? *.nt *.metarx *.pyc *.log *.lock
+global-exclude *.bak *.bk? *.nt *.metarx *.pyc *.log *.lock *.bpl Thumbs.db
 recursive-include rx/test *.nt
 recursive-include rhizome *.nt
 global-exclude */CVS/*
