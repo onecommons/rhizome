@@ -13,17 +13,20 @@ h1 { font-size: 140%; }
 
 h2 { font-size: 130%; }
 
-/* #maincontent is referenced by site-template.xsl */
-#maincontent {
+/* .content is referenced by site-template.xsl */
+.content {
 	font-size: 100%;
 }
 
-#maincontent table {
-	border-spacing: 0px; 
+.content table {
+	border-spacing: 0px!; 
 	border-collapse: collapse;
 }
 
-/* entry content */
+.content td, .content th {  
+  border: 1px solid black;
+  padding: 5px !important;
+}
 
 /* this ids are referenced by default-theme.xsl */
 
@@ -42,21 +45,16 @@ h2 { font-size: 130%; }
 	padding: 20px 0px
 }
 
-#maincontent td, #maincontent th {  
-  border: 1px solid black;
-  padding: 5px
+.content { 
+padding: 5px 5px 5px 10px; 
+font : small Verdana, Helvetica, sans-serif;  
+font-size : 90%; 
 }
 
 #contentTable {
 	border: 2px dotted #333;
 	border-spacing: 0px;
 	padding: 0px
-}
-
-.content { 
-padding: 5px 5px 5px 10px; 
-font : small Verdana, Helvetica, sans-serif;  
-font-size : 90%; 
 }
 
 #titlebar{
@@ -82,6 +80,11 @@ font-size : 90%;
 #header * {
 	padding: 1px;
 }
+
+.footer {
+	height:10px;
+	text-align:center;
+}	
 
 #login-box {
     float: right;
@@ -143,6 +146,5 @@ font-size : 90%;
 }
 
 #sidebar li {
-	/*/*/margin: 0px 0px 0px 0px; /* */
+	margin: 0px 0px 0px 0px; 
 }
-

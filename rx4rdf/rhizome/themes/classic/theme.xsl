@@ -64,7 +64,7 @@
 
     <!-- Main Content -->
     <tr>
-    <td valign="top">        
+    <td valign="top" id='maincontent'>        
       	<xsl:call-template name="display-content" >
      	</xsl:call-template>    
     </td>
@@ -76,6 +76,7 @@
 <tr>
 <td id="footer" width="100%" colspan="2">
 <xsl:if test="not($_static)" >
+
 <p>
 <div style='float: right'>
     <xsl:call-template name='actions-bar' />    
@@ -88,6 +89,9 @@
 </p>
 
 </xsl:if>
+ <div class='footer'>
+  <xsl:value-of disable-output-escaping='yes' select="/*[wiki:name='site-template']/wiki:footer-text" />
+ </div>
 </td>
 </tr>
 </table>
