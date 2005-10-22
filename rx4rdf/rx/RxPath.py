@@ -1311,7 +1311,7 @@ BuiltInExtFunctions = {
 
 #4suite 1.0a3 disables this function but we really need it 
 #as a "compromise" we only execute this function if getElementById is there
-#(though if its not they should look for xml:id)
+#also there's a bug in 4Suite's id() in that nodeset can contain duplicates
 from Ft.Xml.Xslt import XsltFunctions, XsltContext
 from Ft.Lib import Set
 def Id(context, object):
@@ -1337,8 +1337,8 @@ def Id(context, object):
     for id in id_list:
         element = getElementById(id)
         if element:
-           nodeset.append(element)    
-    return nodeset
+           nodeset.append(element)
+    return Set.Unique(nodeset)
 
 XPath.CoreFunctions.CoreFunctions[(EMPTY_NAMESPACE, 'id')] = Id
 XPath.Context.Context.functions[(EMPTY_NAMESPACE, 'id')] = Id
@@ -1354,7 +1354,6 @@ def cmpStatements(self,other):
 Statement.__cmp__ = cmpStatements
 
 from xml.dom import Node
-from Ft.Xml.XPath import Types
 
 preNodeSorting4Suite = hasattr(XPath.Util, 'SortDocOrder') #4Suite versions prior to 1.0b1
 if preNodeSorting4Suite: 
