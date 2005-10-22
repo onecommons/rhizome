@@ -69,7 +69,9 @@ doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"
 
 <link href="site:///basestyles.css" rel="stylesheet" type="text/css" />
 <link href="site:///{$previous:_template/wiki:uses-theme/*/wiki:uses-css-stylesheet/*/wiki:name}" rel="stylesheet" type="text/css" />
-<link href="site:///user.css" rel="stylesheet" type="text/css" />
+<xsl:if test='$previous:_template/wiki:uses-skin/*/wiki:name'>
+  <link href="site:///{$previous:_template/wiki:uses-skin/*/wiki:name}" rel="stylesheet" type="text/css" />
+</xsl:if>
 
 <xsl:if test="wf:file-exists('favicon.ico')"> <!-- performance hack (assumes favicon.ico is external) -->
   <link rel="icon" href="site:///favicon.ico" />
@@ -94,7 +96,7 @@ doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"
 <xsl:param name="content-type" select="$prev-content-type" />
 <xsl:param name="action" select="f:if($previous:action, $previous:action, 'view')" />
 
-   <div id='page-content' class='content_style'>
+   <div id='page-content' class='content'>
      <xsl:choose>
      <xsl:when test="(contains($content-type,'xml')
                   or starts-with($content-type,'text/html')) and $action != 'view-source'">
@@ -129,7 +131,12 @@ doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"
 </form>            
             </xsl:when>
             <xsl:otherwise>
-<form action='site:///login' method='post' accept-charset='UTF-8'><div id="login-div" class="form_style"><div id="login-div-left">Name<input TYPE="text" NAME="loginname" SIZE="10" /><br/>Password<input TYPE="password" NAME="password" SIZE="10" /><input TYPE="hidden" NAME="redirect" value="{$_url}" /></div><div id="login-div-right"><input type="submit" value="Log in" name="login"/><br/><a href="site:///accounts/?about={f:escape-url('http://xmlns.com/foaf/0.1/OnlineAccount')}&amp;action=new" class="form_style">Register</a></div></div></form>            
+<form action='site:///login' method='post' accept-charset='UTF-8'>
+ <div id="login-div" class="site-form">
+  <div id="login-div-left">Name<input TYPE="text" NAME="loginname" SIZE="10" /><br/>Password<input TYPE="password" NAME="password" SIZE="10" /><input TYPE="hidden" NAME="redirect" value="{$_url}" /></div>
+  <div id="login-div-right"><input type="submit" value="Log in" name="login"/><br/><a href="site:///accounts/?about={f:escape-url('http://xmlns.com/foaf/0.1/OnlineAccount')}&amp;action=new" >Register</a></div>
+ </div>
+</form>            
            </xsl:otherwise>
         </xsl:choose>        
 </xsl:if>
@@ -138,7 +145,7 @@ doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"
 
 <xsl:template name="search-form" >
 <xsl:param name="edit-width" select="40" />
-<form action='site:///search' accept-charset='UTF-8' method="get" class="form_style">
+<form action='site:///search' accept-charset='UTF-8' method="get" class="site-form">
 <label for="search" class="bold">Search</label><br/><input type="text" name="search" value="{$previous:search}" size="$edit-width" /><br/><label for="searchType">Type</label>&#xa0;<select name="searchType"><option value="Simple"><xsl:if test='not($previous:searchType) or $previous:searchType = "Simple"'><xsl:attribute name='selected'>selected</xsl:attribute></xsl:if>Simple</option><option value="RxPath" ><xsl:if test='$previous:searchType = "RxPath"'><xsl:attribute name='selected'>selected</xsl:attribute></xsl:if>RxPath</option><option value="RegEx" ><xsl:if test='$previous:searchType = "RegEx"'><xsl:attribute name='selected'>selected</xsl:attribute></xsl:if>Regex</option></select><br/><label for="view">View</label>&#xa0;&#xa0;<select name="view"><option value="list" selected='selected'>List</option><option value="summary">Summary</option><option value="rss20" >RSS 2.0</option><option value="rxml" >RxML</option><option value="rdf" >RDF/XML</option><option value="edit" >Edit</option><option value="rxpathdom" >RxPathDOM</option></select><br/><input type="submit" value="Search" name="Search"/></form></xsl:template>
 
 <xsl:template name="quicklinks-bar" >
@@ -156,14 +163,14 @@ doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"
     <xsl:variable name='aboutparam' select="f:if($previous:about, concat('&amp;about=', f:escape-url($previous:about)), '')" />
     <xsl:variable name='path' select="f:if($previous:itemname, $previous:itemname, $_name)" />
     <xsl:variable name='action' select="f:if($previous:action, $previous:action, 'view')" />
-    <a href="site:///{$path}?{$aboutparam}" class="actionstab_style action-tab {f:if($action='view', ' selected-action-tab selected-action-tab_style', '')}" title="View">View</a>&#xa0;<!-- 
-  --><a href="site:///comments?parent={f:escape-url($previous:__resource)}" onclick="window.open(this.href,'smallActionPopup','directories=0,height=500,width=550,location=0,resizable=1,scrollbars=1,toolbar=0');return false;" title="Comments" class="actionstab_style">Comments (<xsl:value-of select='count(/*[wiki:comments-on = $previous:__resource])'/>)</a>&#xa0;<!--  
-  --><a rel='nofollow' href="site:///{$path}?action=edit{$aboutparam}" class="actionstab_style action-tab {f:if($action='edit', ' selected-action-tab selected-action-tab_style', '')}" title="Edit">Edit</a>&#xa0;<!--  
-   --><a href="site:///{$path}?action=showrevisions" class="actionstab_style action-tab {f:if($action='showrevisions', ' selected-action-tab selected-action-tab_style', '')}" title="Revisions">Revisions</a>&#xa0;<!--  
-    --><a href="site:///{$path}?action=view-metadata{$aboutparam}" class="actionstab_style action-tab {f:if($action='view-metadata', ' selected-action-tab selected-action-tab_style', '')}" title="Metadata">Metadata</a>&#xa0;<!--  
-    --><a rel='nofollow' href="site:///{$path}?action=confirm-delete{$aboutparam}" class="actionstab_style action-tab {f:if($action='confirm-delete', ' selected-action-tab selected-action-tab_style', '')}" title="Delete">Delete</a>&#xa0;<!--  
-    --><a href="site:///{$path}?action=view-source{$aboutparam}" class="actionstab_style action-tab {f:if($action='view-source', ' selected-action-tab selected-action-tab_style', '')}" title="Source">Source</a>&#xa0;<!--  
-    --><a rel='nofollow' href="site:///{$path}?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-print{$aboutparam}" title="Print" class="actionstab_style">Print</a>
+    <a href="site:///{$path}?{$aboutparam}" class="actionstab action-tab {f:if($action='view', ' selected-action-tab selected-action-tab', '')}" title="View">View</a>&#xa0;<!-- 
+  --><a href="site:///comments?parent={f:escape-url($previous:__resource)}" onclick="window.open(this.href,'smallActionPopup','directories=0,height=500,width=550,location=0,resizable=1,scrollbars=1,toolbar=0');return false;" title="Comments" class="actionstab">Comments (<xsl:value-of select='count(/*[wiki:comments-on = $previous:__resource])'/>)</a>&#xa0;<!--  
+  --><a rel='nofollow' href="site:///{$path}?action=edit{$aboutparam}" class="actionstab action-tab {f:if($action='edit', ' selected-action-tab selected-action-tab', '')}" title="Edit">Edit</a>&#xa0;<!--  
+   --><a href="site:///{$path}?action=showrevisions" class="actionstab action-tab {f:if($action='showrevisions', ' selected-action-tab selected-action-tab', '')}" title="Revisions">Revisions</a>&#xa0;<!--  
+    --><a href="site:///{$path}?action=view-metadata{$aboutparam}" class="actionstab action-tab {f:if($action='view-metadata', ' selected-action-tab selected-action-tab', '')}" title="Metadata">Metadata</a>&#xa0;<!--  
+    --><a rel='nofollow' href="site:///{$path}?action=confirm-delete{$aboutparam}" class="actionstab action-tab {f:if($action='confirm-delete', ' selected-action-tab selected-action-tab', '')}" title="Delete">Delete</a>&#xa0;<!--  
+    --><a href="site:///{$path}?action=view-source{$aboutparam}" class="actionstab action-tab {f:if($action='view-source', ' selected-action-tab selected-action-tab', '')}" title="Source">Source</a>&#xa0;<!--  
+    --><a rel='nofollow' href="site:///{$path}?_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-print{$aboutparam}" title="Print" class="actionstab">Print</a>
 </xsl:template>
 
 <xsl:template name="recent-items" >
