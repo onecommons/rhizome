@@ -1406,6 +1406,15 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
             self.stringValue=self.modelUri=modelUri
         else:
             self.stringValue =self.modelUri=RxPath.generateBnode()
+
+    def __cmp__(self, other):
+        if self is other:
+            return 0
+        elif other.ownerDocument == self:
+            return -1
+        else:
+            getKey = getattr(other.ownerDocument or other, 'getKey', lambda: -1)
+            return cmp(self.getKey(), getKey())
     
     def _get_childNodes(self):
         if self._childNodes is None:
