@@ -13,18 +13,13 @@ __Note: this is document is a work in progress with notable holes!__
 This document is intended for developers wishing to develop applications with Raccoon and for administrators looking for a deeper understanding of Raccoon and its deployment. Having an understanding of XPath/XSLT, RDF, and Python is a must, but that understanding doesn't need to be very deep.
 
 !Requirements
-Raccoon requires Python 2.2 or later (2.3 recommended) and 4Suite 1.0a1 
-or later (http://4Suite.org).
+Rhizome requires Python 2.2 or later (2.4 recommended) and the 4Suite XML and RDF 
+libraries (at [http://4Suite.org], version 1.0a1 or later).
 
 Rhizome should work on any platform that supports Python and 4Suite. See [rx4rdf:Download] 
 for details on supported platforms.
 
 Optional Packages:
-
-On Windows, the Python Win32 Extensions ([http://python.org/windows/win32all]) 
-must be installed or interprocess file locking will be disabled (You do not 
-need this unless you have multiple Raccoon processes simultaneously accessing 
-the same application instance).
 
 Redland RDF or RDFLib data stores can be used if Redland ([http://www.redland.opensource.ac.uk])
 or RDFLib ([http://rdflib.net]) are installed. For more information, see the section on loading and saving models below. 
@@ -119,7 +114,7 @@ Fundamentally Raccoon responds to requests. A //Request// consists of a dictiona
 !!A Little Less abstract
 Once the abstract model is clear, let's descend a few thousand feet.
 
-The core Raccoon class that handles requests is the //RequestProcessor//. Each RequestProcessor instance is associated with a data store that is presented to Raccoon as an [rx4rdf:RxPath] DOM (Document Object Model) of a RDF model. (Actually, Raccoon can theoretically work with a regular XML DOM but that is not its intended use.) Raccoon maps the request metadata to XPath variables and an Action's match expressions are RxPath expressions that are evaluated against the RDF model. Besides executing a function that returns a value, an Action may instead change the current context node used when evaluating relative RxPath expressions. 
+The core Raccoon class that handles requests is the //RequestProcessor//. Each RequestProcessor instance is associated with a RDF or XML data store. This data store that is presented to Raccoon as an [rx4rdf:RxPath] DOM (Document Object Model) for RDF, or a standard DOM for XML (but note that this manual assumes the data store is RDF). Raccoon maps the request metadata to XPath variables and an Action's match expressions are RxPath expressions that are evaluated against the data model. Besides executing a function that returns a value, an Action may instead change the current context node used when evaluating relative RxPath expressions. 
 
 Each RequestProcessor is associated with an application config file that defines the action sequences for each type of request. Raccoon supports a few built-in type of requests, such as HTTP, XML-RPC, and command-line, each of which defines how that type of request should be mapped to the request metadata. The application also define its own request types. The application config file is simply a Python script that gets executed when the RequestProcessor is created.
 
@@ -202,7 +197,7 @@ Raccoon invokes the following request triggers (or request types). The applicati
 
 :The content-type, content-length, and status response headers will be set automatically if not set by the request handler. Also if the "useEtags" config option is set, an etag based on a MD5 digest of the response will be set for every response and the "If-None-Match" request headers honored. If no Actions are invoked or the result of processing the request is None, the ^^RequestProcessor.default_not_found^^ method will be used to generate the response.
 
-+^^on-error^^=The on-error request is invoked when an exception is raised while processing a request. The dictionary '_errorInfo' is added to the request metadata. Each item in this dictionary is mapped to an XPath variable in the namespace "http://rx4rdf.sf.net/ns/raccoon/error#" (default prefix: "error"). It will contain the following items:
++//error triggers//=When an exception is raised while processing a request Raccoon will search for a request trigger named //trigger name//^^-error^^ (e.g. ^^http-request-error^^). If found, the associated request Action sequence is invoked with a dictionary named '_errorInfo' added to the request metadata. Each item in this dictionary is mapped to an XPath variable in the namespace "http://rx4rdf.sf.net/ns/raccoon/error#" (default prefix: "error"). It will contain the following items:
 ++message=The message associated with the exception.
 ++name=The name of the exception (class).
 ++module=The name of the module the exception class was defined in.
@@ -212,9 +207,33 @@ Raccoon invokes the following request triggers (or request types). The applicati
 ++functionName=The name of the function that raised the exception.
 ++text=The line in source file that raised the exception.
 ++details=A multi-line string containing the full stack trace of the raised exception.
-:Also in the '_errorInfo' dictionary, but not available as XPath variables, is "type", "value", "traceback", which are the objects returned by ^^sys.exc_info()^^.
+:Also in the '_errorInfo' dictionary, but not available as XPath variables, is "type", "value", "traceback", which are the objects returned by the standard Python function ^^sys.exc_info()^^.
 
-:The ^^on-error^^ handler will not be invoked if an exception occurs while already in an ^^on-error^^ request, or if the request metadata contains a variable named '_noErrorHandling' with a non-zero value.
+:The error handler will not be invoked if an exception occurs while already in an error request, or if the request metadata contains a variable named '_noErrorHandling' with a non-zero value.
+
+The following triggers are invoked when updating the data store and committing a transaction:
+
++^^before-add^^=This trigger is invoked before a statement is to be added to the data store. The following variables will be available:
+++_added=A XPath nodeset containing the predicate element node representing statement that is about to be added.
+++_isnew=A boolean indicating whether the subject resource of the statement was not present in the data store prior to the current transaction.
+++_newResources=A XPath nodeset containing resource element nodes representing all the new resources added during this transaction so far.
+
++^^before-remove^^=This trigger is invoked before a statement is to be removed from the data store. The following variables will be available:
+++_removed=A XPath nodeset containing the predicate element node representing statement that is about to be removed.
+++_isnew=A boolean indicating whether the subject resource of the statement was not present in the data store prior to the current transaction.
+++_newResources=A XPath nodeset containing resource element nodes representing all the new resources added during this transaction so far.
+
++^^before-new^^=This trigger is invoked whenever a statement is added to the data store and its subject is a resource not previously present in the data model. The following variables will be available:
+++_newResources=A XPath nodeset containing the resource element node representing the new resource.
+
++^^before-prepare^^=This trigger is invoked immediately prior to attempting to commit a transaction. At this point, the application still can make modification to the data store within this transaction. The following variables will be available:
+++_added=A XPath nodeset containing predicate element nodes representing all statements added in this transaction.
+++_removed=A XPath nodeset containing predicate element nodes representing all statements removed in this transaction.
+++_newResources=A XPath nodeset containing the new resource element nodes added in this transaction.
+
++^^before-commit^^=This trigger is invoked after all the transaction participants have voted to commit the transaction. The request metadata contains the final set of changes made during the transaction, as the transaction can not be further modified. However the transaction can still be aborted at this point, so this is good time execute any data validation routines. The request metadata will contains the same variables as the ^^before-prepare^^ trigger.
+
++^^after-commit^^=This trigger is invoked after a transaction has completed been committed successfully. The request metadata will contains the same variables as the ^^before-prepare^^ trigger.
 
 !!XPath extension functions 
 
@@ -246,7 +265,7 @@ actions = { 'http-request' : [
 
 """
 
-^^__server__^^ is a config variable which references the application's RequestProcessor. ^^processContents^^ assumes that the result of the match expression can be converted to a string that names the Content Processor to be invoked. The RequestProcessor has a dictionary of Content Processors and the application can add its own by setting the ^^contentProcessors^^ config variable. The contentProcessors functions have the same signature as Action functions and act on the return value of the previous Action. They return either a string that is the result of processing or a tuple containing the result and the name of the next Content Processor to be invoked. This allows a content processing pipeline to be dynamically constructed. Raccoon supports the following content processors:
+^^\__server\__^^ is a config variable which references the application's RequestProcessor. ^^processContents^^ assumes that the result of the match expression can be converted to a string that names the Content Processor to be invoked. The RequestProcessor has a dictionary of Content Processors and the application can add its own by setting the ^^contentProcessors^^ config variable. The contentProcessors functions have the same signature as Action functions and act on the return value of the previous Action. They return either a string or a file-like object that is the result of processing or a tuple containing the result and the name of the next Content Processor to be invoked. Returing a tuple allows a content processing pipeline to be dynamically constructed. Raccoon supports the following content processors:
 
 +Python (http://rx4rdf.sf.net/ns/wiki#item-format-python)=The contents is treated as a [Python|www.python.org] script that is executed when the page is requested. Anything the code writes to ^^stdout^^ is captured and sent as the response. The following are exposed as local variables to the script:
 ++^^\__server\__^^=(see Requests above)
@@ -291,16 +310,30 @@ Raccoon's caches have a mechanism for handling side effects that may occur when 
 
 !!Loading and updating models 
 
-When Raccoon starts, after it has read the application's config file, it will attempts to load the application. 
-
-If the ^^-m^^ command line argument is present, Raccoon will attempt to load that file into the RxPath DOM. Otherwise it will attempt to load from the file path specified by the ^^STORAGE_PATH^^ config variable. If neither of the file paths were specified or if the given file path does not exist it will load the model from the config variable ^^STORAGE_TEMPLATE^^ which is a string of [NTriples|http://www.w3.org/TR/rdf-testcases/#ntriples]). In this case, the next time the model is saved, the file will be created at the given path location unless no path was specified, in which case the application will run in read-only mode and the model not be updated. 
+When Raccoon starts, after it has read the application's config file, it will attempts to load the application. If the ^^-m^^ command line argument is present, Raccoon will attempt to load that file into the RxPath DOM. Otherwise it will attempt to load from the file path specified by the ^^STORAGE_PATH^^ config variable. If neither of the file paths were specified or if the given file path does not exist it will load the model from the config variable ^^STORAGE_TEMPLATE^^ which is a string of [NTriples|http://www.w3.org/TR/rdf-testcases/#ntriples]). In this case, the next time the model is saved, the file will be created at the given path location unless no path was specified, in which case the application will run in read-only mode and the model not be updated. 
 
 After the model is loaded, any statements in the ^^APPLICATION_MODEL^^ config variable are added to the model. ^^APPLICATION_MODEL^^ is a string of [NTriples|http://www.w3.org/TR/rdf-testcases/#ntriples] containing statements that are read-only and not saved with the model. Typically it is used alongside the writable model for structural components such as the schema.
 
-Raccoon loads the model using the function specified by the ^^initModel^^ config variable. Its signature looks like ^^def initModel(location, defaultModel)^^ where location is the value of the ^^-m^^ argument or ^^STORAGE_PATH^^ and defaultModel is a stream containing the NTriples stored in STORAGE_TEMPLATE. Note that ^^initModel^^'s value is a callable object (e.g. a function) which may need to be imported into the config file.
-The default is ^^RxPath.initFileModel^^, which can load RDF, NTriples, and Metakit files created by 4Suite but always saves the model as a special NTriples file that acts as a transaction log, allowing the model to be incrementally updated with appends. Also available is ^^RxPath.initRedlandHashBdbModel^^, which loads and saves to Berkeley DB files created by Redland (requires [Redland|http://www.redland.opensource.ac.uk/] to be installed); and ^^RxPath.initRDFLibModel^^, which loads and saves to the specified RDF/XML file (requires [RDFLib|http://rdflib.net]). 4Suite, Redland, and RDFLib support several other RDF stores (including various SQL databases) and alternative ^^initModel^^ functions can be written fairly easily, however until the underlying RxPath implementation is improved there's not much benefit in using these other sources. 
+Raccoon loads the model using the class or factory function specified by the ^^domStoreFactory^^ config variable. The function must return an object that conforms to the ^^DomStore^^ interface. Raccoon provides two ^^DomStore^^ implementations: ^^XMLDomStore^^ for using an XML file as the datastore and ^^RxPathDomStore^^ (the default), which exposes an RDF model as a RxPath DOM. Once the DOMStore is created, its ^^loadDom^^ method is called, passing both the value of the ^^-m^^ argument or ^^STORAGE_PATH^^ and (as the default model) a stream containing the NTriples stored in STORAGE_TEMPLATE. 
 
-Raccoon provides a few methods for updating the models, each of which use atomic transactions and hooks for authorization. At the lowest level is ^^updateDOM^^ which takes a list of statements to add and remove. Also available is ^^processRxML^^ which parses RxML and updates the model either by adding news statements or, if a list of resources to replace is specified, by merging in the difference between the RxML and the resource list. Finally, there is the ^^xupdateRDFDom^^ method which processes an [rx4rdf:RxUpdate] document and is used by the RxUpdate content processor.
+^^RxPathDomStore^^ can rely different RDF libraries for its underlying RDF store, depending on a factory function passed to its constructor. The default is ^^RxPath.initFileModel^^, which can load RDF, NTriples, and Metakit files created by 4Suite, but always saves the model as a special NTriples file that acts as a transaction log. This allowing the model to be incrementally updated with appends. Also available is ^^RxPath.initRedlandHashBdbModel^^, which loads and saves to Berkeley DB files created by Redland (requires [Redland|http://www.redland.opensource.ac.uk/] to be installed); and ^^RxPath.initRDFLibModel^^, which loads and saves to the specified RDF/XML file (requires [RDFLib|http://rdflib.net]). Below is an example from of an application config file demonstrating how to use one of these alternative RDF libraries: 
+
+p"""
+def createRedlandDomStore():
+  from rx import RxPath,DomStore
+  return DomStore.RxPathDomStore(RxPath.initRedlandHashBdbModel)
+domStoreFactory = createRedlandDomStore
+"""
+
+4Suite, Redland, and RDFLib, each, in turn, support several other RDF stores (including various SQL databases) and alternative ^^initModel^^ functions can be written to use these fairly easily, however until the underlying RxPath implementation is improved there's not much benefit in using these other data sources.
+
+!!Transactions
+
+Each top-level request (that is, a request not invoked within another request, in practice, an external request such as http request or command line invocation) has a separate transaction context associated with it. Any modifications to the data store or other transactional object will be part of that transaction context. This transaction context is managed by a transaction coordinator that implements 2-phase commit protocol, so if any modifications to an object participating in the transactions fails all changes to all transaction participants will be rolled back. Any object that implements the ^^TransactionParticipant^^ interface can participate in a transaction; the ^^DomStore^^ interface is derived from this and Raccoon also provides a implementation for transactionally manipulating the file system (^^TxnFileFactory^^).
+
+After the actions associated with a request are run, the transaction is committed if any of the transaction's participants have been modified. Application code can mark a transaction as read-only by adding a variable named ^^__readOnly^^ to the request metadata; if it is present and evaluates to a non-zero value, the transaction will be aborted if any modification occured. During the commit process three trigger will be invoked: one before the commit process begins (^^before-prepare^^), another after all the transaction participants have voted to commit (^^before-commit^^) and a third one after the commit succeeded (^^after-commit^^). See the above section on request triggers for more details. During the first trigger modifications can still be made to the transaction and this trigger could be used to, for example, transactionally update a full text index based on changes to the data store. By the time the second trigger is invoked the changes to the transaction is finalized but the transaction can still be aborted, at this point schema validation could occur. With the third trigger, the transaction has completed successfully; this could be used to implement notifications about changes to the application. 
+
+Besides allowing an application to modified the data store's DOM directly, Raccoon provides a few methods for updating the data store. At the lowest level is ^^updateDOM^^ which takes a list of statements to add and remove. Also available is ^^processRxML^^ which parses RxML and updates the model either by adding new statements or, if a list of resources to replace is specified, by merging in the difference between the RxML and the resource list. Finally, there is the ^^xupdateRDFDom^^ method which processes an [rx4rdf:RxUpdate] document and is used by the RxUpdate content processor.
 
 #todo: describe global process lock, update statement
 
@@ -335,7 +368,7 @@ Raccoon provides a simple debugging facility that is useful for debugging or cre
 Once you have one of these files, you can launch Raccoon using the -d option, which causes Raccoon to replay the requests stored in that file instead of launching its http server.
 
 !More information
-For more details, read the class and function level documentation found in ^^raccoon.py^^. Not counting the RxPath implementation or the built-in HTTP server, Raccoon is implemented in just one source file. For an example of a complex application running on Raccoon, see the Rhizome config file "rhizome-config.py".
+For more details, read the class and function level documentation found in ^^raccoon.py^^. For an example of a complex application running on Raccoon, see the Rhizome config file "rhizome-config.py".
 
 !Appendix: config settings
 Complete documentation on all the application config settings is available [here|RaccoonConfig].

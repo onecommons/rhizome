@@ -124,6 +124,12 @@ MODEL_RESOURCE_URI = 'http://example.org/rhizomeapp/2/20/2004'
 #default is True
 useEtags = False #disable
 
+#if useFileLock is True Raccoon will use interprocess file lock when committing 
+#a transaction. Alternately useFileLock can be a reference to a class or factory
+#function that conforms to the glock.LockFile interface.
+#default is False
+useFileLock=True #enable
+
 #################################################
 ## available read-only variables 
 #################################################
@@ -318,7 +324,7 @@ configHook = rhizome.configHook
 #actions is a dictionary that is the heart of an application running on Raccoon 
 # the key is the name of the trigger and the value is list of Actions that are invoked in that order
 # Raccoon currently uses these triggers:
-# 'handle-request' is invoked by RequestProcessor.handleRequest (for http requests) and by the 'site:' URL resolver
+# 'http-request' is invoked by RequestProcessor.handleRequest (for http requests) and by the 'site:' URL resolver
 # 'load-model' is invoked after a model is loaded
 # 'run-cmds' is invoked on start-up to handle command line arguements
 # 'before-add' and 'before-remove' is invoked every time a statement is added or removed
@@ -328,7 +334,7 @@ configHook = rhizome.configHook
 # 'after-commit' is invoked after a transaction is completed successfully 
 # triggerName + '-error' is invoked when an exception is raised while processing a trigger
 # see Action class for more info
-actions = { 'handle-request' : [Action(['.//myNs:contents/myNs:ContentTransform/myNs:transformed-by/*',], 
+actions = { 'http-request' : [Action(['.//myNs:contents/myNs:ContentTransform/myNs:transformed-by/*',], 
                                           __server__.processContents, matchFirst = False, forEachNode = True)],
             'run-cmds' : [ Action(["$import", '$i'], lambda result, kw, contextNode, retVal, rhizome=rhizome: 
                                 rhizome.doImport(result[0], **kw)),
