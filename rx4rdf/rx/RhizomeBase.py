@@ -263,7 +263,7 @@ class RhizomeBase(object):
         #note filter: URI fragment might not match wikiname
         #python 2.2 bug: filter() on a unicode returns a list not unicode
         #todo I8N (return a IRI?)
-        return self.server.BASE_MODEL_URI + \
+        return self.BASE_MODEL_URI + \
                filter(lambda c: c.isalnum() or c in '_-./', str(wikiname))
             
     def generatePatch(self, context, contents, oldcontentsNode, base64decode):
