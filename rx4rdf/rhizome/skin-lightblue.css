@@ -1,0 +1,65 @@
+.page {
+	background-color:#cde;
+}
+
+.content {
+   	background-color:white;
+}
+
+.page-title {
+	background-color:#fed; /*use selected-action-tab color*/
+}
+
+.site-form { /* #login-div and #searchform form  */
+	border:1px solid #666;
+	background-color:#fed;
+}
+
+.alert  {
+	background-color:#F00;
+}
+
+.navbar a {
+	border: 1px solid #666;
+	background-color:#fed;
+}
+
+.navbar a:hover {
+	border: 1px solid #666;
+	background-color: #c66;
+}
+.navbar a:active {
+	border: 1px solid #666;
+	background-color: #c66;
+}
+
+.quicklinks a:link,.quicklinks a:visited,.quicklinks a:active {
+	color:#000
+}
+.quicklinks a:hover {
+	color:#c00;
+}
+
+/*----------------------------
+/ Actionsbar
+/  these rules are specific to the default theme 
+-----------------------------*/
+
+#actionsbar a:link,#actionsbar a:visited,#actionsbar a:hover,#actionsbar a:active {	
+    
+	border-color: #666;/* use page-title border color*/
+	border-bottom:1px solid #fed; /* use page-title color*/
+}
+
+#actionsbar a:hover,#actionsbar a:active {  
+	color:#c00;
+}
+#actionsbar {
+	border-bottom:1px solid #666;/* use page-title border color*/
+	border-left:1px solid #cde; /* uses header color*/
+	background-color:#cde; /* uses header color*/
+}
+.selected-action-tab {	
+	background-color:#fed!important; /*use page-title color*/
+}
+

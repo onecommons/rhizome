@@ -1,24 +1,24 @@
-.page_style {	/*rarely seen in normal size-to-browser-width layout (except with small page heights), seen much in fixed width layout*/
+.page {	/*rarely seen in normal size-to-browser-width layout (except with small page heights), seen much in fixed width layout*/
 	background-color:#FFF!important;
 }
 
-.header_style {/* commonly uses sidebar or footer color */
+.header {/* commonly uses sidebar or footer color */
 	background-color:#933!important;
 	color:#FFF!important;
 }
-.header_style a:link, .header_style a:visited {
+.header a:link, .header a:visited {
 	color:#FFF;
 }
-.header_style a:hover, .header_style a:active {
+.header a:hover, .header a:active {
 	color:#CC6;
 }
 
-.sidebar_style { /* commonly uses header or footer color */
+.sidebar { /* commonly uses header or footer color */
 	background-color:#933!important;
 	color:#FFC;
 }
 
-.quicklinks_style a:link, .quicklinks_style a:visited {
+.quicklinks a:link, .quicklinks a:visited {
 	color:#FFC!important;
 }
 #quicklinks a:hover,#quicklinks a:active {
@@ -28,7 +28,7 @@
 	background-color:#FF9!important;
 	text-decoration:none;
 }
-.actionstab_style {	
+.actionstab {	
 	background-color:#FFF;
 	border-bottom-color:#FFF;
 }
@@ -38,7 +38,7 @@
 	color:#FFF;
 	text-decoration:none!important;
 }
-.selected-action-tab_style {	/* use page-title color */
+.selected-action-tab {	/* use page-title color */
 	background-color:#FF9!important;
 	border-bottom-color:#FF9!important;
 	color:#003!important;
@@ -51,25 +51,25 @@
 	border-bottom-color:#630!important;
 }
 
-.page-title_style { /* matched to selected actiontab*/
+.page-title { /* matched to selected actiontab*/
 	background-color:#FF9!important;
 	color:#003!important;
 }
-.content_style {
+.content {
 	background-color:#FFF!important;
 	color:#000;
 }
-.content_style a:link{
+.content a:link{
 }
-.content_style a:active{
+.content a:active{
 }
-.content_style a:hover{
+.content a:hover{
 }
-.content_style a:visited{
+.content a:visited{
 }
 
 
-.form_style {
+.form {
 	background-color:#FF9!important;
 	color:#003!important;
 }
@@ -77,15 +77,15 @@
 	background-color:#336!important;
 }
 
-.navbar_style a {
+.navbar a {
 	background-color:#FF9!important;
 }
-.navbar_style a:hover {
+.navbar a:hover {
 	background-color:#336!important;
 	color:#FFF!important;
 }
 
-.footer_style {	/*commonly uses header or sidebar color*/
+.footer {	/*commonly uses header or sidebar color*/
 	background-color:#933!important;
 	color:#FFF!important;
 	font-weight:bold;
