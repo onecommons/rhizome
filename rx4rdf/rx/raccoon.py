@@ -65,7 +65,8 @@ else:
         Returns the given OS path as a path URI.
         """
         return SiteUriResolver.OsPathToPathUri(StringValue(path))
-    DefaultExtFunctions[(RXWIKI_XPATH_EXT_NS, 'ospath2pathuri')] = OsPath2PathUri
+    DefaultExtFunctions[(RXWIKI_XPATH_EXT_NS,
+                         'ospath2pathuri')] = OsPath2PathUri
     
     ############################################################
     ##Raccoon defaults
@@ -91,16 +92,21 @@ else:
     ############################################################    
     class Requestor(object):
         '''
-        Requestor is a helper class that allows python code to invoke a Raccoon request as if it was function call
+        Requestor is a helper class that allows python code to invoke a
+        Raccoon request as if it was function call
+
         Usage:
-        response = __requestor__.requestname(**kw) where keywords are the optional request parameters
-        An AttributeError exception is raised if the server does recognize the request
+        response = __requestor__.requestname(**kw)
+        where kw is the optional request parameters
+        
+        An AttributeError exception is raised if the server does not
+        recognize the request
         '''
         def __init__(self, server, triggerName = None):
             self.server = server
             self.triggerName = triggerName
 
-        #the trailing __ so you can have requests named 'invoke' without conflicting    
+        #the trailing __ so you can have requests named 'invoke' without conflicting
         def invoke__(self, name, **kw):
             return self.invokeEx__(name, kw)[0]
             
@@ -122,7 +128,8 @@ else:
                 raise AttributeError, name
         
         def __getattr__(self, name):
-            if name in ['__hash__','__nonzero__', '__cmp__', '__del__']: #undefined but reserved attribute names
+            if name in ['__hash__','__nonzero__', '__cmp__', '__del__']:
+                #undefined but reserved attribute names
                 raise AttributeError("'Requestor' object has no attribute '%s'" %name)
             return lambda **k: self.invoke__(name, **k)
             #else:raise AttributeError, name #we can't do this yet since we may need the parameters to figure out what to invoke (like a multimethod)
@@ -139,7 +146,7 @@ else:
         '''        
         actionid = id(action) #do this to avoid memory leaks
         return lambda resultNodeset, kw, contextNode, retVal: (
-            actionid, cacheKeyPredicate(resultNodeset, kw, contextNode, retVal) )
+          actionid, cacheKeyPredicate(resultNodeset, kw, contextNode, retVal))
         
     def notCacheableKeyPredicate(*args, **kw):
         raise MRUCache.NotCacheable
@@ -154,28 +161,33 @@ match expressions. The action function returns a value which is passed
 onto the next Action in the sequence.
         '''
                 
-        def __init__(self, queries, action = None, matchFirst = True, forEachNode = False,
-                     depthFirst=True, requiresContext=False, cachePredicate=notCacheableKeyPredicate,
-                     sideEffectsPredicate=None, sideEffectsFunc=None, isValueCacheableCalc=None,
-                     cachePredicateFactory=defaultActionCacheKeyPredicateFactory,
-                     canReceiveStreams=False, debug=False):
+        def __init__(self, queries, action = None, matchFirst = True,
+                forEachNode = False, depthFirst=True, requiresContext=False,
+                cachePredicate=notCacheableKeyPredicate,
+                sideEffectsPredicate=None, sideEffectsFunc=None,
+                isValueCacheableCalc=None,
+                cachePredicateFactory=defaultActionCacheKeyPredicateFactory,
+                canReceiveStreams=False, debug=False):
             '''Queries is a list of RxPath expressions associated with this action
-            
-    action must be a function with this signature:    
-    def action(matchResult, kw, contextNode, retVal) where:
-        result is the result of the action's matching RxPath query 
-        kw is the dictionary of metadata associated with the request
-        contentNode is the context node used when the RxPath expressions were evaluated
-        retVal was the return value of the last action invoked in the in action sequence or None
+action must be a function with this signature:    
+def action(matchResult, kw, contextNode, retVal) where:
+    result is the result of the action's matching RxPath query 
+    kw is the dictionary of metadata associated with the request
+    contentNode is the context node used when the RxPath expressions were evaluated
+    retVal was the return value of the last action invoked in the in action sequence or None
 
-    If action is None this action will set the context node to the first node in the nodeset returned by the matching expression
+If action is None this action will set the context node to the first node
+in the nodeset returned by the matching expression
 
-    If matchFirst is True (the default) the requesthandler will stop after the first matching query.
-    Otherwise all the match expression be evaluated and the action function call after each match.
+If matchFirst is True (the default) the requesthandler will stop after
+the first matching query. Otherwise all the match expression be
+evaluated and the action function call after each match.
 
-    If forEachNode is True then the action function will be called for each node in a matching expression's result nodeset.
-    The action function's result parameter will be a nodeset contain only that current node.
-    '''        
+If forEachNode is True then the action function will be called for
+each node in a matching expression's result nodeset. The action
+function's result parameter will be a nodeset contain only that
+current node.
+'''        
             self.queries = queries
             self.action = action
             self.matchFirst = matchFirst 
@@ -205,11 +217,14 @@ onto the next Action in the sequence.
             
         def assign(self, varName, *exps, **kw):
             '''
-            Add a variable and expression list.
-            Before the Action is run each expression evaluated, the first one that returns a non-empty value is assigned to the variable.
-            Otherwise, the result of last expression is assigned (so you can choose between '', [], and 0).
-            If the 'assignEmpty' keyword argument is set to False the variable will only be assigned if the result is non-zero (default is True).
-            If the 'post' keyword argument is set to True the variable will be assigned after the Action is run (default is False).
+Add a variable and expression list. Before the Action is run each
+expression evaluated, the first one that returns a non-empty value is
+assigned to the variable. Otherwise, the result of last expression is
+assigned (so you can choose between '', [], and 0). If the
+'assignEmpty' keyword argument is set to False the variable will only
+be assigned if the result is non-zero (default is True). If the 'post'
+keyword argument is set to True the variable will be assigned after
+the Action is run (default is False).
             '''
             assert len(exps), 'Action.assign requires at least one expression'
             assignWhenEmpty = kw.get('assignEmpty', True)            
@@ -225,9 +240,10 @@ onto the next Action in the sequence.
             else:
                 varlist.append( (varName,  exps, assignWhenEmpty) )                    
                 
-    class FunctorAction(Action):        
+    class FunctorAction(Action):
         def __init__(self, actionFunc, indexes = [], **kw):
-            Action.__init__(self, ['true()'], (lambda *args: actionFunc(*[args[i] for i in indexes])), **kw)
+            Action.__init__(self, ['true()'], (lambda *args: actionFunc(
+                                    *[args[i] for i in indexes])), **kw)
                                                          
     def assignVars(self, kw, varlist, default):
         '''
@@ -265,11 +281,13 @@ onto the next Action in the sequence.
             return newvalue
         else:
             import Ft.Lib.boolean
-            assert isinstance(value, (str, Ft.Lib.boolean.BooleanType,
-                                     bool, unicode, int, float, type(None)) )\
-                   or getattr(value, 'nodeType', None), 'not a valid XPath datatype %s: ' % type(value)
+            assert (isinstance(value, (str, Ft.Lib.boolean.BooleanType,
+                                     bool, unicode, int, float, type(None)) )
+                   or getattr(value, 'nodeType', None)
+                    ), 'not a valid XPath datatype %s: ' % type(value)
             #todo: if is string: string = unicode(string,'utf8')
-            #todo: add externalobject wrapper class if not an XPath class or UnicodeError is thrown (to handle binary strings)
+            #todo: add externalobject wrapper class if not an XPath class
+            #       or UnicodeError is thrown (to handle binary strings)
             return value
         
     ############################################################
@@ -281,18 +299,21 @@ onto the next Action in the sequence.
         DefaultDisabledContentProcessors = []        
                     
         requestContext = utils.createThreadLocalProperty('__requestContext',
-            doc='variables you want made available to anyone during this request (e.g. the session)')
+         doc='variables you want made available to anyone during this request')
 
-        inErrorHandler = utils.createThreadLocalProperty('__inErrorHandler', initValue=0)
+        inErrorHandler = utils.createThreadLocalProperty(
+                                            '__inErrorHandler',initValue=0)
         
-        previousResolvers = utils.createThreadLocalProperty('__previousResolvers', initValue=None)
+        previousResolvers = utils.createThreadLocalProperty(
+                                     '__previousResolvers', initValue=None)
 
-        expCache = MRUCache.MRUCache(0, XPath.Compile)#, sideEffectsFunc=_resetFunctions)
+        expCache = MRUCache.MRUCache(0, XPath.Compile)    
                 
         requestsRecord = None
         log = log        
 
-        #keys found in the request metadata dictionary that can't be mapped to XPath variables
+        #keys found in the request metadata dictionary that
+        #can't be mapped to XPath variables
         COMPLEX_REQUESTVARS = ['__requestor__', '__server__',
                                 '_prevkw', '__argv__', '_errorInfo']
 
@@ -330,7 +351,8 @@ onto the next Action in the sequence.
             self.appBase = appBase or '/'
             self.appName = appName
             self.cmd_usage = DEFAULT_cmd_usage
-            self.styleSheetCache = MRUCache.MRUCache(0, styleSheetValueCalc, digestKey=True)
+            self.styleSheetCache = MRUCache.MRUCache(0, styleSheetValueCalc,
+                                                     digestKey=True)
             self.loadConfig(configpath, argsForConfig, appVars)
             self.requestDispatcher = Requestor(self)            
             self.resolver = SiteUriResolver(self)
@@ -338,12 +360,14 @@ onto the next Action in the sequence.
             self.handleCommandLine(argsForConfig or [])
                     
         def handleCommandLine(self, argv):
-            '''        
-            the command line is translated into XPath variables as follows:
-            * arguments beginning with a '-' are treated as a variable name with its value
-            being the next argument unless that argument also starts with a '-'
+            '''  the command line is translated into XPath variables
+            as follows:
+
+            * arguments beginning with a '-' are treated as a variable
+            name with its value being the next argument unless that
+            argument also starts with a '-'
             
-            * the whole command line is assigned to the variable '_cmdline'
+            * the entire command line is assigned to the variable '_cmdline'
             '''
             kw = argsToKw(argv, self.cmd_usage)
             kw['_cmdline'] = '"' + '" "'.join(argv) + '"' 
@@ -351,7 +375,8 @@ onto the next Action in the sequence.
                 
         def loadConfig(self, path, argsForConfig=None, appVars=None):
             if not path and not appVars:
-                raise CmdArgError('you must specify a config file using -a') #path = self.DEFAULT_CONFIG_PATH
+                #todo: path = self.DEFAULT_CONFIG_PATH (e.g. server-config.py)
+                raise CmdArgError('you must specify a config file using -a') 
             if not os.path.exists(path):
                 raise CmdArgError('%s not found' % path) 
 
@@ -378,9 +403,11 @@ onto the next Action in the sequence.
             def initConstants(varlist, default):
                 return assignVars(self, kw, varlist, default)
                             
-            initConstants( [ 'nsMap', 'extFunctions', 'actions',  'authorizationDigests',
+            initConstants( [ 'nsMap', 'extFunctions', 'actions',
+                             'authorizationDigests',
                              'NOT_CACHEABLE_FUNCTIONS', ], {} )
-            initConstants( [ 'STORAGE_PATH', 'STORAGE_TEMPLATE', 'APPLICATION_MODEL',
+            initConstants( [ 'STORAGE_PATH', 'STORAGE_TEMPLATE',
+                             'APPLICATION_MODEL',
                              'DEFAULT_MIME_TYPE', 'transactionLog'], '')
 
             initConstants( ['appBase'], self.appBase)
@@ -392,6 +419,15 @@ onto the next Action in the sequence.
                 self.appName = re.sub(r'\W','_', self.BASE_MODEL_URI)            
             self.log = logging.getLogger("raccoon." + self.appName)
 
+            useFileLock = kw.get('useFileLock')
+            if useFileLock:
+                if isinstance(useFileLock, type):
+                    self.LockFile = useFileLock
+                else:    
+                    self.LockFile = glock.LockFile
+            else:
+                self.LockFile = glock.NullLockFile #the default
+
             self.txnSvc = transactions.RaccoonTransactionService(self)
             domStoreFactory = kw.get('domStoreFactory', DomStore.RxPathDomStore)
             self.domStore = domStoreFactory()                        
@@ -399,18 +435,22 @@ onto the next Action in the sequence.
             self.domStore.removeTrigger = self.txnSvc.removeHook
             self.domStore.newResourceTrigger = self.txnSvc.newResourceHook
             
-            self.defaultRequestTrigger = kw.get('DEFAULT_TRIGGER', 'http-request')
+            self.defaultRequestTrigger = kw.get('DEFAULT_TRIGGER','http-request')
             initConstants( ['globalRequestVars'], [])
-            self.globalRequestVars.extend( ['_name', '_noErrorHandling', '_APP_BASE', '__readOnly'] )
+            self.globalRequestVars.extend( ['_name', '_noErrorHandling',
+                                            '_APP_BASE', '__readOnly'] )
             self.defaultPageName = kw.get('defaultPageName', 'index')
             #cache settings:                
             initConstants( ['LIVE_ENVIRONMENT', 'useEtags'], 1)
             initConstants( ['XPATH_CACHE_SIZE','ACTION_CACHE_SIZE'], 1000)
-            initConstants( ['XPATH_PARSER_CACHE_SIZE','STYLESHEET_CACHE_SIZE'], 200)
-            initConstants( ['maxCacheableStream','FILE_CACHE_SIZE'], 0)#10000000) #~10mb     
+            initConstants( ['XPATH_PARSER_CACHE_SIZE',
+                            'STYLESHEET_CACHE_SIZE'], 200)
+            #disable by default(default cache size used to be 10000000 (~10mb))
+            initConstants( ['maxCacheableStream','FILE_CACHE_SIZE'], 0)
             self.styleSheetCache.capacity = self.STYLESHEET_CACHE_SIZE
                         
-            #todo: these caches are global, only let the root RequestProcessor set these value                   
+            #todo: these caches are global, only let the root RequestProcessor
+            #set these values
             fileCache.maxFileSize = kw.get('MAX_CACHEABLE_FILE_SIZE', 0)                        
             self.expCache.capacity = self.XPATH_PARSER_CACHE_SIZE
             fileCache.capacity = self.FILE_CACHE_SIZE
@@ -422,24 +462,28 @@ onto the next Action in the sequence.
             #security and authorization settings:
             self.SECURE_FILE_ACCESS= kw.get('SECURE_FILE_ACCESS', True)
             self.disabledContentProcessors = kw.get('disabledContentProcessors',
-                                            self.DefaultDisabledContentProcessors)            
-            self.authorizeMetadata = kw.get('authorizeMetadata', lambda *args: True)
-            self.validateExternalRequest = kw.get('validateExternalRequest', lambda *args: True)            
+                                        self.DefaultDisabledContentProcessors)            
+            self.authorizeMetadata = kw.get('authorizeMetadata',
+                                            lambda *args: True)
+            self.validateExternalRequest = kw.get('validateExternalRequest',
+                                            lambda *args: True)            
             self.getPrincipleFunc = kw.get('getPrincipleFunc', lambda kw: '')
             
             self.MODEL_UPDATE_PREDICATE = kw.get('MODEL_UPDATE_PREDICATE')
-            self.MODEL_RESOURCE_URI = kw.get('MODEL_RESOURCE_URI', self.BASE_MODEL_URI)
+            self.MODEL_RESOURCE_URI = kw.get('MODEL_RESOURCE_URI',
+                                             self.BASE_MODEL_URI)
             
             self.cmd_usage = DEFAULT_cmd_usage + kw.get('cmd_usage', '')
-            #todo: shouldn't these be set before so it doesn't override config changes?:
+            #todo: shouldn't these be set before
+            #      so it doesn't override config changes?:
             self.NOT_CACHEABLE_FUNCTIONS.update(DefaultNotCacheableFunctions)
             if self.LIVE_ENVIRONMENT:
-                self.NOT_CACHEABLE_FUNCTIONS.update( EnvironmentDependentFunctions )
+                self.NOT_CACHEABLE_FUNCTIONS.update(EnvironmentDependentFunctions)
                 #only cache stylesheets when they don't depend on external files
                 self.styleSheetCache.isValueCacheableCalc = isStyleSheetCacheable
             else:
-                #don't worry about files changing, the only thing we worry about is the
-                #store changing
+                #don't worry about files changing, the only thing we worry about
+                #is the store changing
                 #if the stylesheet has dependencies on other resources
                 #these functions to keep track of the state of the store                
                 self.styleSheetCache.sideEffectsFunc = self.styleSheetParserSideEffectsFunc
@@ -473,18 +517,35 @@ onto the next Action in the sequence.
             if kw.get('configHook'):
                 kw['configHook'](kw)
 
-            authorizeXPathFuncs = kw.get('authorizeXPathFuncs',lambda *args: None)
+            authorizeXPathFuncs=kw.get('authorizeXPathFuncs',lambda *args:None)
 
             self.authExtFunctions = self.extFunctions.copy()
-            #this is sub-optimal but its too hard to have a separate auth NOT_CACHEABLE_FUNCTIONS dict
-            authorizeXPathFuncs(self.authExtFunctions, self.NOT_CACHEABLE_FUNCTIONS)
+            #this is sub-optimal but its too hard to have a
+            #separate auth NOT_CACHEABLE_FUNCTIONS dict
+            authorizeXPathFuncs(self.authExtFunctions,
+                                self.NOT_CACHEABLE_FUNCTIONS)
 
+            #because the expCache is global don't cache functions that are
+            #bound to instances or local variables
+            for funcDict in [self.extFunctions, self.authExtFunctions]:
+                for n, v in funcDict.items():
+                    if isinstance(v, types.LambdaType):
+                        v.nocache = True
+                    elif isinstance(v, types.MethodType):
+                        #can't set an arbitrary attributes on instancemethod
+                        #so wrap it in a lambda, which we can
+                        def curryFunc(v):
+                            #we need this inner func to create new local var bindings
+                            return lambda *args: v(*args)
+                        wrapper = curryFunc(v)
+                        wrapper.nocache = True
+                        funcDict[n] = wrapper
+                
         def getLock(self):
             '''
-            acquires the class lock.
-            Call release() on the returned lock object to release it
-            (Though this is not absolutely required since it will try to be released when garbage collected.)
-            '''
+            Acquires and returns the lock associated with this RequestProcessor.
+            Call release() on the returned lock object to release it.
+            '''            
             assert self.lock
             return glock.LockGetter(self.lock)
 
@@ -494,13 +555,16 @@ onto the next Action in the sequence.
             else:
                 source = self.STORAGE_PATH
             if not source:
-                self.log.warning('no model path given and STORAGE_PATH not set -- model is read-only.')
-            elif not os.path.isabs(source): #todo its possible for source to not be file path -- this will break that
+                self.log.warning('no model path given and STORAGE_PATH'
+                                 ' is not set -- model is read-only.')
+            elif not os.path.isabs(source):
+                #todo its possible for source to not be file path
+                #     -- this will break that
                 source = os.path.join( self.baseDir, source)
 
             if not self.lock:            
                 lockName = 'r' + `hash(repr(source))` + '.lock'
-                self.lock = glock.GlobalLock(lockName)
+                self.lock = self.LockFile(lockName)
                 
             lock = self.getLock()
             self.queryCache = MRUCache.MRUCache(self.XPATH_CACHE_SIZE,
@@ -509,9 +573,11 @@ onto the next Action in the sequence.
                                     context, self.NOT_CACHEABLE_FUNCTIONS),
                     processXPathExpSideEffects, calcXPathSideEffects)
             #self.queryCache.debug = self.log.info
-            self.actionCache = MRUCache.MRUCache(self.ACTION_CACHE_SIZE,digestKey=True)
+            self.actionCache = MRUCache.MRUCache(self.ACTION_CACHE_SIZE,
+                                                 digestKey=True)
             
-            self.domStore.loadDom(self, source, StringIO.StringIO(self.STORAGE_TEMPLATE))
+            self.domStore.loadDom(self, source,
+                            StringIO.StringIO(self.STORAGE_TEMPLATE))
             lock.release()
     ##        outputfile = file('debug.xml', "w+", -1)
     ##        from Ft.Xml.Domlette import Print, PrettyPrint
@@ -544,11 +610,13 @@ onto the next Action in the sequence.
                     #this is a stack in case runActions is re-entrant
                     if self.previousResolvers is None:
                         self.previousResolvers = []                    
-                    self.previousResolvers.append( InputSource.DefaultFactory.resolver )
+                    self.previousResolvers.append(
+                        InputSource.DefaultFactory.resolver )
                     InputSource.DefaultFactory.resolver = self.resolver
                     
-                    return self.doActions(sequence, kw, errorSequence=errorSequence,
-                                                      newTransaction=newTransaction)
+                    return self.doActions(sequence, kw,
+                                          errorSequence=errorSequence,
+                                          newTransaction=newTransaction)
                 finally:
                     InputSource.DefaultFactory.resolver = self.previousResolvers.pop()
                             
@@ -562,14 +630,14 @@ onto the next Action in the sequence.
                 extFuncs = self.extFunctions.copy()
 
             closures = {
-            (RXWIKI_XPATH_EXT_NS, 'assign-metadata') : lambda context, name, val:
-              AssignMetaData(kw, context, name, val, recordChange = '_metadatachanges'),
-            (RXWIKI_XPATH_EXT_NS, 'remove-metadata') : lambda context, name:
-              RemoveMetaData(kw, context, name, recordChange = '_metadatachanges'),
-            (RXWIKI_XPATH_EXT_NS, 'has-metadata') : lambda context, name:
-              HasMetaData(kw, context, name),
-            (RXWIKI_XPATH_EXT_NS, 'get-metadata') : lambda context, name, default=XFalse:
-              GetMetaData(kw, context, name, default),
+    (RXWIKI_XPATH_EXT_NS,'assign-metadata'):lambda context, name, val:
+      AssignMetaData(kw, context, name, val, recordChange='_metadatachanges'),
+    (RXWIKI_XPATH_EXT_NS,'remove-metadata') : lambda context, name:
+      RemoveMetaData(kw, context, name, recordChange = '_metadatachanges'),
+    (RXWIKI_XPATH_EXT_NS,'has-metadata') : lambda context, name:
+      HasMetaData(kw, context, name),
+    (RXWIKI_XPATH_EXT_NS,'get-metadata'):lambda context, name, default=XFalse:
+      GetMetaData(kw, context, name, default),
             }
             for c in closures.values():
                 #since we are using closures here
@@ -579,16 +647,21 @@ onto the next Action in the sequence.
             extFuncs[(RXWIKI_XPATH_EXT_NS, 'evaluate')] = self.Evaluate
             
             #add most kws to vars (skip references to non-simple types):
-            #todo: use of toXPathDataType is inconsistent -- should use throughout -- especially with prevkw
-            vars = dict( [( (None, x[0]), toXPathDataType(x[1], self.domStore.dom) ) for x in kw.items()\
-                          if x[0] not in self.COMPLEX_REQUESTVARS and x[0] != '_metadatachanges'] )
+            #todo: use of toXPathDataType is inconsistent
+            #      -- should use throughout -- especially with prevkw
+            vars = dict([
+                ( (None, x[0]), toXPathDataType(x[1],self.domStore.dom) )
+                    for x in kw.items()
+                        if x[0] not in self.COMPLEX_REQUESTVARS
+                           and x[0] != '_metadatachanges'
+                        ])
             #magic constants:
             vars[(None, 'STOP')] = self.STOP_VALUE
-            if not kw.has_key('_APP_BASE'):
+            if not kw.has_key('_APP_BASE'): #let request override appBase  
                 vars[(None, '_APP_BASE')] = self.appBase
             vars[(None, 'BASE_MODEL_URI')] = self.BASE_MODEL_URI        
 
-            for (ns, (dictname, attrib, filter)) in self.kw2varsMap.items():        
+            for (ns, (dictname, attrib, filter)) in self.kw2varsMap.items():    
                 nestedDict = kw.get(dictname)
                 if nestedDict and attrib:
                     if isinstance(attrib, str):
@@ -603,7 +676,7 @@ onto the next Action in the sequence.
             #print 'vars', vars
             return vars, extFuncs
 
-        def evalXPath(self, xpath,  vars=None, extFunctionMap = None, node = None):
+        def evalXPath(self, xpath,  vars=None, extFunctionMap=None, node=None):
             #print 'eval node', node        
             try:
                 node = node or self.domStore.dom
@@ -614,7 +687,8 @@ onto the next Action in the sequence.
                 vars[ (None, '__context')] = [ node ] #we also set this in doActions()
                     
                 context = XPath.Context.Context(node, varBindings = vars,
-                            extFunctionMap = extFunctionMap, processorNss = self.nsMap)
+                            extFunctionMap = extFunctionMap,
+                            processorNss = self.nsMap)
                 return self.domStore.evalXPath(xpath, context, expCache =
                                self.expCache, queryCache = self.queryCache)
             except (RuntimeException), e:
@@ -629,7 +703,8 @@ onto the next Action in the sequence.
             for name, exps, assignEmpty in actionvars:
                 vars, extFunMap = self.mapToXPathVars(kw)            
                 for exp in exps:
-                    result = self.evalXPath(exp, vars=vars, extFunctionMap = extFunMap, node = contextNode)                    
+                    result = self.evalXPath(exp, vars=vars,
+                                extFunctionMap=extFunMap, node=contextNode)                    
                     if result:
                         break
                 if debug:
@@ -653,50 +728,63 @@ onto the next Action in the sequence.
                     for xpath in action.queries:
                         #todo add _root variable also? 
                         vars, extFunMap = self.mapToXPathVars(kw)
-                        result = self.evalXPath(xpath, vars=vars, extFunctionMap = extFunMap, node = contextNode)
+                        result = self.evalXPath(xpath, vars=vars,
+                                    extFunctionMap=extFunMap, node=contextNode)
                         if result is self.STOP_VALUE:#for $STOP
                             break
-                        if result: #todo: != []: #if not equal empty nodeset (empty strings ok)
+                        if result: #todo: if result != []:
+                            #if not equal empty nodeset (empty strings ok)
+                            
                             #if no action function is defined
                             #the action resets the contextNode instead
                             if not action.action: 
-                                if type(result) == list: #only set context if result is a nonempty nodeset
+                                if type(result) == list:
+                                    #only set context if result is a nonempty nodeset
                                     contextNode = result[0]
                                     kw['__context'] = [ contextNode ]
-                                    self.log.debug('context changed: %s', result)
-                                    #why would you want to evaluate every query in this case?
+                                    self.log.debug('context changed: %s',result)
+                                    #why would you want to evaluate
+                                    #every query in this case?
                                     assert action.matchFirst 
                                 break
                             else:
-                                if not action.canReceiveStreams and hasattr(retVal, 'read'):
+                                if (not action.canReceiveStreams
+                                        and hasattr(retVal, 'read')):
                                     retVal = retVal.read()
                                 if action.forEachNode:
-                                    assert type(result) == list, 'result must be a nodeset'
+                                    assert type(result) == list, (
+                                        'result must be a nodeset')
                                     if action.depthFirst:
                                         #we probably want the reverse of
-                                        #document order (e.g. the deepest first)
-                                        #copy the list since it might have been cached
+                                        #document order
+                                        #(e.g. the deepest first)
+                                        #copy the list since it might have
+                                        #been cached
                                         result = result[:] 
                                         result.reverse()
                                     for node in result:
-                                        if kw.get('_metadatachanges'): del kw['_metadatachanges']
-                                        retVal = self.actionCache.getOrCalcValue(action.action,
-                                            [node], kw, contextNode, retVal,
-                                            hashCalc=action.cacheKeyPredicate,
-                                            sideEffectsCalc=action.sideEffectsPredicate,
-                                            sideEffectsFunc=action.sideEffectsFunc,
-                                            isValueCacheableCalc=action.isValueCacheableCalc)
+                                        if kw.get('_metadatachanges'):
+                                            del kw['_metadatachanges']
+                                        retVal = self.actionCache.getOrCalcValue(
+                            action.action,
+                            [node], kw, contextNode, retVal,
+                            hashCalc=action.cacheKeyPredicate,
+                            sideEffectsCalc=action.sideEffectsPredicate,
+                            sideEffectsFunc=action.sideEffectsFunc,
+                            isValueCacheableCalc=action.isValueCacheableCalc)
                                 else:
-                                    if kw.get('_metadatachanges'): del kw['_metadatachanges']
-                                    retVal = self.actionCache.getOrCalcValue(action.action,
-                                                result, kw, contextNode, retVal,
-                                                hashCalc=action.cacheKeyPredicate,
-                                                sideEffectsCalc=action.sideEffectsPredicate,
-                                                sideEffectsFunc=action.sideEffectsFunc,
-                                                isValueCacheableCalc=action.isValueCacheableCalc)
+                                    if kw.get('_metadatachanges'):
+                                        del kw['_metadatachanges']
+                                    retVal = self.actionCache.getOrCalcValue(
+                        action.action, result, kw, contextNode, retVal,
+                        hashCalc=action.cacheKeyPredicate,
+                        sideEffectsCalc=action.sideEffectsPredicate,
+                        sideEffectsFunc=action.sideEffectsFunc,
+                        isValueCacheableCalc=action.isValueCacheableCalc)
                             if action.matchFirst:
                                 break
-                    self.__assign(action.postVars, kw, contextNode, action.debug)
+
+                    self.__assign(action.postVars,kw,contextNode,action.debug)
             except:
                 exc = ActionWrapperException()
                 exc.state = (result, contextNode, retVal)
@@ -723,7 +811,7 @@ onto the next Action in the sequence.
                     if kw.get('__readOnly'):
                         self.log.warning(
                             'a read-only transaction was modified and aborted')
-                        if self.txnSvc.isActive(): #else its already been aborted
+                        if self.txnSvc.isActive():#else its already been aborted
                             self.txnSvc.abort()                        
                     else:
                         self.txnSvc.commit()
@@ -746,7 +834,8 @@ onto the next Action in the sequence.
 
             try:
                 if newTransaction:
-                    retVal = self._doActionsTxn(sequence, kw, contextNode, retVal)
+                    retVal = self._doActionsTxn(sequence, kw,
+                                                contextNode, retVal)
                 else:
                     result, contextNode, retVal = self._doActionsBare(
                                     sequence, kw, contextNode, retVal)
@@ -756,7 +845,8 @@ onto the next Action in the sequence.
                     result, contextNode, retVal = exc_info[1].state
                     exc_info = exc_info[1].nested_exc_info
 
-                if self.inErrorHandler or kw.get('_noErrorHandling'):#avoid endless loops
+                if self.inErrorHandler or kw.get('_noErrorHandling'):
+                    #avoid endless loops
                     raise exc_info[1] or exc_info[0], None, exc_info[2]
                 else:
                     self.inErrorHandler += 1
@@ -767,7 +857,8 @@ onto the next Action in the sequence.
                     if errorSequence and sequence is not errorSequence:
                         import traceback as traceback_module
                         def extractErrorInfo(type, value):
-                            #value may be either the nested exception or the wrapper exception
+                            #value may be either the nested exception
+                            #or the wrapper exception
                             message = str(value)
                             module = '.'.join( str(type).split('.')[:-1] )
                             name = str(type).split('.')[-1]
@@ -776,24 +867,34 @@ onto the next Action in the sequence.
                         
                         def getErrorKWs():                            
                             type, value, traceback = exc_info
-                            if isinstance(value, utils.NestedException) and value.useNested:
-                                 message, module, name, errorCode = extractErrorInfo(
-                                     value.nested_exc_info[0], value.nested_exc_info[1])
+                            if (isinstance(value, utils.NestedException)
+                                    and value.useNested):
+                                message, module, name, errorCode=extractErrorInfo(
+                                     value.nested_exc_info[0],
+                                     value.nested_exc_info[1])
                             else:
-                                message, module, name, errorCode = extractErrorInfo(type, value)                            
+                                message, module, name, errorCode=extractErrorInfo(
+                                                                 type, value)
                             #these should always be the wrapper exception:     
                             (fileName, lineNumber, functionName,
-                                text) = traceback_module.extract_tb(traceback, 1)[0]
-                            details = ''.join( traceback_module.format_exception(
-                                                        type, value, traceback) )
+                                text) = traceback_module.extract_tb(
+                                                        traceback, 1)[0]
+                            details = ''.join(
+                                traceback_module.format_exception(
+                                            type, value, traceback) )
                             return locals()
+
                         kw['_errorInfo'] = getErrorKWs()
-                        self.log.warning("invoking error handler on exception", exc_info=1)
-                        #todo provide a protocol for mapping exceptions to XPath variables, e.g. line # for parsing errors
-                        #kw['errorInfo'].update(self.extractXPathVars(kw['errorInfo']['value']) )
+                        self.log.warning("invoking error handler on exception",
+                                         exc_info=1)
+                        #todo provide a protocol for mapping exceptions to
+                        #XPath variables, e.g. line # for parsing errors
+                        #kw['errorInfo'].update(self.extractXPathVars(
+                        #                  kw['errorInfo']['value']) )
                         return self.callActions(errorSequence, result, kw,
                                 contextNode, retVal, self.globalRequestVars,
-                                    #if we're creating a new transaction, it has been aborted by now, so start a new one
+                        #if we're creating a new transaction,
+                        #it has been aborted by now, so start a new one:
                                             newTransaction=newTransaction) 
                     else:
                         #traceback.print_exception(*exc_info)
@@ -803,37 +904,42 @@ onto the next Action in the sequence.
             return retVal
 
         def callActions(self, actions,resultNodeset, kw, contextNode, retVal,
-                        globalVars=None, errorSequence=None, newTransaction=False):
+                    globalVars=None, errorSequence=None, newTransaction=False):
             '''
             process another set of actions using the current context as input,
             but without modified the current context.
             Particularly useful for template processing.
             '''
-            prevkw = kw.get('_prevkw', {}).copy() #merge previous prevkw, overriding vars as necessary
+            #merge previous prevkw, overriding vars as necessary
+            prevkw = kw.get('_prevkw', {}).copy() 
             templatekw = {}
             
             globalVars = globalVars or []
-            #globalVars are variables that should be present through out the whole request
-            #so copy them into templatekw instead of _prevkw
+            #globalVars are variables that should be present throughout the
+            #whole request so copy them into templatekw instead of _prevkw
             globalVars = self.COMPLEX_REQUESTVARS + globalVars
 
-            for k, v in kw.items():
-                #initialize the templates variable map copying the core request kws
-                #and copy the r est (the application specific kws) to _prevkw
-                #this way the template processing doesn't mix with the orginal request
-                #but are made available in the 'previous' namespace (think of them as template parameters)
+            for k, v in kw.items():                
+                #initialize the templates variable map copying the
+                #core request kws and copy the r est (the application
+                #specific kws) to _prevkw this way the template
+                #processing doesn't mix with the orginal request but
+                #are made available in the 'previous' namespace (think
+                #of them as template parameters)
                 if k in globalVars:
                     templatekw[k] = v
                 elif k != '_metadatachanges':
                     prevkw[k] = v
             templatekw['_prevkw'] = prevkw
-            if hasattr(retVal, 'read'): #todo: delay doing this until $_contents is required
+            if hasattr(retVal, 'read'):
+                #todo: delay doing this until $_contents is required
                 retVal = retVal.read()            
             templatekw['_contents'] = retVal
             
             #nodeset containing current resource
-            templatekw['_previousContext'] = contextNode and [ contextNode ] or []
-            templatekw['_originalContext'] = kw.get('_originalContext', templatekw['_previousContext'])
+            templatekw['_previousContext']=contextNode and [contextNode] or []
+            templatekw['_originalContext']=kw.get('_originalContext',
+                                                templatekw['_previousContext'])
             #use the resultNodeset as the contextNode for call action
             if isinstance(resultNodeset, list): 
                 contextNode = resultNodeset
@@ -845,7 +951,8 @@ onto the next Action in the sequence.
     ###########################################
     ## content processing 
     ###########################################        
-        def processContents(self, result, kw, contextNode, contents, dynamicFormat = False):        
+        def processContents(self, result, kw, contextNode, contents,
+                                                dynamicFormat=False):
             if contents is None:
                 return contents        
             formatType = StringValue(result)        
@@ -859,41 +966,53 @@ onto the next Action in the sequence.
             while formatType:
                 contentProcessor = self.contentProcessors.get(formatType)
                 if not contentProcessor:
-                    raise RaccoonError('unknown content processor format:' + formatType)
-                authorizeContentFunc = contentProcessor.authorize or self.authorizeContentProcessorsDefault
+                    raise RaccoonError('unknown content processor format:'
+                                                               + formatType)
+                authorizeContentFunc = (contentProcessor.authorize
+                                    or self.authorizeContentProcessorsDefault)
                 if authorizeContentFunc:
-                    authorizeContentFunc(contents, formatType, kw, dynamicFormat)        
+                    authorizeContentFunc(contents, formatType, kw, dynamicFormat)
                 
                 useCache = True
                 if hasattr(contents, 'read'):            
-                    if not contentProcessor.processStream: #contentProcessor can't handle streams
+                    if not contentProcessor.processStream:
+                        #contentProcessor can't handle streams
                         contents = contents.read()  
-                    elif contentProcessor.getCachePredicate and self.maxCacheableStream:
+                    elif (contentProcessor.getCachePredicate and
+                                          self.maxCacheableStream):
                         #if the contentProcessor is cachable 
-                        #try to read up to the maximum size we want to read at a time
+                        #try to read up to the maximum size we want to read
+                        #at a time
                         #if the stream isn't bigger than we can use the cache
                         value = contents.read(self.maxCacheableStream + 1)        
                         if len(value) > self.maxCacheableStream:
                             #too big to read all at once
-                            #use CombinedStream since we've already read from the stream            
-                            stream = ContentProcessors.CombinedReadOnlyStream(StringIO(value), contents), -1
-                            retVal = contentProcessor.processStream(result, kw, contextNode, stream)
+                            #use CombinedStream since we've already read
+                            #from the stream            
+                            stream = ContentProcessors.CombinedReadOnlyStream(
+                                                    StringIO(value), contents)
+                            retVal = contentProcessor.processStream(result, kw,
+                                                        contextNode, stream)
                             useCache = False                
                         else:
                             contents = value
                     else:
-                        retVal = contentProcessor.processStream(result, kw, contextNode, contents)
+                        retVal = contentProcessor.processStream(result, kw,
+                                                        contextNode, contents)
                         useCache = False                
                             
                 if useCache:
-                    kw['_preferStreamThreshhold'] = self.actionCache.maxValueSize
+                    kw['_preferStreamThreshhold']=self.actionCache.maxValueSize
+
                     retVal = self.actionCache.getOrCalcValue(                            
                         contentProcessor.processContents,
                         result, kw, contextNode, contents,
-                        hashCalc=contentProcessor.getCachePredicate or notCacheableKeyPredicate,
+                        hashCalc=contentProcessor.getCachePredicate
+                                        or notCacheableKeyPredicate,
                         sideEffectsFunc=contentProcessor.processSideEffects,
                         sideEffectsCalc=contentProcessor.getSideEffectsPredicate,
-                        isValueCacheableCalc=contentProcessor.isValueCacheablePredicate )
+                        isValueCacheableCalc=
+                                contentProcessor.isValueCacheablePredicate)
                     del kw['_preferStreamThreshhold']
 
                 if type(retVal) is tuple:
@@ -916,19 +1035,19 @@ onto the next Action in the sequence.
             digest = utils.shaDigestString(contents)
             if not self.authorizationDigests.get(digest):
                 raise NotAuthorized(
-                 'This application is not configured to process the content with a SHA1 digest of '
-                 + digest)
+                 'This application is not configured to process the content '
+                 'with a SHA1 digest of ' + digest)
             
         def processRxSLT(self, stylesheet, kw=None):
             '''
-            apply a RxSLT to the store's DOM. Actually, if the DOM isn't an RxPath DOM,
-            stylesheet will be treated as standard XSLT.
+            apply a RxSLT to the store's DOM. Actually, if the DOM isn't
+            a RxPath DOM, the stylesheet will be treated as standard XSLT.
             '''
             if kw is None: kw = {}        
             vars, funcs = self.mapToXPathVars(kw,doAuth=True)
             
-            contents, stylesheet = self.domStore.applyXslt(stylesheet, vars, funcs,
-                        baseUri='path:',styleSheetCache=self.styleSheetCache)
+            contents, stylesheet = self.domStore.applyXslt(stylesheet, vars,
+                funcs, baseUri='path:',styleSheetCache=self.styleSheetCache)
             format = kw.get('_nextFormat')            
             if format is None:
                 format = self._getFormatFromStyleSheet(stylesheet)
@@ -944,12 +1063,14 @@ onto the next Action in the sequence.
                 if child.expandedName[0] == XSL_NAMESPACE and \
                     child.expandedName[1] == 'output' and child._method]
            
-            if outputElements and outputElements[-1]._method[1] not in ('xml', 'html', 'xhtml'):
-                return None #text or unknown output method -- no further processing
+            if outputElements and outputElements[-1]._method[1] not in (
+                                                  'xml', 'html', 'xhtml'):
+                #text or unknown output method -- no further processing
+                return None 
             else:
                 return 'http://rx4rdf.sf.net/ns/wiki#item-format-xml'
             
-        def processXslt(self, styleSheetContents, contents, kw = None, uri='path:'):
+        def processXslt(self, styleSheetContents, contents, kw=None, uri='path:'):
             if kw is None: kw = {}
             vars, extFunMap = self.mapToXPathVars(kw,doAuth=True)
             
@@ -970,17 +1091,19 @@ onto the next Action in the sequence.
             try:
                 if type(contents) == type(u''):
                     contents = contents.encode('utf8')
-                contents = processor.run(InputSource.DefaultFactory.fromString(contents, uri),
-                                     topLevelParams = vars)
+                contents = processor.run(
+                    InputSource.DefaultFactory.fromString(contents, uri),
+                    topLevelParams = vars)
             except Ft.Xml.Xslt.XsltException:
                 #if Error.SOURCE_PARSE_ERROR
                 #probably because there's no root element, try wrapping in a <div>
                 if contents[:5] == '<?xml':
-                    contents = '<div>'+contents[contents.find('?>')+2:]+'</div>'
+                    contents='<div>'+contents[contents.find('?>')+2:]+'</div>'
                 else:
-                    contents = '<div>'+contents+'</div>'
-                contents = processor.run(InputSource.DefaultFactory.fromString(contents, uri),
-                                 topLevelParams = vars)
+                    contents='<div>'+contents+'</div>'
+                contents = processor.run(
+                    InputSource.DefaultFactory.fromString(contents, uri),
+                    topLevelParams = vars)
             format = kw.get('_nextFormat')
             if format is None:
                 format = self._getFormatFromStyleSheet(styleSheet)
@@ -989,24 +1112,29 @@ onto the next Action in the sequence.
             return (contents, format)
 
         def styleSheetParserSideEffectsCalc(self, cacheValue, *args):
-            '''
-            We use sideEffects here to store a key based on the value
-            (we can't store this in the key because the key has to be calculated before the value)
-            SideEffectsFunc will raise KeyError if current key doesn't match
-            '''
-            if not cacheValue.standAlone: #should be a StylesheetElement created in raccoon.styleSheetValueCalc
-                #if the stylesheet relies on other files (e.g. through xsl:import)
-                #we want to include the state of the store so that when it changes we invalidate this key
-                #and recalculate the value -- just in case one of those referenced files have changed                
+            '''We use sideEffects here to store a key based on the
+            value (we can't store this in the key because the key has
+            to be calculated before the value) SideEffectsFunc will
+            raise KeyError if current key doesn't match '''
+
+            if not cacheValue.standAlone:
+                #should be a StylesheetElement created in
+                #raccoon.styleSheetValueCalc if the stylesheet relies
+                #on other files (e.g. through xsl:import) we want to
+                #include the state of the store so that when it
+                #changes we invalidate this key and recalculate the
+                #value -- just in case one of those referenced files
+                #have changed
                 key = self.domStore.getStateKey()
             else:
                 key = None
             return key
 
-        def styleSheetParserSideEffectsFunc(self, cacheValue, sideEffects, *args):                    
+        def styleSheetParserSideEffectsFunc(self,cacheValue,sideEffects,*args):
             if sideEffects:                
                 if sideEffects != self.domStore.getStateKey():
-                    #if the model has changed, raise a KeyError so we reparse the stylesheet
+                    #if the model has changed, raise a KeyError
+                    #so we reparse the stylesheet
                     raise KeyError
             else:
                 assert cacheValue.standAlone
@@ -1021,7 +1149,8 @@ onto the next Action in the sequence.
             '''
             modelNode = rdfDom.findSubject(self.MODEL_RESOURCE_URI)
             if not modelNode:
-                self.log.warning("model resource not found: %s" % self.MODEL_RESOURCE_URI)
+                self.log.warning("model resource not found: %s"
+                                     % self.MODEL_RESOURCE_URI)
                 return
             for p in modelNode.childNodes:
                 if p.stmt.predicate == self.MODEL_UPDATE_PREDICATE:
@@ -1055,8 +1184,10 @@ onto the next Action in the sequence.
         def updateDom(self, addStmts, removedNodes=None):
             '''update our DOM
             addStmts is a list of Statements to add
-            removedNodes is a list of RxPath nodes (either subject or predicate nodes) to remove
+            removedNodes is a list of RxPath nodes
+               (either subject or predicate nodes) to remove
             '''
+            
             removedNodes = removedNodes or []
             #log.debug('removing %s' % removeResources)
             self.txnSvc.join(self.domStore)
@@ -1080,12 +1211,14 @@ onto the next Action in the sequence.
             
             oldNss = context.processorNss.copy()
             context.processorNss.update(self.nsMap)
-            DOMnsMap = dict([(y, x) for x,y in getattr(context.node.ownerDocument,
-                                                       'nsRevMap', {}).items()] )
+            DOMnsMap = dict([(y,x) for x,y in
+                getattr(context.node.ownerDocument,'nsRevMap', {}).items()])
             context.processorNss.update(DOMnsMap)
             xpath = StringValue(expr)
             #use if caches available
-            compExpr = self.expCache.getValue(xpath) #todo: nsMap should be part of the key -- until then clear the cache if you change that!        
+            compExpr = self.expCache.getValue(xpath)
+            #todo: nsMap should be part of the key
+            # -- until then clear the cache if you change that!
             queryCache= getattr(context.node.ownerDocument, 'queryCache', None)
             if queryCache:
                 res = queryCache.getValue(compExpr, context)         
@@ -1121,7 +1254,8 @@ onto the next Action in the sequence.
                 contextNode = contextNode[0]
             else:
                 contextNode = context.node
-            return self.processContents(formatURI, kw, contextNode, contents, True)
+            return self.processContents(formatURI, kw, contextNode,
+                                        contents, True)
                 
         def saveRxML(self, context, contents, about=None):
             '''
@@ -1131,14 +1265,18 @@ onto the next Action in the sequence.
             application's "extFunctions" dictionary. '''          
             try:
                 import zml
-                xml = zml.zmlString2xml(contents, mixed=False, URIAdjust = True)#parse the zml to xml
+                #parse the zml to xml
+                xml = zml.zmlString2xml(contents, mixed=False, URIAdjust=True)
                         
                 if isinstance(about, ( types.ListType, types.TupleType ) ):            
-                    #about may be a list of text nodes, convert to a list of strings
+                    #about may be a list of text nodes,
+                    #convert to a list of strings
                     about = [StringValue(x) for x in about if x]
                 elif about is not None:
-                    if about: about = [ about ]
-                    else: about = []
+                    if about:
+                        about = [ about ]
+                    else:
+                        about = []
                 xml ='<rx:rx>'+ xml+'</rx:rx>'
                 self._processRxML(xml, about)
             except NotAuthorized:
@@ -1187,8 +1325,9 @@ onto the next Action in the sequence.
             oldVal = self.domStore.dom.globalRecurseCheck
             self.domStore.dom.globalRecurseCheck=True
             try:
-                strIO = StringIO.StringIO()        
-                PrettyPrint(self.domStore.dom, strIO, asHtml=1) #asHtml to suppress <?xml ...>
+                strIO = StringIO.StringIO()
+                #use asHtml to suppress <?xml ...>
+                PrettyPrint(self.domStore.dom, strIO, asHtml=1) 
             finally:
                 self.domStore.dom.globalRecurseCheck=oldVal
             return '<RxPathDOM>'+strIO.getvalue() +'</RxPathDOM>'
@@ -1227,15 +1366,15 @@ onto the next Action in the sequence.
 
             self.kw2varsMap = self.kw2varsMap.copy()
             self.kw2varsMap.update( { 
-                      None : ('_request', '__dict__', lambda n,v:
-                              requestAttrMap.get(n) and (requestAttrMap[n], v) or None),
-                      RXIKI_REQUEST_COOKIES_NS : ('_request', 'simpleCookie',
-                                                  lambda n,v: (n,v.value)),
-                      RXIKI_HTTP_REQUEST_HEADER_NS : ('_request', 'headerMap', None),          
-                      RXIKI_RESPONSE_COOKIES_NS : ('_response', 'simpleCookie',
-                                                   lambda n,v: (n,v.value)),
-                      RXIKI_HTTP_RESPONSE_HEADER_NS : ('_response', 'headerMap', None),
-                      RXIKI_SESSION_NS : ('_session', None, None),
+                None : ('_request', '__dict__', lambda n,v:
+                    requestAttrMap.get(n) and (requestAttrMap[n], v) or None),
+                RXIKI_REQUEST_COOKIES_NS : ('_request', 'simpleCookie',
+                                              lambda n,v: (n,v.value)),
+                RXIKI_HTTP_REQUEST_HEADER_NS : ('_request', 'headerMap',None),          
+                RXIKI_RESPONSE_COOKIES_NS : ('_response', 'simpleCookie',
+                                               lambda n,v: (n,v.value)),
+                RXIKI_HTTP_RESPONSE_HEADER_NS : ('_response','headerMap',None),
+                RXIKI_SESSION_NS : ('_session', None, None),
             })
             self.COMPLEX_REQUESTVARS += ['_request','_response', '_session']            
 
@@ -1256,7 +1395,8 @@ onto the next Action in the sequence.
 
             request.browserBase = request.base + '/'
             
-            #the operative part of the url (browserUrl = browserBase + browserPath + '?' + browserQuery)
+            #the operative part of the url
+            #(browserUrl = browserBase + browserPath + '?' + browserQuery)
             path = request.browserUrl[len(request.browserBase):]
             if path.find('?') > -1:
                 request.browserPath, request.browserQuery = path.split('?', 1)
@@ -1271,7 +1411,8 @@ onto the next Action in the sequence.
             kw['_name'] = name
             #import pprint; pprint.pprint(kw)
 
-            #if the request name has an extension try to set a default mimetype before executing the request
+            #if the request name has an extension try to set
+            #a default mimetype before executing the request
             i=name.rfind('.')
             if i!=-1:
                 ext=name[i:]      
@@ -1281,7 +1422,8 @@ onto the next Action in the sequence.
 
             try:                
                 rc = {}
-                #requestContext is used by all Requestor objects in the current thread 
+                #requestContext is used by all Requestor objects
+                #in the current thread 
                 rc['_session']=kw['_session']
                 rc['_request']=kw['_request']
                 self.requestContext.append(rc)
@@ -1289,10 +1431,12 @@ onto the next Action in the sequence.
                 self.validateExternalRequest(kw)
                 result = self.runActions('http-request', kw)
                 if result is not None: #'cause '' is OK
-                    if hasattr(result, 'read'): #we don't yet support streams
+                    if hasattr(result, 'read'):
+                        #we don't yet support streams
                         result = result.read()
                     else:
-                        #an http request must return a string (not unicode, for example)
+                        #an http request must return a string
+                        #(not unicode, for example)
                         result = str(result) 
                     
                     #if mimetype is not set, make another attempt
@@ -1344,7 +1488,8 @@ onto the next Action in the sequence.
 </head><body>
 <h2>HTTP Error 404</h2>
 <p><strong>404 Not Found</strong></p>
-<p>The Web server cannot find the file or script you asked for. Please check the URL to ensure that the path is correct.</p>
+<p>The Web server cannot find the file or script you asked for.
+Please check the URL to ensure that the path is correct.</p>
 <p>Please contact the server's administrator if this problem persists.</p>
 </body></html>'''
 
@@ -1402,7 +1547,8 @@ onto the next Action in the sequence.
                     rootArgs += argv[i:i+2]
                     configArgs += argv[i+2:] 
                     break        
-                if argv[i] in ['-d', '-r', '-x', '-s', '-l', '-h', '--help'] or (eatNext and argv[i][0] != '-'):
+                if argv[i] in ['-d', '-r', '-x', '-s', '-l', '-h', '--help'
+                               ] or (eatNext and argv[i][0] != '-'):
                     eatNext = argv[i] in ['-d', '-s', '-l']
                     mainArgs.append( argv[i] )
                 else:
@@ -1421,10 +1567,12 @@ onto the next Action in the sequence.
                     import logging.config as log_config
                 if not os.path.exists(logConfig):
                     raise CmdArgError("%s not found" % logConfig)
-                log_config.fileConfig(logConfig) #todo document loggers: rhizome, server, raccoon, rdfdom
-                #any logger already created and not explicitly specified in the log config file is disabled
-                #this seems like a bad design -- certainly took me a while to why understand things weren't getting logged
-                #so re-enable the loggers
+                log_config.fileConfig(logConfig)
+                #any logger already created and not explicitly
+                #specified in the log config file is disabled this
+                #seems like a bad design -- certainly took me a while
+                #to why understand things weren't getting logged so
+                #re-enable the loggers
                 for logger in logging.Logger.manager.loggerDict.itervalues():
                     logger.disabled = 0        
             else: #set defaults        
@@ -1458,7 +1606,8 @@ onto the next Action in the sequence.
                 for request in requests:
                     print>>out, 'request', request[0]
                     root.handleHTTPRequest(request[0], request[1])
-            elif '-x' not in mainArgs: #if -x (execute cmdline and exit) we're done
+            elif '-x' not in mainArgs:
+                #if -x (execute cmdline and exit) we're done
                 sys.argv = mainArgs #hack for Server
                 from rx import Server
                 if '-r' in mainArgs:

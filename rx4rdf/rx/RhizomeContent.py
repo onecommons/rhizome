@@ -316,9 +316,8 @@ class RhizomeXMLContentProcessor(
                                   kw['__server__'].appBase),
                                   linkFixerFactory=linkFixerFactory)
 
-    def processMarkupCachePredicate(self, result, kw, contextNode, contents):
-        return (contents, contextNode, contextNode.ownerDocument.getKey(),
-                contextNode.ownerDocument.revision,
+    def getCachePredicate(self, result, kw, contextNode, contents):
+        return (self.uri, contents, contextNode.getKey(),
                 kw.get('_APP_BASE', kw['__server__'].appBase),
                 self.getMaxes(kw))
 

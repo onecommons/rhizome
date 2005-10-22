@@ -87,7 +87,7 @@ class Base64ContentProcessor(ContentProcessor):
         return base64.decodestring(contents)
 
     def getCachePredicate(self,result, kw, contextNode, contents):
-        return contents
+        return self.uri, contents
 
 class SiteLinkFixer(HTMLFilter):
     '''
@@ -171,7 +171,7 @@ class XMLContentProcessor(ContentProcessor):
         return self.processMarkup(contents, kw['__server__'].appBase)
 
     def getCachePredicate(self, result, kw, contextNode, contents):
-        return contents
+        return self.uri, contents
 
     def processMarkup(self, contents, baseURL, docpath=None,
                       linkFixerFactory=None):
@@ -214,7 +214,9 @@ class RxSLTContentProcessor(ContentProcessor):
         if isinstance(styleSheetKeys, MRUCache.NotCacheable):
             kw['__server__'].log.debug(
                 "stylesheet %s is not cacheable" % styleSheetUri)
-        return styleSheetKeys
+            return styleSheetKeys
+        else:
+            return self.uri, styleSheetKeys
         
     def getSideEffectsPredicate(self, cacheValue, resultNodeset, kw,
                                 contextNode, retVal):
@@ -347,7 +349,9 @@ class XSLTContentProcessor(ContentProcessor):
         if isinstance(styleSheetKeys, MRUCache.NotCacheable):
             kw['__server__'].log.debug(
                 "stylesheet %s is not cacheable" % styleSheetUri)
-        return styleSheetKeys
+            return styleSheetKeys
+        else:
+            return self.uri, styleSheetKeys
                 
     def getSideEffectsPredicate(self, cacheValue, resultNodeset,
                                 kw, contextNode, retVal):
@@ -374,7 +378,7 @@ class ZMLContentProcessor(ContentProcessor):
         return {}
     
     def getCachePredicate(self, result, kw, contextNode, contents):
-        return contents
+        return self.uri, contents
                 
     def processZMLSideEffects(self, contextNode, kw):
         #optimization: only set the doctype (which will invoke wiki2html.xsl
