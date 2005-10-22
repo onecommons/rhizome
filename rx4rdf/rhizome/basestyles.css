@@ -1,24 +1,85 @@
-/*
- for diff-revisions.py 
-   table.diff {font-family:Courier; border:medium;}
-   #difflib_chg_to0__top th, #difflib_chg_to0__top td
-     { border: 0; border-spacing: 0px; padding: 0; font-size: smaller; }  
-  .diff_header {background-color:#e0e0e0}
-  td.diff_header {text-align:right; border:0}
-  .diff_next {background-color:#c0c0c0}
-  .diff_add {background-color:#aaffaa}
-  .diff_chg {background-color:#ffff77}
-  .diff_sub {background-color:#ffaaaa}
-  
-/ for forrest skin: /
+/*-------------------------------------------------------
+/ The following are used by system files
+------------------------------------------------------*/
+/*-------------------------
+/ used by diff-revisions.py (when comparing revisions)
+-------------------------*/
+table.diff {
+	border:medium;
+	font-family: "Courier New", Courier, monospace;
+		font-family:Courier;
+}
+#difflib_chg_to0__top th, #difflib_chg_to0__top td {
+	padding: 0px; 
+	border-spacing: 0px; 
+	border: 0px; 
 
-table .title {font-weight : bold;width:100%;border: 0px;}
+		font-size: smaller; 
+}  
+.diff_header {
+	background-color:#e0e0e0
+}
+td.diff_header {
+	text-align:right; 
+	border:0px;
+}
+.diff_next {
+	background-color:#c0c0c0;
+}
+.diff_add {
+	background-color:#aaffaa;
+}
+.diff_chg {
+	background-color:#ffff77;
+}
+.diff_sub {
+	background-color:#ffaaaa;
+}
+/*----------------------------------
+/ Used by document2html.xsl
+/-----------------------------------*/
+.pre {
+	white-space: pre;
+}
 
-.pre { white-space: pre;}
-.ForrestTable { width: 100%; background-color: #7099C5; color: #ffffff; font-size : 90%;}
-.ForrestTable caption { text-align: left; color: black; font-weight: bold; }
-.ForrestTable th { text-align: center; }
-.ForrestTable td { background-color: #f0f0ff; color: black; }
+table .title {
+	width:100%;
+	border:0px;
+	font-weight:bold;
+}
+
+.ForrestTable {
+	width:100%; 
+	background-color: #7099c5; 
+	font-size:90%;color:#ffffff;
+}
+.ForrestTable caption { 
+	text-align: left; 
+	font-weight: bold;color: black; 
+	}
+.ForrestTable th { 
+	text-align: center;
+}
+.ForrestTable td {
+	background-color: #f0f0ff; 
+	color: black;
+}
+.codefrag {
+	font-family: "Courier New", Courier, monospace;
+}
+
+/* used in search.xsl, showrevisions.xsl */
+div .title {
+	font-weight:bold;
+}
+
+/* used by document2html.xsl, edit-metadata.xsl, edit.xsl*/
+.code {
+	border: 1px solid #ccc;
+	line-height: 1.25em; 
+}
+
+/* used by document2html.xsl */
 .frame { margin: 5px 20px 5px 20px; font-size: 90%; }
 .frame .content { margin: 0px; }
 .note { border: solid 1px #7099C5; background-color: #f0f0ff; }
@@ -27,17 +88,8 @@ table .title {font-weight : bold;width:100%;border: 0px;}
 .warning .label { background-color: #D00000; color: #ffffff; }
 .fixme { border: solid 1px #C6C600; background-color: #FAF9C3; }
 .fixme .label { background-color: #C6C600; color: #ffffff; }
-.code { border-color: #CFDCED; border-style: solid; border-width: 1px; 
-       line-height: 1.25em; 
-      }
+
 .codefrag {	font-family: "Courier New", Courier, monospace; }
 .highlight { background-color: yellow; }
 .minitoc {margin: 5px 5px 5px 40px;}
-.dtdElement { width: 100%;	font-size: 90%; background-color : #ffffff; }
-.dtdTag {    color: #990000; text-transform : uppercase;  font-style : normal;  font-size : 120%;  font-weight : bold; }
-@media print {
-   .menu {
-     display: none;
-   }
-}
-*/
+
