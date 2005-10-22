@@ -1,6 +1,24 @@
 Rx4RDF and Rhizome Changelog
 ============================
 
+Changes in Version 0.5.1 (Oct 21, 2005)
+----------------------------------------
+Minor release:
+* docs:    updated docs
+* utils:   replace glock implementation with one that doesn't require win32all
+* Raccoon: add useFileLock config variable for turning on the inter-process lock 
+            (default is off)
+* setup:   include test files in setup
+* Raccoon: make transaction state thread local
+* Rhizome: replace footer.xml with base:site-template\wiki:footer-text property
+* Rhizome: add login-as-user option to the create user page
+* Rhizome: add css skin files to the data store, add wiki:uses-skin property
+* Rhizome: various fixes to glitches in themes and skins
+* Rhizome: display session message in header and display page actions message there
+* Raccoon: fix a couple of cache related bugs
+           (one caused an endless loop when displaying an empty page)
+* RxPath:  compatibility with 4Suite 1.0b2
+
 Changes in Version 0.5 (Sept 28, 2005)
 ----------------------------------------
 Major changes and bug fixes:

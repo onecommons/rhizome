@@ -1,10 +1,10 @@
-Rx4RDF requires Python 2.2 or later (2.3 recommended) and 4Suite 1.0a1 
-or later ([http://4Suite.org]).
+Rx4RDF requires Python 2.2 or later (2.4 recommended) and the 4Suite XML and RDF 
+libraries (at [http://4Suite.org], version 1.0a1 or later).
 
 Rx4RDF and Rhizome are tested on Linux and Windows 2000/XP  
 and should work on any platform that supports Python and 4Suite.
-It has been known to work on Windows 98, Cygwin and OS X. 
-For OS X you should have 4Suite 1.0a4 installed -- see
+It has been also known to work on Windows 98, Cygwin and OS X. 
+For OS X you should have 4Suite 1.0a4 or later installed -- see
 [http://uche.ogbuji.net/tech/akara/nodes/2003-01-01/osx] for more details.
 
 [Source (zip)|http://sourceforge.net/project/showfiles.php?group_id=85676]
@@ -18,11 +18,6 @@ Optional Packages:
 If Lupy is installed ([http://www.divmod.org/Home/Projects/Lupy]), Rhizome will
 perform full-text indexing of content (requires Python 2.3). 
 See the Rhizome manual for more info.
-
-On Windows, the Python Win32 Extensions ([http://python.org/windows/win32all]) 
-must be installed or interprocess file locking will be disabled (You do not 
-need this unless you have multiple Raccoon processes simultaneously accessing 
-the same application instance).
 
 RDFLib data stores can be used if RDFLib ([http://www.rdflib.net])
 is installed. See the Raccoon manual for more info. In addition, if RDFLib is 

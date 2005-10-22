@@ -13,11 +13,13 @@ Building on top of Rx4RDF is an application stack that allows RDF to be used to 
 * [RDFScribbler] is another application built on [Raccoon]. It is a simple web application that can display and edit any arbitrary RDF model using RxSLT and RxUpdate.
 
 <div align='center': 
- \<img src='site:\/\//rhizomearch.png' alt='Rhizome architecture' height='336px' width='362px'/\>
+ \<img src='site:\/\//rhizomearch.png' alt='Rhizome architecture' /\>
 
 Rhizome architecture
 <
 See also:
+
+[Intelligent Systems article on Rhizome | http://www.liminalzone.org/static/IEEE_IS_Souzis_v20n5.pdf] (pdf)
 
 [Why RDF?|RDF]
 

@@ -2,7 +2,7 @@ Raccoon is fairly complete, I don't expect to add much functionality. Raccoon is
 
 That being said, here's a "strategic" feature list:
 
-* Add update triggers and validation hooks
+* Add update triggers and validation hooks (Done!)
 * Build-out caching a bit more, in particular:
 ** Add support for etags and if-none-else headers (Done!)
 ** Add caching to the URL/file resolver (Done!)
@@ -12,6 +12,7 @@ That being said, here's a "strategic" feature list:
 ** Allow for fine-grained authorization (i.e. when adding and removing individual statements)
   (Done!)
 ** Integrate a sandbox for the safe execution of Python content (Zope seems like it has one, can we use that?)
-* Support multiple applications per Raccoon instance
+* Support multiple applications per Raccoon instance (Done!)
+** Support a master meta-application config file that can dispatch requests to the appropriate applications (Done!)
 ** Allow the application config files to treated like any content handler, allowing it to be edited through Raccoon.
-** Support a master meta-application config file that can dispatch requests to the appropriate applications
+

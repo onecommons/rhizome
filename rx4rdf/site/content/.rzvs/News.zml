@@ -1,4 +1,19 @@
 !Latest News
+
+\[21 Oct 2005]
+Version 0.5.1 of Rx4RDF and Rhizome released. 
+
+Minor release, changes include:
+
+Remove the dependency on the win32all Python library;
+Improved themes, add CSS skins to data store;
+plus some bug fixes and documentation improvements.
+
+[Download] it or view the [changelog|changelog.txt]
+
+\[1 Oct 2005]
+I've published an article about Rhizome in the Sept/Oct issue of [IEEE Intelligent Systems| http://www.computer.org/portal/site/intelligent/]. A copy can be found [here | http://www.liminalzone.org/static/IEEE_IS_Souzis_v20n5.pdf] (pdf).
+
 \[28 Sep 2005]
 Version 0.5.0 of Rx4RDF and Rhizome released. 
 
