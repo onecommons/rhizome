@@ -45,6 +45,10 @@ f:if($account, concat('Edit Profile of ', $account/foaf:accountName), 'Register 
          tr: 
              td: `Full Name:     
              td: input type=text name=fullname value="{$user/foaf:name}"           
+         x:if test='not($account)':
+             tr: 
+                 td: `Login as user after account creation:     
+                 td: input type=checkbox name=loginnow checked value="1"
          tr:              
              td: 
                input type="hidden" name="action" value="{f:if($account,'save','creation')}" #workaround IE bug: value doesn't work with button
