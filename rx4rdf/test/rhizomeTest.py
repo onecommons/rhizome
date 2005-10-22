@@ -94,8 +94,9 @@ class RhizomeTestCase(unittest.TestCase):
         1. view it
         1. create new html page called "sanitize" using illegal html (e.g. javascript)
         1. view it
-        1. create a new user account
+        1. create a new user account (foo/foo)
         1. view it
+        1. edit it, change password to 'bar'
         '''
         for configpath in glob.glob('test-config*.py'):
             print 'testing ', configpath
@@ -493,14 +494,18 @@ class RhizomeTestCase(unittest.TestCase):
         cacheSizes = self._testCaches(False)
         #make sure the cache isn't erroneously growing
         self.failUnless(cacheSizes[-1] == cacheSizes[-2])
+
         #yes, this is quite a fragile test:
-        self.failUnless(cacheSizes[-1][:-1] == (6, 3, 107, 57))#, 13523L)) #14695
+        #print cacheSizes[-1]
+        self.failUnless(cacheSizes[-1][:-1] == (7, 5, 135, 57))#, 16724L)) 
 
         cacheSizes = self._testCaches(True)
         #make sure the cache isn't erroneously growing
         self.failUnless(cacheSizes[-1] == cacheSizes[-2])
+
         #yes, this is quite a fragile test:
-        self.failUnless(cacheSizes[-1][:-1] == (5, 1, 97, 57))#, 13523L))
+        #print cacheSizes[-1]
+        self.failUnless(cacheSizes[-1][:-1] == (6, 3, 123, 57))#, 16724L))
         
 SAVE_WORK=False
 DEBUG = False

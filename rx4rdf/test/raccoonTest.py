@@ -30,7 +30,7 @@ class RaccoonTestCase(unittest.TestCase):
             raccoon.fileCache.getValue(path)        
         
     def testAuth(self):
-        root = raccoon.RequestProcessor(a='testAuthAction.py')
+        root = raccoon.RequestProcessor(a='testAuthAction.py', model_uri = 'test:')
         unauthorized = root.domStore.dom.findSubject( 'http://rx4rdf.sf.net/ns/auth#Unauthorized' )
         #the guest user has no rights
         user = root.domStore.dom.findSubject( root.BASE_MODEL_URI+'users/guest' )
@@ -47,7 +47,7 @@ class RaccoonTestCase(unittest.TestCase):
         self.failUnless( start == result)
 
     def testMinimalApp(self):
-        root = raccoon.RequestProcessor(a='testMinimalApp.py')
+        root = raccoon.RequestProcessor(a='testMinimalApp.py',model_uri = 'test:')
         result = root.runActions('http-request', utils.kw2dict(_name='foo'))
         #print type(result), result
         response = "<html><body>page content.</body></html>"
@@ -63,7 +63,8 @@ class RaccoonTestCase(unittest.TestCase):
         self.failUnless( '<html><body>not found!</body></html>' == result)
 
     def testContentProcessing(self):
-        root = raccoon.RequestProcessor(a='testContentProcessor.py')        
+        root = raccoon.RequestProcessor(a='testContentProcessor.py',
+                                        model_uri='test:')
 
         result = root.runActions('http-request', utils.kw2dict(_name='authorized'))
         self.failUnless( result == 'authorized code executed\n')
@@ -81,7 +82,7 @@ class RaccoonTestCase(unittest.TestCase):
         from StringIO import StringIO
         testString = "a stream of text"
         
-        root = raccoon.RequestProcessor(a='testMinimalApp.py')        
+        root = raccoon.RequestProcessor(a='testMinimalApp.py',model_uri='test:')        
         root.actions={ 'test' : [
             raccoon.FunctorAction(lambda *args: StringIO(testString)),
             #assume the content is text
@@ -110,7 +111,7 @@ class RaccoonTestCase(unittest.TestCase):
             self.fail("should have thrown exception")
             
     def testXPathExtFuncs(self):
-        root = raccoon.RequestProcessor(a='testAuthAction.py')
+        root = raccoon.RequestProcessor(a='testAuthAction.py',model_uri='test:')
         
         self.failUnless( root.evalXPath("""/* = wf:map(/*, ".")""") )
         self.failUnless( root.evalXPath("""count(/*) = count(wf:map(/*, "."))""") )

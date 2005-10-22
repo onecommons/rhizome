@@ -45,8 +45,8 @@ class ZMLTestCase(unittest.TestCase):
 
     def testCopyZML(self):
         for f in glob.glob('z2x-test*.zml'):
-            from rx import zml09
-            result = zml09.copyZML(file(f,'rb')).rstrip()
+            from rx import zml07
+            result = zml07.copyZML(file(f,'rb')).rstrip()
             orginal = open(f,'rb').read().rstrip()            
             print f, len(result), len(orginal)
             self.failUnless(orginal == result, f + ':\n' +

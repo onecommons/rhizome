@@ -1,8 +1,10 @@
+BASE_MODEL_URI='test:'
+import os.path
 try:
     rhizomedir=__argv__[__argv__.index("--rhizomedir")+1]
-except (IndexError, ValueError):
-    rhizomedir='../rhizome'
-__include__(rhizomedir + '/rhizome-config.py')
+except (IndexError, ValueError):        
+    rhizomedir=os.path.join(os.path.dirname(os.path.dirname(__configpath__[-1])),'rhizome')
+__include__(os.path.join(rhizomedir,'rhizome-config.py') )
 
 __addItem__('assert', format='xml', disposition='entry', contents=
 '''
