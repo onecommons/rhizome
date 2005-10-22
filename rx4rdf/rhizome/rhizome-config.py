@@ -492,7 +492,6 @@ templateList = [rhizome._addItemTuple('_not_found',loc='path:_not_found.xsl', fo
  rhizome._addItemTuple('delete', loc='path:delete.xml', format='rxupdate', disposition='handler', 
                         handlesAction=['delete'], actionType='rdfs:Resource'),
  rhizome._addItemTuple('basestyles.css',format='text', loc='path:basestyles.css'),
- rhizome._addItemTuple('user.css',format='text', loc='path:user.css'),
  rhizome._addItemTuple('edit-icon.png',format='binary',loc='path:edit.png'),
  #rhizome._addItemTuple('list',loc='path:list-pages.xsl', format='rxslt', disposition='entry'),
  rhizome._addItemTuple('showrevisions',loc='path:showrevisions.xsl', format='rxslt', disposition='entry',handlesAction=['showrevisions']),
@@ -559,7 +558,7 @@ rhizome._addItemTuple('new-sitetheme-template', loc='path:new-sitetheme-template
             disposition='rxml-template', format='text', title='Create New Site Theme'),             
 rhizome._addItemTuple('Sandbox',loc='path:sandbox.xsl', format='rxslt', disposition='entry'),               	
 rhizome._addItemTuple('process-contents',loc='path:process-contents.xsl', format='rxslt', 
-                        disposition='complete'),               	
+                        disposition='complete'),               	                        
 ]
 
 #forrest templates, essentially recreates forrest/src/resources/conf/sitemap.xmap 
@@ -581,7 +580,6 @@ rhizome._addItemTuple('docbook2document.xsl', loc='path:docbook2document.xsl', f
 templateList += [rhizome._addItemTuple('index',loc='path:index.zml', format='zml', label=None, 
                 title="Home", disposition='entry', accessTokens=None, keywords=None),
 rhizome._addItemTuple('sidebar',loc='path:sidebar.zml', format='zml', label=None, accessTokens=None, keywords=None),
-rhizome._addItemTuple('footer',loc='path:footer.xml', format='xml', label=None, accessTokens=None, keywords=None),
 rhizome._addItemTuple('ZMLSandbox', format='zml', label=None, disposition='entry', accessTokens=None, keywords=None,
 	contents="Feel free to [edit|?action=edit] this page to experiment with [ZML]..."),
 rhizome._addItemTuple('RxMLSandbox',loc='path:RxMLSandbox.xsl', format='rxslt', label=None, keywords=None,
@@ -602,6 +600,20 @@ rhizome._addItemTuple('RaccoonManual',loc='path:help/RaccoonDoc.zml', dispositio
      format='zml', title="Raccoon Manual", doctype='document',keywords=['help']),
 rhizome._addItemTuple('RaccoonConfig',loc='path:help/RaccoonConfig.txt', disposition='entry', 
      format='text', title="Raccoon Config Settings", keywords=['help']),
+]
+
+#css skins
+templateList += [
+ rhizome._addItemTuple('skin-lightblue.css',format='text', 
+        loc='path:skin-lightblue.css', keywords=['skin']),
+ rhizome._addItemTuple('skin-nocolor.css',format='text', 
+        loc='path:skin-allwhite.css', keywords=['skin']),
+ rhizome._addItemTuple('skin-olive.css',format='text', 
+        loc='path:skin-olive.css',keywords=['skin']),
+ rhizome._addItemTuple('skin-lava.css',format='text', 
+        loc='path:skin-lava.css',keywords=['skin']),
+ rhizome._addItemTuple('skin-brownbasic.css',format='text', 
+        loc='path:skin-brownbasic.css', keywords=['skin']),
 ]
 
 #themes:
@@ -648,7 +660,9 @@ siteVars =\
  base:site-template:
   wiki:header-image: `underconstruction.gif
   wiki:header-text: `Header, site title goes here:<br />edit the <a href="site:///site-template?action=edit-metadata">site template's metadata</a>
+  wiki:footer-text: `your footer text goes here &#169; 2005 by you &#xa0;&#xa0;Footer | Links | Here | Etc. 
   wiki:uses-theme: base:default-theme
+  wiki:uses-skin:  base:skin-lightblue.css
 '''
 templateList.append( ('@sitevars', rxml.zml2nt(contents=siteVars, nsMap=nsMap)) )
 
@@ -793,6 +807,15 @@ authStructure =\
   auth:has-permission: auth:permission-remove-statement   
   auth:priority: 90
 
+ base:write-structural-directory-token:
+  rdf:type: auth:AccessToken
+  rdfs:comment: `Overrides write-structure-token to let children be added to a folder
+  auth:has-permission: auth:permission-add-statement
+  auth:has-permission: auth:permission-new-resource-statement
+  auth:has-permission: auth:permission-remove-statement   
+  auth:with-property: wiki:has-child
+  auth:priority: 90
+
  wiki:ItemDisposition:
   auth:type-guarded-by: base:write-structure-token
   
@@ -833,11 +856,10 @@ authStructure =\
  base:save: 
     auth:grants-rights-to: base:save-only-override-token
     auth:grants-rights-to: base:execute-function-token
- 
- #users or roles with this access-token can set pages as released 
- #(and delete pages).
- #note that if you create more labels with the wiki:is-released property
- #you'll want to add a <auth:with-value> property to this token
+
+ base:save-user: 
+    auth:grants-rights-to: base:write-structural-directory-token
+  
  base:released-label-token:
   rdf:type: auth:AccessToken
   rdfs:label: `Public but Private Release
@@ -847,7 +869,10 @@ authStructure =\
   auth:with-property: wiki:has-label
   auth:with-value:    wiki:label-released
   auth:priority: 20
-  
+  rdfs:comment: '''Users or roles with this access-token can set pages as released (and delete pages). 
+Note that if you create more labels with the wiki:is-released property you'll want to add a <auth:with-value> property to this token
+'''
+ 
  base:create-unsanitary-content-token:
   rdfs:comment: `If the content creator has this token, rhizome.processMarkup() will not try to sanitize the HTML or XML.
   rdf:type: auth:AccessToken  
@@ -1128,7 +1153,6 @@ readProtectAll =\
  base:index: auth:guarded-by: base:override-general-read-token 
  base:login: auth:guarded-by: base:override-general-read-token 
  base:sidebar: auth:guarded-by: base:override-general-read-token 
- base:footer: auth:guarded-by: base:override-general-read-token 
  base:intermap.txt: auth:guarded-by: base:override-general-read-token  
  base:basestyle.css: auth:guarded-by: base:override-general-read-token 
  base:user.css: auth:guarded-by: base:override-general-read-token 
