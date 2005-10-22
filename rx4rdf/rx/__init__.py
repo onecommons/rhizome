@@ -12,7 +12,7 @@ __all__ = ["raccoon", "RxPathDom", "RxPath", "utils", 'htmlfilter',
            "Server", "XUpdate", 'MRUCache', "DomTree", 
            "glock", "metakitdriver", "htmldiff" ]
 
-__version__ = '0.5.0'
+__version__ = '0.5.1'
 
 try:
     import Ft
