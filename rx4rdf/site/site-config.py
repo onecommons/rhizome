@@ -32,13 +32,10 @@ __addRxML__(replace = '@sitevars', contents = '''
  base:site-template:
   wiki:header-image: `Rx4RDFlogo.gif
   wiki:header-text: `
+  wiki:footer-text: `&#169; 2005 Liminal Systems All Rights Reserved
   wiki:uses-theme: base:default-theme
+  wiki:uses-skin:  base:skin-lightblue.css
   
- #unfortunately we also have to add this alias in addition to setting wiki:uses-theme
- #because site-template.xsl can only statically import an URL
- {http://rx4rdf.sf.net/site/default/theme.xsl}:
-   wiki:alias: `theme.xsl
-
  base:ZML:
   wiki:alias: `zml
   wiki:alias: `RhizML
