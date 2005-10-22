@@ -2,6 +2,7 @@
 #http://cvs.eby-sarna.com/PEAK/src/peak/storage/transactions.py?rev=1.33
 import time
 import os, os.path
+from rx import utils
 from rx import logging #for python 2.2 compatibility
 
 class NotReadyError(Exception):
@@ -70,16 +71,16 @@ class TransactionService(object):
     #state          = binding.Make(TransactionState)
     errorHandler   = BasicTxnErrorHandler() #binding.Make(BasicTxnErrorHandler)
     stateFactory = TransactionState
-    
+        
     def __init__(self, loggerName='transactions'):         
         self.state = self.stateFactory()
         self.log = logging.getLogger(loggerName)
 
     def join(self, participant):
-        if self.state.cantCommit:
-            raise BrokenTransaction
-        elif not self.isActive():
+        if not self.isActive():
             raise OutsideTransaction
+        elif self.state.cantCommit:
+            raise BrokenTransaction
         elif self.state.safeToJoin:
             if participant not in self.state.participants:
                 self.state.participants.append(participant)
@@ -89,6 +90,9 @@ class TransactionService(object):
 
     def isDirty(self):
         '''return True if any of the transaction participants were modified'''    
+        if not self.isActive():
+            raise OutsideTransaction
+
         for p in self.state.participants:
             if p.isDirty(self):
                 return True
@@ -131,6 +135,7 @@ class TransactionService(object):
         if self.isActive():
             raise TransactionInProgress
 
+        self.state = self.stateFactory()
         self.state.timestamp = time.time()
         self.addInfo(**info)
 
@@ -245,6 +250,10 @@ class RaccoonTransactionState(TransactionState):
 class RaccoonTransactionService(TransactionService):
     lock = None
     stateFactory = RaccoonTransactionState
+    #Raccoon associates each request with one transaction context
+    #and one thread; therefore we need one transaction context per thread
+    state = utils.createThreadLocalProperty('__state',
+                                    initValue = RaccoonTransactionState())
 
     def __init__(self, server):        
         self.server = server

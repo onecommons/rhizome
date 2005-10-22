@@ -86,11 +86,10 @@ def createThreadLocalProperty(name, fget=True, fset=True, fdel=True, doc=None, *
     if kw.has_key('initValue'):
         initAttr = True
         initValue =  kw['initValue']
-        assert len(kw) == 1
     else:
         initAttr = False
-        assert len(kw) == 0
-        
+    initAttrFunc = kw.get('initValueFunc')
+
     def getThreadLocalAttr(self):    
         attr = getattr(self, name, None)
         if attr is None:
@@ -98,6 +97,10 @@ def createThreadLocalProperty(name, fget=True, fset=True, fdel=True, doc=None, *
             setattr(self, name, attr)
         if initAttr:            
             return attr.setdefault(thread.get_ident(), initValue)
+        if initAttrFunc and not attr.has_key(thread.get_ident()):
+            value = initAttrFunc(self)
+            attr[thread.get_ident()] = value
+            return value
         else:
             return attr[thread.get_ident()]
     
