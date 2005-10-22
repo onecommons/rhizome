@@ -1,13 +1,16 @@
 /**********************************
-/ Rhizome Default Skin
+/ Rhizome Default Theme
 ***********************************
-/ CSSNotes:
-/ * underscore before element '_element' is Internet Explorer-specific hack 
+/ CSS notes:
+/ * leading underscore in property name (e.g. '_padding') is a 
+/   Internet Explorer-specific hack -- only IE will apply them
+/   
 ***********************************/
 
 body {
 	margin:0px;padding:0px;
-	font-family:Verdana, Arial, Helvetica, sans-serif;color:#000;
+	font-family:Verdana, Arial, Helvetica, sans-serif;
+	color:#000;
 }
 img {
 	border:none;
@@ -27,12 +30,17 @@ a:active {
 
 a.emptylink {
 	display:block!important;
-	text-align:left;overflow:hidden;white-space:nowrap;
-	height:auto!important;width:auto!important;
-	margin:auto!important;padding:none!important;
+	text-align:left;
+	overflow:hidden;
+	white-space:nowrap;
+	height:auto!important;
+	width:auto!important;
+	margin:auto!important;
+	padding:none!important;
 	border: none!important;
 	text-decoration: none!important;
 	font-weight:normal!important;
+
 	color:#000!important;
 	background-color: #fff!important;
 }
@@ -70,7 +78,6 @@ h5 {
 	padding-top:4px;
 	border-left:2px dotted #666;border-right:2px dotted #666;border-bottom:2px dotted #666;
 	font-size:9pt;
-	background-color:#fff;
 }
 
 .column-spacer {
@@ -83,8 +90,8 @@ h5 {
 	width:373px;height:1px;border:none;
 }
 #main-table {
-	height:100%;width:100%;vertical-align:top;
-	margin-left:1px;_margin-left:0px;margin-right:2px;_margin-right:0px;margin-bottom:0px;padding:0px;
+	width:100%;vertical-align:top;
+	margin-top:0px;margin-left:1px;_margin-left:0px;margin-right:2px;_margin-right:0px;margin-bottom:0px;padding:0px;
 	border-spacing:0px;border-collapse:collapse;
 }
 #content-body-table {
@@ -97,17 +104,17 @@ h5 {
 }
 #content-body-table td{
 	margin:0px;padding:0px;
-	width:1px;vertical-align:top;
+	/* width:1px;*/
+	vertical-align:top;
 	margin-bottom:10px;
 }
 #content-display-cell {
 	width:100%!important;
 }
-#main-table-column {	
+#main-table-column {
 	height:1%;width:100%;vertical-align:top;
 	padding:0px;
 	border-spacing:0px;border-collapse:collapse;border:none;
-	background-color:#fff;
 }
 #page-content table {
     /*width:100%;*/
@@ -118,7 +125,6 @@ h5 {
 #page-content td, #page-content th {
 	padding:4px;
 	border:1px solid #000;
-	white-space:nowrap;
 }
 
 #page-content pre {
@@ -126,28 +132,32 @@ h5 {
 }
 #page-content {
 	vertical-align:top;
-	margin:2px;margin-top:0px;_margin:2px;padding:0px;
-	background-color:#fff;
+	margin:2px;margin-top:0px;_margin:2px;
+	padding:0px;
 }
 
 #page-title {	
 	height:1px;
 	white-space:nowrap;
 	padding:3px;
-	border-top:none;border:1px solid #000;
-	font-size:14pt;font-weight:bold;font-family:"Trebuchet MS",Arial,Helvetica,sans-serif;letter-spacing:0.02em;color:#000;
-	background-color:#fff;
+	border-top:none;
+	border:1px solid #000;
+	font-size:14pt; 
+	font-weight:bold;
+	font-family:"Trebuchet MS",Arial,Helvetica,sans-serif;
+	letter-spacing:0.02em;
+	color:#000;
 }
 /*----------------------------
 / Header
 -----------------------------*/
 #header-container-row {	
 	margin:0px;padding:0px;
-	background-color:#fff;
 }
 #header-table {	
 	width:100%;
-	margin-bottom:-12px;_margin-bottom:0px;padding:0px;
+	margin-bottom:-12px;_margin-bottom:0px;
+	padding:0px;
 	border-spacing:0px;
 }
 #header-cell-left {
@@ -156,12 +166,14 @@ h5 {
 	padding:0px;
 }
 #header-cell-right {
-	text-align:right;vertical-align:top;
+	text-align:right;
+	vertical-align:top;
 	padding-right:5px;
 }
 #header-title {
 	white-space:nowrap;
-	font-size:15pt;font-weight:bold;letter-spacing:-0.05em;
+	font-size:15pt;font-weight:bold;
+	letter-spacing:-0.05em;
 }
 /*----------------------------
 / Login Form
@@ -176,11 +188,11 @@ h5 {
 }
 #login-div {
 	position:relative;float:right;
-	height:50px;width:195px;_width:215px;
+	height:50px;
+	width:195px;_width:215px;
 	padding:3px;
 	border:1px solid #000;
 	font-size:7.5pt;
-	background-color:#fff;
 }
 #login-div a:link {
 	padding-bottom:1px;
@@ -215,15 +227,20 @@ h5 {
 / Feedback Messages
 -----------------------------*/
 .shortmessage {
+    display:block;
 	position:relative;
-	height:12px;
-	margin:0px;padding:2px;
-	font-size:8pt;font-weight:bold;color:#000;
-	background-color:#ccc;
+	margin-bottom:17px;
+	padding:2px;
+	font-size:8pt;font-weight:bold;
+	color:#000;
 }
 .alert  {
+    display:block;
+    position:absolute;
+    padding:2px;
+    height:12px;
 	color:#fff;
-	background-color:#f00;
+	background-color:#000; 
 }
 /*----------------------------
 / Actionsbar
@@ -232,7 +249,10 @@ h5 {
 	position:relative;
 	white-space:nowrap;
 	padding:2px;padding-bottom:0px;							
-	border:1px solid #000;
+	border-left:1px solid #000;
+	border-right:1px solid #000;
+	border-top:1px solid #000;
+	border-bottom:1px solid white;
 	text-decoration:none;
 	color:#000;
 	background-color:#fff;
@@ -242,7 +262,8 @@ h5 {
 	color:#333;
 }
 #actionsbar {
-	height:15px;width:100%;vertical-align:bottom;
+	height:15px;width:100%;
+	vertical-align:bottom;
 	text-align:right;white-space:nowrap;
 	padding:0px 5px 0px 0px;
 	border-bottom:1px solid #000;
@@ -257,39 +278,41 @@ h5 {
 / Navbar
 -----------------------------*/
 #navbar-column {
-	height:1%;width:1px;vertical-align:top;
-	background-color:#fff;
+	height:1%;width:1px;
+	vertical-align:top;
 }
-#navbar {
+.navbar {
 	vertical-align:middle;
 	text-align:left;
 	margin-left:2px;padding:0px;
 	font-size: 8pt;
-	background-color:#fff;
 }
-#navbar a {
+.navbar a {
 	display:block;
 	text-align:left;overflow:hidden;white-space:nowrap;
 	height:11px;_height:14px;width:106px;
-	margin:2px auto;margin-right:5px;padding:3px;padding-top:4px;_padding-top:1px;
+	margin:2px auto;margin-right:5px;
+	padding:3px;
+	padding-top:4px;_padding-top:1px;
 	border: 1px solid #333;
 	text-decoration: none;
-	font-weight:bold;font-family:"Trebuchet MS",Arial,Helvetica,sans-serif;line-height:1em;color: #000;
+	font-weight:bold;font-family:"Trebuchet MS",Arial,Helvetica,sans-serif;line-height:1em;
+	color: #000;
 	background-color:#fff;
 }
-#navbar a:link {
+.navbar a:link {
 }
-#navbar a:visited {
+.navbar a:visited {
 }
-#navbar a:hover {
+.navbar a:hover {
 	border: 1px solid #000;
 	color:#fff;
-	background-color: #000;
+	background-color: #000; 
 }
-#navbar a:active {
+.navbar a:active {
 	border: 1px solid #000;
 	color:#fff;
-	background-color: #fff;
+	background-color: #fff; 
 }
 
 #navbar ul {
@@ -312,22 +335,22 @@ h5 {
 	height:1%;width:1%;vertical-align:top;
 	white-space:nowrap;
 	padding-left:6px;
-	background-color:#fff;
+	/* background-color:#fff; */
 }
 /*----------------------------
 / Quicklinks
 -----------------------------*/
-#quicklinks {
+.quicklinks {
 	white-space:nowrap;text-align:left;
 	font-size:7pt;
 }
-#quicklinks a:link,#quicklinks a:visited,#quicklinks a:active {
+.quicklinks a:link,.quicklinks a:visited,.quicklinks a:active {
 	text-decoration:underline;
 	color:#000;
 }
-#quicklinks a:hover {	
+.quicklinks a:hover {	
 	text-decoration:underline;
-	color:#000!important;
+	color:#000;
 }
 /*----------------------------
 / Search Form
@@ -337,7 +360,6 @@ h5 {
 	margin:0px;margin-right:3px;padding:4px;
 	border:1px solid #000;
 	font-size:7.5pt;
-	background-color:#fff;
 }
 #searchform input {
 	width:103px;;vertical-align:top;
@@ -354,87 +376,7 @@ h5 {
 #footer-row {
 	text-align:center;
 	padding:3px 0px 6px 0px;
-	font-size:8pt;color: #666;
-	background-color:#fff;
+	font-size:8pt;
+	color: #666;
 }
 
-/*-------------------------------------------------------
-/ The following are used by system files
-------------------------------------------------------*/
-/*-------------------------
-/ used by diff-revisions.py (when comparing revisions)
--------------------------*/
-table.diff {
-	border:medium;
-	font-family: "Courier New", Courier, monospace;
-		font-family:Courier;
-}
-#difflib_chg_to0__top th, #difflib_chg_to0__top td {
-	padding: 0px; 
-	border-spacing: 0px; 
-	border: 0px; 
-
-		font-size: smaller; 
-}  
-.diff_header {
-	background-color:#e0e0e0
-}
-td.diff_header {
-	text-align:right; 
-	border:0px;
-}
-.diff_next {
-	background-color:#c0c0c0;
-}
-.diff_add {
-	background-color:#aaffaa;
-}
-.diff_chg {
-	background-color:#ffff77;
-}
-.diff_sub {
-	background-color:#ffaaaa;
-}
-/*----------------------------------
-/ Used by document2html.xsl
-/-----------------------------------*/
-.pre {
-	white-space: pre;
-}
-
-table .title {
-	width:100%;
-	border:0px;
-	font-weight:bold;
-}
-
-.ForrestTable {
-	width:100%; 
-	background-color: #7099c5; 
-	font-size:90%;color:#ffffff;
-}
-.ForrestTable caption { 
-	text-align: left; 
-	font-weight: bold;color: black; 
-	}
-.ForrestTable th { 
-	text-align: center;
-}
-.ForrestTable td {
-	background-color: #f0f0ff; 
-	color: black;
-}
-.codefrag {
-	font-family: "Courier New", Courier, monospace;
-}
-
-/* used in search.xsl, showrevisions.xsl */
-div .title {
-	font-weight:bold;
-}
-
-/* used by document2html.xls, edit-metadata.xsl, edit.xsl*/
-.code {
-	border: 1px solid #ccc;
-	line-height: 1.25em; 
-}
