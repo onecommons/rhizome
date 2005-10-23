@@ -1,8 +1,8 @@
                             README
 
                          Rx4RDF and Rhizome
-                         Version 0.5.0
-                         Sep 28, 2005
+                         Version 0.5.1
+                         Oct 21, 2005
  
   Introduction
   ------------
@@ -41,8 +41,8 @@
   Requirements
   ------------
     
-  Rx4RDF requires Python 2.2 or later (2.3 recommended) and 4Suite 1.0a1 
-  or later (http://4Suite.org).
+  Rx4RDF requires Python 2.2 or later (2.3 recommended) and the 4Suite 
+  XML and RDF libraries (at [http://4Suite.org], version 1.0a1 or later).
    
   Rx4RDF and Rhizome are known to run on Linux and Windows 2000/XP 
   and should work on any platform that supports Python and 4Suite. 
@@ -52,12 +52,7 @@
   If Lupy is installed (http://www.divmod.org/Home/Projects/Lupy), Rhizome will
   perform full-text indexing of content (requires Python 2.3). 
   See the Rhizome manual for more info.
-  
-  On Windows, the Python Win32 Extensions (http://python.org/windows/win32all) 
-  must be installed or interprocess file locking will be disabled (You do not 
-  need this unless you have multiple Raccoon processes simultaneously accessing 
-  the same application instance).
-  
+    
   Redland RDF data stores can be used if Redland (http://www.redland.opensource.ac.uk)
   is installed. See the Raccoon manual for more info.
   
@@ -108,13 +103,12 @@
   * See comment at top of RxPathDom.py for discrepancies with the RxPath
   specification. 
   * RxSLT doesn't handle xsl:copy-of as specified in the RxPath spec.
+  * RxSLT's implementation of xsl:key is extremely slow and should be avoided.
   * Using Ft.Xml.PrettyPrint with the RxPath DOM will only work some of the time.
     
   Raccoon
-  * The global write lock doesn't seem to work correctly on CygWin and is disabled 
-  on that platform.
   * When using file-based sessions, the files aren't deleted when the session ends.
-  * The ROOT_PATH config setting doesn't work properly.
+  * On Windows and Cygwin, lock files are not deleted with the process ends.
 
   Rhizome
   * Dynamic pages might not behave as expected since Rhizome doesn't set headers
@@ -126,6 +120,8 @@
     files into the directory specified by SAVE_DIR (the default is 
     "content/.rzvs").
   * Deleting a page doesn't delete its file or remove its contents from the index.
+    Note that this can be a security concern, because those files will be still 
+    accessible.
   * When searching, the RxML and Edit views only support queries that evaluate 
     to a resource list (as opposed to a list of statement predicates, for example). 
   
