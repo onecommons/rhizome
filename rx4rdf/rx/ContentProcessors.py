@@ -6,7 +6,7 @@
     http://rx4rdf.sf.net    
 """
 import base64, sys
-from rx import utils, Caching, MRUCache
+from rx import Caching, MRUCache, RxPath
 from rx.htmlfilter import HTMLFilter
 try:
     import cStringIO
@@ -22,7 +22,8 @@ class ContentProcessor(object):
     '''
     #define if the ContentProcessor can handle incoming streams
     processStream = None
-    #define if the ContentProcessor is cacheable
+    #define if the ContentProcessor might be cacheable
+    #returns a key or raise MRUCache.NotCacheable
     getCachePredicate = None
     #optional method for interacting with the cache
     #a side effects predicate returns a representation of the side effects
@@ -214,7 +215,7 @@ class RxSLTContentProcessor(ContentProcessor):
         if isinstance(styleSheetKeys, MRUCache.NotCacheable):
             kw['__server__'].log.debug(
                 "stylesheet %s is not cacheable" % styleSheetUri)
-            return styleSheetKeys
+            raise styleSheetKeys
         else:
             return self.uri, styleSheetKeys
         
@@ -233,8 +234,14 @@ class RxUpdateContentProcessor(ContentProcessor):
     label = 'RxUpdate'
     
     def processContents(self, result, kw, contextNode, contents):
-        return kw['__server__'].processXUpdate(str(contents.strip()), kw)
-
+        '''execute the xupdate script, updating the server's model
+        '''        
+        server = kw['__server__']
+        server.txnSvc.join(server.domStore)
+        xupdate = str(contents.strip())
+        #uri is used as baseuri #todo specify this?
+        return server.xupdateRDFDom(server.domStore.dom, xupdate, kw, uri=None)
+        
 class PythonContentProcessor(ContentProcessor):
     uri = 'http://rx4rdf.sf.net/ns/wiki#item-format-python'
     label = 'Python'
@@ -317,8 +324,8 @@ DefaultContentProcessors = [
     PythonContentProcessor(),
 ]
                     
-# we define a couple of content processors here instead of in Raccoon because
-# they make assumptions about the underlying schema
+# we define the following content processors here but don't add them to 
+# DefaultContentProcessors because they make assumptions about the underlying schema
 class XSLTContentProcessor(ContentProcessor):
     '''
     Treat the contents as an XSLT stylesheet and apply it to the string 
@@ -329,27 +336,44 @@ class XSLTContentProcessor(ContentProcessor):
     label = 'XSLT'
 
     def _getStyleSheetURI(self, kw, contextNode):
-        return kw.get('_contentsURI') or kw['__server__'].evalXPath( 
-            'concat("site:///", (/a:NamedContent[wiki:revisions/*/*'
-            '[.=$__context]]/wiki:name)[1])',
-            node=contextNode)
-    
-    def processContents(self, result, kw, contextNode, contents):
-        return kw['__server__'].processXslt(contents, kw['_contents'], kw,
+        uri = kw.get('_contentsURI','')
+        if not uri:
+            res = kw.get('__handlerResource')
+            if res:
+                uri = kw['__server__'].evalXPath("string(./wiki:name)", node=res)
+            else:
+                uri = kw['__server__'].evalXPath(
+                    'string( (/a:NamedContent[wiki:revisions/*/*'
+                    '[.=$__context]]/wiki:name)[1])', node=contextNode)
+        return 'site:///' + uri
+            
+    def processContents(self, result, kw, contextNode, styleSheetContents):
+        source = kw.get('_contentsDoc')
+        if source is None:
+            source = kw['_contents']
+        else:
+            del kw['_contentsDoc']
+        return kw['__server__'].processXslt(styleSheetContents, source, kw,
                 uri=self._getStyleSheetURI(kw, contextNode) )
 
     def getCachePredicate(self, result, kw, contextNode, styleSheetContents):
+        if kw.has_key('_contentsDoc'):
+            #can't cache if just $_contentsDoc is defined
+            raise MRUCache.NotCacheable()
+        else:
+            contentKey = kw['_contents']
+
         styleSheetKeys = Caching.getXsltCacheKeyPredicate(
                         kw['__server__'].styleSheetCache,
                         kw['__server__'].NOT_CACHEABLE_FUNCTIONS,
                         styleSheetContents,
-                        kw['_contents'], kw, contextNode,
+                        contentKey, kw, contextNode,
                         styleSheetUri=self._getStyleSheetURI(kw, contextNode))
 
         if isinstance(styleSheetKeys, MRUCache.NotCacheable):
             kw['__server__'].log.debug(
                 "stylesheet %s is not cacheable" % styleSheetUri)
-            return styleSheetKeys
+            raise styleSheetKeys
         else:
             return self.uri, styleSheetKeys
                 
@@ -362,6 +386,25 @@ class XSLTContentProcessor(ContentProcessor):
                            kw, contextNode, retVal):
         return Caching.xsltSideEffectsFunc(cacheValue, sideEffects,
                                 resultNodeset, kw, contextNode, retVal)
+
+class RDFShredder(ContentProcessor):
+    uri = 'http://rx4rdf.sf.net/ns/wiki#item-format-rdf'
+    label = 'RDF'
+    rdfFormat = 'unknown'
+
+    def __init__(self, uri=None, mimetype='', label='', rdfFormat='unknown'):
+        ContentProcessor.__init__(self, uri, mimetype, label)
+        self.rdfFormat = rdfFormat
+            
+    def processContents(self, result, kw, contextNode, contents):
+        server = kw['__server__']
+        type = kw.get('parseType', self.rdfFormat)        
+        uri = kw.get('__resource')
+        if uri:
+            uri = RxPath.StringValue(uri)
+        resources = kw.get('resourceToReplace')        
+        #returns None -- ok!?
+        return server.updateStoreWithRDF(contents, type, uri, resources)
 
 from rx import zml
 class ZMLContentProcessor(ContentProcessor):
@@ -401,4 +444,7 @@ class ZMLContentProcessor(ContentProcessor):
         #todo: optimize: don't fix up links if doctype is set
         #since we're gonna do that again anyway
         #fixes up site://links
-        return (contents, 'http://rx4rdf.sf.net/ns/wiki#item-format-xml') 
+        return (contents, 'http://rx4rdf.sf.net/ns/wiki#item-format-xml')
+
+
+    
