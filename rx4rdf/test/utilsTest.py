@@ -29,30 +29,42 @@ class utilsTestCase(unittest.TestCase):
     def testVisitExpr(self):
         expr='/*/foo:bar[. = 1 + baz] | "dsfdf"'
         parseExpr = XPath.Compile(expr)
-        def test(node): pass#print node        
+        def test(node, fields): pass
         parseExpr.visit(test)
-        
+        class TestVisit(XPathExprVisitor):
+            def descend(self, node, fields, *args):
+                #print 'ov', node, fields
+                return XPathExprVisitor.descend(self, node, fields, *args)
+
+            def ParsedLiteralExpr(self, node):
+                parentNode, field = self.ancestors[-1]
+                if isinstance(parentNode, XPath.ParsedExpr.ParsedUnionExpr):
+                    assert field == '_right'
+                    self.ancestors[-1] = parentNode._left
+
+            def ParsedNLiteralExpr(self, node):
+                parentNode, field = self.ancestors[-1]
+                if self.foundFuncCall:
+                    self.ancestors[-1] = parentNode._args[1]
+
+            foundFuncCall = 0
+            def FunctionCall(self, node):
+                self.foundFuncCall = 1
+                return self.DESCEND
+                                    
+        parseExpr.visit(TestVisit().visit)
+        #parseExpr.pprint()
+        self.failUnless(parseExpr._left == parseExpr._right)
+
+        parseExpr = XPath.Compile('foo(1, /bar)')
+        parseExpr.visit(TestVisit().visit)
+        parseExpr.pprint()
+
     def testIterExpr(self):        
         expr='/*/foo:bar[. = 1 + baz] | "dsfdf"'
         parseExpr = XPath.Compile(expr)        
         for term in parseExpr:
             pass#print term
-
-    def testNtriples(self):
-        #test character escaping 
-        s1 = r'''bug: File "g:\_dev\rx4rdf\rx\Server.py", '''
-        n1 = r'''_:x1f6051811c7546e0a91a09aacb664f56x142 <http://rx4rdf.sf.net/ns/archive#contents> "bug: File \"g:\\_dev\\rx4rdf\\rx\\Server.py\", ".'''
-        [(subject, predicate, object, objectType)] = [x for x in parseTriples([n1])]
-        self.failUnless(s1 == object)
-        #test xml:lang support
-        n2 = r'''_:x1f6051811c7546e0a91a09aacb664f56x142 <http://rx4rdf.sf.net/ns/archive#contents> "english"@en-US.'''
-        [(subject, predicate, object, objectType)] = [x for x in parseTriples([n2])]
-        self.failUnless(object=="english" and objectType == 'en-US')
-        #test datatype support
-        n3 = r'''_:x1f6051811c7546e0a91a09aacb664f56x142 <http://rx4rdf.sf.net/ns/archive#contents>'''\
-        ''' "1"^^http://www.w3.org/2001/XMLSchema#int.'''
-        [(subject, predicate, object, objectType)] = [x for x in parseTriples([n3])]
-        self.failUnless(object=="1" and objectType == 'http://www.w3.org/2001/XMLSchema#int')
     
     def testDynException(self):
         _defexception = DynaExceptionFactory(__name__)
@@ -66,6 +78,42 @@ class utilsTestCase(unittest.TestCase):
             raise TestDynError("another msg")
         except (TestDynError), e:
             self.failUnless(e.msg == "another msg")
+
+    def testThreadlocalAttribute(self):
+        class HasThreadLocals(object_with_threadlocals):
+            def __init__(self, bar):
+                #set values that will initialize across every thread
+                self.initThreadLocals(tl1 = 1, tl2 = bar)
+
+        test = HasThreadLocals('a')        
+        test.tl1 = 2        
+        test2 = HasThreadLocals('b')
+        
+        self.failUnless(test.tl2 == 'a')    
+        self.failUnless(test2.tl2 == 'b')        
+                
+        def threadMain():
+            #make sure the initial value are what we expect
+            self.failUnless(test.tl1 == 1)
+            self.failUnless(test.tl2 == 'a')
+            #change them
+            test.tl1 = 3
+            test.tl2 = 'b'
+            #make they're what we just set
+            self.failUnless(test.tl1 == 3)
+            self.failUnless(test.tl2 == 'b')
+
+        #make sure the initial values are what we expect
+        self.failUnless(test.tl1 == 2)
+        self.failUnless(test.tl2 == 'a')
+        
+        thread1 = threading.Thread(target=threadMain)
+        thread1.start()
+        thread1.join()
+
+        #make sure there the values haven't been changed by the other thread
+        self.failUnless(test.tl1 == 2)
+        self.failUnless(test.tl2 == 'a')
 
     def runLinkFixer(self, fixerFactory, contents, result):
         import StringIO
@@ -313,6 +361,20 @@ class utilsTestCase(unittest.TestCase):
         self.failUnless(test.buggy() == 2)
         self.failUnless(test.buggy_old_() == 1) 
         self.failUnless(test.addedFunc() == 'NeedsPatching')
+
+import doctest
+
+class DocTestTestCase(unittest.TestCase):
+    '''only works in Python 2.4 and higher'''
+    
+    doctestSuite = doctest.DocTestSuite(utils)
+
+    def run(self, result):
+        return self.doctestSuite.run(result)
+
+    def runTest(self):
+        '''Just here so this TestCase gets automatically added to the
+        default TestSuite'''
         
 if __name__ == '__main__':
     import sys
