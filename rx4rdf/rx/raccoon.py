@@ -18,7 +18,6 @@ if __name__ == '__main__':
     raccoon.main(sys.argv[1:])
 else:
     from rx import utils, glock, RxPath, MRUCache, XUpdate, DomStore, transactions
-    from Ft.Rdf.Drivers import Memory
     import os, time, sys, base64, mimetypes, types, traceback
     import urllib, re
     from Ft.Xml.Lib.Print import PrettyPrint
@@ -132,7 +131,8 @@ else:
                 #undefined but reserved attribute names
                 raise AttributeError("'Requestor' object has no attribute '%s'" %name)
             return lambda **k: self.invoke__(name, **k)
-            #else:raise AttributeError, name #we can't do this yet since we may need the parameters to figure out what to invoke (like a multimethod)
+            #else:raise AttributeError, name #we can't do this yet since
+            #we may need the parameters to figure out what to invoke (like a multimethod)
 
     def defaultActionCacheKeyPredicateFactory(action, cacheKeyPredicate):
         '''
@@ -211,6 +211,7 @@ current node.
             #todo deal with cacheKeyPredicate and cachePredicateFactory
             import copy
             dup = copy.copy(self)
+            dup.queries = copy.copy( self.queries )
             dup.preVars = copy.copy( self.preVars )
             dup.postVars = copy.copy( self.postVars )
             return dup
@@ -293,20 +294,11 @@ the Action is run (default is False).
     ############################################################
     ##Raccoon main class
     ############################################################
-    class RequestProcessor(object):
+    class RequestProcessor(utils.object_with_threadlocals):                
         DEFAULT_CONFIG_PATH = ''#'raccoon-default-config.py'
         lock = None
         DefaultDisabledContentProcessors = []        
                     
-        requestContext = utils.createThreadLocalProperty('__requestContext',
-         doc='variables you want made available to anyone during this request')
-
-        inErrorHandler = utils.createThreadLocalProperty(
-                                            '__inErrorHandler',initValue=0)
-        
-        previousResolvers = utils.createThreadLocalProperty(
-                                     '__previousResolvers', initValue=None)
-
         expCache = MRUCache.MRUCache(0, XPath.Compile)    
                 
         requestsRecord = None
@@ -340,6 +332,10 @@ the Action is run (default is False).
                      appBase='/', model_uri=None, appName='',
                      #dictionary of config settings, overrides the config
                      appVars=None):
+
+            self.initThreadLocals(requestContext=None, inErrorHandler=0, 
+                                   previousResolvers=None)
+
             self.requestContext = [{}] #stack of dicts
             configpath = a or self.DEFAULT_CONFIG_PATH
             self.source = m
@@ -438,7 +434,7 @@ the Action is run (default is False).
             self.defaultRequestTrigger = kw.get('DEFAULT_TRIGGER','http-request')
             initConstants( ['globalRequestVars'], [])
             self.globalRequestVars.extend( ['_name', '_noErrorHandling',
-                                            '_APP_BASE', '__readOnly'] )
+                                    '__store', '_APP_BASE', '__readOnly'] )
             self.defaultPageName = kw.get('defaultPageName', 'index')
             #cache settings:                
             initConstants( ['LIVE_ENVIRONMENT', 'useEtags'], 1)
@@ -461,6 +457,17 @@ the Action is run (default is False).
             
             #security and authorization settings:
             self.SECURE_FILE_ACCESS= kw.get('SECURE_FILE_ACCESS', True)
+            #by default disable URL schemes with network access
+            #(e.g.'http' and 'ftp') by default
+            #see Ft.Lib.Uri.DEFAULT_URI_SCHEMES for the full list:
+            #('http', 'https', 'file', 'ftp', 'data', 'gopher')
+            self.DEFAULT_URI_SCHEMES= kw.get('DEFAULT_URI_SCHEMES', ['file','data'])
+            
+            for name in [ 'uriResolveBlacklist', 'uriResolveWhitelist']:
+                setting = kw.get(name, [])                
+                value = [re.compile(x) for x in setting]
+                setattr(self, name, value)
+
             self.disabledContentProcessors = kw.get('disabledContentProcessors',
                                         self.DefaultDisabledContentProcessors)            
             self.authorizeMetadata = kw.get('authorizeMetadata',
@@ -469,7 +476,6 @@ the Action is run (default is False).
                                             lambda *args: True)            
             self.getPrincipleFunc = kw.get('getPrincipleFunc', lambda kw: '')
             
-            self.MODEL_UPDATE_PREDICATE = kw.get('MODEL_UPDATE_PREDICATE')
             self.MODEL_RESOURCE_URI = kw.get('MODEL_RESOURCE_URI',
                                              self.BASE_MODEL_URI)
             
@@ -567,18 +573,20 @@ the Action is run (default is False).
                 self.lock = self.LockFile(lockName)
                 
             lock = self.getLock()
-            self.queryCache = MRUCache.MRUCache(self.XPATH_CACHE_SIZE,
-                    lambda compExpr, context: compExpr.evaluate(context),
-                    lambda compExpr, context: getKeyFromXPathExp(compExpr,
-                                    context, self.NOT_CACHEABLE_FUNCTIONS),
-                    processXPathExpSideEffects, calcXPathSideEffects)
-            #self.queryCache.debug = self.log.info
-            self.actionCache = MRUCache.MRUCache(self.ACTION_CACHE_SIZE,
-                                                 digestKey=True)
-            
-            self.domStore.loadDom(self, source,
-                            StringIO.StringIO(self.STORAGE_TEMPLATE))
-            lock.release()
+            try:
+                self.queryCache = MRUCache.MRUCache(self.XPATH_CACHE_SIZE,
+                        lambda compExpr, context: compExpr.evaluate(context),
+                        lambda compExpr, context: getKeyFromXPathExp(compExpr,
+                                        context, self.NOT_CACHEABLE_FUNCTIONS),
+                        processXPathExpSideEffects, calcXPathSideEffects)
+                #self.queryCache.debug = self.log.info
+                self.actionCache = MRUCache.MRUCache(self.ACTION_CACHE_SIZE,
+                                                     digestKey=True)
+                
+                self.domStore.loadDom(self, source,
+                                StringIO.StringIO(self.STORAGE_TEMPLATE))
+            finally:
+                lock.release()
     ##        outputfile = file('debug.xml', "w+", -1)
     ##        from Ft.Xml.Domlette import Print, PrettyPrint
     ##        outputfile.write('<root>')
@@ -593,7 +601,7 @@ the Action is run (default is False).
     ## request handling engine
     ###########################################
             
-        def runActions(self, triggerName, kw = None, newTransaction=True):
+        def runActions(self, triggerName, kw = None, initVal=None, newTransaction=True):
             '''        
             Retrieve the action sequences associated with the triggerName.    
             Each Action has a list of RxPath expressions that are evaluated after 
@@ -614,7 +622,7 @@ the Action is run (default is False).
                         InputSource.DefaultFactory.resolver )
                     InputSource.DefaultFactory.resolver = self.resolver
                     
-                    return self.doActions(sequence, kw,
+                    return self.doActions(sequence, kw, retVal=initVal,
                                           errorSequence=errorSequence,
                                           newTransaction=newTransaction)
                 finally:
@@ -655,6 +663,8 @@ the Action is run (default is False).
                         if x[0] not in self.COMPLEX_REQUESTVARS
                            and x[0] != '_metadatachanges'
                         ])
+
+            vars[ (None, '__store')] = [ self.domStore.dom ]
             #magic constants:
             vars[(None, 'STOP')] = self.STOP_VALUE
             if not kw.has_key('_APP_BASE'): #let request override appBase  
@@ -684,8 +694,8 @@ the Action is run (default is False).
                     extFunctionMap = self.extFunctions
                 if vars is None:
                    vars = {}
-                vars[ (None, '__context')] = [ node ] #we also set this in doActions()
-                    
+                #we also set this in __doActionsBare()
+                vars[ (None, '__context')] = [ node ] 
                 context = XPath.Context.Context(node, varBindings = vars,
                             extFunctionMap = extFunctionMap,
                             processorNss = self.nsMap)
@@ -725,8 +735,7 @@ the Action is run (default is False).
 
                     self.__assign(action.preVars, kw, contextNode, action.debug)
                                         
-                    for xpath in action.queries:
-                        #todo add _root variable also? 
+                    for xpath in action.queries:                        
                         vars, extFunMap = self.mapToXPathVars(kw)
                         result = self.evalXPath(xpath, vars=vars,
                                     extFunctionMap=extFunMap, node=contextNode)
@@ -804,19 +813,18 @@ the Action is run (default is False).
                     self.txnSvc.abort()
                 raise
             else:
-                self.txnSvc.state.result = result
-                self.txnSvc.state.contextNode = contextNode
-                self.txnSvc.state.retVal = retVal
-                if self.txnSvc.isDirty(): 
-                    if kw.get('__readOnly'):
-                        self.log.warning(
+                if self.txnSvc.isActive(): #could have already been aborted                
+                    self.txnSvc.state.result = result
+                    self.txnSvc.state.contextNode = contextNode
+                    self.txnSvc.state.retVal = retVal
+                    if self.txnSvc.isDirty(): 
+                        if kw.get('__readOnly'):
+                            self.log.warning(
                             'a read-only transaction was modified and aborted')
-                        if self.txnSvc.isActive():#else its already been aborted
                             self.txnSvc.abort()                        
-                    else:
-                        self.txnSvc.commit()
-                else: #don't bother committing
-                    if self.txnSvc.isActive(): #else its already been aborted
+                        else:
+                            self.txnSvc.commit()
+                    else: #don't bother committing                    
                         self.txnSvc.abort()    #need this to clean up the transaction
             return retVal
                 
@@ -840,7 +848,7 @@ the Action is run (default is False).
                     result, contextNode, retVal = self._doActionsBare(
                                     sequence, kw, contextNode, retVal)
             except:
-                exc_info = sys.exc_info()
+                exc_info = sys.exc_info()                
                 if isinstance(exc_info[1], ActionWrapperException):
                     result, contextNode, retVal = exc_info[1].state
                     exc_info = exc_info[1].nested_exc_info
@@ -952,19 +960,24 @@ the Action is run (default is False).
     ## content processing 
     ###########################################        
         def processContents(self, result, kw, contextNode, contents,
-                                                dynamicFormat=False):
+                                dynamicFormat=False,contentProcessors=None):
             if contents is None:
-                return contents        
+                return contents
+            if contentProcessors is None:
+                contentProcessors = self.contentProcessors
+            
             formatType = StringValue(result)        
             self.log.debug('enc %s', formatType)
-            if kw.get('_staticFormat'):
+            #setting _staticFormat disables dynamic format processing
+            if kw.get('_staticFormat'):                
                 kw['__lastFormat']=formatType
                 staticFormat = True
             else:
                 staticFormat = False            
-            
+
             while formatType:
-                contentProcessor = self.contentProcessors.get(formatType)
+                contentProcessor = contentProcessors.get(formatType)
+
                 if not contentProcessor:
                     raise RaccoonError('unknown content processor format:'
                                                                + formatType)
@@ -1088,13 +1101,19 @@ the Action is run (default is False).
             for (k, v) in extFunMap.items():
                 namespace, localName = k
                 processor.registerExtensionFunction(namespace, localName, v)
-            try:
-                if type(contents) == type(u''):
+            try:                
+                if isinstance(contents, unicode):
                     contents = contents.encode('utf8')
-                contents = processor.run(
-                    InputSource.DefaultFactory.fromString(contents, uri),
-                    topLevelParams = vars)
+                if isinstance(contents, str):
+                    contents = processor.run(
+                        InputSource.DefaultFactory.fromString(contents, uri),
+                        topLevelParams = vars)
+                else:
+                    contents = processor.runNode(contents, uri,
+                                                topLevelParams = vars)
             except Ft.Xml.Xslt.XsltException:
+                if type(contents) != str:
+                    raise
                 #if Error.SOURCE_PARSE_ERROR
                 #probably because there's no root element, try wrapping in a <div>
                 if contents[:5] == '<?xml':
@@ -1104,6 +1123,7 @@ the Action is run (default is False).
                 contents = processor.run(
                     InputSource.DefaultFactory.fromString(contents, uri),
                     topLevelParams = vars)
+
             format = kw.get('_nextFormat')
             if format is None:
                 format = self._getFormatFromStyleSheet(styleSheet)
@@ -1140,54 +1160,31 @@ the Action is run (default is False).
                 assert cacheValue.standAlone
 
     ###########################################
-    ## update processing (to be refactored)
-    ###########################################        
-        def addUpdateStatement(self, rdfDom):
+    ## update processing 
+    ###########################################                
+        def xupdateRDFDom(self, rdfDom, xupdate, kw=None, uri=None):
             '''
-            Add a statement representing the current state of the model.
-            This is a bit of hack right now, just generates a random value.
-            '''
-            modelNode = rdfDom.findSubject(self.MODEL_RESOURCE_URI)
-            if not modelNode:
-                self.log.warning("model resource not found: %s"
-                                     % self.MODEL_RESOURCE_URI)
-                return
-            for p in modelNode.childNodes:
-                if p.stmt.predicate == self.MODEL_UPDATE_PREDICATE:
-                    modelNode.removeChild(p)
-            object = RxPath.generateBnode()[RxPath.BNODE_BASE_LEN:]
-            stmt = RxPath.Statement(modelNode.uri, self.MODEL_UPDATE_PREDICATE,
-                                 object, objectType=RxPath.OBJECT_TYPE_LITERAL)
-            RxPath.addStatements(rdfDom, [stmt])
-        
-        def xupdateRDFDom(self, rdfDom, xupdate=None, kw=None, uri=None):
-            '''execute the xupdate script on the specified RxPath DOM
+            execute the xupdate script on the specified RxPath DOM
             '''
             kw = kw or {}
             baseUri= uri or 'path:'
             vars, funcs = self.mapToXPathVars(kw,doAuth=True)
-            #don't do an authorization check for the XPath functions
-            #because we don't other authorization for xupdate and
-            #we need to call XUpdate on behalf of others
 
             output = StringIO.StringIO()
             RxPath.applyXUpdate(rdfDom, xupdate, vars, funcs,
                                 uri=baseUri, msgOutput=output)
+            msg = output.getvalue()
+            if msg:
+                self.log.debug('XUpdate messages: ' + msg)
             return output.getvalue()            
-            
-        def processXUpdate(self, xupdate=None, kw=None, uri=None):
-            '''execute the xupdate script, updating the server's model
-            '''
-            self.txnSvc.join(self.domStore)
-            return self.xupdateRDFDom(self.domStore.dom, xupdate, kw, uri)
-                                        
+                                                    
         def updateDom(self, addStmts, removedNodes=None):
-            '''update our DOM
+            '''
+            update the DOM store (assumes a RxPath DOM)
             addStmts is a list of Statements to add
             removedNodes is a list of RxPath nodes
                (either subject or predicate nodes) to remove
-            '''
-            
+            '''            
             removedNodes = removedNodes or []
             #log.debug('removing %s' % removeResources)
             self.txnSvc.join(self.domStore)
@@ -1198,10 +1195,41 @@ the Action is run (default is False).
                 
             #and add the statements
             RxPath.addStatements(self.domStore.dom, addStmts)
-            
-            #if self.MODEL_UPDATE_PREDICATE:
-            #    self.addUpdateStatement(self.domStore.dom) 
 
+        def updateStoreWithRDF(self, contents, type, uri, resources=None):    
+            '''        
+            Update the model with the given RDF document.
+            
+            The resources is a list of resources originally contained in
+            RDF document before it was edited. If present, this list is
+            used to create a diff between those resources statements in
+            the model and the statements in the current RDF doc.
+            
+            If resources is None, the RDF statements are treated as new
+            to the model and bNode labels are renamed if they are used in
+            the existing model.
+
+            uri is URI to be used for relative URIs in the RDF source
+              if omitted or none, the server BASE_MODEL_URI is used
+            '''
+            if not uri:
+                #relative URLs in RDF will be based on this uri
+                uri = self.BASE_MODEL_URI
+            
+            revNsMap = dict(map(lambda x: (x[1], x[0]), self.nsMap.items()) )    
+            srcDom = RxPath.RxPathDOMFromStatements(
+                    RxPath.parseRDFFromString(contents,uri,type), revNsMap, uri)
+
+            storeDom = self.domStore.dom        
+            if resources is None:
+                #no resources specified -- just add all the statements
+                newStatements, removedNodes = RxPath.addDOM(
+                                    storeDom, srcDom)
+            else:
+                newStatements, removedNodes = RxPath.mergeDOM(
+                            storeDom, srcDom,resources)
+            return self.updateDom(newStatements, removedNodes)
+            
     ###########################################
     ## XPath extension functions                
     ###########################################
@@ -1240,6 +1268,38 @@ the Action is run (default is False).
             except StopIteration:
                 pass
             return kw
+
+        def saveRDF(self, context, contents, type='unknown', uri=None, about=None):
+            '''
+            XPath extension function for saving RDF. Because of
+            potential security risks, it is not added by default to the
+            external function namespace and so needs to be added to
+            application's "extFunctions" dictionary.
+            
+            If the about parameter is present, the RDF will replace
+            the specified resources. If the parameter is a nodeset, each node is
+            converted to its string value, which is treated as a resource URI; 
+            otherwise the parameter is converted to a string.
+
+            uri is the URI of the RDF source is used the base URI to
+            be used for relative URIs in the RDF source            
+            '''          
+            contents = StringValue(contents)
+            type = StringValue(type)
+            if uri is not None:
+                uri = StringValue(uri)
+            
+            if isinstance(about, (list, tuple) ):            
+                #about may be a list of text nodes,
+                #convert to a list of strings
+                about = [StringValue(x) for x in about if x]
+            elif about is not None:
+                if about:
+                    about = [ about ]
+                else:
+                    about = []
+
+            return self.updateStoreWithRDF(contents, type, uri, about)
             
         def processContentsXPath(self, context, contents, formatURI, *args):
             '''This XPath extention function lets you invoke the
@@ -1256,59 +1316,6 @@ the Action is run (default is False).
                 contextNode = context.node
             return self.processContents(formatURI, kw, contextNode,
                                         contents, True)
-                
-        def saveRxML(self, context, contents, about=None):
-            '''
-            XPath extension function for saving RxML. Because of
-            potential security risks, it is not added by default to the
-            external function namespace and so needs to be added to
-            application's "extFunctions" dictionary. '''          
-            try:
-                import zml
-                #parse the zml to xml
-                xml = zml.zmlString2xml(contents, mixed=False, URIAdjust=True)
-                        
-                if isinstance(about, ( types.ListType, types.TupleType ) ):            
-                    #about may be a list of text nodes,
-                    #convert to a list of strings
-                    about = [StringValue(x) for x in about if x]
-                elif about is not None:
-                    if about:
-                        about = [ about ]
-                    else:
-                        about = []
-                xml ='<rx:rx>'+ xml+'</rx:rx>'
-                self._processRxML(xml, about)
-            except NotAuthorized:
-                raise
-            except:
-                print traceback.print_exc()
-                self.log.exception("metadata save failed")
-                raise
-
-        def _processRxML(self, xml, resources=None):
-            '''        
-            Update the model with the RxML document.
-            
-            The resources is a list of resources originally contained in
-            RxML document before it was edited. If present, this list is
-            used to create a diff between those resources statements in
-            the model and the statements in the current RxML doc.
-            
-            If resources is None, the RxML statements are treated as new
-            to the model and bNode labels are renamed if they are used in
-            the existing model. '''
-            import rxml
-            rxmlDom  = rxml.rxml2RxPathDOM(StringIO.StringIO(xml))
-
-            if resources is None:
-                #no resources specified -- just add all the statements            
-                newStatements, removedNodes = RxPath.addDOM(
-                                    self.domStore.dom, rxmlDom)
-            else:
-                newStatements, removedNodes = RxPath.mergeDOM(
-                            self.domStore.dom, rxmlDom,resources)
-            return self.updateDom(newStatements, removedNodes)
 
         def site2http(self, context, text):
             '''see ContentProcessor.SiteLinkFixer.doFixup'''
@@ -1487,6 +1494,7 @@ the Action is run (default is False).
 <meta name="robots" content="noindex" />
 </head><body>
 <h2>HTTP Error 404</h2>
+
 <p><strong>404 Not Found</strong></p>
 <p>The Web server cannot find the file or script you asked for.
 Please check the URL to ensure that the path is correct.</p>
@@ -1602,9 +1610,19 @@ Please check the URL to ensure that the path is correct.</p>
                     debugFileName = 'debug-wiki.pkl'
                 flags = sys.version_info[:2] < (2, 3) and 'b' or 'U'
                 requests = pickle.load(file(debugFileName, 'r'+flags))
-                
-                for request in requests:
-                    print>>out, 'request', request[0]
+                import repr
+                rpr = repr.Repr(); rpr.maxdict = 20; rpr.maxlevel = 2;
+                for i, request in enumerate(requests):
+                    verb = getattr( request[1].get('_request'),'method', 'request')
+                    login = request[1].get('_session',{}).get('login','')
+                    print>>out, i, verb, request[0], 'login:', login
+                    #print form variables
+                    print>>out, rpr.repr(dict([(k, v) for k, v in request[1].items()
+                                        if isinstance(v, (unicode, str, list))]))
+                    #pprint.pprint( dict([(k, v) for k, v in request[1].items()
+                    #    if isinstance(v, (unicode, str, list))]), out)
+                    #print>>out, 'request', request[0], request[1].get('about',''), request[1].get(
+                    #        'action',''), request[1].get('_session',{}).get('login','')
                     root.handleHTTPRequest(request[0], request[1])
             elif '-x' not in mainArgs:
                 #if -x (execute cmdline and exit) we're done
