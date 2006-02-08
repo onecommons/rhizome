@@ -14,11 +14,13 @@ from Ft.Lib import Uri
 
 try:
     #needed for 4Suite versions > 1.0a3
-    import Ft.Lib.Resolvers
+    import Ft.Lib.Resolvers    
 except ImportError:
     from Ft.Lib import UriException
+    old4Suite = True
 else:
-    #import succeeded, use new-style UriException    
+    #import succeeded, use new-style UriException
+    old4Suite = False
     def UriException(error, uri, msg):
         assert error == Ft.Lib.UriException.RESOURCE_ERROR
         return Ft.Lib.UriException(error, loc=uri, msg=msg)
@@ -61,6 +63,7 @@ class SiteUriResolver(Uri.SchemeRegistryResolver):
 
     def __init__(self, root):
         Uri.SchemeRegistryResolver.__init__(self)
+        self.supportedSchemes = root.DEFAULT_URI_SCHEMES[:]
         self.handlers['site'] = self.resolveSiteScheme
         self.supportedSchemes.append('site')
         self.server = root
@@ -69,6 +72,26 @@ class SiteUriResolver(Uri.SchemeRegistryResolver):
         self.supportedSchemes.append('path')
         if root.SECURE_FILE_ACCESS:
             self.handlers['file'] = self.secureFilePathresolve
+        self.uriwhitelist = root.uriResolveWhitelist
+        self.uriblacklist = root.uriResolveBlacklist
+
+    def resolve(self, uri, base=None):
+        if base:
+           uri = self.normalize(uri, base)
+        elif old4Suite:
+            #workaround bug in older 4Suite, base resolve does check supportedSchemes
+            self.normalize(uri, uri)
+        if self.uriwhitelist:
+            for regex in self.uriwhitelist:
+                if re.match(regex,uri):
+                    break
+            else:
+                raise UriException(UriException.RESOURCE_ERROR, uri, 'Unauthorized') 
+        elif self.uriblacklist:
+            for regex in self.uriblacklist:
+                if re.match(regex,uri):
+                    raise UriException(UriException.RESOURCE_ERROR, uri, 'Unauthorized') 
+        return Uri.SchemeRegistryResolver.resolve(self, uri,base)
 
     def getPrefix(self, path):
         '''
@@ -132,7 +155,7 @@ class SiteUriResolver(Uri.SchemeRegistryResolver):
             filepath = os.path.join(prefix.strip(), path)
             #check to make sure the path url was trying to sneak outside the path (i.e. by using ..)
             if self.server.SECURE_FILE_ACCESS:
-                if not os.path.abspath(filepath).startswith(os.path.abspath(prefix)):                        
+                if not os.path.abspath(filepath).startswith(os.path.abspath(prefix)):
                     continue
             return prefix
         
