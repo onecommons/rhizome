@@ -6,7 +6,7 @@
     http://rx4rdf.sf.net    
 """
 from Ft.Xml import Domlette, InputSource
-from rx import utils, RxPath, transactions
+from rx import RxPath, transactions
 import StringIO, os, os.path
 from rx import logging #for python 2.2 compatibility
 
@@ -117,30 +117,43 @@ class XMLDomStore(DomStore):
         self.loadDom(None, self._location, self._defaultModel)
 
 class RxPathDomStore(DomStore):        
-    def __init__(self, initModel=RxPath.initFileModel):
-        self.initModel = initModel
+    def __init__(self, modelFactory=RxPath.IncrementalNTriplesFileModel, schemaFactory=RxPath.defaultSchemaClass):
+        '''
+        modelFactory is a RxPath.Model class or factory function that takes
+        two parameters:
+          a location (usually a local file path) and iterator of Statements
+          to initialize the model if it needs to be creator
+                
+        schemaClass 
+        '''
+        self.modelFactory = modelFactory
+        self.schemaFactory = schemaFactory
                                         
-    def loadDom(self, requestProcessor, source, defaultModel):        
+    def loadDom(self, requestProcessor, source, defaultTripleStream):        
         self.log = logging.getLogger("domstore." + requestProcessor.appName)
-        model = self.initModel(source, defaultModel)
+        model = self.modelFactory(source,
+                        RxPath.NTriples2Statements(defaultTripleStream))
                 
         if requestProcessor.APPLICATION_MODEL:
-            appmodel, appdb = utils.DeserializeFromN3File(StringIO.StringIO(
-                   requestProcessor.APPLICATION_MODEL), scope='application')
-            model = RxPath.MultiModel(model, RxPath.FtModel(appmodel))
+            appTriples = StringIO.StringIO(requestProcessor.APPLICATION_MODEL)
+            stmtGen = RxPath.NTriples2Statements(appTriples, 'context:application')
+            appmodel = RxPath.MemModel(stmtGen)
+            model = RxPath.MultiModel(model, appmodel)
             
         if requestProcessor.transactionLog:
-            model = RxPath.MirrorModel(model, RxPath.initFileModel(
-                requestProcessor.transactionLog, StringIO.StringIO('')) )
+            model = RxPath.MirrorModel(model, RxPath.IncrementalNTriplesFileModel(
+                requestProcessor.transactionLog, []) )
             
         #reverse namespace map #todo: bug! revNsMap doesn't work with 2 prefixes one ns            
-        revNsMap = dict(map(lambda x: (x[1], x[0]), requestProcessor.nsMap.items()) )        
-        self.dom = RxPath.createDOM(model, revNsMap, modelUri=requestProcessor.MODEL_RESOURCE_URI)
+        revNsMap = dict(map(lambda x: (x[1], x[0]), requestProcessor.nsMap.items()) )
+        self.dom = RxPath.createDOM(model, revNsMap,
+                                modelUri=requestProcessor.MODEL_RESOURCE_URI,
+                                    schemaClass = self.schemaFactory)
         self.dom.addTrigger = self.addTrigger
         self.dom.removeTrigger = self.removeTrigger
         self.dom.newResourceTrigger = self.newResourceTrigger
         #we need to set this up now so that the schema from the model isn't
-        #added as part of a transaction that may get rolled by
+        #added as part of a transaction that may get rolled-back:
         self.dom.schema = self.dom.schemaClass(self.dom.model.getStatements())                
         
         #associate the queryCache with the DOM Document
@@ -149,8 +162,8 @@ class RxPathDomStore(DomStore):
     def applyXslt(self, xslStylesheet, topLevelParams = None, extFunctionMap = None,
               baseUri='file:', styleSheetCache = None):
         processor = RxPath.RxSLTProcessor()
-        result = RxPath.applyXslt(self.dom, xslStylesheet, topLevelParams, extFunctionMap,
-                      baseUri, styleSheetCache, processor=processor)
+        result = RxPath.applyXslt(self.dom, xslStylesheet, topLevelParams,
+                extFunctionMap, baseUri, styleSheetCache, processor=processor)
         return result, processor.stylesheet        
 
     def evalXPath(self, xpath, context, expCache=None, queryCache=None):
@@ -165,12 +178,16 @@ class RxPathDomStore(DomStore):
         self.dom.commit(**txnService.getInfo())
 
     def abortTransaction(self, txnService):
+        from rx import MRUCache
         if not self.isDirty(txnService):
             return
-        #key = id(self.dom)
+        key = self.dom.getKey()
         self.dom.rollback()
-        #if txnService.server.actionCache:
-        #    txnService.server.actionCache.invalidate(key)
+        if isinstance(key, MRUCache.InvalidationKey):
+            if txnService.server.actionCache:
+                txnService.server.actionCache.invalidate(key)
+            if txnService.server.queryCache:
+                txnService.server.queryCache.invalidate(key)
 
     def getStateKey(self):
         if self.dom:
