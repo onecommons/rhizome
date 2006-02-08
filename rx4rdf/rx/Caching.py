@@ -376,9 +376,12 @@ def getXsltCacheKeyPredicate(styleSheetCache, styleSheetNotCacheableFunctions,
     Returns a key that uniquely identifies the result of processing this stylesheet
     considering the input source and referenced parameters.
     '''
-    revision = getattr(contextNode.ownerDocument, 'revision', None)
-    key = [styleSheetContents, styleSheetUri, sourceContents, contextNode,
-         id(contextNode.ownerDocument), revision]
+    getKey = getattr(contextNode.ownerDocument, 'getKey', None)
+    if getKey:
+        docKey = getKey()
+    else:
+        docKey = id(contextNode.ownerDocument)
+    key=[styleSheetContents, styleSheetUri, sourceContents, contextNode, docKey]
 
     styleSheet = styleSheetCache.getValue(styleSheetContents, styleSheetUri)                  
     try:
@@ -412,9 +415,7 @@ def getXsltCacheKeyPredicate(styleSheetCache, styleSheetNotCacheableFunctions,
         context = XPath.Context.Context(contextNode, processorNss = processorNss)
         if HasMetaData(kw, context, qname): 
             value = GetMetaData(kw, context, qname)
-            if type(value) is type([]):
-                value = tuple(value)
-            key.append( ( var._name ,value) )
+            key.append( ( var._name, getKeyFromValue(value)) )
         else:
             key.append( var._name )
     return tuple(key)
@@ -454,19 +455,19 @@ def _addXPathExprCacheKey(compExpr, nsMap, key, notCacheableXPathFunctions):
     context = XPath.Context.Context(None, processorNss = nsMap)    
     for field in compExpr:
         if isinstance(field, XPath.ParsedExpr.FunctionCall):
-          (prefix, local) = field._key
-          if prefix:
-              expanded = (nsMap[prefix], local)
-          else:
-              expanded = field._key
-          if expanded in notCacheableXPathFunctions:
-               keyfunc = notCacheableXPathFunctions[expanded]
-               if keyfunc:
-                   #may raise MRUCache.NotCacheable
-                   key.append( keyfunc(field, context,
+            (prefix, local) = field._key
+            if prefix:
+                expanded = (nsMap[prefix], local)
+            else:
+                expanded = field._key
+            if expanded in notCacheableXPathFunctions:
+                keyfunc = notCacheableXPathFunctions[expanded]
+                if keyfunc:
+                    #may raise MRUCache.NotCacheable
+                    key.append( keyfunc(field, context,
                             notCacheableXPathFunctions) ) 
-               else:
-                   raise MRUCache.NotCacheable    
+                else:
+                    raise MRUCache.NotCacheable    
 
 def getStylesheetCacheKey(nodes, styleSheetNotCacheableFunctions, key=None):
     '''
