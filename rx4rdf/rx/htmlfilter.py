@@ -199,6 +199,35 @@ class HTMLFilter(HTMLParser.HTMLParser, object):
         else:
             return HTMLParser.HTMLParser.unknown_decl(self, data)
 
+import StringIO
+def getRootElementName(string):
+    class StopParsing(Exception): pass
+    
+    class FindRootElementName(HTMLFilter):
+        nsURI = ''
+        prefix = ''
+        local = ''
+        
+        def handle_starttag(self, tag, attrs):
+            parts = tag.split(':',1)
+            if len(parts) == 1:
+                self.prefix = ''; self.local = parts[0]
+            else:
+                self.prefix, self.local = parts
+
+            nsattr = self.prefix and 'xmlns:'+self.prefix or 'xmlns'
+            for name, value in attrs:
+                if name == nsattr:
+                    self.nsURI = value
+                    
+            raise StopParsing
+    try:
+        gre = FindRootElementName(StringIO.StringIO())
+        gre.feed(string)
+    except StopParsing:
+        pass
+    return gre.nsURI, gre.prefix, gre.local
+
 class BlackListHTMLSanitizer(HTMLFilter):
     '''
     Filters outs attribute and elements that match the blacklist.
