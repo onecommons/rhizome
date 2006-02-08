@@ -8,8 +8,7 @@
 import sys, re, urllib
 from rx import utils, RxPath
 from Ft.Xml import EMPTY_NAMESPACE,InputSource,SplitQName, XML_NAMESPACE
-from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, RDF_MS_BASE, RDF_SCHEMA_BASE, BNODE_BASE
-from Ft.Rdf.Statement import Statement
+from RxPath import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, RDF_MS_BASE, RDF_SCHEMA_BASE, BNODE_BASE,Statement
 try:
     import cStringIO
     StringIO = cStringIO
@@ -145,22 +144,29 @@ def addList2Model(model, subject, p, listID, scope, getObject = getObject):
         object, objectType = getObject(child)
         if prevListID:
             listID = RxPath.generateBnode()
-            model.add( Statement( prevListID, RDF_MS_BASE+'type', RDF_MS_BASE+'List', '', scope, OBJECT_TYPE_RESOURCE))                
-            model.add( Statement( prevListID, RDF_MS_BASE+'rest', listID, '', scope, OBJECT_TYPE_RESOURCE))                        
-        model.add( Statement( listID, RDF_MS_BASE+'first', object, '', scope, objectType))
+            model.addStatement( Statement( prevListID, RDF_MS_BASE+'type',
+                            RDF_MS_BASE+'List', OBJECT_TYPE_RESOURCE, scope))
+            model.addStatement( Statement( prevListID, RDF_MS_BASE+'rest',
+                                        listID, OBJECT_TYPE_RESOURCE, scope))
+        model.addStatement( Statement( listID, RDF_MS_BASE+'first', object,
+                                                          objectType, scope))
         prevListID = listID
-    model.add( Statement( listID, RDF_MS_BASE+'type', RDF_MS_BASE+'List', '', scope, OBJECT_TYPE_RESOURCE))                
-    model.add( Statement( listID, RDF_MS_BASE+'rest', RDF_MS_BASE+'nil', '', scope, OBJECT_TYPE_RESOURCE))
+    model.addStatement( Statement( listID, RDF_MS_BASE+'type',
+                            RDF_MS_BASE+'List', OBJECT_TYPE_RESOURCE, scope))                
+    model.addStatement( Statement( listID, RDF_MS_BASE+'rest',
+                             RDF_MS_BASE+'nil', OBJECT_TYPE_RESOURCE, scope))
 
 def addContainer2Model(model, subject, p, listID, scope, getObject, listType):
     assert listType.startswith('rdf:')
-    model.add( Statement( listID, RDF_MS_BASE+'type', RDF_MS_BASE+listType[4:], '', scope, OBJECT_TYPE_RESOURCE))
+    model.addStatement( Statement( listID, RDF_MS_BASE+'type',
+                    RDF_MS_BASE+listType[4:], OBJECT_TYPE_RESOURCE, scope))
     ordinal = 1
     for child in p.childNodes:
         if child.nodeType == p.COMMENT_NODE:
             continue
         object, objectType = getObject(child)
-        model.add( Statement( listID, RDF_MS_BASE+'_' + str(ordinal), object, '', scope, objectType))
+        model.addStatement( Statement( listID, RDF_MS_BASE+'_' + str(ordinal),
+                                                    object, objectType, scope))
         ordinal += 1
     
 def addResource(model, scope, resource, resourceElem, rxNSPrefix,nsMap,
@@ -183,24 +189,26 @@ def addResource(model, scope, resource, resourceElem, rxNSPrefix,nsMap,
         if not id: id = p.getAttributeNS(EMPTY_NAMESPACE, RX_STMTID_ATTRIB)
         if id and noStmtIds:
             raise RxMLError(RX_STMTID_ATTRIB + ' attribute found at illegal location')
-        if not id: id = ''
+        if id:
+            raise RxMLError(RX_STMTID_ATTRIB + ' attribute not yet supported')
 
         object = getAttributefromQName(p, rxNSPrefix, 'res') #this is deprecated
         if object:
             objectType = OBJECT_TYPE_RESOURCE
-        elif getAttributefromQName(p, rxNSPrefix, 'list') is not None\
-             or getAttributefromQName(p, {'': EMPTY_NAMESPACE}, 'list') is not None\
-             or getAttributefromQName(p, rxNSPrefix, 'listType') is not None\
-             or getAttributefromQName(p, {'': EMPTY_NAMESPACE}, 'listType') is not None\
-             or len([c for c in p.childNodes if c.nodeType != p.COMMENT_NODE \
-                and c.nodeValue and c.nodeValue.strip()]) > 1:
+        elif (getAttributefromQName(p, rxNSPrefix, 'list') is not None
+             or getAttributefromQName(p, {'': EMPTY_NAMESPACE}, 'list') is not None
+             or getAttributefromQName(p, rxNSPrefix, 'listType') is not None
+             or getAttributefromQName(p, {'': EMPTY_NAMESPACE}, 'listType') is not None
+             or len([c for c in p.childNodes if c.nodeType != p.COMMENT_NODE 
+                and c.nodeValue and c.nodeValue.strip()]) > 1):
             #the object of this predicate is a list
             listID = getAttributefromQName(p, rxNSPrefix, 'list')
             if not listID:
                 listID = p.getAttributeNS(EMPTY_NAMESPACE, 'list')
             if not listID:
-                listID = RxPath.generateBnode()
-            model.add( Statement(resource, predicate, listID, id, scope, OBJECT_TYPE_RESOURCE))
+                listID = RxPath.generateBnode()            
+            model.addStatement( Statement(resource, predicate, listID, id,
+                                                  OBJECT_TYPE_RESOURCE, scope))
             listType = getAttributefromQName(p, rxNSPrefix, 'listType')
             if not listID:
                 listType = p.getAttributeNS(EMPTY_NAMESPACE, 'listType')
@@ -213,20 +221,25 @@ def addResource(model, scope, resource, resourceElem, rxNSPrefix,nsMap,
         else: #object is a a literal or resource
             childNodes = [child for child in p.childNodes
                               if child.nodeType != child.COMMENT_NODE]
-            if not childNodes: #if predicate has no child we assume its an empty literal
-                #this could be the result of the common error with ZML where the ':' was missing after the predicate
+            if not childNodes:
+                #if predicate has no child we assume its an empty literal
+                #this could be the result of the common error with ZML
+                #where the ':' was missing after the predicate
                 invalidAttrLocalNames = [attName[1] for attName in p.attributes.keys()
                                if attName[1] not in [RX_STMTID_ATTRIB, 'id'] ]                               
                 if invalidAttrLocalNames:
                     #there's an attribute that not either 'stmtid' or 'rdf:id'
                     raise RxMLError('invalid attribute ' + invalidAttrLocalNames[0] +
-                                    ' on predicate element ' + p.localName + ' -- did you forget a ":"?')
+                                    ' on predicate element ' + p.localName
+                                                    + ' -- did you forget a ":"?')
                 object, objectType = "", OBJECT_TYPE_LITERAL
             else:
                 assert len(childNodes) == 1, p
-                object, objectType = getObject(childNodes[0],rxNSPrefix,nsMap, thisResource)
+                object, objectType = getObject(childNodes[0],rxNSPrefix,nsMap,
+                                                                 thisResource)
         #print >>sys.stderr, 'adding ', repr(resource), repr(predicate), object, 
-        model.add( Statement( resource, predicate, object, id, scope, objectType))
+        model.addStatement( Statement( resource, predicate, object, objectType,
+                                                                        scope))
         #for o, oElem in objectResources: #add striping? ok, except for typename -- will add over and over
         #    addResources(model, scope, o, oElem, rxNSPrefix,nsMap,thisResource)
 
@@ -291,7 +304,8 @@ def addRxdom2Model(rootNode, model, rdfdom = None, thisResource = None,  scope =
         else:
             resource, typeName = getResource(s, rxNSPrefix, nsMap, thisResource)
             if typeName:
-                model.add( Statement( resource, RDF_MS_BASE + 'type', typeName, '', scope, OBJECT_TYPE_RESOURCE))
+                model.addStatement( Statement( resource, RDF_MS_BASE + 'type',
+                                        typeName, OBJECT_TYPE_RESOURCE, scope))
             resources = [ resource ]
         for resource in resources:
             addResource(model, scope, resource, s, rxNSPrefix,nsMap,thisResource, len(resources) > 1)        
@@ -445,7 +459,7 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
         #print resourceNode
         line += indent + getResourceNameFromURI(resourceNode) + ':'
         if rescomment:
-            line += ' ;'+ rescomment
+            line += ' #'+ rescomment
         line += NL
         for p in resourceNode.childNodes:
             line += outputPredicate(p, indent + INDENT)
@@ -459,7 +473,7 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
 
     return root + prefixes + line
 
-def rx2model(path, url=None, debug=0, namespaceAware=0):
+def rx2model(path, url=None, debug=0, namespaceAware=0, scope=''):
     '''
     Parse the RxML and returns a 4Suite model containing its statements.
     '''
@@ -472,36 +486,32 @@ def rx2model(path, url=None, debug=0, namespaceAware=0):
         src = path    
     doc = expatbuilder.parse(src, namespaces=namespaceAware)
 
-    from Ft.Rdf.Drivers import Memory    
-    db = Memory.CreateDb('', 'default')
-    import Ft.Rdf.Model
-    outputModel = Ft.Rdf.Model.Model(db)
+    outputModel = RxPath.MemModel()
     
-    nsMap = addRxdom2Model(doc, outputModel, thisResource='wikiwiki:')
-    return outputModel, db, nsMap
+    nsMap = addRxdom2Model(doc, outputModel, thisResource='wikiwiki:', scope=scope)
+    return outputModel, nsMap
 
 def rxml2RxPathDOM(path, url=None, debug=0, namespaceAware=0):
-    outputModel, db, nsMap = rx2model(path, url, debug, namespaceAware)
+    outputModel, nsMap = rx2model(path, url, debug, namespaceAware)
     #todo: bug! revNsMap doesn't work with 2 prefixes one ns
     revNsMap = dict(map(lambda x: (x[1], x[0]), nsMap.items()) )#uri to prefix namespace map    
-    return RxPath.createDOM(RxPath.FtModel(outputModel), revNsMap)
+    return RxPath.createDOM(outputModel, revNsMap)
 
-def rx2statements(path, url=None, debug=0, namespaceAware=0):
+def rx2statements(path, url=None, debug=0, namespaceAware=0, scope=''):
     '''
     Given a rxml file return a list of tuples like (subject, predicate, object, statement id, scope, objectType)
     '''
-    model, db, nsMap = rx2model(path, url, debug, namespaceAware)
-    stmts = db._statements['default'] #get statements directly, avoid copying list
-    return stmts
+    model, nsMap = rx2model(path, url, debug, namespaceAware, scope)
+    return model.getStatements()
     
-def rx2nt(path, url=None, debug=0, namespaceAware=0):
+def rx2nt(path, url=None, debug=0, namespaceAware=0, scope=''):
     '''
     given a rxml file return a string of N-triples
     path is either a stream-like object or a string that is file path
     '''
-    stmts = rx2statements(path, url, debug, namespaceAware)
+    stmts = rx2statements(path, url, debug, namespaceAware, scope)
     outputfile = StringIO.StringIO()
-    utils.writeTriples(stmts, outputfile)
+    RxPath.writeTriples(stmts, outputfile)
     return outputfile.getvalue()
 
 def getXMLFromZML(stream=None, contents=None, nsMap = None, addRootElement=True):
@@ -537,23 +547,17 @@ def zml2RDF_XML(stream=None, contents=None, debug=0, nsMap = None, addRootElemen
         namespaceAware = True
     else:
         namespaceAware = False
-    model, db, nsMap = rx2model(StringIO.StringIO(xml), debug=debug,namespaceAware=namespaceAware)
-
-    from Ft.Rdf.Serializers.Dom import Serializer as DomSerializer
-    serializer = DomSerializer()
-    outdoc = serializer.serialize(model, nsMap = nsMap)
-    return outdoc
+    model, nsMap = rx2model(StringIO.StringIO(xml), debug=debug,namespaceAware=namespaceAware)
+    uri2prefixMap= dict(map(lambda x: (x[1], x[0]), nsMap.items()) )#reverse namespace map
+    return serializeRDF(model.getStatements(), 'rdfxml', uri2prefixMap)
 
 def main(argv=sys.argv, out=sys.stdout):
     if '-n' in argv:
         print >>out, rx2nt(argv[2])
     elif '-z' in argv:
-        outdoc = zml2RDF_XML(file(argv[2]), addRootElement=False)
-        from Ft.Xml.Lib.Print import PrettyPrint
-        import sys
-        PrettyPrint(outdoc, stream=out)
+        print >>out, zml2RDF_XML(file(argv[2]), addRootElement=False)
     elif '-r' in argv:
-        model, db = utils.deserializeRDF( argv[2] )
+        model, db = RxPath.deserializeRDF( argv[2] )
         nsMap = {
                 'bnode': BNODE_BASE,   
                'rx': RX_NS              
