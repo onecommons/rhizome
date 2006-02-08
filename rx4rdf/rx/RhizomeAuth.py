@@ -271,7 +271,14 @@ class RhizomeAuth(RhizomeBase):
             if self.server.domStore.dom.findSubject(subject) in newResources:
                 action = 'http://rx4rdf.sf.net/ns/auth#permission-new-resource-statement'
 
-        required = self.findTokens + '''[auth:has-permission=$__authAction]
+        if action == 'http://rx4rdf.sf.net/ns/auth#permission-new-resource-statement':
+            #don't do class-based authorization while an resource is being constructed
+            #instead we do that in seperate action in before-prepare
+            findTokens = self.findTokens 
+        else:
+            findTokens = "("+self.findTokens+"|"+self.findClassTokens+")"
+            
+        required = findTokens + '''[auth:has-permission=$__authAction]
             [not($__authProperty) or not(auth:with-property)
              or is-subproperty-of($__authProperty,auth:with-property)]
             [not($__authValue) or not(auth:with-value)
