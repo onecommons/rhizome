@@ -6,7 +6,9 @@
 <  authors:
 <    person name = 'Adam Souzis' email="asouzis@users.sf.net"
 <  status:
-Revision Dec. 12, 2004 Replaced rdf:li with rdfs:member; added is-property-of and is-instance-of core functions; other clarifications
+Revision Nov 2,  2005 Replaced rdf:ID attribute with get-statement-uris() function; specify string-value for root node
+Revision Sep 28, 2005 Added is-subclass-of function, change is-property-of and is-instance-of semantics
+Revision Dec 12, 2004 Replaced rdf:li with rdfs:member; added is-property-of and is-instance-of core functions; other clarifications
 Revision Apr 19, 2004 Added core functions, added uri attribute to Predicate nodes, other clarifications
 Revision Feb 15, 2004 Minor changes (mostly editorial)
 Initial Draft Aug 28, 2003
@@ -114,7 +116,6 @@ Each distinct [blank node|http://www.w3.org/TR/2003/WD-rdf-concepts/#section-bla
 For each Subject Element one child element is created for each statement in the RDF model that has the Subject Element's RDF URI reference as the statement's subject. This child element is referred to here as a "Predicate Element". The name of the child element will be QName based on the statement's predicate URI reference (i.e. the property URI). (See section QName mapping).  The predicate URI reference will also appear as the value of an attribute named "uri". 
 
 The follow attributes may also appear:
-1.If the statement has been reified the element will have an "rdf:ID" attribute whose value is the URI reference of the reification statements. 
 1.If the object of the statement is a literal the Predicate Element may have ^^rdf:datatype^^ and/or ^^xml:lang^^ attributes.
 1.If the Predicate Element is named ^^rdf:first^^ or ^^rdfs:member^^, it will have a ^^listID^^ (no namespace URI) attribute whose value is described in the list section below.
 <        note: 
@@ -170,7 +171,7 @@ We define 2 modes of behavior for handling circular references (where the ancest
 A [Node test|http://www.w3.org/TR/xpath#node-tests] that is a QName or of the form ^^[NCName|http://www.w3.org/TR/REC-xml-names#NT-NCName]:*^^ matches a Subject or Object element when the statement ^^<element URI reference> rdf:type <NodeTest URI reference>^^ holds true, where the NodeTest URI reference is the URI obtained from its QName (as descibed above). If the node is a Predicate element, the Node Test matches when the NodeTest URI reference matches a property URI reference that subsumes the property represented by the element's URI reference.  How these assertions are determined is up to the RxPath processor.  An RxPath processor SHOULD support [RDF Schema|http://www.w3.org/TR/rdf-schema/]. In this case, the match will occur when the statement ^^<element URI reference> rdfs:subPropertyOf <NodeTest URI reference>^^ holds true (see [RDFS entailment rule 6|http://www.w3.org/TR/rdf-mt/#rulerdfs6]). 
 
 <    s2 title="String Value" 
-In RxPath, the [string value|http://www.w3.org/TR/xpath#dt-string-value] of a Subject or Object element is its URI reference. Otherwise, RxPath follows XPath. Note that a consequence of this rule is that the string-value of a Predicate element will be the string-value of its Object node -- either a literal or its URI reference.
+In RxPath, the [string value|http://www.w3.org/TR/xpath#dt-string-value] of a Subject or Object element is its URI reference. The string value of a Document node (the root node) will be a URI that SHOULD represent the RDF model or source document. Otherwise, RxPath follows XPath. Note that a consequence of this rule is that the string-value of a Predicate element will be the string-value of its Object node -- either a literal or its URI reference.
 
 <    s2 title="Axes" 
 RxPath constrains XPath's descendant axes (descendant, descendant-or-self, following, proceeding) in two ways.
@@ -238,6 +239,8 @@ should these functions be in an extension namespace?
 +//boolean// is-subclass-of(//object//,//object//)= This function returns true if any of the class resources specified in the first argument is an subclass of any of the class resources specified in the second argument. If the argument is a node-set, each node is converted to its string value, which is treated as the URI reference of a resource. Otherwise the argument is converted to its string value, which is treated as a URI reference. Note that in [RDF Schema|http://www.w3.org/TR/rdf-schema/] a class is a subclass of itself.
 
 +//boolean// is-instance-of(//object//,//object//)= This function returns true if any of the resources specified in the first argument is an instance of any of the class resources specified in the second argument. If the argument is a node-set, each node is converted to its string value, which is treated as the URI reference of a resource. Otherwise the argument is converted to its string value, which is treated as a URI reference. This function SHOULD return the same result as the equivalent Name Test for a Subject or Object Element.
+
++//nodeset// get-statement-resources(//nodeset//?)=  For each node in the argument nodeset that is a Predicate element, find any Subject elements whose URI reference is a ^^rdf:Statement^^ resource that reifies the Predicate element. Note that while the RDF/XML syntax only can express one reified statement resource per statement (through the ^^rdf:ID^^ attribute) it is possible and valid for a statement to have any number of reified statement resources.
 
 <  s1 title="RxSLT":
 RxSLT is a language for transforming RDF to XML. It is syntactically identical to [XSLT 1.0||http://www.w3.org/TR/xslt] and behaves as very similarly. A RxSLT processor behaves indentically to a XSLT 1.0 processor transforming a document whose data model conformed to the Data Model mapping described above; with the following exceptions:
