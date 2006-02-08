@@ -116,6 +116,31 @@ class RaccoonTestCase(unittest.TestCase):
         self.failUnless( root.evalXPath("""/* = wf:map(/*, ".")""") )
         self.failUnless( root.evalXPath("""count(/*) = count(wf:map(/*, "."))""") )
 
+    def testResolvers(self):
+        '''
+        test an action pipeline whose retVal is a file-like object
+        '''
+        from Ft.Xml import InputSource
+        from Ft.Lib import UriException
+        root = raccoon.RequestProcessor(a='testMinimalApp.py',model_uri='test:')
+        InputSource.DefaultFactory.resolver = root.resolver
+        
+        test = lambda: InputSource.DefaultFactory.fromUri('http://www.google.com')        
+        self.failUnlessRaises(UriException, test)
+
+        appVars = dict(DEFAULT_URI_SCHEMES=['http'],
+                       uriResolveBlacklist=[r'.*yahoo\.com.*'])
+        root = raccoon.RequestProcessor(a='testMinimalApp.py',model_uri='test:',
+            appVars=appVars)
+        InputSource.DefaultFactory.resolver = root.resolver
+        
+        test = lambda: InputSource.DefaultFactory.fromUri('http://www.yahoo.com/')        
+        self.failUnlessRaises(UriException, test)
+
+        self.failUnless(InputSource.DefaultFactory.fromUri('http://www.google.com'))
+
+        
+
 if __name__ == '__main__':
     import sys    
     #import os, os.path
