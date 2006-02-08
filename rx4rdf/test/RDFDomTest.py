@@ -11,16 +11,50 @@ from Ft.Rdf import Util
 import cStringIO
 from Ft.Xml.Lib.Print import PrettyPrint
 from pprint import *
-        
+   
 newRDFDom = 1
 if not newRDFDom:
     from rx.RDFDom import *
 else:
     from rx.RxPath import *
     RDFDoc = lambda model, nsMap: createDOM(model, nsMap)
-    
-from rx import utils
+
 import difflib, time
+
+from rx.RxPathUtils import _parseTriples as parseTriples
+from Ft.Rdf.Statement import Statement as FtStatement
+from Ft.Rdf.Model import Model as Model4Suite
+#this function is no longer used by RxPath
+def DeserializeFromN3File(n3filepath, driver=Memory, dbName='', create=0, defaultScope='',
+                        modelName='default', model=None):
+    if not model:
+        if create:
+            db = driver.CreateDb(dbName, modelName)
+        else:
+            db = driver.GetDb(dbName, modelName)
+        db.begin()
+        model = Model4Suite(db)
+    else:
+        db = model._driver
+        
+    if isinstance(n3filepath, ( type(''), type(u'') )):
+        stream = file(n3filepath, 'r+')
+    else:
+        stream = n3filepath
+        
+    #bNodeMap = {}
+    #makebNode = lambda bNode: bNodeMap.setdefault(bNode, generateBnode(bNode))
+    makebNode = lambda bNode: BNODE_BASE + bNode
+    for stmt in parseTriples(stream,  makebNode):
+        if stmt[0] is Removed:            
+            stmt = stmt[1]
+            scope = stmt[4] or defaultScope
+            model.remove( FtStatement(stmt[0], stmt[1], stmt[2], '', scope, stmt[3]) )
+        else:
+            scope = stmt[4] or defaultScope
+            model.add( FtStatement(stmt[0], stmt[1], stmt[2], '', scope, stmt[3]) )                
+    #db.commit()
+    return model, db
 
 class RDFDomTestCase(unittest.TestCase):
     ''' tests rdfdom, rxpath, rxslt, and xupdate on a rdfdom
@@ -86,23 +120,31 @@ class RDFDomTestCase(unittest.TestCase):
             self.loadModel = self.loadRdflibModel
         elif DRIVER == 'Redland':
             self.loadModel = self.loadRedlandModel
+        elif DRIVER == 'Mem':
+            self.loadModel = self.loadMemModel
+        else:
+            raise "unrecognized driver: " + DRIVER
 
     def loadFtModel(self, source, type='nt'):
         if type == 'rdf':
             #assume relative file
             model, self.db = Util.DeserializeFromUri('file:'+source, scope='')
         else:
-            model, self.db = utils.DeserializeFromN3File( source )
+            model, self.db = DeserializeFromN3File( source )
         return FtModel(model)
 
-    def loadRedlandModel(self, source, type='nt'):        
+    def loadRedlandModel(self, source, type='nt'):
         if type == 'rdf':
-            assert 'Not Supported'
+            assert False, 'Not Supported'
         else:            
             for f in glob.glob('RDFDomTest*.db'):
                 if os.path.exists(f):
-                    os.unlink(f)            
-            return initRedlandHashBdbModel("RDFDomTest", source)
+                    os.unlink(f)
+            if isinstance(source, (str, unicode)):
+                stream = file(source, 'r+')
+            else:
+                stream = source                    
+            return initRedlandHashBdbModel("RDFDomTest", stream)
 
     def loadRdflibModel(self, source, type='nt'):
         dest = tempfile.mktemp()
@@ -110,6 +152,16 @@ class RDFDomTestCase(unittest.TestCase):
             type = 'xml'
         return initRDFLibModel(dest, source, type)
 
+    def loadMemModel(self, source, type='nt'):
+        if type == 'nt':
+            type = 'ntriples'
+        elif type == 'rdf':
+            type = 'rdfxml'        
+        if isinstance(source, (str, unicode)):
+            return MemModel(parseRDFFromURI('file:'+source,type))
+        else:
+            return MemModel(parseRDFFromString(source.read(),'test:', type))
+        
     def getModel(self, source, type='nt'):
         model = self.loadModel(source, type)
         self.nsMap = {u'http://rx4rdf.sf.net/ns/archive#':u'arc',
@@ -120,6 +172,22 @@ class RDFDomTestCase(unittest.TestCase):
        
     def tearDown(self):
         pass
+
+    def testNtriples(self):        
+        #test character escaping 
+        s1 = r'''bug: File "g:\_dev\rx4rdf\rx\Server.py", '''
+        n1 = r'''_:x1f6051811c7546e0a91a09aacb664f56x142 <http://rx4rdf.sf.net/ns/archive#contents> "bug: File \"g:\\_dev\\rx4rdf\\rx\\Server.py\", ".'''
+        [(subject, predicate, object, objectType, scope)] = [x for x in parseTriples([n1])]
+        self.failUnless(s1 == object)
+        #test xml:lang support
+        n2 = r'''_:x1f6051811c7546e0a91a09aacb664f56x142 <http://rx4rdf.sf.net/ns/archive#contents> "english"@en-US.'''
+        [(subject, predicate, object, objectType, scope)] = [x for x in parseTriples([n2])]
+        self.failUnless(object=="english" and objectType == 'en-US')
+        #test datatype support
+        n3 = r'''_:x1f6051811c7546e0a91a09aacb664f56x142 <http://rx4rdf.sf.net/ns/archive#contents>'''\
+        ''' "1"^^http://www.w3.org/2001/XMLSchema#int.'''
+        [(subject, predicate, object, objectType, scope)] = [x for x in parseTriples([n3])]
+        self.failUnless(object=="1" and objectType == 'http://www.w3.org/2001/XMLSchema#int')
 
     def testDom(self):
         self.rdfDom = self.getModel(cStringIO.StringIO(self.model1) )
@@ -300,13 +368,98 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         res10 = self.rdfDom.evalXPath(xpath3,  self.model1NsMap)
         self.failUnless(res10 == res3)                
         
-    def timeXPath(self):
+    def timeXPath(self):        
         self.rdfDom = self.getModel(cStringIO.StringIO(self.model1) )
-        start = time.time()
-        for i in xrange(100):        
-            xpath = "/*[wiki:name/text()='HomePage']/a:has-expression/*/a:hasContent/text()"
-            self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-        print time.time() - start
+        return self._timeXPath(self.rdfDom, 1)
+
+    def timeXPathBig(self):        
+        source = cStringIO.StringIO(self.model1)
+        model = MemModel()
+        count = 0
+        for stmt in parseRDFFromString(source.read(),'test:', 'ntriples'):            
+            for i in xrange(200):
+                modStmt = MutableStatement(*stmt)
+                if i > 0:
+                    modStmt[0] += str(i)
+                count += 1                
+                model.addStatement(modStmt)
+
+        print count, model.size()
+        self.nsMap = {u'http://rx4rdf.sf.net/ns/archive#':u'arc',
+               u'http://www.w3.org/2002/07/owl#':u'owl',
+               u'http://purl.org/dc/elements/1.1/#':u'dc',
+               }
+        rdfDom = RDFDoc(model, self.nsMap)
+        
+        return self._timeXPath(rdfDom, 1)
+
+    def _timeXPath(self, rdfDom, count):
+        from rx import RxPathQuery
+        from Ft.Xml.XPath.Context import Context 
+
+        queries = [
+        ("/*[wiki:name='HomePage']", 12),
+        ("/*[wiki:name='HomePage']/a:has-expression/*/a:hasContent/text()", 79),
+        ("/*/*", 0.12),
+        ("/*/baz", 966),                
+        ("/*[wiki:name='HomePage']/a:has-expression/*", 77.5),
+        ("/*/*[node()]", 0.5),
+        ("/a:NamedContent", 1.25),
+        ("/a:NamedContent[wiki:name='HomePage']", 0.35),
+        ("/*/a:has-expression", 7.6),
+        ("/*[.='http://nonexistent']", 1),
+        ("/*[.='http://4suite.org/rdf/banonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6']", 1),        
+        ]
+
+        for xpath, expectRatio in queries:
+            compExpr = XPath.Compile(xpath)
+            context = Context(rdfDom,
+                    extFunctionMap = BuiltInExtFunctions,
+                    processorNss = self.model1NsMap)            
+            newExpVisitor = RxPathQuery.ReplaceRxPathSubExpr(context, compExpr)
+            print xpath
+            print repr(newExpVisitor.resultExpr)
+
+            #if profile:
+            #    for i in xrange(2): 
+            #        res = newExpVisitor.resultExpr.evaluate(context)
+            #    return
+        
+            compExpr0 = XPath.Compile(xpath)
+
+            res = compExpr0.evaluate(context)        
+            start = time.clock()
+            for i in xrange(count):
+                #print 'orig', self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+                res = compExpr0.evaluate(context)
+                            
+            xpathClock = time.clock() - start
+            print xpathClock, len(res), res and res[0] or []
+
+            newExpVisitor.describe = True
+            res = newExpVisitor.resultExpr.evaluate(context)            
+            res.describe(sys.stdout)
+            newExpVisitor.describe = False                        
+
+            start = time.clock()                
+            for i in xrange(count):                            
+                #print 'orig', self.rdfDom.evalXPath( xpath,  self.model1NsMap)            
+                def tst():
+                    return newExpVisitor.resultExpr.evaluate(context)
+                if profile:
+                    res = prof.runcall(tst)
+                    break
+                else:
+                    res = tst()
+                
+            rxpathClock = time.clock() - start
+            print rxpathClock, len(res), res and res[0] or []
+            print 'RATIO', xpathClock / rxpathClock
+            print '\n'
+            
+            #self.failUnless((not res and not res2) or res[0] == res2[0])
+            #self.failUnless( rxpathClock / xpathClock < expectRatio)
+            
 
     def testLoop(self):
         loopNsMap = {'loop': 'http://loop.com#'}
@@ -398,6 +551,10 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless( res1 )
 
+        xpath = "*[wiki:name='about']/wiki:revisions/*"
+        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        self.failUnless(res1 and res1[0].isCompound() )
+        
     def testContainers(self):
         self.rdfDom = self.getModel("about.containertest.nt")
         xpath = "*/wiki:revisions/*/rdfs:member/@listID='http://www.w3.org/1999/02/22-rdf-syntax-ns#_1'"
@@ -432,9 +589,33 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         #the property resources don't appear as the objects of any statements so exclude them
         res2 = self.rdfDom.evalXPath( '/*[not(is-instance-of(.,uri("rdf:Property")))]',  self.model1NsMap)
-        #pprint(( len(res1), len(res2), res1, '2', res2 ))
+        pprint(( len(res1), len(res2), res1, '2', res2 ))
         self.failUnless(res1 == res2)
-        
+
+    def testrdfdocument(self):
+        dataurl = '<RDF:RDF>'
+        source = '<foo/>'
+        xslStylesheet=r'''<?xml version="1.0" ?>        
+        <xsl:stylesheet version="1.0" xmlns:wiki='http://rx4rdf.sf.net/ns/wiki#'
+                xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+        <xsl:output method='text' />
+        <xsl:template match="/">
+            <xsl:value-of select="rdfdocument('test/about.rx.nt', 'unknown')/*/wiki:name" />
+	    </xsl:template>         
+        </xsl:stylesheet>
+        ''' 
+        from Ft.Lib.Uri import OsPathToUri
+        from Ft.Xml import InputSource
+        from Ft.Xml.Xslt import Processor
+
+        uri = OsPathToUri(os.getcwd())
+        STY = InputSource.DefaultFactory.fromString(xslStylesheet,uri)
+        SRC = InputSource.DefaultFactory.fromString(source, uri)
+        proc = Processor.Processor()
+        proc.appendStylesheet(STY)
+        result = proc.run(SRC)
+        self.failUnless(result == 'about')
+                
     def testDiff(self):
         self.rdfDom = self.getModel("about.rx.nt")
         updateDom = self.getModel("about.diff1.nt")
@@ -470,10 +651,20 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         #and add the statements
         addStatements(self.rdfDom, statements)
         return statements, nodesToRemove
+
+    def testStatement(self):
+        self.failUnless(Statement('s', 'o', 'p') == Statement('s', 'o', 'p'))
+        self.failUnless(Statement('s', 'o', 'p','L') == Statement('s', 'o', 'p'))        
+        self.failUnless(Statement('s', 'o', 'p',scope='C1') == Statement('s', 'o', 'p', scope='C2'))
+        self.failUnless(Statement('s', 'o', 'p','L','C') == Statement('s', 'o', 'p'))
+        #test rich comparison ops e.g. != 
+        self.failUnless(not Statement('s', 'o', 'p','L','C') != Statement('s', 'o', 'p'))
+        self.failUnless(Statement('s', 'p', 'a') < Statement('s', 'p', 'b'))
     
-    def testMerge(self):
+    def testMerge(self):        
         self.rdfDom = self.getModel("about.rx.nt")
         updateDom = self.getModel("about.diff1.nt")
+            
         statements, nodesToRemove = mergeDOM(self.rdfDom, updateDom ,
             ['http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2'])                
         #nothing should have changed
@@ -482,6 +673,9 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
 
         self.rdfDom = self.getModel("about.rx.nt")
         updateDom = self.getModel("about.diff2.nt")
+        def nr(node): print 'new', node.uri
+        updateDom.newResourceTrigger = nr
+
         #we've added and removed one non-list statement and changed the first list item
         statements, nodesToRemove = self._mergeAndUpdate(updateDom ,
             ['http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2'])
@@ -489,6 +683,7 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         #merge in the same updateDom in again, this time there should be no changes
         statements, nodesToRemove = self._mergeAndUpdate(updateDom ,
             ['http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2'])
+
         self.failUnless( not statements and not nodesToRemove )
 
         self.rdfDom = self.getModel("about.rx.nt")        
@@ -504,6 +699,7 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
                 
     def testXUpdate(self):       
         '''test RxUpdate (and addTriggers)'''
+        self.loadModel = self.loadFtModel #for now this test requires the 4Suite driver
         from rx import RxPathDom
         adds = []    
         def addTrigger(node):
@@ -519,7 +715,7 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'
         xmlns:owl='http://www.w3.org/2002/07/owl#'
         >
-            <xupdate:append select='/'>
+            <xupdate:append select='/' to-graph='context:1'>
                 <Contents rdf:about='urn:sha:2jmj7l5rSw0yVb/vlWAYkK/YBwk='>
                     <content-length>0</content-length>
                     <hasContent />
@@ -530,14 +726,10 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         applyXUpdate(self.rdfDom,xupdate)
         self.failUnless(len(adds) == 3) #2 statements plus the type statement
 
-        if newRDFDom:
-            db = self.db
-        else:
-            from Ft.Rdf.Drivers import Memory
-            db = Memory.CreateDb('', 'default')
-            import Ft.Rdf.Model
-            outputModel = Ft.Rdf.Model.Model(db)
-            treeToModel(self.rdfDom, outputModel)        
+        res1 = self.rdfDom.evalXPath( "get-graph-predicates('context:1')")
+        self.failUnless(len(res1) == 3)
+
+        db = self.db
         statements = {'default': [(u'http://rx4rdf.sf.net/ns/archive/archive-example.rdf', u'http://purl.org/dc/elements/1.1/creator', u'Adam Souzis', u'', u'', u'L'),
                                   (u'http://rx4rdf.sf.net/ns/archive/archive-example.rdf', u'http://purl.org/dc/elements/1.1/date', u'2003-04-10', u'', u'', u'L'),
                                   (u'http://rx4rdf.sf.net/ns/archive/archive-example.rdf', u'http://purl.org/dc/elements/1.1/identifier', u'http://rx4rdf.sf.net/ns/archive', u'', u'', u'L'),
@@ -546,9 +738,9 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
                                   (u'http://rx4rdf.sf.net/ns/archive/archive-example.rdf', u'http://rx4rdf.sf.net/ns/archive#imports', u'http://rx4rdf.sf.net/ns/archive', u'', u'', u'R'),
                                   (u'http://rx4rdf.sf.net/ns/archive/archive-example.rdf', u'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', u'http://www.w3.org/2002/07/owl#Ontology', u'', u'', u'R'),
                                   (u'http://rx4rdf.sf.net/ns/archive/archive-example.rdf', u'http://www.w3.org/2002/07/owl#versionInfo', u'v0.1 April 20, 2003', u'', u'', u'L'),
-                                  (u'urn:sha:2jmj7l5rSw0yVb/vlWAYkK/YBwk=', u'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', u'http://rx4rdf.sf.net/ns/archive#Contents', u'', u'', u'R'),
-                                  (u'urn:sha:2jmj7l5rSw0yVb/vlWAYkK/YBwk=', u'http://rx4rdf.sf.net/ns/archive#content-length', u'0', u'', u'', u'L'),
-                                  (u'urn:sha:2jmj7l5rSw0yVb/vlWAYkK/YBwk=', u'http://rx4rdf.sf.net/ns/archive#hasContent', u'', u'', u'', u'L')]}
+                                  (u'urn:sha:2jmj7l5rSw0yVb/vlWAYkK/YBwk=', u'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', u'http://rx4rdf.sf.net/ns/archive#Contents', u'', u'context:1', u'R'),
+                                  (u'urn:sha:2jmj7l5rSw0yVb/vlWAYkK/YBwk=', u'http://rx4rdf.sf.net/ns/archive#content-length', u'0', u'', u'context:1', u'L'),
+                                  (u'urn:sha:2jmj7l5rSw0yVb/vlWAYkK/YBwk=', u'http://rx4rdf.sf.net/ns/archive#hasContent', u'', u'', u'context:1', u'L')]}
         currentStmts = db._statements['default']
         currentStmts.sort()
         #print 'XUPDATE ', pprint( currentStmts) 
@@ -556,6 +748,22 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         expectedStmts.sort()
         d = difflib.SequenceMatcher(None,currentStmts, expectedStmts )         
         self.failUnless( currentStmts == expectedStmts , 'statements differ: '+`d.get_opcodes()` )
+
+        removes = []    
+        def removeTrigger(node):
+            #we only expect predicate, not resource nodes
+            self.failUnless( RxPathDom.looksLikePredicate(node) )
+            removes.append(node)
+            
+        self.rdfDom.removeTrigger = removeTrigger
+        xupdate=r'''<?xml version="1.0" ?> 
+        <xupdate:modifications version="1.0" xmlns:xupdate="http://www.xmldb.org/xupdate">    
+            <xupdate:remove select="get-graph-predicates('context:1')" />
+        </xupdate:modifications>
+        '''               
+        applyXUpdate(self.rdfDom,xupdate)
+        self.failUnless(len(removes) == 3)
+        self.failUnless(len(db._statements['default']) == len(currentStmts) - 3)
 
     def testXslt2(self):
         self.rdfDom = self.getModel(cStringIO.StringIO(self.model2) )
@@ -645,15 +853,51 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         #print list(d.compare(result,file('testXslt1.xml').read())) #list of characters, not lines!
         self.failUnless( result == file('testXslt1.xml').read(),'xml output does not match')
 
-DRIVER = '4Suite'
+    def testXPathRewrite(self):
+        from rx import RxPathQuery
+        from Ft.Xml.XPath.Context import Context 
+
+        tests = { '/*' : 'evalRxPath:SelectOp()',
+                  'foo(/*)' : 'foo(evalRxPath:SelectOp())',
+                  '/baz/foo[bar][1=2][0][foo]' : 'evalRxPath:SelectOp()',
+                  '/*/*[foo/bar]': 'evalRxPath:SelectOp()',                  
+                }
+
+        domNode = createDOM(MemModel() )        
+        for exp, expected in tests.items():            
+            visitor = RxPathQuery.ReplaceRxPathSubExpr(
+                        Context(domNode),XPath.Compile(exp))
+            print exp, expected, repr(visitor.resultExpr)
+            #self.failUnless(repr(visitor.resultExpr) == expected)
+            
+        
+DRIVER = 'Mem'#'4Suite'#'Mem'
+
+def profilerRun(testname, testfunc):
+    import hotshot, hotshot.stats
+    global prof
+    prof = hotshot.Profile(testname+".prof")
+    testfunc() #prof.runcall(testfunc)
+    prof.close()
+
+    stats = hotshot.stats.load(testname+".prof")
+    stats.strip_dirs()
+    stats.sort_stats('cumulative','time')
+    #stats.sort_stats('time','calls')
+    stats.print_stats(100)            
 
 if __name__ == '__main__':
     import sys    
     #import os, os.path
     #os.chdir(os.path.basename(sys.modules[__name__ ].__file__))    
     if sys.argv.count('--driver'):
-        DRIVER = sys.argv[sys.argv.index('--driver')]
-        del sys.argv[sys.argv.index('--driver')]    
+        arg = sys.argv.index('--driver')
+        DRIVER = sys.argv[arg+1]
+        del sys.argv[arg:arg+2]
+
+    profile = sys.argv.count('--prof')
+    if profile:
+        del sys.argv[sys.argv.index('--prof')]
 
     try:
         test=sys.argv[sys.argv.index("-r")+1]
@@ -662,6 +906,10 @@ if __name__ == '__main__':
     else:
         tc = RDFDomTestCase(test)
         tc.setUp()
-        getattr(tc, test)() #run test
+        testfunc = getattr(tc, test)
+        if profile:
+            profilerRun(test, testfunc)
+        else:
+            testfunc() #run test
 
 

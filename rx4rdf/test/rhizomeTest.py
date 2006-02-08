@@ -191,7 +191,8 @@ class RhizomeTestCase(unittest.TestCase):
         self.failUnlessRaises(OutsideTransaction, lambda: root.evalXPath(xpath, vars, extFunMap))                        
 
     def _fineGrainedCheck(self, root, account, contents, expectNotAuthorized,
-                resourcesExp=None, kw=None, exceptionType=raccoon.NotAuthorized):
+                resourcesExp=None, kw=None, exceptionType=raccoon.NotAuthorized,
+                xpath=None, xpathValidate=None):
         kw = kw or {}
         kw['contents'] = contents
         kw['__account'] = account        
@@ -201,17 +202,20 @@ class RhizomeTestCase(unittest.TestCase):
         root.txnSvc.begin()
         root.txnSvc.state.kw = kw
 
-        if resourcesExp:
-            #replacing resource -- merge statements with matching bnodes
-            xpath='''wf:save-metadata($contents, %s)''' % resourcesExp
-        else:
-            #all new -- matching bnodes labels will be renamed
-            xpath='''wf:save-metadata($contents)'''
+        if xpath is None:
+            if resourcesExp:
+                #replacing resource -- merge statements with matching bnodes
+                xpath='''wf:save-rdf($contents, 'rxml_zml', '', %s)''' % resourcesExp
+            else:
+                #all new -- matching bnodes labels will be renamed
+                xpath='''wf:save-rdf($contents, 'rxml_zml')'''
                 
         try:            
             vars, extFunMap = root.mapToXPathVars(kw, doAuth=True)
             root.evalXPath(xpath, vars, extFunMap)
             root.txnSvc._prepareToVote() #we don't want to actually commit
+            if xpathValidate:
+                self.failUnless( root.evalXPath(xpathValidate, vars, extFunMap) )
         except exceptionType:            
             if not expectNotAuthorized:                
                 self.fail('raised %s: %s' % (exceptionType, sys.exc_info()[1])) 
@@ -222,7 +226,7 @@ class RhizomeTestCase(unittest.TestCase):
                 self.fail('unexpectedly succeeded')
 
         if root.txnSvc.isActive(): #else already aborted
-            root.txnSvc.abort()        
+            root.txnSvc.abort()    #we don't want to actually commit this  
         
     def testFineGrainedAuthorization(self):
         root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
@@ -247,7 +251,7 @@ class RhizomeTestCase(unittest.TestCase):
         self._fineGrainedCheck(root, adminAccount, contents, False)
         
         #test remove
-        #this rxml removes the auth:guarded statement and so will raise NotAuthorized
+        #this rxml removes the auth:guarded-by statement and so will raise NotAuthorized
         contents = '''
         prefixes:
             wiki: `http://rx4rdf.sf.net/ns/wiki#
@@ -272,7 +276,7 @@ class RhizomeTestCase(unittest.TestCase):
         '''
         self._fineGrainedCheck(root, guestAccount, contents, False)
 
-        #but all wiki:DocType is protected (by a class access token)
+        #all wiki:DocTypes are protected by a class access token
         #so we can't make any statements about them
         contents = '''
         prefixes:
@@ -286,6 +290,20 @@ class RhizomeTestCase(unittest.TestCase):
         '''
         self._fineGrainedCheck(root, guestAccount, contents, True)
         self._fineGrainedCheck(root, adminAccount, contents, False)
+
+        #same test, but test remove (removes all but the rdfs:label statement,
+        #including the class type
+        contents = '''
+        prefixes:
+            wiki: `http://rx4rdf.sf.net/ns/wiki#
+            base: `test:
+
+        {http://rx4rdf.sf.net/ns/wiki#doctype-faq}:
+           rdfs:label: `FAQ
+        '''
+        replaceResourceExp = "/*[.='http://rx4rdf.sf.net/ns/wiki#doctype-faq']"
+        self._fineGrainedCheck(root, guestAccount, contents, True,replaceResourceExp)
+        self._fineGrainedCheck(root, adminAccount, contents, False,replaceResourceExp)
 
         #test transitive authorization base:diffrevisions is protected by base:save-only-token
         saveOnlyProtectedcontents = '''
@@ -377,7 +395,7 @@ class RhizomeTestCase(unittest.TestCase):
         guestAccount = root.evalXPath("/*[foaf:accountName = 'guest']")
         self.failUnless(guestAccount)
 
-        #trigger validation error
+        #trigger validation error -- wiki:name must be unique, and 'index' is already used
         contents = '''
         prefixes:
             wiki: `http://rx4rdf.sf.net/ns/wiki#
@@ -396,10 +414,11 @@ class RhizomeTestCase(unittest.TestCase):
         #because hasPage() will fail
         #also, because these uses the default template with the sidebar
         #we also test link generation with content generated through internal link resolution
-        
+
+        appVars = {}#'domStoreFactory': createRedlandDomStore}         
         argsForConfig = ['--rhizomedir', os.path.abspath(RHIZOMEDIR)]
         root = raccoon.HTTPRequestProcessor(a='test-links.py',
-                                argsForConfig=argsForConfig)
+                            argsForConfig=argsForConfig, appVars=appVars)
 
         self.doHTTPRequest(root, {}, 'http://www.foo.com/page1')
         self.doHTTPRequest(root, {}, 'http://www.foo.com/page1/')
@@ -506,9 +525,77 @@ class RhizomeTestCase(unittest.TestCase):
         #yes, this is quite a fragile test:
         #print cacheSizes[-1]
         self.failUnless(cacheSizes[-1][:-1] == (6, 3, 123, 57))#, 16724L))
+
+    def testShredding(self):
+        appVars = { 'useIndex':0,
+                    'DEFAULT_URI_SCHEMES':['http','data','file'],}
+        root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
+                            model_uri = 'test:', appVars = appVars )
+        guestAccount = root.evalXPath("/*[foaf:accountName = 'guest']")
+        self.failUnless(guestAccount)
         
+        xpath = '''wf:shred(/*[wiki:name='ZMLSandbox'],
+         'http://rx4rdf.sf.net/ns/wiki#item-format-xml', "<testshredder />")'''
+
+        xpathValidate = "/*[wiki:name='ZMLSandbox']/wiki:testprop = 'test success!'"  
+        #xml-shred.xsl has a test pattern for matching <testshredder>
+        self._fineGrainedCheck(root, guestAccount, '', False, xpath=xpath,
+                               xpathValidate=xpathValidate)
+
+        xpath = '''wf:shred(/*[wiki:name='ZMLSandbox'],
+         'http://rx4rdf.sf.net/ns/wiki#item-format-xml', "<faq />")'''
+
+        xpathValidate = '''(/*[wiki:name='ZMLSandbox']//wiki:revisions/*/rdf:first)[last()]/*/wiki:doctype
+           = uri('wiki:doctype-faq') and count((/*[wiki:name='ZMLSandbox']//wiki:revisions/*/rdf:first)[last()]/*/wiki:doctype) = 1'''
+        #xml-shred.xsl should deduce the proper doctype
+        self._fineGrainedCheck(root, guestAccount, '', False, xpath=xpath,
+                               xpathValidate=xpathValidate)
+        
+        xpath = '''wf:shred(/*[wiki:name='ZMLSandbox'],
+         'http://rx4rdf.sf.net/ns/wiki#item-format-xml', $contents)'''
+        contents = file('testgrddl.html').read()
+
+        #work around bug in http://www.w3.org/2000/06/dc-extract/dc-extract.xsl: invalid predicate
+        xpathValidate = "/*[wiki:name='ZMLSandbox']/*[uri(.)='http://purl.org/dctitle'] = 'Joe Lambda Home page as example of RDF in XHTML'"  
+        self._fineGrainedCheck(root, guestAccount, contents, False, xpath=xpath,
+                               xpathValidate=xpathValidate)
+
+    def testShredding2(self):
+        appVars = { 'useIndex':0,
+                    'DEFAULT_URI_SCHEMES':['http','data','file'],}
+        root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
+                            model_uri = 'test:', appVars = appVars )
+        #import testgrddl.html
+        #export testgrddl.html
+        #verify 
+
+def createRedlandDomStore():
+  from rx import RxPath,DomStore
+  return DomStore.RxPathDomStore(RxPath.initRedlandHashBdbModel)
+
+def createMemStore():
+  from rx import RxPath,DomStore
+  def initModel(location, defaultModel):
+    if os.path.exists(location):
+        source = location
+    else:
+        source = defaultModel
+    return RxPath.MemModel(source)
+  return DomStore.RxPathDomStore(initModel, RxPath.BaseSchema)
+    
 SAVE_WORK=False
 DEBUG = False
+
+def profilerRun(testname, testfunc):
+    import hotshot, hotshot.stats
+    prof = hotshot.Profile(testname+".prof")
+    prof.runcall(testfunc)
+    prof.close()
+
+    stats = hotshot.stats.load(testname+".prof")
+    stats.strip_dirs()
+    stats.sort_stats('cumulative','time')
+    stats.print_stats(100)            
 
 if __name__ == '__main__':
     import sys    
@@ -520,12 +607,24 @@ if __name__ == '__main__':
     DEBUG = sys.argv.count('--debug')
     if DEBUG:
         del sys.argv[sys.argv.index('--debug')]
+    profile = sys.argv.count('--prof')
+    if profile:
+        del sys.argv[sys.argv.index('--prof')]
 
     try:
         test=sys.argv[sys.argv.index("-r")+1]
     except (IndexError, ValueError):
-        unittest.main()
+        if profile:
+            name, ext = os.path.splitext(
+                os.path.split(sys.modules[__name__ ].__file__)[1])
+            profilerRun(name, unittest.main)
+        else:
+            unittest.main()
     else:
         tc = RhizomeTestCase(test)
         tc.setUp()
-        getattr(tc, test)() #run test
+        testfunc = getattr(tc, test)
+        if profile:
+            profilerRun(test, testfunc)
+        else:
+            testfunc() #run test
