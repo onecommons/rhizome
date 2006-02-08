@@ -11,30 +11,23 @@
 defaultZMLVersion = 0.7
 
 try:
-    from rx.utils import InterfaceDelegator, NestedException
+    from rx.utils import NestedException
 except ImportError:
     #copied from rx/utils.py so this file has no dependencies
-    class InterfaceDelegator:
-        '''assumes only methods will be called on this object and the
-        methods always return None'''
-
-        def __init__(self, handlers):
-            self.handlers = handlers
-        
-        def call(self, name, args, kw):
-            for h in self.handlers:
-                getattr(h, name)(*args, **kw)
-            
-        def __getattr__(self, name):
-            return lambda *args, **kw: self.call(name, args, kw)
-
     class NestedException(Exception):
         def __init__(self, msg = None,useNested = False):
             if not msg is None:
                 self.msg = msg
             self.nested_exc_info = sys.exc_info()
             self.useNested = useNested
-            Exception.__init__(self, msg)
+            if useNested and self.nested_exc_info[0]:
+                if self.nested_exc_info[1]:
+                    args = getattr(self.nested_exc_info[1], 'args', ())
+                else: #nested_exc_info[1] is None, a string must have been raised
+                    args = self.nested_exc_info[0]
+            else:
+                args = msg
+            Exception.__init__(self, args)
 
 class ZMLParseError(NestedException):
     def __init__(self, msg = ''):                
@@ -531,15 +524,46 @@ class Handler(object):
     '''
     SAX-like interface 
     '''
-    def startElement(self, element): pass
-    def attrib(self, name, value): pass
-    def endElement(self,element): pass
-    def comment(self, string): pass
-    def text(self, string): pass
-    def whitespace(self, string): pass
-    def pi(self, name, value): pass
-    def endDocument(self): pass
+    nextHandler = None
+    def __init__(self, nextHandler=None):
+        self.nextHandler = nextHandler
 
+    def startElement(self, element):
+        if self.nextHandler:
+            self.nextHandler.startElement(element)
+
+    def attrib(self, name, value):
+        if self.nextHandler:
+            self.nextHandler.attrib(name, value)
+
+    #def endAttribs(self):
+    #    if self.nextHandler:
+    #        self.nextHandler.endAttribs()
+        
+    def endElement(self,element):
+        if self.nextHandler:
+            self.nextHandler.endElement(element)
+        
+    def comment(self, string):
+        if self.nextHandler:
+            self.nextHandler.comment(string)
+        
+    def text(self, string):
+        if self.nextHandler:
+            self.nextHandler.text(string)
+
+    def whitespace(self, string):
+        if self.nextHandler:
+            self.nextHandler.whitespace(string)
+        
+    def pi(self, name, value):
+        if self.nextHandler:
+            self.nextHandler.pi(name, value)
+        
+    def endDocument(self):
+        if self.nextHandler:
+            self.nextHandler.endDocument()
+        
 class OutputHandler(Handler):
     def __init__(self, output):
         self.output = output
@@ -580,6 +604,7 @@ class OutputHandler(Handler):
         pass#self.output.write( string ) #this put whitespace in places you wouldn't expect
 
     def pi(self, name, value):
+        self.__finishElement()
         self.output.write( u'<?' + name + ' ' + value.rstrip('\n') + '?>')
     
     def endDocument(self):
@@ -754,7 +779,8 @@ class MarkupMapFactoryHandler(Handler):
     '''    
     terminate = False
     
-    def __init__(self, parseState):        
+    def __init__(self, parseState, handler=None):
+        super(MarkupMapFactoryHandler, self).__init__(handler)
         self.markupfactory = parseState.mmf
         self.elementCount = 0
         self.st = parseState
@@ -768,24 +794,37 @@ class MarkupMapFactoryHandler(Handler):
         self.elementCount += 1
         if self.terminate and self.elementCount == 2:
             raise MarkupMapDetectionException()
+        super(MarkupMapFactoryHandler, self).startElement(element)
             
-    def attrib(self, name, value):
-        if not self.markupfactory.done and self.elementCount < 2:
+    def attrib(self, name, value):        
+        if not self.markupfactory.done and self.elementCount < 2:                
             mm = self.markupfactory.attrib(name, value)
             if mm:
-                self.st.mm = mm            
+                self.st.mm = mm
+        #elif self.elementCount == 1 and name == 'xmlns':
+        #    self.defaultNSDeclaration = value
+        super(MarkupMapFactoryHandler, self).attrib(name, value)
+
+    #def endAttribs(self):
+    #    if self.elementCount < 2 and not self.defaultNSDeclaration:
+    #        defaultNS = self.st.mm.wantDefaultNSDeclaration()
+    #        if defaultNS:
+    #            self.nextHandler.attrib('xmlns', defaultNS)
+    #    super(MarkupMapFactoryHandler, self).endAttribs()
                             
     def comment(self, string): 
-         if not self.markupfactory.done and self.elementCount < 2:
+        if not self.markupfactory.done and self.elementCount < 2:
             mm = self.markupfactory.comment(string)
             if mm:
                 self.st.mm = mm      
-
+        super(MarkupMapFactoryHandler, self).comment(string)
+        
     def pi(self, name, value): 
-         if not self.markupfactory.done and self.elementCount < 2:
+        if not self.markupfactory.done and self.elementCount < 2:
             mm = self.markupfactory.pi(name, value)
             if mm:
-                self.st.mm = mm      
+                self.st.mm = mm
+        super(MarkupMapFactoryHandler, self).pi(name, value)
 
 def interWikiMapParser(interwikimap):
     interWikiMap = {}
@@ -1759,8 +1798,7 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
 
     output = StringIO.StringIO()
     outputHandler = handler or OutputHandler(output)
-    st.handler = handler = InterfaceDelegator( [ outputHandler,
-                                MarkupMapFactoryHandler(st) ] )
+    st.handler = handler = MarkupMapFactoryHandler(st, outputHandler)
     del st
         
     try:                    
