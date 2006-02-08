@@ -206,7 +206,9 @@ class TransactionService(object):
                 p.finishTransaction(self,committed)
             except:
                 self.errorHandler.finishFailed(self,p,committed)
+
         self.state = self.stateFactory()
+        
 
     def isActive(self):
         return self.state.timestamp is not None
@@ -247,16 +249,21 @@ class RaccoonTransactionState(TransactionState):
         self.contextNode = None
         self.retVal = None
 
-class RaccoonTransactionService(TransactionService):
+class RaccoonTransactionService(TransactionService,utils.object_with_threadlocals):
+    #__metaclass__ = utils.hasthreadlocalattributes
+    
     lock = None
     stateFactory = RaccoonTransactionState
-    #Raccoon associates each request with one transaction context
-    #and one thread; therefore we need one transaction context per thread
-    state = utils.createThreadLocalProperty('__state',
-                                    initValue = RaccoonTransactionState())
+
+    #state = utils.threadlocalattribute(RaccoonTransactionState())
+    #state = utils.createThreadLocalProperty('__state',
+    #                                initValue = RaccoonTransactionState())
 
     def __init__(self, server):        
         self.server = server
+        #Raccoon associates each request with one transaction context
+        #and one thread; therefore we need one transaction context per thread
+        self.initThreadLocals(state=RaccoonTransactionState())
         super(RaccoonTransactionService, self).__init__(server.log.name)
 
     def newResourceHook(self, node):
@@ -283,24 +290,26 @@ class RaccoonTransactionService(TransactionService):
         This is intended to be set as the DOMStore's removeTrigger
         '''
         if self.isActive():
-            self.state.removals.append(node)
-            isnew = node.parentNode in self.state.newResources
+            state = self.state
+            state.removals.append(node)
+            isnew = node.parentNode in state.newResources
             kw = {'_removed' : [node], '_isnew' : isnew,
-                  '_newResources': self.state.newResources}
+                  '_newResources': state.newResources}
             self._runActions('before-remove', kw)
                 
     def _runActions(self, trigger, morekw=None):      
        actions = self.server.actions.get(trigger)       
        if actions:
-            kw = self.state.kw.copy()
+            state = self.state
+            kw = state.kw.copy()
             if morekw is None: 
-                morekw = { '_added' : self.state.additions,
-                           '_removed' : self.state.removals,
-                           '_newResources': self.state.newResources}
+                morekw = { '_added' : state.additions,
+                           '_removed' : state.removals,
+                           '_newResources': state.newResources}
             kw.update(morekw)
             errorSequence= self.server.actions.get(trigger+'-error')
-            self.server.callActions(actions,self.state.result, kw,
-                    self.state.contextNode,  self.state.retVal,
+            self.server.callActions(actions,state.result, kw,
+                    state.contextNode,  state.retVal,
                     globalVars= self.server.globalRequestVars + morekw.keys(),
                     errorSequence=errorSequence)
 
