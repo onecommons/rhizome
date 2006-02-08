@@ -1,5 +1,41 @@
 Rx4RDF and Rhizome Changelog
 ============================
+Changes in Version 0.6.0 (xxx xx, 2006)
+----------------------------------------
+* RxPath: Replaced rdf:ID attribute with get-statement-uris() function
+* RxPath: add rdfDocument() XPath function (invoke from XSLT/RxSLT only)
+* RxPath: get Redland adapter working again
+* raccoon: add $__store global request variable
+* RxPath: preliminary support for named graphs/contexts: 
+** add context parameter to Model.getStatements api, implement for 4Suite and Redland
+** add NTriples parser support via "#!graph uri" comment
+** add pushContext/popContext to RxPathDom.Document for adding statements to a context
+** no support yet for duplicate statements across contexts
+** added get-graph-predicates(graphuri) XPath function
+* XUpdate: add "to-graph" attribute to XUpdate elements to specify the subgraph for additions.
+* utils: move RDF-related functions to new module RxPathUtils, cleaned up RDF parsing APIs
+* raccoon: replace save-metadata XPath function with save-rdf: can now handle multiple RDF formats
+* raccoon: replace XPath function get-rdf-as-xml with serialize-rdf, now supports multiple formats
+* raccoon: add uriResolveBlacklist, uriResolveWhitelist and DEFAULT_URI_SCHEMES config settings
+     restrict URL resolution with URL scheme and by URL regular expression whitelists or blacklists 
+* utils: change threadlocalattribute to rely on threading.local 
+        (and implement threading.local for Python 2.3)
+* Rhizome: except for new resources, move class-based authentication actions back to fine-grained check
+* raccoon: DomStore now invalidates affected cache nodes on transaction rollback
+* Rhizome: better support for RDF formats
+** add a NTriples item format (and Turtle if redland is installed)
+** enable viewing and editing of RDF in all supported formats (RDF/XML, NTriples, RxML, Turtle)
+   on these pages: edit-metadata, default-resource-viewer, view-metadata and search
+* raccoon: fix bug where uncacheable XSLT stylesheets where being cached
+* RxPath: add MemModel, an efficient in-memory Model; clean up Model constructors
+* RxPath: remove dependencies on 4Suite Rdf package; now optional
+* Rhizome: add shredding support:
+** add shred() and shred-with-xslt() XPath functions
+** add shredders config variable (DOC), shredders include:
+** shredders for RDF (any supported format)
+** GRDDL XSLT stylesheets
+** save.xml invokes shred() when saving content
+** have import command shred unless new --noshred option is used
 
 Changes in Version 0.5.1 (Oct 21, 2005)
 ----------------------------------------
