@@ -2,7 +2,7 @@
 usage: diff = HtmlDiff().make_file(fromlines,tolines,fromfile,tofile,context=True,numlines=3)
 '''
 from __future__ import generators
-#note a bug: there must be some differences or an exception is thrown
+
 import sys
 if sys.version_info < (2, 3):
     def enumerate(collection):
@@ -12,7 +12,7 @@ if sys.version_info < (2, 3):
         while 1:
             yield (i, it.next())
             i += 1
-
+            
 from difflib import *
 
 #code below copied from
