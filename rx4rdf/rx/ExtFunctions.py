@@ -10,8 +10,7 @@ import os, os.path, time, sys, base64, traceback, urllib, re
 from Ft.Xml.XPath.Conversions import StringValue, NumberValue
 from Ft.Xml import SplitQName, XPath, InputSource, EMPTY_NAMESPACE
 from Ft.Xml.XPath import RuntimeException,FT_EXT_NAMESPACE
-from rx import utils, RxPath
-
+from rx import RxPath
 from RxPath import XFalse, XTrue, Xbool
 from Ft.Lib import Uri, number, Time
 
@@ -115,17 +114,16 @@ def DocumentAsText(context, url):
     urlString = StringValue( url )
     if not urlString:
         return [] #return an empty nodeset    
-    #file = urllib2.urlopen(urlString) #use InputSource instead so our SiteUriResolver get used
-    #print "urlstring", urlString
-    #todo: set baseURI = this current context's $_path, have site resolver use this as the docbase
+    #todo: set baseURI = this current context's $_path,
+    #have site resolver use this as the docbase
     file = InputSource.DefaultFactory.fromUri(urlString)
     bytes = file.read()
-    #print bytes[0:100]
-    #print 'bytes', bytes
+    #print 'bytes', bytes[0:100]
     return bytes
 
 def String2NodeSet(context, string):
-    '''Ft.Xml.Xslt.Exslt.Common.NodeSet is not implemented correctly -- this behavior should be part of it'''
+    ''' Ft.Xml.Xslt.Exslt.Common.NodeSet is not implemented correctly
+    -- this behavior should be part of it'''
     #if its already a nodeset just return that
     #(this enables us to use function to treat strings and text nodeset interchangable
     if isinstance(string, list):
@@ -169,7 +167,7 @@ def Split(context, string, pattern=u' '):
 def GenerateBnode(context, name=None):
     if name is not None:
         name = StringValue(name)
-    return utils.generateBnode(name)
+    return RxPath.generateBnode(name)
 
 def FileExists(context, uri):
     path = StringValue(uri)
@@ -289,28 +287,50 @@ def Map(context, nodeset, string):
         return l
     nodeset = reduce(eval, nodeset, [])        
     return Set.Unique(nodeset)
-    
-def GetRDFXML(context, resultset = None):
-  '''Returns a nodeset containing a RDF/XML representation of the
+
+def ParseRDF(context, contents, type='unknown', uri=''): 
+    contents = StringValue(contents)
+    type = StringValue(type)
+    uri = StringValue(uri)
+    if not uri:
+        from Ft.Lib import Uuid
+        uri = 'urn:uuid:'+Uuid.UuidAsString(Uuid.GenerateUuid())
+    nsRevMap = getattr(context.node.ownerDocument, 'nsRevMap', None)
+    schemaClass = getattr(context.node.ownerDocument, 'schemaClass',
+                                                    RxPath.defaultSchemaClass)
+    stmts = RxPath.parseRDFFromString(contents, uri, type)            
+    return [RxPath.RxPathDOMFromStatements(stmts, nsRevMap, uri,schemaClass)]
+
+def SerializeRDF(context, resultset, type='rdfxml',
+                                 fixUp=None, fixUpPredicate=None):
+    '''Returns a nodeset containing a RDF/XML representation of the
   RxPathDOM nodes contained in resultset parameter. If
   resultset is None, it will be set to the context node '''
-  if resultset is None:
-        resultset = [ context.node ]
-  from Ft.Rdf.Serializers.Dom import Serializer as DomSerializer
-  serializer = DomSerializer()
-  stmts = []
-  for n in resultset:
-      stmts.extend(n.getModelStatements())
-  if resultset:
-      nsMap=resultset[0].ownerDocument.nsRevMap
-  else:
-      nsMap = None
-  outdoc = serializer.serialize(None, stmts = stmts, nsMap = nsMap)
-  return [outdoc]
-  #prettyOutput = StringIO.StringIO()
-  #from Ft.Xml.Lib.Print import PrettyPrint
-  #PrettyPrint(outdoc, stream=prettyOutput)
-  #return prettyOutput.getvalue()    
+    stmts = []    
+    if resultset:
+        uri2prefixMap=resultset[0].rootNode.nsRevMap        
+        if resultset[0].nodeName == '#document':
+            resultset = n.childNodes
+            
+        for n in resultset:
+            nl = [n]
+            if RxPath.isResource(context, nl):
+                preds = n.childNodes
+            elif RxPath.isPredicate(context, nl):
+                preds = nl
+            else:
+                preds = [] #error?
+                
+            for p in preds:
+                stmts.extend(p.getModelStatements())
+                if (RxPath.isResource(context, p.childNodes)
+                    and p.firstChild.isCompound()):
+                    #object is a list so add all the list items too
+                    stmts.extend(p.firstChild.getModelStatements())        
+                                        
+    else:
+        uri2prefixMap = None
+    return RxPath.serializeRDF(stmts, type, uri2prefixMap,fixUp, fixUpPredicate)
 
 import Ft
 class XPathUserError(XPath.RuntimeException):
@@ -436,7 +456,8 @@ DefaultExtFunctions = {
     (RXWIKI_XPATH_EXT_NS, 'split'): Split,
     (RXWIKI_XPATH_EXT_NS, 'min'): Min,
     (RXWIKI_XPATH_EXT_NS, 'max'): Max,
-    (RXWIKI_XPATH_EXT_NS, 'get-rdf-as-xml'): GetRDFXML,
+    (RXWIKI_XPATH_EXT_NS, 'serialize-rdf'): SerializeRDF,
+    (RXWIKI_XPATH_EXT_NS, 'parse-rdf'): ParseRDF,
     (RXWIKI_XPATH_EXT_NS, 'instance-of'): instanceof,
     (RXWIKI_XPATH_EXT_NS, 'error'): Error,
 }
