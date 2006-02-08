@@ -303,27 +303,51 @@ classAuthenticateRemovesAction.assign("__authAction",
 classAuthenticateRemovesAction.assign("__authResources", 
  '($_removed/..)[not(.=$_newResources)]')
 
-##when an auth:requires-authorization-for property is added or removed,
+##when an auth:requires-authorization-for property is added,
 ##we reauthorize all the statements down the whole transitive
 ##authorization tree for the object of the property, even statements
 ##that have been added in a previous transaction by a user with greater
 ##rights. We want to do this because by adding or removing these
 ##relationships we are essentially creating new objects and these
-##statements will have different meaning in the system so we need to
+##statements may have different meaning in the system so we need to
 ##check if the user has the right to (re)assert them.
 recheckAuthorizations = Action([ 
  '''f:if($__account/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser', $STOP)''',
- '($_added | $_removed)/self::auth:requires-authorization-for', 
+ '$_added/self::auth:requires-authorization-for', 
   ], lambda result, kw, contextNode, retVal, rhizome=rhizome: 
        rhizome.recheckAuthorizations(result, kw))
 recheckAuthorizations.assign("__extraPrivilegeResources", 
   '$previous:__handlerResource','/..')
 
+shredders = [
+    rx.rhizome.raccoon.ContentProcessors.XSLTContentProcessor(),
+    rx.rhizome.raccoon.ContentProcessors.RxUpdateContentProcessor(),
+    rhizome.zmlContentProcessor,
+    rx.rhizome.XMLShredder(rhizome,'xml-shred.xsl'), 
+    #this should work for all XML-based RDF formats:
+    rx.rhizome.raccoon.ContentProcessors.RDFShredder(), 
+    rx.rhizome.raccoon.ContentProcessors.RDFShredder(
+        'http://rx4rdf.sf.net/ns/wiki#item-format-ntriples',
+              mimetype='text/plain', label='NTriples', rdfFormat='ntriples'),
+    #PythonSourceCodeShredder(), #todo
+]
+        
+shredderRequestSequence = [ 
+  Action(['$_format'],
+         lambda result, kw, contextNode, contents, rhizome=rhizome:
+            rhizome.server.processContents(result, kw, 
+     rhizome.server.domStore.dom, contents, contentProcessors=rhizome.shredders))
+]
+
 ###############################################################################
 ##associate all these Action sequences with the appropriate request triggers
 ###############################################################################                                    
-actions = { 'http-request' : handleRequestSequence,
+actions = { 
+    'http-request' : handleRequestSequence,
     'http-request-error': [errorAction] + handleRequestSequence[3:],
+
+    'shred' : shredderRequestSequence, #rhizome-specific trigger
+    
     #rhizome adds two command line options: --import and --export
     'run-cmds' : [ Action(["$import", '$i'], 
                     lambda result, kw, contextNode, retVal, rhizome=rhizome: 
@@ -337,14 +361,14 @@ actions = { 'http-request' : handleRequestSequence,
     'before-add': [ Action(['''wf:authorize-statements($_added,
       "http://rx4rdf.sf.net/ns/auth#permission-add-statement", 
       $_newResources, wf:get-metadata('previous:__handlerResource',/..))''',
-      #check-authorization should either return true or raise an exception
+      #authorize-statements should either return true or raise an exception
       "wf:error('Authorization check unexpectedly failed.')"]), 
                   ],
                      
     'before-remove': [ Action(['''wf:authorize-statements($_removed,
       "http://rx4rdf.sf.net/ns/auth#permission-remove-statement", 
       $_newResources, wf:get-metadata('previous:__handlerResource',/..))''',
-      #check-authorization should either return true or raise an exception                         
+      #authorize-statements should either return true or raise an exception                         
       "wf:error('Authorization check unexpectedly failed.')"]),
                      ],
 
@@ -356,8 +380,8 @@ actions = { 'http-request' : handleRequestSequence,
     'before-prepare': [ 
         recheckAuthorizations,
         classAuthenticateNewResourceAction,
-        classAuthenticateAddsAction,
-        classAuthenticateRemovesAction,                            
+#        classAuthenticateAddsAction,
+#        classAuthenticateRemovesAction,                            
         #invoke the validatation schematron document on the changes
         Action(['''wf:request('validate-schema', '_noErrorHandling', 1,
          'phase', 'incremental', '_added', $_added, '_removed', $_removed)''']),
@@ -384,6 +408,7 @@ nsMap = {'a' : 'http://rx4rdf.sf.net/ns/archive#',
          'bnode' : "bnode:",
          'kw' : rhizome.BASE_MODEL_URI + 'kw#',
          'foaf' : "http://xmlns.com/foaf/0.1/",
+          'dataview': 'http://www.w3.org/2003/g/data-view'
          }
 rhizome.nsMap = nsMap
 
@@ -403,7 +428,22 @@ contentProcessors = [
     rx.rhizome.raccoon.ContentProcessors.XSLTContentProcessor(),
     rhizome.zmlContentProcessor,
     rx.rhizome.PatchContentProcessor(rhizome),   
+    rx.rhizome.raccoon.ContentProcessors.StreamingNoOpContentProcessor(
+        'http://rx4rdf.sf.net/ns/wiki#item-format-ntriples',
+                     mimetype='text/plain', label='NTriples'),        
 ]
+
+try:
+   import RDF
+   contentProcessors.append(
+    rx.rhizome.raccoon.ContentProcessors.StreamingNoOpContentProcessor(
+        'http://rx4rdf.sf.net/ns/wiki#item-format-turtle',
+                     mimetype='text/plain', label='Turtle'))   
+   shredders.append(
+      rx.rhizome.raccoon.ContentProcessors.RDFShredder(
+        'http://rx4rdf.sf.net/ns/wiki#item-format-turtle',
+        mimetype='text/plain', label='Turtle', rdfFormat='turtle')) 
+except ImportError: pass
 
 authorizeContentProcessors = {
     #when content is being created dynamically 
@@ -418,10 +458,9 @@ authorizeContentProcessors = {
 }
                   
 extFunctions = {
-(RXWIKI_XPATH_EXT_NS, 'get-rdf-as-rxml'): rhizome.getRxML,
 (RXWIKI_XPATH_EXT_NS, 'get-contents'): rhizome.getContents,
 (RXWIKI_XPATH_EXT_NS, 'truncate-contents'): rhizome.truncateContents,
-(RXWIKI_XPATH_EXT_NS, 'save-metadata'): __server__.saveRxML,
+(RXWIKI_XPATH_EXT_NS, 'save-rdf'): __server__.saveRDF,
 (RXWIKI_XPATH_EXT_NS, 'generate-patch'): rhizome.generatePatch,
 (RXWIKI_XPATH_EXT_NS, 'save-contents'): rhizome.saveContents,
 (RXWIKI_XPATH_EXT_NS, 'get-nameURI'): rhizome.getNameURI,
@@ -434,16 +473,21 @@ extFunctions = {
 (RXWIKI_XPATH_EXT_NS, 'auth-value-matches'): rx.rhizome.authorizationValueMatch,
 (RXWIKI_XPATH_EXT_NS, 'request') :  rhizome.makeRequest,
 (RXWIKI_XPATH_EXT_NS, 'fixup-urls'): __server__.site2http,
+
+(RXWIKI_XPATH_EXT_NS, 'shred') :  rhizome.startShredding,
+(RXWIKI_XPATH_EXT_NS, 'shred-with-xslt') :  rhizome.shredWithStylesheet,
 }
 
 NOT_CACHEABLE_FUNCTIONS = {
     (RXWIKI_XPATH_EXT_NS, 'generate-patch'): 0,
-    (RXWIKI_XPATH_EXT_NS, 'save-metadata'): 0,
+    (RXWIKI_XPATH_EXT_NS, 'save-rdf'): 0,
     (RXWIKI_XPATH_EXT_NS, 'save-contents'): 0,
     (RXWIKI_XPATH_EXT_NS, 'process-contents'): 0,
     (RXWIKI_XPATH_EXT_NS, 'request') : 0,
     (RXWIKI_XPATH_EXT_NS, 'auth-value-matches'): 
         rx.rhizome.authorizationValueMatchCacheKey,
+    (RXWIKI_XPATH_EXT_NS, 'shred') : 0,
+    (RXWIKI_XPATH_EXT_NS, 'shred-with-xslt') : 0,
 }
 
 #this function is called by rhizome.authorizeXPathFunc to dynamically 
@@ -472,7 +516,6 @@ STORAGE_PATH = "./wikistore.nt"
 #initModel = RxPath.initRedlandHashBdbModel
 
 MODEL_RESOURCE_URI = rhizome.BASE_MODEL_URI
-MODEL_UPDATE_PREDICATE = 'http://rx4rdf.sf.net/ns/wiki#model-update-id'
 
 configHook = rhizome.configHook
 getPrincipleFunc = lambda kw: kw.get('__account', '')
@@ -521,7 +564,8 @@ rhizome._addItemTuple('rxml-template-handler',loc='path:rxml-template-handler.xs
                         disposition='entry', handlesDisposition='rxml-template'),               
 rhizome._addItemTuple('generic-new-template', loc='path:generic-new-template.txt', handlesAction=['new'], actionType='rdfs:Resource',
             disposition='rxml-template', format='text', title='Create New Resource'), 
-rhizome._addItemTuple('rxml2rdf',loc='path:rxml2rdf.py', format='python', disposition='complete'),
+#rhizome._addItemTuple('rxml2rdf',loc='path:rxml2rdf.py', format='python', disposition='complete'),
+rhizome._addItemTuple('process-rdfsandbox',loc='path:process-rdfsandbox.xsl', format='rxslt', disposition='complete'),
 rhizome._addItemTuple('default-error-handler', loc='path:default-error-handler.xsl', disposition='entry', doctype='xhtml', format='rxslt'), 
 rhizome._addItemTuple('xslt-error-handler', loc='path:xslt-error-handler.xsl', disposition='entry', doctype='xhtml', format='rxslt'), 
 rhizome._addItemTuple('short-display-handler',loc='path:short-display-handler.xsl', format='rxslt', 
@@ -537,6 +581,8 @@ rhizome._addItemTuple('schematron-skeleton', loc='path:skeleton1-5.xsl', format=
 rhizome._addItemTuple('schematron-rxpath', loc='path:schematron-rxpath.xsl', format='http://www.w3.org/1999/XSL/Transform', handlesDoctype='schematron'),
 rhizome._addItemTuple('validate-schema', loc='path:validate-schema.xml', disposition='complete', doctype='schematron', format='xml'), 
 rhizome._addItemTuple('site-theme', loc='path:site-theme.xsl', disposition='complete', format='rxslt'), 
+#added in 0.6.0:
+rhizome._addItemTuple('xml-shred.xsl', loc='path:xml-shred.xsl', format='http://www.w3.org/1999/XSL/Transform'),
 
 #administration pages
 rhizome._addItemTuple('administration', loc='path:administer.xsl', disposition='entry', format='rxslt', title="Administration"), 
@@ -1204,8 +1250,9 @@ def name2uri(name, nsMap=nsMap):
         return name
     
 def addStructure(type, structure, extraProps=[], name2uri=name2uri):
-    '''Structure is a sequence consisting of at least the resource URI 
-    and a label, followed by one literal for each extra property.'''
+    '''Structure is a sequence of tuples, each of which consists
+     of at least the resource URI and a label, followed by one literal 
+     for each extra property.'''
     n3 = ''
     type = name2uri(type)
     for props in structure:
@@ -1248,7 +1295,8 @@ docTypes = [ ('http://rx4rdf.sf.net/ns/wiki#doctype-faq', 'FAQ', 'text/xml'),
    ('http://rx4rdf.sf.net/ns/wiki#doctype-document', 'Document', 'text/xml'),
    ('http://rx4rdf.sf.net/ns/wiki#doctype-specification', 'Specification', 'text/xml'),
    ('http://rx4rdf.sf.net/ns/wiki#doctype-docbook', 'DocBook', 'text/xml'), 
-   ('http://rx4rdf.sf.net/ns/wiki#doctype-schematron', 'Schematron', 'text/xml'), 
+   ('http://rx4rdf.sf.net/ns/wiki#doctype-schematron', 'Schematron', 'text/xml', 
+                                             "http://www.ascc.net/xml/schematron"), 
    #todo: uncomment this when we can hide it from users
    #('http://rx4rdf.sf.net/ns/wiki#doctype-wiki', 'Wiki', 'text/html'), 
    ]
@@ -1261,7 +1309,7 @@ templateList.append( ('@dispositions',
  addStructure('http://rx4rdf.sf.net/ns/wiki#ItemDisposition', itemDispositions)))
 templateList.append( ('@doctypes', 
  addStructure('http://rx4rdf.sf.net/ns/wiki#DocType', 
- docTypes, ['http://rx4rdf.sf.net/ns/archive#content-type'])) )
+ docTypes, ['http://rx4rdf.sf.net/ns/archive#content-type', 'wiki:for-namespace'])) )
 templateList.append( ('@labels', 
  addStructure('http://rx4rdf.sf.net/ns/wiki#Label', labels)+
 '''<http://rx4rdf.sf.net/ns/wiki#label-draft> <http://rx4rdf.sf.net/ns/wiki#is-draft> "" .\n'''
@@ -1286,26 +1334,39 @@ templateMap = dict(templateList)
 #create a NTriples string
 STORAGE_TEMPLATE = "".join(templateMap.values()) 
 
-itemFormats = [cp.mimetype and (cp.uri, cp.label, cp.mimetype) 
- or (cp.uri, cp.label) 
- for cp in contentProcessors + rx.rhizome.raccoon.ContentProcessors.DefaultContentProcessors
+itemFormats = [
+ cp.mimetype and (cp.uri, cp.label, cp.mimetype)  or (cp.uri, cp.label) 
+ for cp in contentProcessors 
+        + rx.rhizome.raccoon.ContentProcessors.DefaultContentProcessors
  if cp.label
 ]
 
-#define the APPLICATION_MODEL (static, read-only statements in the 'application' scope)
-APPLICATION_MODEL= addStructure('http://rx4rdf.sf.net/ns/wiki#ItemFormat', 
-   itemFormats,
-    ['http://rx4rdf.sf.net/ns/archive#content-type'])\
-   + '''<%saccounts/admin> <%s> "%s" .\n''' % (
-   rhizome.BASE_MODEL_URI, passwordHashProperty, adminShaPassword)
+_rfb = 'http://rx4rdf.sf.net/ns/wiki#rdfformat-'
+rdfFormats = [(_rfb+'rdfxml', 'RDF/XML', 1, 1),(_rfb+'rxml_zml', 'RxML',1,1),
+                                           (_rfb+'ntriples', 'NTriples',1,1)]
+try:
+   import RDF
+   rdfFormats += [(_rfb+'turtle', 'Turtle',0,1)]
+except ImportError: pass
+   
+#define the APPLICATION_MODEL (static, read-only statements in the 'context:application' scope)
+APPLICATION_MODEL= (
+  addStructure('http://rx4rdf.sf.net/ns/wiki#ItemFormat', itemFormats, 
+                            ['http://rx4rdf.sf.net/ns/archive#content-type'])
+  + addStructure('http://rx4rdf.sf.net/ns/wiki#RDFFormat', rdfFormats,
+                                    ['wiki:can-serialize', 'wiki:can-parse'])
+  + '''<%saccounts/admin> <%s> "%s" .\n''' % (rhizome.BASE_MODEL_URI, 
+                                passwordHashProperty, adminShaPassword)
+)
 
 #add the "archive" schema to APPLICATION_MODEL
 import os.path
-from rx import utils
+from rx import RxPathUtils
 #4Suite's RDF parser can't parse archive-schema.rdf 
 #so we have to load a NTriples file instead
-schema = utils.convertToNTriples(
-  os.path.split(_rhizomeConfigPath)[0]+'/archive-schema.nt')
+#schema = RxPathUtils.convertToNTriples(
+#  os.path.split(_rhizomeConfigPath)[0]+'/archive-schema.nt')
+schema = file(os.path.split(_rhizomeConfigPath)[0]+'/archive-schema.nt').read()
 #to regenerate: change above to end in .rdf and uncomment this line:
 #file(os.path.split(_rhizomeConfigPath)[0]+'/archive-schema.nt', 'w').write(schema)
 APPLICATION_MODEL += schema
