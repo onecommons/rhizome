@@ -24,6 +24,7 @@
 <a href="site:///{$_name}?action=edit-metadata&amp;about={f:escape-url($__resource)}">Edit Metadata</a>
 &#xa0;<a href='site:///search?search=%2F*%2F*%5B.%3D%27{f:escape-url($__resource)}%27%5D&amp;searchType=RxPath&amp;view=html'>Used By</a>
 &#xa0;<a href='site:///search?search=%2F*%5B.%3D%27{f:escape-url($__resource)}%27%5D&amp;searchType=RxPath&amp;view=rdf'>RDF/XML</a>
+&#xa0;<a href='site:///search?search=%2F*%5B.%3D%27{f:escape-url($__resource)}%27%5D&amp;searchType=RxPath&amp;view=ntriples'>NTriples</a>
 <hr />
 <xsl:if test='$__resource/wiki:about'>
  Keywords:&#xa0; 
@@ -43,7 +44,7 @@
     <xsl:variable name='fixupPredicate' select=
     "&quot;&lt;a href='site:///search?search=%%2F*%%2F*%%5Bis-subproperty-of%%28%%40uri%%2C%%27%(encodeduri)s%%27%%29%%5D&amp;amp;searchType=RxPath&amp;amp;view=html&amp;amp;title=Property%%20Usage'>%(predicate)s&lt;/a>&quot;" />
                
-    <xsl:value-of disable-output-escaping='yes' select="wf:get-rdf-as-rxml($__resource, '', $fixup, $fixupPredicate)" />
+    <xsl:value-of disable-output-escaping='yes' select="wf:serialize-rdf($__resource, 'rxml_zml', $fixup, $fixupPredicate)" />
 </pre>
 
 </xsl:template>

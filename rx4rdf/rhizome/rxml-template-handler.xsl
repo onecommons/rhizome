@@ -22,6 +22,7 @@
 <form method="POST" action="site:///{$_name}" accept-charset='UTF-8' enctype="multipart/form-data">	
     <input TYPE="hidden" NAME="action" VALUE="save-metadata" />    
     <input TYPE="hidden" NAME="itemname" VALUE="{$_name}" />
+    <input TYPE="hidden" NAME="rdfFormat" VALUE="rxml_zml" />
         Create New Resources from Template
          <br/>
 	<textarea NAME="metadata" ROWS="20" COLS="75" STYLE="width:100%" WRAP="off">

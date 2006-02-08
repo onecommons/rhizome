@@ -104,7 +104,9 @@
 
     <xu:if test='wf:has-metadata("metadata")'>
          <!-- hack for now: replace #this# with the resource -->
-        <xu:variable name='save-metadata' select="wf:save-metadata(f:replace('#this#', concat('{',$resource,'}'), $metadata))" />
+         <xu:variable name='metdataContents' 
+           select="f:replace('#this#', concat('{',$resource,'}'), $metadata)" />
+        <xu:variable name='save-metadata' select="wf:save-rdf($metdataContents)" />
     </xu:if>
             
     <!-- add or update last modified -->
@@ -197,6 +199,13 @@
     -->         
     <xu:variable name = 'lastContents' select="( ($resource/wiki:revisions/*/rdf:first/*)[last()]//a:contents)[last()]" />
     <xu:variable name = 'lastContentsDigest' select="$lastContents/*/a:sha1-digest" />
+
+    <xu:if test='$lastContents'>
+        <xu:variable name='graphSource' select="/*[a:from-source = ($resource/wiki:revisions/*/rdf:first/*)[last()]/a:contents/*]" />        
+        <xu:if test='$graphSource'>
+            <xu:remove select='get-graph-predicates($graphSource/a:entails)' />                
+        </xu:if>
+    </xu:if>
     
     <xu:if test='$replaceRevision'>        
         <!-- for simplicity's sake we implement this by just removing the last revision 
@@ -204,9 +213,9 @@
         We must do this before any possible patching because we may need to re-generate the last patch
         -->                
         <xu:remove select='id($lastContents/*)'/>
-        <xu:remove select='($resource/wiki:revisions/*/rdf:first)[last()]'/>
+        <xu:remove select='($resource/wiki:revisions/*/rdf:first)[last()]'/>                
     </xu:if>
-        
+
     <xu:if test='not($replaceRevision)'>    
         <!-- 
         remove previous revision's wiki:alt-contents
@@ -239,22 +248,38 @@
               <a:contents>
                 <a:ContentTransform>                    
                     <a:transformed-by rdf:resource='http://rx4rdf.sf.net/ns/content#pydiff-patch-transform' />
+                    <!-- pydiff-patch-base points to the resource that whose contents we will apply the patch to, 
+                    i.e. the contents of the revision we're about to add
+                    At first it will point the resource whose has-contents predicate has raw content as its object
+                    But as we add revisions we replace that raw content with patch transforms, thus creating a chain of patches to apply
+                    -->                    
+                    <a:pydiff-patch-base rdf:resource='{$formatTransformURI}' />                    
                     <a:contents><xu:copy-of select='$patch'/></a:contents>
-                    <a:pydiff-patch-base>
-                        <!-- this points to the resource that whose contents we will apply the patch to, 
-                        i.e. the contents of the revision we're about to add
-                        At first it will point the resource whose has-contents predicate has raw content as its object
-                        But as we add revisions we replace that raw content with patch transforms, thus creating a chain of patches to apply
-                        -->
-                        <xu:attribute name="rdf:resource">
-                            <xu:value-of select="$formatTransformURI"/> 
-                        </xu:attribute>
-                   </a:pydiff-patch-base>
                 </a:ContentTransform>
               </a:contents>
            </xu:replace>           
         </xu:if>                 
     </xu:if>
+    <!--
+        this is how the above patching logic plays itself out given base64 encoded content:
+        
+        given revision 1 contents:    
+            format -> base64decode A -> content A
+        
+        add revision 2:
+            revision 2 = format -> base64decode B -> content B
+            
+        replace revision 1 base64decode A -> content A with patch + reference to revision 2
+        so revision 1 = 
+            format -> (patch -base-> base64decode B -> content B)
+        
+        add revision 3
+        revision 2 base64decode B -> content B is replaced with 
+        (patch -base-> base64decode C -> content C)
+        
+        thus revision 1 now looks like 
+        format -> (patch -base-> (patch -base-> base64decode C -> content C))    
+    -->
 
      <xu:variable name='user' select='/foaf:Person[foaf:holdsAccount = $__account]'/>
      <xu:if test='not($user)'>        
@@ -300,26 +325,6 @@
         </xu:if> 
      </xu:if> 
         
-<!--
-    this is how the above patching logic plays itself out given base64 encoded content:
-    
-    given revision 1 contents:    
-        format -> base64decode A -> content A
-    
-    add revision 2:
-        revision 2 = format -> base64decode B -> content B
-        
-    replace revision 1 base64decode A -> content A with patch + reference to revision 2
-    so revision 1 = 
-        format -> (patch -base-> base64decode B -> content B)
-    
-    add revision 3
-    revision 2 base64decode B -> content B is replaced with 
-    (patch -base-> base64decode C -> content C)
-    
-    thus revision 1 now looks like 
-    format -> (patch -base-> (patch -base-> base64decode C -> content C))    
--->
         
     <!-- add the new revision -->
     <xu:append select='$resource/wiki:revisions/*'>
@@ -328,12 +333,10 @@
             <xu:variable name="itemURI" select="wf:generate-bnode()"/>
             <xu:attribute name="rdf:about"><xu:value-of select="$itemURI"/></xu:attribute>
             
-            <wiki:item-disposition>
-                <xu:attribute name="rdf:resource"><xu:value-of select="$disposition"/></xu:attribute>
-            </wiki:item-disposition>
+            <wiki:item-disposition rdf:resource="{$disposition}" />
             
             <xu:if test='wf:get-metadata("doctype")'>
-                <wiki:doctype><xu:attribute name="rdf:resource"><xu:value-of select="$doctype"/></xu:attribute></wiki:doctype>
+                <wiki:doctype rdf:resource="{$doctype}"/>                
             </xu:if>
             <xu:if test='$title'>
                 <wiki:title><xu:value-of select="$title"/></wiki:title>
@@ -362,10 +365,8 @@
             </xu:if>    
             <!-- we do this last in case, after we know we were authorized to add the above properties-->        
             <a:contents>
-                <a:ContentTransform>
-                   <xu:attribute name="rdf:about"><xu:value-of select="$formatTransformURI"/></xu:attribute>
-                   <a:transformed-by><xu:attribute name="rdf:resource"><xu:value-of select="$format"/></xu:attribute>
-                   </a:transformed-by>
+                <a:ContentTransform rdf:about="{$formatTransformURI}" >
+                   <a:transformed-by rdf:resource="{$format}" />
                    <a:contents>
                      <xu:copy-of select="wf:save-contents($itemname, $format, $contents,
                                     count($resource/wiki:revisions/*/rdf:first)+1, $resource, 
@@ -376,10 +377,26 @@
         </wiki:Item>
        </rdf:first>
     </xu:append>
+
+    <xu:variable name='contextURI' select="concat('context:', $formatTransformURI)" />
+
+    <xu:append select='/' to-graph='{$contextURI}'>
+       <xu:variable name='shredded' select='wf:shred($resource, $format, $contents)' />
+       <xu:if test='$shredded'>
+           <a:RDFSource>             
+                <a:from-source rdf:resource="{$formatTransformURI}" />
+                <a:entails rdf:resource="{$contextURI}" />
+                <!-- todo:
+                    add: a:with-algorithm algorithmURI
+                    add inverse of a:from-source
+                -->
+            </a:RDFSource>
+       </xu:if>            
+    </xu:append>
     
     <!-- todo need to assign $revision  
     <xu:if test='wf:has-metadata("revision-metadata")'>
-        <xu:variable name='save-metadata' select="wf:save-metadata(f:replace('#this#', concat('{',$revision,'}'), $revision-metadata))" />
+        <xu:variable name='save-metadata' select="wf:save-rdf(f:replace('#this#', concat('{',$revision,'}'), $revision-metadata))" />
     </xu:if>
     -->
     <xu:variable name='frameid' select="wf:assign-metadata('frameid', $current-time)" /> <!-- used by the iframe-display-handler -->                            

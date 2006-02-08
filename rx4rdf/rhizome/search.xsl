@@ -20,13 +20,16 @@
 <xsl:param name="_url" />
 <xsl:param name="_name" />
 <xsl:param name="BASE_MODEL_URI" />
-
+<xsl:param name="editFormat" select="'rxml_zml'" />
 <xsl:param name="sortKey" select="'position()'" />
 <xsl:param name="sortKeyType" select="'text'" />
 <xsl:param name="sortKeyOrder" select="'ascending'" />
 <xsl:param name="sortKeyCaseOrder" select="'upper-first'" />
 
-<xsl:output method='xhtml' indent='yes' encoding="UTF-8" />
+<!-- 
+<f:output method="{f:if($view='ntriples', 'text', 'xhtml')}" indent='yes' omit-xml-declaration="yes" encoding="UTF-8" />
+-->
+<xsl:output method="xhtml" indent='yes' omit-xml-declaration="yes" encoding="UTF-8" />
 <xsl:variable name="searchExp">     
      <xsl:choose>
         <xsl:when test="$searchType='Simple'">                     
@@ -188,16 +191,20 @@ No results found.
 </xsl:if>
 <pre>
 <xsl:variable name='fixup' select="&quot;&lt;a href='site:///.?action=view-metadata&amp;amp;about=%(encodeduri)s'>%(res)s&lt;/a>&quot;" />
-<xsl:value-of disable-output-escaping='yes' select="wf:get-rdf-as-rxml($results, '', $fixup)" />
+<xsl:value-of disable-output-escaping='yes' select="wf:serialize-rdf($results, 'rxml_zml', $fixup)" />
 </pre>
        </xsl:when>
        <xsl:when test="$view = 'rdf'">
 <xsl:variable name='_disposition' select="wf:assign-metadata('_disposition', /*[.='http://rx4rdf.sf.net/ns/wiki#item-disposition-complete'])" />              
 <!-- 'application/rdf+xml' is more correct but browser display the xml mimetype better --> 
 <xsl:variable name='content-type' select="wf:assign-metadata('_contenttype', 'application/xml')" />               
-<xsl:copy-of select="wf:get-rdf-as-xml($results)" />
+<xsl:value-of select="wf:serialize-rdf($results, 'rdfxml')" disable-output-escaping='yes' />
        </xsl:when>
-       
+       <xsl:when test="$view = 'ntriples'">
+<xsl:variable name='_disposition' select="wf:assign-metadata('_disposition', /*[.='http://rx4rdf.sf.net/ns/wiki#item-disposition-complete'])" /> 
+<xsl:variable name='_nextFormat' select="wf:assign-metadata('_nextFormat', 'http://rx4rdf.sf.net/ns/wiki#item-format-text')" />
+<xsl:value-of select="wf:serialize-rdf($results,'ntriples')" disable-output-escaping='yes'/>
+       </xsl:when>       
        <xsl:when test="$view = 'edit'">
 <div class="title"><xsl:value-of select="$searchType" /> Search Results for "<xsl:value-of select="$search" />"</div>
 <xsl:if test='not($results)'>
@@ -206,13 +213,14 @@ No results found.
 <form method="POST" action="site:///save-metadata" accept-charset='UTF-8' enctype="multipart/form-data">	
     <input TYPE="hidden" NAME="itemname" VALUE="save-metadata" />
     <input TYPE="hidden" NAME="action" VALUE="save-metadata" />    
+    <input type="hidden" name="rdfFormat" value="{$editFormat}"/>
     <xsl:for-each select="$results">    
         <input TYPE="hidden" NAME="resource" VALUE="{.}" />
     </xsl:for-each>
         Edit Metadata
          <br/>
 	<textarea NAME="metadata" ROWS="30" COLS="75" STYLE="width:100%" WRAP="off">
-	<xsl:value-of select="wf:get-rdf-as-rxml($results)" />
+	<xsl:value-of select="wf:serialize-rdf($results, $editFormat)" />
 	</textarea>
 	<br/>
 	<input TYPE="submit" NAME="save" VALUE="Save" />	

@@ -2,13 +2,15 @@
 <xu:modifications version="1.0" xmlns:xu="http://www.xmldb.org/xupdate" 
 xmlns:wf="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#" 
 xmlns:f="http://xmlns.4suite.org/ext" >
+  <xu:variable name="rdfFormat" select="wf:get-metadata('rdfFormat','unknown')"/>
+
   <xu:if test="wf:has-metadata('resource')">
-    <xu:variable name="dummy" select="wf:save-metadata($metadata, $resource)"/>
+    <xu:variable name="dummy" select="wf:save-rdf($metadata, $rdfFormat, wf:get-metadata('about', ''),$resource)"/>
   </xu:if>
   
   <xu:if test="not(wf:has-metadata('resource'))">
     <!-- no resource, add new content -->
-    <xu:variable name="dummy" select="wf:save-metadata($metadata)"/>
+    <xu:variable name="dummy" select="wf:save-rdf($metadata, $rdfFormat, wf:get-metadata('about', ''))"/>
   </xu:if>
 </xu:modifications>
 

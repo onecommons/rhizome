@@ -10,11 +10,25 @@
 		xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
 		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header" >		
 
-<xsl:output omit-xml-declaration='yes' indent='no' encoding="UTF-8" />
+<xsl:output method='xhtml' omit-xml-declaration='yes' indent='no' encoding="UTF-8" />
+<xsl:param name="fromFormat" select="'http://rx4rdf.sf.net/ns/wiki#rdfformat-rxml_zml'" />
+<xsl:param name="toFormat" select="'http://rx4rdf.sf.net/ns/wiki#rdfformat-rdfxml'" />
+
+<xsl:template name="add-option" >
+<xsl:param name="text" />
+<xsl:param name="value" />
+<xsl:param name="selected" />
+	<option value="{$value}">
+	<xsl:if test='$selected'>
+		<xsl:attribute name='selected'>selected</xsl:attribute>
+	</xsl:if>
+	<xsl:value-of select='$text' />
+	</option>
+</xsl:template>
+
 <xsl:template match="/" >
-<p>Use this page to experiment with the RxML syntax. If you want to save your RxML, click <a href='site:///generic-new-template'>here</a> instead.</p>
-<form method="POST" action="site:///rxml2rdf" accept-charset='UTF-8' enctype="multipart/form-data">	         
-	<textarea name="rxmlAsZML" rows="20" COLS="75" style="width:100%" wrap="off">
+<form method="POST" action="site:///process-rdfsandbox" target='results' accept-charset='UTF-8' enctype="multipart/form-data">	         
+	<textarea name="contents" rows="20" COLS="75" style="width:100%" wrap="off">
 	<xsl:text>
 #a generic RxML template 
 prefixes:
@@ -29,8 +43,34 @@ prefixes:
 	</xsl:text>
 	</textarea>
 	<br/>
-	<input TYPE="submit" NAME="convert" VALUE="Convert To RDF/XML" />
+Convert from:
+<select name="fromFormat" size="1" width="100">
+<xsl:for-each select="/wiki:RDFFormat[wiki:can-parse]">
+    <xsl:call-template name="add-option" >
+        <xsl:with-param name="text" select="rdfs:label" />
+        <xsl:with-param name="value" select="." />
+        <xsl:with-param name="selected" select=". = $fromFormat" />
+    </xsl:call-template>
+</xsl:for-each>
+</select>
+to:
+<select name="toFormat" size="1" width="100">
+<xsl:for-each select="/wiki:RDFFormat[wiki:can-serialize]">
+    <xsl:call-template name="add-option" >
+        <xsl:with-param name="text" select="rdfs:label" />
+        <xsl:with-param name="value" select="." />
+        <xsl:with-param name="selected" select=". = $toFormat" />
+    </xsl:call-template>    
+</xsl:for-each>	
+</select>
+
+<input TYPE="submit" NAME="convert" VALUE="Convert" />
+
 </form>
+
+<h4>Results:</h4>
+<iframe src='' name='results' width='100%' height='300px'/>
+
 <div class="code" style='font-size: smaller'>
 <p align='center'><b><a href="site:///RxML">RxML</a> Quick Reference</b></p>
 <xsl:value-of disable-output-escaping='yes' 
