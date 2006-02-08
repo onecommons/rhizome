@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- from http://www.w3.org/2004/lambda/Sites/index.html
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+       "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"> -->
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head profile="http://www.w3.org/2003/g/data-view">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <title>Joe Lambda's Home page [an example of RDF in XHTML]</title>
+  <link rel="schema.DC" href="http://purl.org/dc" />
+  <link rel="meta" type="application/rdf+xml" title="FOAF"
+  href="http://www.w3.org/2000/06/webdata/xslt?xslfile=http%3A%2F%2Fwww.w3.org%2F2003%2F11%2Frdf-in-xhtml-processor;xmlfile=http%3A%2F%2Fwww.w3.org%2F2003%2F12%2Frdf-in-xhtml-xslts%2Fcomplete-example.html"
+  />
+  <meta name="DC.Title" xml:lang="en" lang="en"
+  content="Joe Lambda Home page as example of RDF in XHTML" />
+  <meta name="DC.Creator" content="Joe Lambda" />
+
+  <meta name="DC.Description" xml:lang="en" lang="en"
+  content="home page for the infamous Joe Lambda, with the purpose of demonstrating how to mix several RDF vocabularies in XHTML"
+  />
+  <meta name="DC.Publisher"
+  content="W3C - World Wide Web Consortium - http://www.w3.org" />
+  <link rel="transformation" href="http://www.w3.org/2003/12/rdf-in-xhtml-xslts/grokFOAF.xsl" />
+  <link rel="transformation" href="http://www.w3.org/2003/12/rdf-in-xhtml-xslts/grokCC.xsl" />
+  <link rel="transformation" href="http://www.w3.org/2003/12/rdf-in-xhtml-xslts/grokGeoURL.xsl" />
+  <link rel="transformation" href="http://www.w3.org/2000/06/dc-extract/dc-extract.xsl" />
+  <link rel="transformation" href="http://www.w3.org/2000/08/w3c-synd/home2rss.xsl" />
+  <link rel="stylesheet" href="/StyleSheets/base" />
+  <link rel="stylesheet" type="text/css" href="http://www.w3.org/QA/2002/12/qa4.css" />
+
+  <meta name="ICBM" content="39.2975, -94.71388888888889" />
+</head>
+
+<body>
+
+<div class="foaf-person">
+<h1>Joe Lambda's homepage</h1>
+
+<p><strong>Note: this should obsolete the <a
+href="/2003/12/rdf-in-xhtml-xslts/complete-example.html">older version</a>
+presently.</strong></p>
+
+<p>Hi there, my name is <span class="foaf-name">Joe Lambda</span>, and I work
+at <a href="http://www.acme.com" rel="foaf-work">ACME Inc.</a>. You can
+contact me by email at <a
+href="mailto:joe.lambda@example.org">joe.lambda@example.org</a>, or get more
+info on my <a href="http://www.example.org/~jlambda/"
+rel="foaf-home">personal home page</a>.</p>
+
+<h2>People I know</h2>
+<ul>
+  <li><a href="http://www.example.org/~bfoo/" rel="foaf-knows">Bill
+  Foo</a></li>
+  <li><a href="mailto:gbaz@example.com" rel="foaf-knows">G. Baz</a></li>
+</ul>
+</div>
+
+<h2 id="slogan">Joe's Thoughts</h2>
+
+<div><a
+  href="http://www.w3.org/2000/06/webdata/xslt?xslfile=http%3A%2F%2Fwww.w3.org%2F2003%2F11%2Frdf-in-xhtml-processor&amp;xmlfile=http%3A%2F%2Fwww.w3.org%2F2004%2Flambda%2FSites%2Findex.html">RSS/RDF/XML</a></div>
+
+<div class="item">
+<h3 id="it34534">Weekly Schedule</h3>
+
+<p>People keep asking me when I'm in the office and whem I'm not, so
+I'm adding my regular weekly schedule to my homepage.</p>
+</div>
+
+<div class="vcalendar">
+<p>Duration is 1 hour unless otherwise specified.</p>
+
+<table border="1" summary="weekly schedule" class="weekly">
+  <caption>starting <span class="dtstart">2005-08-01</span><br/>
+
+  timezone: <a class="tz" href=
+  "http://www.w3.org/2002/12/cal/tzd/America/Chicago#tz" >Chicago
+  time</a></caption>
+  <thead>
+    <tr>
+      <td><br />
+      </td>
+      <th>Mon</th>
+      <th>Tue</th>
+
+      <th>Wed</th>
+      <th>Thu</th>
+      <th>Fri</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+
+      <th>0000 to 0830</th>
+      <td>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+      <td>
+
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <th>0830 to 1159</th>
+      <td>09:00 staff meeting</td>
+      <td><p>09:30 <a href="/2001/sw/DataAccess/">RDF DAWG</a></p>
+
+      </td>
+      <td>
+      </td>
+      <td>08:30 Project Review
+      </td>
+      <td>09:00 work out at gym</td>
+    </tr>
+    <tr>
+      <th>1200 to 1659</th>
+
+      <td>12:00 weekly chat with Fred</td>
+      <td>12:00 Herbology
+        <p>13:30 Divination
+        to <span>15:00</span></p></td>
+      <td></td>
+      <td><span>13:00</span> game of go with Clara
+        <!-- weeks 2,4 --></td>
+      <td></td>
+
+    </tr>
+    <tr>
+      <th>1700 to 1859</th>
+      <td><span>18:00</span> go home
+      </td>
+      <td><span>18:00</span> go home
+      </td>
+
+      <td><span>18:00</span> go home
+      </td>
+      <td><span>18:00</span> go home
+      </td>
+      <td><span>18:00</span> go home
+      </td>
+    </tr>
+
+  </tbody>
+</table>
+
+<blockquote>
+  <p>see <a href="../../../2003/g/td/weekCal.xsl">weekCal.xsl</a> in
+  progress.</p>
+</blockquote>
+</div>
+<div class="item">
+<h3 id="blog3">Skiing - check out my snaps!
+
+</h3>
+<p><small><a rel="details" href="http://www.w3.org/2004/lambda/Sites/index.html#blog3">3</a></small> <b class="date">18 Feb 2004</b> Headed <a href="http://geourl.org/near/?lat=44.52020645141601&amp;lon=-72.796483039855957&amp;dist=50">up north</a> for
+a big of skiing today.  Took a camera of course and a GPS.
+At the end of the day, downlowded them pics and the tracks
+and cross-correlated them by time - so here is a
+
+<a href="../Documents/2004/02/18/map.svg">map of my tracks
+with my photos on it</a>.
+Made some <a href="../Documents/2004/02/18/Overview.html">notes</a>
+on how I did it. 
+</p>
+
+<p>FYI... <a href="http://geourl.org/rdf/?amp;lat=44.52020645141601&amp;lon=-72.796483039855957">RDF data about nearby places</a></p>
+</div>
+
+<div class="item">
+<h3 id="blog2">Taking a trip to Boston
+</h3>
+
+<p><small><a
+href="http://www.w3.org/2004/lambda/Sites/index.html#blog2"
+rel="details">2</a></small>
+
+ <b class="date">15 Jan 2004</b> I'm all set. It's gonna be great! Hmm...
+maybe I'll put my itinerary online so folks can tell if they'll be in town at
+the same time I am.</p>
+
+</div>
+
+<div class="item">
+<h3 id="blog1">New home page
+
+</h3>
+
+<p><small><a
+href="http://www.w3.org/2004/lambda/Sites/index.html#blog1"
+rel="details">1</a></small> <b class="date">4 Dec 2003</b> Whee! Web publishing is fun!</p>
+
+</div>
+
+<blockquote>
+  <h2>An example of RDF in XHTML</h2>
+
+  <p>This page is a fake home page for Joe Lambda, with the purpose of
+  demonstrating how to mix several RDF vocabularies in XHTML using a <a
+  href="http://www.w3.org/2004/01/rdxh/spec">technique involving XSLT</a>.</p>
+
+  <p>The following RDF vocabularies/applications are implemented in this
+  page:</p>
+
+  <ul>
+    <li><a href="http://www.foaf-project.org/">FOAF</a>, using <a
+      href="grokFOAF.xsl">grokFOAF.xsl</a> (see <a
+      href="http://xml.mfd-consult.dk/foaf/explorer/?foaf=http%3A%2F%2Fwww.w3.org%2F2003%2F12%2Frdf-in-xhtml-xslts%2Fcomplete-example.html">this
+      content via FOAF explorer</a>)</li>
+    <li><a href="http://creativecommons.org/licenses/">Creative Commons
+      Licenses</a>, using <a href="grokCC.xsl">grokCC.xsl</a></li>
+    <li><a href="http://purl.org/dc">Dublin Core</a> (1.1), using <a
+      href="/2000/06/dc-extract/dc-extract.xsl">dc-extract.xsl</a></li>
+
+    <li><a href="http://geourl.org/">GeoURL</a>, using <a
+      href="grokGeoURL.xsl">grokGeoURL.xsl</a></li>
+    <li><a href="http://purl.org/rss/1.0/">RSS 1.0</a>, using <a
+      href="/2000/08/w3c-synd/home2rss.xsl">home2rss.xsl</a></li>
+  </ul>
+
+  <p>The <a
+  href="http://www.w3.org/2000/06/webdata/xslt?xslfile=http%3A%2F%2Fwww.w3.org%2F2003%2F11%2Frdf-in-xhtml-processor&amp;xmlfile=http%3A%2F%2Fwww.w3.org%2F2004%2Flambda%2FSites%2Findex.html">output
+  of this</a> can be seen as RDF using the <a
+  href="../../../2003/11/rdf-in-xhtml-demo">demonstrator based on an XSLT
+  servlet</a>.</p>
+
+  <p>This page also uses <a href="http://rdfweb.org/topic/Autodiscovery">FOAF
+  autodiscovery</a> (ie. <em>link rel="meta"</em> conventions in the
+  document's head) to link to the derrived RDF data. This allows tools such
+  as <a href="http://xml.mfd-consult.dk/">FOAF Explorer</a> or the <a
+  href="http://www.typepad.com/">TypePad</a> weblogging service (see <a
+  href="joe-lambda-typepad.png">screenshot</a> of "add a friend" facility) to
+  exploit a machine-readable view of the data in this document.</p>
+
+  <address>
+    <a href="/People/Dom/">Dominique Haza&#235;l-Massieux</a> &lt;<a
+    href="mailto:dom@w3.org">dom@w3.org</a>&gt;<br />
+    Last Modified: $Date$
+  </address>
+</blockquote>
+<hr />
+<address>
+  Joe Lamba<br />
+
+  <small>$Revision$ of $Date$</small><br />
+  This page is licensed with a <a
+  href="http://creativecommons.org/licenses/by-nd/1.0/"
+  rel="cc-license">Creative Common License</a> allowing copy and
+  redistribution with attribution to the author, and disallowing derivative
+  works.
+</address>
+</body>
+</html>
