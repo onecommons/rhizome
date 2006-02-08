@@ -9,7 +9,7 @@ S'Execute'
 p6
 sS'code'
 p7
-S'assert 2==__server__.evalXPath("count(/*[wiki:name=\'testminoredit\']/wiki:revisions/*/rdf:first/*)")\nfrom Ft.Xml import InputSource\ncontents = InputSource.DefaultFactory.fromUri(\'site:///testminoredit?action=view-source&_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-complete&_noErrorHandling=1').read()\nassert contents[0]=="4", \'first character should be "4"\''
+S'revCount=__server__.evalXPath("count(/*[wiki:name=\'testminoredit\']/wiki:revisions/*/rdf:first/*)")\nassert 2==revCount,"revCount is "+str(revCount)+" not 2"\nfrom Ft.Xml import InputSource\ncontents = InputSource.DefaultFactory.fromUri(\'site:///testminoredit?action=view-source&_disposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-complete&_noErrorHandling=1').read()\nassert contents[0]=="4", \'first character should be "4"\''
 p8
 sS'_response'
 p9
