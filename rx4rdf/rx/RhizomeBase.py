@@ -11,9 +11,9 @@ from rx import zml, rxml, raccoon, utils, RxPath
 from rx.transactions import TxnFileFactory
 import Ft
 from Ft.Lib import Uri
-from Ft.Rdf import RDF_MS_BASE,OBJECT_TYPE_RESOURCE,RDF_SCHEMA_BASE
+from RxPath import RDF_MS_BASE,OBJECT_TYPE_RESOURCE,RDF_SCHEMA_BASE
 from Ft.Xml import InputSource
-import os, os.path, sys, types, base64, traceback, re
+import os, os.path, sys, types, base64, traceback, re, copy
 try:
     import cPickle
     pickle = cPickle
@@ -94,7 +94,8 @@ class RhizomeBase(object):
                 
             #SAVE_DIR should be a sub-dir of one of the PATH
             #directories so that 'path:' URLs to files there include
-            #the subfolder to make them distinctive. (Because you don't want to be able override them)
+            #the subfolder to make them distinctive.
+            #(Because you don't want to be able override them)
             saveDirPrefix = [prefix for prefix in self.server.PATH
                 if self.SAVE_DIR.startswith(os.path.abspath(prefix)) ]
             assert saveDirPrefix and self.SAVE_DIR[len(saveDirPrefix[0]):],\
@@ -108,7 +109,8 @@ class RhizomeBase(object):
                                           self.BASE_MODEL_URI+'password-hash')
         self.secureHashSeed = kw.get('SECURE_HASH_SEED', self.defaultSecureHashSeed)
         if self.secureHashSeed == self.defaultSecureHashSeed:
-            self.log.warning("SECURE_HASH_SEED using default seed -- set your own private value.")
+            self.log.warning("SECURE_HASH_SEED using default seed"
+                             " -- set your own private value.")
         self.secureHashMap = kw.get('secureHashMap',        
             { self.passwordHashProperty :  self.secureHashSeed })
         #make this available as an XPath variable
@@ -116,7 +118,8 @@ class RhizomeBase(object):
                         "'"+self.passwordHashProperty+"'")
 
         if not kw.get('ADMIN_PASSWORD_HASH') and not kw.get('ADMIN_PASSWORD'):
-            self.log.warning("neither ADMIN_PASSWORD nor ADMIN_PASSWORD_HASH was set; using default admin password.")
+            self.log.warning("neither ADMIN_PASSWORD nor ADMIN_PASSWORD_HASH "
+                             "was set; using default admin password.")
         elif kw.get('ADMIN_PASSWORD') == self.defaultPassword:
             self.log.warning("ADMIN_PASSWORD set is to the default admin password.")
 
@@ -124,24 +127,32 @@ class RhizomeBase(object):
 
         #this is just like findResourceAction except we don't assign the 'not found' resource
         #used by hasPage
-        self.checkForResourceAction = raccoon.Action(self.findResourceAction.queries[:-1])
-        self.checkForResourceAction.assign("__resource", '.', post=True)
-        self.indexDir = kw.get('INDEX_DIR', os.path.join(self.server.baseDir, 'contentindex'))
+        self.checkForResourceAction = copy.deepcopy(self.findResourceAction)        
+        self.checkForResourceAction.queries.pop()
+                
+        self.indexDir = kw.get('INDEX_DIR',
+                            os.path.join(self.server.baseDir, 'contentindex'))
         self.indexableFormats = kw.get('indexableFormats', self.defaultIndexableFormats)
 
-        xmlContentProcessor = self.server.contentProcessors['http://rx4rdf.sf.net/ns/wiki#item-format-xml']
+        xmlContentProcessor = self.server.contentProcessors[
+                                'http://rx4rdf.sf.net/ns/wiki#item-format-xml']
         xmlContentProcessor.blacklistedElements = kw.get('blacklistedElements',
-                                utils.BlackListHTMLSanitizer.blacklistedElements)
+                              utils.BlackListHTMLSanitizer.blacklistedElements)
         for name in [ 'blacklistedContent', 'blacklistedAttributes']:
             setting = kw.get(name)
             if setting is not None:
                 value = dict([(re.compile(x), re.compile(y))
                                for x, y in setting.items()])
-                setattr(xmlContentProcessor, name, result)
-                
-        zmlContentProcessor = self.server.contentProcessors['http://rx4rdf.sf.net/ns/wiki#item-format-zml']
+                setattr(xmlContentProcessor, name, value)
+
+        #apply settings to the zmlContentProcessor
+        zmlContentProcessor = self.server.contentProcessors[
+                        'http://rx4rdf.sf.net/ns/wiki#item-format-zml']
         raccoon.assignVars(zmlContentProcessor, kw, ['undefinedPageIndicator',
-                        'externalLinkIndicator', 'interWikiLinkIndicator'], 1)        
+                        'externalLinkIndicator', 'interWikiLinkIndicator'], 1)
+        
+        self.shredders = dict([ (x.uri, x) for x in kw.get('shredders', [])])
+
         self.uninitialized = False
                                  
     ######XPath extension functions#####        
@@ -150,18 +161,6 @@ class RhizomeBase(object):
             resultset = context.node
         contents = raccoon.StringValue(resultset)
         return zml.zmlString2xml(contents,self.mmf )
-
-    def getRxML(self, context, resultset = None, comment = '',
-                                fixUp=None, fixUpPredicate=None):
-      '''
-      Returns a string of an RxML/ZML representation of the node.
-      RxPathDOM nodes contained in resultset parameter. If
-      resultset is None, it will be set to the context node
-      '''
-      if resultset is None:
-            resultset = [ context.node ]
-      return rxml.getRXAsZMLFromNode(resultset, rescomment = comment,
-                            fixUp=fixUp, fixUpPredicate=fixUpPredicate)
 
     def getSecureHash(self, context, plaintext, secureProperty=None):
         if not secureProperty:
@@ -187,9 +186,11 @@ class RhizomeBase(object):
         
     def truncateContents(self, context, node=None, maxwords=0, maxlines=0):
         '''
-        Get the contents of the given revision resource, truncating it when maxwords is reached.
-        Returns either a string of the contents or a number if the contents can't be represented in HTML
-        (e.g. if it binary or if it contains HTML that can be embedded).
+        Get the contents of the given revision resource,
+        truncating it when maxwords is reached. Returns either a
+        string of the contents or a number if the contents can't be
+        represented in HTML (e.g. if it binary or if it contains HTML
+        that can be embedded).
         '''
         #if maxwords is None: #todo
         #    maxwords = self.maxSummaryWords
@@ -253,8 +254,8 @@ class RhizomeBase(object):
 
         kw = { '_name' : url }
         self.server.doActions([self.checkForResourceAction], kw)
-        if kw['__resource'] and kw['__resource'] != [self.server.domStore.dom]\
-           or kw.get('externalfile'):            
+        if (kw['__resource'] and kw['__resource'] != [self.server.domStore.dom]
+           or kw.get('externalfile')):            
             return raccoon.XTrue
         else:
             return raccoon.XFalse
@@ -447,7 +448,7 @@ class RhizomeBase(object):
                 #xml = '''<a:Content rdf:about='%(sha1urn)'>%(contentProps)s<a:contents>%(contents)s</a:contents></<a:Content>''' % locals()
             except UnicodeError:
                 #could be binary, base64 encode
-                encodedURI = utils.generateBnode()
+                encodedURI = RxPath.generateBnode()
                 contents = base64.encodestring(contents)            
                 xml = ("<a:ContentTransform %(ns)s rdf:about='%(encodedURI)s'>"
                     "<a:transformed-by>"
@@ -568,7 +569,7 @@ class RhizomeBase(object):
         
     ###template generation####
     def addFolders(self, pathSegments, baseURI=None):
-        from rx.utils import Res
+        from rx.RxPathUtils import Res
         Res.nsMap = self.nsMap
         
         if not baseURI:
@@ -616,7 +617,7 @@ class RhizomeBase(object):
             else:
                 return kw
 
-        from rx.utils import Res
+        from rx.RxPathUtils import Res
         Res.nsMap = self.nsMap
 
         if not baseURI:

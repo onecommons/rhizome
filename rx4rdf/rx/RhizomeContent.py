@@ -138,6 +138,7 @@ class MarkupMapFactory(zml.DefaultMarkupMapFactory):
             'faq' : faqMM,
             'faqs' : faqMM,
             'document' : documentMM,
+            'section' : documentMM,
             'specification' : specificationMM,
             'todo' : todoMM,
             
@@ -331,6 +332,42 @@ class PatchContentProcessor(raccoon.ContentProcessors.ContentProcessor):
     def processContents(self,result, kw, contextNode, contents):
         return self.rhizome.processPatch(contents, kw, result)
 
+class XMLShredder(raccoon.ContentProcessors.ContentProcessor):
+    uri = 'http://rx4rdf.sf.net/ns/wiki#item-format-xml'
+    label = 'XML/XHTML'
+    mimetype = 'text/html' #todo
+
+    def __init__(self, rhizome,defaultShredderStylesheetName):
+        self.rhizome = rhizome
+        self.defaultShredderStylesheetName = defaultShredderStylesheetName
+        
+    def processContents(self,result, kw, contextNode, contents):
+        #deduce content type from root element
+        #if it corresponds to one of the contentprocessor formats used by the shredder
+        #return that format so that contentprocessor will process it
+        ns, prefix, local = utils.getRootElementName(contents)
+        #print ns, local, contents[:500]
+        if ns == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#' or local=='rx':
+            #it's rdf: either rdfxml or rxml_xml
+            return contents, 'http://rx4rdf.sf.net/ns/wiki#item-format-rdf'
+        elif kw.get('_deduceDynamic'):
+            del kw['_deduceDynamic'] #only do this once
+
+            if ns == "http://www.xmldb.org/xupdate" :
+                return contents, 'http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate'
+            elif ns == 'http://www.w3.org/1999/XSL/Transform':
+                assert kw.get('_contents') or kw.get('_contentsDoc'), 'XSLT source missing'
+                return contents, 'http://www.w3.org/1999/XSL/Transform'
+
+        #otherwise invoke the generic XML shredder stylesheet
+        kw['_contents'] = contents
+        kw['_contentURI'] = 'site:///'+self.defaultShredderStylesheetName
+        #we'll need to figure out what the XSLT is outputting
+        kw['_deduceDynamic'] = True 
+        stylesheetContents = self.rhizome.makeRequest(None,
+                self.defaultShredderStylesheetName, 'action', 'view-source')
+        return stylesheetContents, 'http://www.w3.org/1999/XSL/Transform' 
+
 class RhizomeContent(RhizomeBase):
     def __init__(self, server):
         self.server = server
@@ -394,4 +431,62 @@ class RhizomeContent(RhizomeBase):
         assert base, "patch failed: couldn't find contents for %s" % repr(base)
         patch = pickle.loads(str(contents)) 
         return utils.patch(base,patch)
-    
+
+    def startShredding(self, context, resource, format, content):
+        format = raccoon.StringValue(format)
+        if format in ['http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate',
+                      'http://www.w3.org/1999/XSL/Transform',
+                      'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt']:
+            #treat these formats as plain xml -- we just want to analyze
+            #them, not execute them
+            format = 'http://rx4rdf.sf.net/ns/wiki#item-format-xml'
+        elif format not in self.shredders:
+            #don't try to shred unsupported formats
+            #todo: processContents should support a default content processor
+            return raccoon.XFalse
+        kw = {}
+        kw['__resource'] = resource
+        kw['_format'] = format
+        changeCount = len(self.server.txnSvc.state.additions)
+        result = self.server.runActions('shred', kw, content,newTransaction=False)
+        changes = len(self.server.txnSvc.state.additions) > changeCount
+        #change is inaccurate if the shredder removed some change
+        #and then added the same number of new ones
+        return changes and raccoon.XTrue or raccoon.XFalse
+
+    def shredWithStylesheet(self, context, stylesheetUri, sourceNode,
+                                                        sourceResource):
+        '''
+        This function can be called by a shredder stylesheet that is
+        shredding a document to support nested shredding on the same
+        document.
+        Returns true is if any statements were extracted.
+        '''
+        stylesheetUri = raccoon.StringValue(stylesheetUri)
+        kw = {}
+        kw['_contentsDoc'] = sourceNode[0]
+        kw['__resource'] = sourceResource
+        kw['_format'] = 'http://www.w3.org/1999/XSL/Transform' 
+        #the stylesheet will output xml that needs to be further processed
+        #so set _deduceFormat to signal XMLShredder to try to figure out how
+        #to process the result
+        kw['_deduceDynamic'] = True
+        if stylesheetUri.startswith('site:'):
+            if '?' in stylesheetUri:
+                if stylesheetUri[-1] == '?':
+                    delim = ''
+                else:
+                    delim = '&'
+            else:
+                delim = '?'
+            stylesheetUri += delim+'action=view-source'
+        kw['_contentURI'] = stylesheetUri
+        
+        changeCount = len(self.server.txnSvc.state.additions)
+        inputSource = InputSource.DefaultFactory.fromUri(stylesheetUri)
+        initVal = inputSource.stream.read()
+        inputSource.stream.close()
+        result = self.server.runActions('shred', kw, initVal, newTransaction=False)
+        changes = len(self.server.txnSvc.state.additions) > changeCount
+        return changes and raccoon.XTrue or raccoon.XFalse
+
