@@ -10,34 +10,70 @@
 '''
 from __future__ import generators
 
-from rx import utils
 from Ft.Lib.boolean import false as XFalse, true as XTrue, bool as Xbool
-from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, Util
-from Ft.Rdf import BNODE_BASE, BNODE_BASE_LEN,RDF_MS_BASE,RDF_SCHEMA_BASE
-import Ft.Rdf.Model
+
 from Ft.Xml.XPath.Conversions import StringValue, NumberValue
 from Ft.Xml import XPath, InputSource, SplitQName, EMPTY_NAMESPACE
-from Ft.Rdf.Statement import Statement
-from rx.utils import generateBnode
+
+from rx import utils
+from rx.RxPathUtils import *
 from rx.RxPathSchema import *
-import os.path, sys, StringIO, traceback
+
+import os.path, sys, traceback
 
 from rx import logging #for python 2.2 compatibility
 log = logging.getLogger("RxPath")
 
-#from Ft.Rdf import RDF_MS_BASE -- for some reason we need this to be unicode for the xslt engine:
-RDF_MS_BASE=u'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
-OBJECT_TYPE_XMLLITERAL='http://www.w3.org/1999/02/22-rdf-syntax-ns#XMLLiteral'
-
-#If true, the RDFLib RDF/XML parser will be used instead of the broken 4Suite one
-#this is set to True if RDFLib is installed 
-useRDFLibParser = False
-
-def createDOM(model, nsRevMap = None, modelUri=None, schemaClass = RDFSSchema):
+def createDOM(model, nsRevMap = None, modelUri=None, schemaClass = defaultSchemaClass):
     from rx import RxPathDom
     return RxPathDom.Document(model, nsRevMap,modelUri,schemaClass)
 
-class Model(object):
+
+class Tupleset(object):
+    '''
+    Interface for representing a set of tuples
+    '''
+    
+    def filter(self, conditions=None):        
+        '''Returns a iterator of the tuples in the set
+           where conditions is a position:value mapping
+        '''
+
+    def left_inner(self):
+        return self
+    
+    def asBool(self):
+        size = self.size()
+        if size < sys.maxint:
+            return bool(size)
+        else:
+            for row in self:
+                return True
+            return False
+
+    def size(self):
+        '''
+        If unknown return sys.maxint
+        '''
+        return sys.maxint
+
+    def __iter__(self):
+        return self.filter()
+
+    def __contains__(self, row):
+        #filter for a row that matches all the columns of this row
+        for test in self.filter(dict(enumerate(row))):
+            if row == test:
+                return True
+        return False
+
+    def update(self, rows):
+        raise TypeError('Tupleset is read only')
+
+    def append(self, row, *moreRows):
+        raise TypeError('Tupleset is read only')
+    
+class Model(Tupleset):
     ### Transactional Interface ###
 
     def commit(self, **kw):
@@ -46,14 +82,39 @@ class Model(object):
     def rollback(self):
         return
 
+    ### Tupleset interface ###
+
+    def filter(self,conditions=None):
+        kw = {}
+        if conditions:
+            labels = ('subject', 'predicate','object', 'objecttype','context')
+            for key, value in conditions.iteritems():
+                kw[labels[key] ] = value
+        for stmt in self.getStatements(**kw):
+            yield stmt
+
+    def update(self, rows):
+        for row in rows:
+            assert len(row) == 5
+            self.addStatement(row)
+
+    def append(self, row, *moreRows):
+        assert not moreRows
+        assert len(row) == 5
+        self.addStatement(row)
+
+    def describe(self, out, indent=''):        
+        print >>out, indent, self.__class__.__name__,hex(id(self))
+        
     ### Operations ###
-    
-    def getResources(self):
+                
+    def getResources(self, schema=None):
         '''All resources referenced in the model, include resources that only appear as objects in a triple.
            Returns a list of resources are sorted by their URI reference
         '''
         
-    def getStatements(self, subject = None, predicate = None, object=None, objecttype=None):
+    def getStatements(self, subject = None, predicate = None, object=None,
+                      objecttype=None,context=None):
         ''' Return all the statements in the model that match the given arguments.
         Any combination of subject, predicate or object can be None, and any None slot is
         treated as a wildcard that matches any value in the model.
@@ -66,10 +127,12 @@ class Model(object):
         '''add the specified statement to the model'''
         
     def removeStatement(self, statement ):
-        '''removes the statement'''
+        '''Removes the statement. If 'scope' isn't specified, the statement
+           will be removed from all contexts it appears in.
+        '''
 
     reifiedIDs = None
-    def findStatementID(self, stmt):        
+    def findStatementIDs(self, stmt):        
         if self.reifiedIDs is None:
            self.reifiedIDs = getReifiedStatements(self.getStatements())
         triple = (stmt.subject, stmt.predicate, stmt.object, stmt.objectType)
@@ -80,7 +143,7 @@ def getReifiedStatements(stmts):
     Find statements created by reification and return a list of the statements being reified 
     '''
     reifyPreds = { RDF_MS_BASE+'subject':0, RDF_MS_BASE+'predicate':1, RDF_MS_BASE+'object':2}
-    reifiedStmts = {}
+    reifiedStmts = {} #reificationURI => (triple)
     for stmt in stmts:
         index = reifyPreds.get(stmt.predicate)
         if index is not None:
@@ -91,26 +154,24 @@ def getReifiedStatements(stmts):
     #make a new dict, with the triple as key, while ignoring any incomplete statements
     for stmtUri, triple in reifiedStmts.items():
         if triple[0] and triple[1] and triple[2] is not None:
-            #reifiedStmt = Statement(triple[0], triple[1], triple[2],
-            #            objectType=triple[3], statementUri=stmtUri)
-            reifiedDict[tuple(triple)] = stmtUri
+            reifiedDict.setdefault(tuple(triple), []).append(stmtUri)
         #else: log.warning('incomplete reified statement')
     return reifiedDict
 
-def removeDupStatementsFromSortedList(aList, pred=None):       
+def removeDupStatementsFromSortedList(aList, pred=None):
     def removeDups(x, y):
         if pred and not pred(y):
             return x
         if not x or x[-1] != y:            
             x.append(y)
-        else: #x[-1] == y but Statement.__cmp__ doesn't consider the reified URI
-            #its a duplicate statement but second one has a reified URI
-            if x and y.uri: #the reified statement URI
-                x[-1].uri = y.uri #note: we only support one reification per statement
+        #else: #x[-1] == y but Statement.__cmp__ doesn't consider the reified URI
+        #    #its a duplicate statement but second one has a reified URI
+        #    if x and y.uri: #the reified statement URI
+        #        x[-1].uri = y.uri #note: we only support one reification per statement
         return x
     return reduce(removeDups, aList, [])
 
-def getResourcesFromStatements(stmts):
+def getResourcesFromStatements(stmts, schema=None):
     '''
     given a lists of statements return all the resources that appear as either or subject or object,
     except for non-head list resources.
@@ -132,68 +193,114 @@ def getResourcesFromStatements(stmts):
             resourceDict[stmt.object] = 1
         predicates[stmt.predicate] = 1
     assert not resourceDict.has_key(''), resourceDict.get('')
-    resourceDict.update( predicates )
-    #todo: get rid of this hack!:    
-    for x in RDFSSchema.requiredProperties + RDFSSchema.requiredClasses:
-        resourceDict[x] = 1
-    #todo: a more complete approach would be to call _baseSchema.findStatements()
-    #on each resource and add any new resources in the resulting statements
+    if schema:
+        schema.inferResources(resourceDict, predicates, stmts)
     resources = resourceDict.keys()    
     for uri, isHead in lists.items():
         if isHead:
             resources.append(uri)
-    
     resources.sort()
     return resources
     
-class FtModel(Model):
+class MemModel(Model):
     '''
-    wrapper around 4Suite's Ft.Rdf.Model
+    simple in-memory module
     '''
-    def __init__(self, ftmodel):
-        self.model = ftmodel
+    def __init__(self,statements=None):
+        self.by_s = {}
+        self.by_p = {}
+        self.by_o = {}
+        self.by_c = {}
+        if statements:
+            for stmt in statements:
+                self.addStatement(stmt)                                
 
-    def _beginIfNecessary(self):
-        if not getattr(self.model._driver, '_db', None):
-            #all the 4Suite driver classes that require begin() set a _db attribute
-            #and for the ones that don't, begin() is a no-op
-            self.model._driver.begin()
-
-    def commit(self, **kw):
-        self.model._driver.commit()
-
-    def rollback(self):
-        self.model._driver.rollback()        
+    def size(self):
+        return len(self.by_s)
     
-    def getResources(self):
+    def getResources(self,schema=None):
         '''All resources referenced in the model, include resources that only appear as objects in a triple.
            Returns a list of resources are sorted by their URI reference
         '''
-        self._beginIfNecessary()
-        return getResourcesFromStatements(self.model.complete(None, None, None))
+        return getResourcesFromStatements(self.getStatements(),schema)
         
-    def getStatements(self, subject = None, predicate = None, object = None, objecttype=None):
+    def getStatements(self, subject = None, predicate = None, object = None,
+                      objecttype=None,context=None):
         ''' Return all the statements in the model that match the given arguments.
         Any combination of subject and predicate can be None, and any None slot is
         treated as a wildcard that matches any value in the model.'''
-        self._beginIfNecessary()        
-        statements = self.model.complete(subject, predicate, object)        
-        statements.sort()
-        #4Suite doesn't support selecting based on objectype so filter here
-        def matchType(stmt):
-            return stmt.objectType == objecttype
-        pred = objecttype and matchType or None
-        return removeDupStatementsFromSortedList(statements, pred)
+        fs = subject is not None
+        fp = predicate is not None
+        fo = object is not None
+        fot = objecttype is not None
+        fc = context is not None
+        
+        if not fc:
+            if fs:                
+                stmts = self.by_s.get(subject,[])            
+            elif fo:
+                stmts = self.by_o.get(object, [])
+            elif fp:
+                stmts = self.by_p.get(predicate, [])
+            else:
+                #get all
+                stmts = utils.flattenSeq(self.by_s.itervalues(), 1)
+                #stmts = reduce(lambda l, i: l.extend(i) or l, self.by_s.values(), [])
+                if fot:
+                    stmts = [s for s in stmts if s.objectType == objecttype]
+                else:
+                    stmts = list(stmts)
+                stmts.sort()
+                return stmts
+        else:
+            by_cAnds = self.by_c[context]        
+            if fs:                
+                stmts = by_cAnds.get(subject,[])
+            else:
+                #stmts = reduce(lambda l, i: l.extend(i) or l, by_cAnds.values(), [])
+                stmts = utils.flattenSeq(by_cAnds.itervalues(), 1)
+                
+        stmts = [s for s in stmts 
+                    if not fs or s.subject == subject
+                    and not fp or s.predicate == predicate
+                    and not fo or s.object == object
+                    and not fot or s.objectType == objecttype
+                    and not fc or s.scope == context]
+        stmts.sort()
+        return stmts   
                      
-    def addStatement(self, statement ):
+    def addStatement(self, stmt ):
         '''add the specified statement to the model'''
-        self._beginIfNecessary()
-        self.model.add( statement )
-
-    def removeStatement(self, statement ):
+        if stmt in self.by_s.get(stmt[0], []):
+            return #statement already in
+        self.by_s.setdefault(stmt[0], []).append(stmt)
+        self.by_p.setdefault(stmt[1], []).append(stmt)
+        self.by_o.setdefault(stmt[2], []).append(stmt)
+        self.by_c.setdefault(stmt[4], {}).setdefault(stmt[0], []).append(stmt)
+        
+    def removeStatement(self, stmt ):
         '''removes the statement'''
-        self._beginIfNecessary()
-        self.model.remove( statement)
+        stmts = self.by_s.get(stmt.subject)
+        if not stmts:
+            return
+        try:
+            stmts.remove(stmt)
+        except ValueError:
+            return        
+        self.by_p[stmt.predicate].remove(stmt)
+        self.by_o[stmt.object].remove(stmt)
+        try:
+            self.by_c[stmt.scope][stmt.subject].remove(stmt)
+        except (ValueError,KeyError):
+            #this can happen since scope isn't part of the stmt's key
+            for subjectDict in self.by_c.values():
+                stmts = subjectDict.get(stmt.subject,[])
+                try:
+                    stmts.remove(stmt)
+                except ValueError:
+                    pass
+                else:
+                    return            
         
 class MultiModel(Model):
     '''
@@ -210,22 +317,38 @@ class MultiModel(Model):
     def rollback(self):
         self.models[0].rollback()        
 
-    def getResources(self):
+    def getResources(self, schema=None):
         resources = []
+        changed = 0
         for model in self.models:
-            resources += model.getResources()
-        resources.sort()
-        return utils.removeDupsFromSortedList(resources)
+            moreResources = model.getResources(schema)
+            if moreResources:
+                changed += 1
+                resources.extend(moreResources)
+        if changed > 1:        
+            resources.sort()
+            return utils.removeDupsFromSortedList(resources)
+        else:
+            return resources
                     
-    def getStatements(self, subject = None, predicate = None, object = None, objecttype=None):
+    def getStatements(self, subject = None, predicate = None, object = None,
+                      objecttype=None,context=None):
         ''' Return all the statements in the model that match the given arguments.
         Any combination of subject and predicate can be None, and any None slot is
         treated as a wildcard that matches any value in the model.'''
         statements = []
+        changed = 0
         for model in self.models:
-            statements += model.getStatements(subject, predicate,object, objecttype)
-        statements.sort()
-        return removeDupStatementsFromSortedList(statements)
+            moreStatements = model.getStatements(subject, predicate,object,
+                                              objecttype,context)
+            if moreStatements:
+                changed += 1
+                statements.extend(moreStatements)
+        if changed > 1:        
+            statements.sort()
+            return removeDupStatementsFromSortedList(statements)
+        else:
+            return statements            
                      
     def addStatement(self, statement ):
         '''add the specified statement to the model'''
@@ -252,11 +375,13 @@ class MirrorModel(Model):
         for model in self.models:
             model.rollback()
 
-    def getResources(self):
-        return self.models[0].getResources()
+    def getResources(self, schema=None):
+        return self.models[0].getResources(schema)
                             
-    def getStatements(self, subject = None, predicate = None, object = None, objecttype=None):
-        return self.models[0].getStatements(subject, predicate, object, objecttype)
+    def getStatements(self, subject = None, predicate = None, object = None,
+                      objecttype=None,context=None):
+        return self.models[0].getStatements(subject, predicate, object,
+                                            objecttype,context)
                      
     def addStatement(self, statement ):
         for model in self.models:
@@ -279,12 +404,17 @@ class TransactionModel(object):
     TransactionalMyModel(TransactionModel, MyModel): pass
     '''
     queue = None
+    autocommit = True
+
+    def __init__(self, *args, **kw):
+        super(TransactionModel, self).__init__(*args, **kw)
+        self.autocommit = False
     
     def commit(self, **kw):        
         if not self.queue:
             return     
         for stmt in self.queue:
-            if stmt[0] is utils.Removed:
+            if stmt[0] is Removed:
                 super(TransactionModel, self).removeStatement( stmt[1] )
             else:
                 super(TransactionModel, self).addStatement( stmt[0] )
@@ -296,7 +426,8 @@ class TransactionModel(object):
         #todo: if self.autocommit: raise exception
         self.queue = []
 
-    def _match(self, stmt, subject = None, predicate = None, object = None, objecttype=None):
+    def _match(self, stmt, subject = None, predicate = None, object = None,
+                                               objecttype=None,context=None):
         if subject and stmt.subject != subject:
             return False
         if predicate and stmt.predicate != predicate:
@@ -304,54 +435,69 @@ class TransactionModel(object):
         if object is not None and stmt.object != object:
             return False
         #todo: handle objecttype
+        if context is not None and stmt.scope != context:
+            return False
         return True
         
-    def getStatements(self, subject = None, predicate = None, object = None, objecttype=None):
+    def getStatements(self, subject = None, predicate = None, object = None,
+                      objecttype=None,context=None):
         ''' Return all the statements in the model that match the given arguments.
         Any combination of subject and predicate can be None, and any None slot is
         treated as a wildcard that matches any value in the model.'''
-        statements = super(TransactionModel, self).getStatements(subject, predicate, object, objecttype)
+        statements = super(TransactionModel, self).getStatements(subject, predicate, object,
+                                                                 objecttype,context)
         if not self.queue: 
             return statements
 
-        #avoid phantom reads, etc.        
+        #avoid phantom reads, etc.
+        changed = False
         for stmt in self.queue:
-            if stmt[0] is utils.Removed:
-                if self._match(stmt[1], subject, predicate, object, objecttype):
+            if stmt[0] is Removed:
+                if self._match(stmt[1], subject, predicate, object,
+                                               objecttype,context):
+                    changed = True
+                    if stmt[1] not in statements:
+                        print stmt[1], stmt[1][0]
+                        print [s for s in statements if s[0] == stmt[1][0] ]
+                        print [repr(i) for i in (subject, predicate, object, objecttype,context)]
                     statements.remove( stmt[1] )
             else:
-                if self._match(stmt[0], subject, predicate, object, objecttype):
+                if self._match(stmt[0], subject, predicate, object,
+                                               objecttype,context):
+                    changed = True
                     statements.append( stmt[0] )
-        
-        statements.sort()
-        return removeDupStatementsFromSortedList(statements)
+
+        if changed:        
+            statements.sort()
+            return removeDupStatementsFromSortedList(statements)
+        else:
+            return statements
 
     def addStatement(self, statement ):
         '''add the specified statement to the model'''
+        if self.autocommit:
+            return super(TransactionModel, self).addStatement(statement)        
         if self.queue is None: 
             self.queue = []    
         self.queue.append( (statement,) )
         
     def removeStatement(self, statement ):
         '''removes the statement'''
+        if self.autocommit:
+            return super(TransactionModel, self).removeStatement(statement)
         if self.queue is None: 
             self.queue = []    
-        self.queue.append( (utils.Removed, statement) )
+        self.queue.append( (Removed, statement) )
 
-class NTriplesFileModel(FtModel):
-    def __init__(self, inputfile, outputpath):        
-        self.path = outputpath
-        if isinstance(inputfile, ( type(''), type(u'') )): #assume its a file path or URL
-            memorymodel, memorydb = utils.deserializeRDF(inputfile)
-        else: #assume its is a file stream of NTriples
-            memorymodel, memorydb = utils.DeserializeFromN3File(inputfile)
-        FtModel.__init__(self, memorymodel)
+class NTriplesFileModel(MemModel):
+    def __init__(self, path, defaultStatements, context=''):
+        self.path, stmts, format = _loadRDFFile(path, defaultStatements,context)
+        MemModel.__init__(self, stmts)    
 
     def commit(self, **kw):
-        self.model._driver.commit()
         outputfile = file(self.path, "w+", -1)
-        stmts = self.model._driver._statements['default'] #get statements directly, avoid copying list
-        utils.writeTriples(stmts, outputfile)
+        stmts = self.getStatements()
+        writeTriples(stmts, outputfile)
         outputfile.close()
         
 class _IncrementalNTriplesFileModelBase(object):
@@ -360,20 +506,17 @@ class _IncrementalNTriplesFileModelBase(object):
     Use in a class hierarchy for Model where self has a path attribute
     and TransactionModel is preceeds this in the MRO.
     '''
-    #just so we can call _unmapStatements
-    dummyFtModel = Ft.Rdf.Model.Model(None)
     
     def commit(self, **kw):                
         import os.path, time
         if os.path.exists(self.path):
-            #self.model._driver.commit() #memory based stores don't need this
             outputfile = file(self.path, "a+")
             def unmapQueue():
                 for stmt in self.queue:
-                    if stmt[0] is utils.Removed:
-                        yield utils.Removed, self.dummyFtModel._unmapStatements( (stmt[1],))[0]
+                    if stmt[0] is Removed:
+                        yield Removed, stmt[1]
                     else:
-                        yield self.dummyFtModel._unmapStatements( (stmt[0],))[0]
+                        yield stmt[0]
                         
             comment = kw.get('source','')
             if isinstance(comment, (list, tuple)):                
@@ -382,7 +525,7 @@ class _IncrementalNTriplesFileModelBase(object):
                 comment = comment.getAttributeNS(RDF_MS_BASE, 'about')
                 
             outputfile.write("#begin " + comment + "\n")            
-            utils.writeTriples( unmapQueue(), outputfile)            
+            writeTriples( unmapQueue(), outputfile)            
             outputfile.write("#end " + time.asctime() + ' ' + comment + "\n")
             outputfile.close()
         else: #first time
@@ -390,23 +533,140 @@ class _IncrementalNTriplesFileModelBase(object):
 
 class IncrementalNTriplesFileModel(TransactionModel, _IncrementalNTriplesFileModelBase, NTriplesFileModel): pass
 
-def initFileModel(location, defaultModel):
+def _loadRDFFile(path, defaultStatements,context=''):
     '''
-    If location doesn't exist create a new model and initialize it with the statements specified in defaultModel,
-    a NTriples file object
-    '''    
-    if os.path.exists(location):
-        source = location
+    If location doesn't exist create a new model and initialize it
+    with the statements specified in defaultModel
+    '''
+    if os.path.exists(path):
+        uri = Uri.OsPathToUri(path)
+        stmts = parseRDFFromURI(uri, scope=context)
     else:
-        source = defaultModel
+        stmts = defaultStatements
 
     #we only support writing to a NTriples file 
-    if location.endswith('.nt'):
-        destination = location
+    if not path.endswith('.nt'):
+        base, ext = os.path.splitext(path)
+        path = base + '.nt'
+        if ext == '.rdf':
+            format = 'rdfxml'
+        else:
+            format = 'unsupported'
     else:
-        destination = os.path.splitext(location)[0] + '.nt'
+        format = 'ntriples'
+    
+    return path,stmts,format
+
+try:
+    import Ft.Rdf.Model
+    from Ft.Rdf.Statement import Statement as FtStatement   
+    from Ft.Rdf.Drivers import Memory
+    from Ft.Rdf import OBJECT_TYPE_UNKNOWN #"?"
+
+    if not hasattr(FtStatement, 'asTuple'):
+        #bug fix for pre beta1 versions of 4Suite
+        def cmpStatements(self,other):
+            if isinstance(other,FtStatement):        
+                return cmp( (self.subject,self.predicate,self.object, self.objectType),#, self.scope),
+                            (other.subject,other.predicate, other.object, other.objectType))#, other.scope))
+            else:
+                raise TypeError("Object being compared must be a Statement, not a %s" % type(other))
+        FtStatement.__cmp__ = cmpStatements
+    #todo: we (and 4Suite) doesn't consider scope, change this when we change our model
+
+    def Ft2Statements(statements, defaultScope=''):
+        for stmt in statements:
+            if stmt.objectType == OBJECT_TYPE_UNKNOWN:
+                objectType = OBJECT_TYPE_LITERAL
+            else:
+                objectType = stmt.objectType
+            yield Statement(stmt.subject, stmt.predicate,  stmt.object,
+                    objectType=objectType, scope=stmt.scope or defaultScope)
         
-    return IncrementalNTriplesFileModel(source, destination)
+    def statement2Ft(stmt):
+        return FtStatement(stmt.subject, stmt.predicate, stmt.object,
+                objectType=stmt.objectType, scope=stmt.scope)
+    
+    class FtModel(Model):
+        '''
+        wrapper around 4Suite's Ft.Rdf.Model
+        '''
+        def __init__(self, ftmodel):
+            self.model = ftmodel
+
+        def _beginIfNecessary(self):
+            if not getattr(self.model._driver, '_db', None):
+                #all the 4Suite driver classes that require begin() set a _db attribute
+                #and for the ones that don't, begin() is a no-op
+                self.model._driver.begin()
+
+        def commit(self, **kw):
+            self.model._driver.commit()
+
+        def rollback(self):
+            self.model._driver.rollback()        
+        
+        def getResources(self,schema=None):
+            '''All resources referenced in the model, include resources that only appear as objects in a triple.
+               Returns a list of resources are sorted by their URI reference
+            '''
+            self._beginIfNecessary()
+            return getResourcesFromStatements(self.model.complete(None, None, None),schema)
+            
+        def getStatements(self, subject = None, predicate = None, object = None,
+                          objecttype=None,context=None):
+            ''' Return all the statements in the model that match the given arguments.
+            Any combination of subject and predicate can be None, and any None slot is
+            treated as a wildcard that matches any value in the model.'''
+            self._beginIfNecessary()        
+            statements = list(Ft2Statements(
+                self.model.complete(subject, predicate, object,scope=context)))
+            statements.sort()
+            #4Suite doesn't support selecting based on objectype so filter here
+            if objecttype:
+                pred = lambda stmt: stmt.objectType == objecttype
+            else:
+                pred = None
+            return removeDupStatementsFromSortedList(statements, pred)
+                         
+        def addStatement(self, statement ):
+            '''add the specified statement to the model'''
+            self._beginIfNecessary()
+            self.model.add( statement2Ft(statement) )
+
+        def removeStatement(self, statement ):
+            '''removes the statement'''
+            self._beginIfNecessary()
+            self.model.remove( statement2Ft(statement) )
+
+    class NTriplesFtModel(FtModel):
+        def __init__(self, path, defaultStatements, context=''):
+            self.path, stmts, format = _loadRDFFile(path, defaultStatements,context)
+            db = Memory.GetDb('', 'default')
+            model = Ft.Rdf.Model.Model(db)
+            stmts = [statement2Ft(stmt) for stmt in stmts]
+            model.add(stmts)
+            FtModel.__init__(self, model)    
+        
+        def commit(self, **kw):
+            self.model._driver.commit()
+            outputfile = file(self.path, "w+", -1)
+            stmts = self.model._driver._statements['default'] #get statements directly, avoid copying list
+            def mapStatements(stmts):
+                #map 4Suite's tuples to Statements
+                for stmt in stmts:                    
+                    if stmt[5] == OBJECT_TYPE_UNKNOWN:
+                        objectType = OBJECT_TYPE_LITERAL
+                    else:
+                        objectType = stmt[5]
+                    yield (stmt[0], stmt[1], stmt[2], objectType, stmt[3])
+            writeTriples(mapStatements(stmts), outputfile)
+            outputfile.close()
+
+    class IncrementalNTriplesFtModel(TransactionModel, _IncrementalNTriplesFileModelBase, NTriplesFtModel): pass
+
+except ImportError:
+    log.debug("4Suite RDF not installed")
 
 try:
     import RDF #import Redland RDF
@@ -424,6 +684,8 @@ try:
             return unicode(node.uri)
 
     def URI2node(uri): 
+        if isinstance(uri, unicode):
+            uri = uri.encode('utf8')
         if uri.startswith(BNODE_BASE):
             return RDF.Node(blank=uri[BNODE_BASE_LEN:])
         else:
@@ -433,6 +695,11 @@ try:
         if objectType == OBJECT_TYPE_RESOURCE:            
             return URI2node(object)
         else:
+            if isinstance(object, unicode):
+                object = object.encode('utf8')
+            if isinstance(objectType, unicode):
+                objectType = objectType.encode('utf8')
+                
             kwargs = { 'literal':object}
             if objectType.find(':') > -1:
                 kwargs['datatype'] = objectType
@@ -442,18 +709,20 @@ try:
         
     def statement2Redland(statement):
         object = object2node(statement.object, statement.objectType)
-        return RDF.Statement(URI2node(statement.subject), URI2node(statement.predicate), object)
+        return RDF.Statement(URI2node(statement.subject),
+                             URI2node(statement.predicate), object)
 
-    def redland2Statements(redlandStatements):
+    def redland2Statements(redlandStatements, defaultScope=''):
         '''RDF.Statement to Statement'''
         for stmt in redlandStatements:
             if stmt.object.is_literal():                
                 objectType = stmt.object.literal_value.get('language') or \
                              stmt.object.literal_value.get('datatype') or OBJECT_TYPE_LITERAL
             else:
-                objectType = OBJECT_TYPE_RESOURCE            
-            yield Statement(node2String(stmt.subject), node2String(stmt.predicate),
-                            node2String(stmt.object), objectType=objectType)
+                objectType = OBJECT_TYPE_RESOURCE
+            yield Statement(node2String(stmt.subject), node2String(stmt.predicate),                            
+                            node2String(stmt.object), objectType=objectType,
+                            scope=redlandStatements.context() or defaultScope)
         
     class RedlandModel(Model):
         '''
@@ -468,14 +737,16 @@ try:
         def rollback(self):
             pass
             
-        def getResources(self):
+        def getResources(self, schema=None):
             '''All resources referenced in the model, include resources that only appear as objects in a triple.
                Returns a list of resources are sorted by their URI reference
-            '''                    
+            '''
+            import time
             stmts = redland2Statements( self.model.find_statements(RDF.Statement()) )
-            return getResourcesFromStatements(stmts)
+            return getResourcesFromStatements(stmts,schema)
         
-        def getStatements(self, subject = None, predicate = None, object = None, objecttype=None):
+        def getStatements(self, subject=None, predicate=None, object=None,
+                          objecttype=None,context=None):
             ''' Return all the statements in the model that match the given arguments.
             Any combination of subject and predicate can be None, and any None slot is
             treated as a wildcard that matches any value in the model.'''
@@ -485,40 +756,37 @@ try:
                 predicate = URI2node(predicate)
             if object is not None:
                 object = object2node(object, objectType)
-            statements = list( redland2Statements( self.model.find_statements(
-                                RDF.Statement(subject, predicate, object)) ) )
+            redlandStmts = self.model.find_statements(
+                                RDF.Statement(subject, predicate, object),
+                                context=context or None)
+            statements = list( redland2Statements( redlandStmts ) )
             statements.sort()
             return removeDupStatementsFromSortedList(statements)
                          
         def addStatement(self, statement ):
-            '''add the specified statement to the model'''            
-            self.model.add_statement( statement2Redland(statement) )
+            '''add the specified statement to the model'''
+            self.model.add_statement(statement2Redland(statement),
+                                      context=statement.scope or None)
 
         def removeStatement(self, statement ):
             '''removes the statement'''
-            self.model.remove_statement( statement2Redland(statement))
+            self.model.remove_statement(statement2Redland(statement),
+                                        context=statement.scope or None)
 
-    class TransactionalRedlandModel(TransactionModel, RedlandModel): pass
+    class RedlandHashBdbModel(TransactionModel, RedlandModel):
+        def __init__(self,location, defaultStatements=()):
+            if os.path.exists(location + '-sp2o.db'):
+                storage = RDF.HashStorage(location, options="hash-type='bdb'")
+                model = RDF.Model(storage)
+            else:
+                # Create a new BDB store
+                storage = RDF.HashStorage(location, options="new='yes',hash-type='bdb'")
+                model = RDF.Model(storage)                
+                for stmt in defaultStatements:
+                    model.add_statement( statement2Redland(stmt), context=stmt.scope)
+                model.sync()
+            super(RedlandHashBdbModel, self).__init__(model)
 
-    def initRedlandHashBdbModel(location, defaultModel):
-        if os.path.exists(location + '-sp2o.db'):
-            storage = RDF.HashStorage(location, options="hash-type='bdb'")
-            model = RDF.Model(storage)
-        else:
-            # Create a new BDB store
-            storage = RDF.HashStorage(location, options="new='yes',hash-type='bdb'")
-            model = RDF.Model(storage)
-            
-            makebNode = lambda bNode: BNODE_BASE + bNode
-            for stmt in utils.parseTriples(defaultModel,  makebNode):
-                model.add_statement( statement2Redland(
-                    Statement(stmt[0], stmt[1], stmt[2], '', '', stmt[3]) ) )            
-            #ntriples = defaultModel.read()            
-            #parser=RDF.Parser(name="ntriples", mime_type="text/plain")                        
-            #parser.parse_string_into_model(model, ntriples, base_uri=RDF.Uri("file:"))
-            model.sync()
-        return TransactionalRedlandModel(model)
-    
 except ImportError:
     log.debug("Redland not installed")
 
@@ -527,8 +795,6 @@ try:
     from rdflib.Literal import Literal
     from rdflib.BNode import BNode
     from rdflib.URIRef import URIRef
-    
-    useRDFLibParser = True
     
     def statement2rdflib(statement):
         if statement.objectType == OBJECT_TYPE_RESOURCE:            
@@ -540,17 +806,20 @@ try:
             elif len(statement.objectType) > 1: #must be a language id
                 kwargs['lang'] = statement.objectType
             object = Literal(statement.object, **kwargs)            
-        return (RDFLibModel.URI2node(statement.subject), RDFLibModel.URI2node(statement.predicate), object)
+        return (RDFLibModel.URI2node(statement.subject),
+                RDFLibModel.URI2node(statement.predicate), object)
 
-    def rdflib2Statements(rdflibStatements):
+    def rdflib2Statements(rdflibStatements, defaultScope=''):
         '''RDFLib triple to Statement'''
         for (subject, predicate, object) in rdflibStatements:
             if isinstance(object, Literal):                
                 objectType = object.language or object.datatype or OBJECT_TYPE_LITERAL
             else:
                 objectType = OBJECT_TYPE_RESOURCE            
-            yield Statement(RDFLibModel.node2String(subject), RDFLibModel.node2String(predicate),
-                            RDFLibModel.node2String(object), objectType=objectType)
+            yield Statement(RDFLibModel.node2String(subject),
+                            RDFLibModel.node2String(predicate),
+                            RDFLibModel.node2String(object),
+                            objectType=objectType, scope=defaultScope)
 
     class RDFLibModel(Model):
         '''
@@ -592,12 +861,12 @@ try:
         def rollback(self):
             pass
             
-        def getResources(self):
+        def getResources(self, schema=None):
             '''All resources referenced in the model, include resources that only appear as objects in a triple.
                Returns a list of resources are sorted by their URI reference
             '''                    
             stmts = rdflib2Statements( self.model.triples( (None, None, None)) ) 
-            return getResourcesFromStatements(stmts)
+            return getResourcesFromStatements(stmts,schema)
         
         def getStatements(self, subject = None, predicate = None, object = None, objecttype=None):
             ''' Return all the statements in the model that match the given arguments.
@@ -622,37 +891,27 @@ try:
             self.model.remove( statement2rdflib(statement))
 
     class RDFLibFileModel(RDFLibModel):
-        def __init__(self, inputfile, outputpath, format="xml"):        
-            self.path = outputpath
-            self.format = format
-
+        def __init__(self,path, defaultStatements=(), context=''):
+            ntpath, stmts, format = _loadRDFFile(path, defaultStatements,context)
+            if format == 'unsupported':                
+                self.format = 'nt'
+                self.path = ntpath
+            else:
+                self.format = (format == 'ntriples' and 'nt') or (
+                               format == 'rdfxml' and 'xml') or 'error'
+                assert self.format != 'error', 'unexpected format'
+                self.path = path
+                
             from rdflib.TripleStore import TripleStore                                    
             RDFLibModel.__init__(self, TripleStore())
-            
-            if isinstance(inputfile, ( type(''), type(u'') )): #assume its a file path or URL                
-                self.model.load(inputfile,format) #model is the tripleStore                            
-            else: #assume its is a file stream of NTriples
-                makebNode = lambda bNode: BNODE_BASE + bNode
-                for stmt in utils.parseTriples(inputfile,makebNode):
-                    self.addStatement( Statement(stmt[0], stmt[1], stmt[2], '', '', stmt[3]) ) 
+            for stmt in stmts:
+                self.addStatement( stmt )             
     
         def commit(self):
             self.model.save(self.path, self.format)
 
     class TransactionalRDFLibFileModel(TransactionModel, RDFLibFileModel): pass
-    
-    def initRDFLibModel(location, defaultModel, format="xml"):
-        '''
-        If location doesn't exist create a new model and initialize it with the statements specified in defaultModel,
-        which should be a NTriples file object. Whenever changes to the model are committed, location will be updated.
-        '''        
-        if os.path.exists(location):
-            source = location
-        else:
-            source = defaultModel
-            
-        return TransactionalRDFLibFileModel(source, location, format)
-    
+        
 except ImportError:
     log.debug("rdflib not installed")
 
@@ -702,7 +961,7 @@ def getURIFromElementName(elem):
     return u + getURIFragmentFromLocal(local)
 
 def getURIFragmentFromLocal(local):
-    if not local.lstrip('_'): #must be all '_'s
+    if local[-1:] == '_' and not local.lstrip('_'): #must be all '_'s
         return local[:-1] #strip last '_'
     else:
         return local
@@ -783,332 +1042,6 @@ def evalXPath(xpath, context, expCache=None, queryCache=None):
     else:
         res = compExpr.evaluate(context)
     return res
-
-def addStatements(rdfDom, stmts):
-    '''
-    Update the DOM (and so the underlying model) with the given list of statements.
-    If the statements include RDF list or container statements, it must include all items of the list
-    '''
-    #we have this complete list requirement because otherwise we'd have to figure out
-    #the head list resource and update its children and possible also do this for every nested list 
-    #resource not included in the statements (if the model exposed them)
-    listLinks = {}
-    listItems = {}
-    tails = []
-    containerItems = {}
-    for stmt in stmts:
-        #print 'stmt', stmt
-        if stmt.predicate == RDF_MS_BASE+'first':
-            listItems[stmt.subject] = stmt
-            #we handle these below
-        elif stmt.predicate == RDF_MS_BASE+'rest':                
-            if stmt.object == RDF_MS_BASE+'nil':
-                tails.append(stmt.subject)
-            else:
-                listLinks[stmt.object] = stmt.subject
-        elif stmt.predicate.startswith(RDF_MS_BASE+'_'): #rdf:_n
-            containerItems[(stmt.subject, int(stmt.predicate[len(RDF_MS_BASE)+1:]) )] = stmt
-        else:
-            subject = rdfDom.findSubject(stmt.subject) or rdfDom.addResource(stmt.subject)
-            subject.addStatement(stmt)
-
-    #for each list encountered
-    for tail in tails:            
-        orderedItems = [ listItems[tail] ]            
-        #build the list from last to first
-        head = tail
-        while listLinks.has_key(head):
-            head = listLinks[head]
-            orderedItems.append(listItems[head])            
-        orderedItems.reverse()
-        for stmt in orderedItems:
-            listid = stmt.subject
-            stmt.subject = head #set the subject to be the head of the list
-            subject = rdfDom.findSubject(stmt.subject) or rdfDom.addResource(stmt.subject)
-            subject.addStatement(stmt, listid)
-        
-    #now add any container statements in the correct order
-    containerKeys = containerItems.keys()
-    containerKeys.sort()
-    for key in containerKeys:
-        stmt = containerItems[key]
-        listid = stmt.predicate
-        head = stmt.subject
-        stmt.predicate = RDF_SCHEMA_BASE+u'member'
-        subject = rdfDom.findSubject(stmt.subject) or rdfDom.addResource(stmt.subject)
-        subject.addStatement(stmt, listid)
-
-def diffResources(sourceDom, resourceNodes):
-    ''' Given a list of Subject nodes from another RxPath DOM, compare
-    them with the resources in the source DOM. This assumes that the
-    each Subject node contains all the statements it is the subject
-    of.
-
-    Returns the tuple (Subject or Predicate nodes to add list, Subject
-    or Predicate nodes to remove list, Re-ordered resource dictionary)
-    where Reordered is a dictionary whose keys are RDF list or
-    collection Subject nodes from the source DOM that have been
-    modified or reordered and whose values is the tuple (added node
-    list, removed node list) containing the list item Predicates nodes
-    added or removed.  Note that a compoundresource could be
-    re-ordered but have no added or removed items and so the lists
-    will be empty.
-    
-    This diff routine punts on blank node equivalency; this means bNode
-    labels must match for the statements to match. The exception is
-    RDF lists and containers -- in this case the bNode label or exact
-    ordinal value of the "rdf:_n" property is ignored -- only the
-    order is compared.  '''
-    removals = []
-    additions = []
-    reordered = {}
-    for resourceNode in resourceNodes:
-        currentNode = sourceDom.findSubject(resourceNode.uri)
-        if currentNode: 
-            isCompound = currentNode.isCompound()
-            isNewCompound = resourceNode.isCompound()
-            if isNewCompound != isCompound:
-                #one's a compound resource and the other isn't (or they're different types of compound resource)
-                if isNewCompound and isCompound and isCompound != \
-                    RDF_MS_BASE + 'List' and isNewCompound != RDF_MS_BASE + 'List':
-                    #we're switching from one type of container (Seq, Alt, Bag) to another
-                    #so we just need to add and remove the type statements -- that will happen below
-                    diffResource = True
-                else:
-                    #remove the previous resource
-                    removals.append(currentNode) 
-                    #and add the resource's current statements
-                    #we add all the its predicates instead just adding the
-                    #resource node because it isn't a new resource
-                    for predicate in resourceNode.childNodes:
-                        additions.append( predicate) 
-                    
-                    diffResource = False
-            else:
-                diffResource = True
-        else:
-            diffResource = False
-            
-        if diffResource:
-            def update(currentChildren, resourceChildren, added, removed):
-                changed = False
-                for tag, alo, ahi, blo, bhi in opcodes:#to turn a into b
-                    if tag in ['replace', 'delete']:
-                        changed = True
-                        for currentPredicate in currentChildren[alo:ahi]:
-                            #if we're a list check that the item hasn't just been reordered, not removed
-                            if not isCompound or \
-                                toListItem(currentPredicate) not in resourceNodeObjects:
-                                    removed.append( currentPredicate)
-                    if tag in ['replace','insert']:
-                        changed = True
-                        for newPredicate in resourceChildren[blo:bhi]:
-                            #if we're a list check that the item hasn't just been reordered, not removed
-                            if not isCompound or \
-                                toListItem(newPredicate) not in currentNodeObjects:                            
-                                    added.append( newPredicate )                    
-                    #the only other valid value for tag is 'equal'
-                return changed
-            
-            if isCompound:
-                #to handle non-membership statements we split the childNode lists
-                #and handle each separately (we can do that the RxPath spec says all non-membership statements will come first)
-                i = 0
-                for p in currentNode.childNodes:
-                    if p.stmt.predicate in [RDF_MS_BASE + 'first', RDF_SCHEMA_BASE + 'member']:
-                        break
-                    i+=1
-                currentChildren = currentNode.childNodes[:i]
-                j = 0
-                for p in resourceNode.childNodes:
-                    if p.stmt.predicate in [RDF_MS_BASE + 'first', RDF_SCHEMA_BASE + 'member']:
-                        break
-                    j+=1                
-                resourceChildren = resourceNode.childNodes[:j]
-                
-                #if it's a list or collection we just care about the order, ignore the predicates
-                import difflib
-                toListItem = lambda x: (x.stmt.objectType, x.stmt.object)
-                currentListNodes = currentNode.childNodes[i:]
-                currentNodeObjects = map(toListItem, currentListNodes)
-                resourceListNodes = resourceNode.childNodes[j:]
-                resourceNodeObjects = map(toListItem, resourceListNodes)
-                opcodes = difflib.SequenceMatcher(None, currentNodeObjects,
-                                           resourceNodeObjects).get_opcodes()
-                if opcodes:
-                    #print opcodes
-                    currentAdded = []
-                    currentRemoved = []
-                    #if the list has changed
-                    if update(currentListNodes, resourceListNodes, currentAdded, currentRemoved):
-                           reordered[ currentNode ] = ( currentAdded, currentRemoved )
-            else:
-                currentChildren = currentNode.childNodes
-                resourceChildren = resourceNode.childNodes
-                
-            opcodes = utils.diffSortedList(currentChildren,resourceChildren,
-                    lambda a,b: cmp(a.stmt, b.stmt) )
-            update(currentChildren,resourceChildren,additions, removals)
-        else: #new resource (add all the statements)
-            additions.append(resourceNode)
-    return additions, removals, reordered
-
-def mergeDOM(sourceDom, updateDOM, resources, authorize=None):
-    '''
-    Performs a 2-way merge of the updateDOM into the sourceDom.
-    
-    Resources is a list of resource URIs originally contained in
-    update DOM before it was edited. If present, this list is
-    used to create a diff between those resources statements in
-    the source DOM and the statements in the update DOM.
-
-    All other statements in the update DOM are added to the source
-    DOM. (Conflicting bNode labels are not re-labeled as we assume
-    update DOM was orginally derived from the sourceDOM.)
-
-    This doesn't modify the source DOM, instead it returns a pair
-    of lists (Statements to add, nodes to remove) that can be used to
-    update the DOM, e.g.:
-    
-    >>> statements, nodesToRemove = mergeDOM(sourceDom, updateDom ,resources)
-    >>> for node in nodesToRemove:
-    >>>    node.parentNode.removeChild(node)
-    >>> addStatements(sourceDom, statements)    
-    '''
-    #for each of these resources compare its statements in the update dom
-    #with those in the source dom and add or remove the differences    
-    newNodes = []
-    removeResources = []            
-    resourcesToDiff = []
-    for resUri in resources:
-        resNode = updateDOM.findSubject(resUri)
-        if resNode: #do a diff on this resource
-            #print 'diff', resUri
-            resourcesToDiff.append(resNode)
-        else:#a resource no longer in the rxml has all their statements removed
-            removeNode = sourceDom.findSubject(resUri)
-            if removeNode:
-                removeResources.append(removeNode)
-                        
-    for resNode in updateDOM.childNodes:
-        #resources in the dom but not in resources just have their statements added
-        if resNode.uri not in resources:                    
-            if resNode.isCompound():
-                #if the node is a list or container we want to compare with the list in model
-                #because just adding its statements with existing list statements would mess things up
-                #note: thus we must assume the list in the updateDOM is complete
-                #print 'list to diff', resNode
-                resourcesToDiff.append(resNode)
-            else:
-                sourceResNode  = sourceDom.findSubject(resNode.uri)
-                if sourceResNode:
-                    #not a new resource: add each statement that doesn't already exist in the sourceDOM
-                    for p in resNode.childNodes:
-                        if not sourceResNode.findPredicate(p.stmt):
-                            newNodes.append(p)                    
-                else:
-                    #new resource: add the subject node
-                    newNodes.append(resNode)
-        else:
-            assert resNode in resourcesToDiff #resource in the list will have been added above
-                       
-    additions, removals, reordered = diffResources(sourceDom, resourcesToDiff)
-
-    newNodes.extend( additions )
-    removeResources.extend( removals)
-    if authorize:
-        authorize(newNodes, removeResources, reordered)
-
-    newStatements = reduce(lambda l, n: l.extend(n.getModelStatements()) or l, newNodes, [])
-    
-    #for modified lists we just remove the all container and collection resource
-    #and add all its statements    
-    for compoundResource in reordered.keys():
-        removeResources.append(compoundResource)
-        newCompoundResource = updateDOM.findSubject( compoundResource.uri)
-        assert newCompoundResource
-        newStatements = reduce(lambda l, p: l.extend(p.getModelStatements()) or l,
-                        newCompoundResource.childNodes, newStatements)
-    return newStatements, removeResources
-
-def addDOM(sourceDom, updateDOM, authorize=None):
-    ''' Add the all statements in the update RxPath DOM to the source
-    RxPathDOM. If the updateDOM contains RDF lists or containers that
-    already exist in sourceDOM they are replaced instead of added
-    (because just adding the statements could form malformed lists or
-    containers). bNode labels are renamed if they are used in the
-    existing model. If you don't want to relabel conflicting bNodes
-    use mergeDOM with an empty resource list.
-
-    This doesn't modify the source DOM, instead it returns a pair
-    of lists (Statements to add, nodes to remove) that can be used to
-    update the DOM in the same manner as mergeDOM.
-    '''
-    stmts = updateDOM.model.getStatements()    
-    bNodes = {}
-    replacingListResources = []
-    for stmt in stmts:                
-        def updateStatement(attrName):
-            '''if the bNode label is used in the sourceDom choose a new bNode label'''
-            uri = getattr(stmt, attrName)
-            if uri.startswith(BNODE_BASE):
-                if bNodes.has_key(uri):
-                    newbNode = bNodes[uri]
-                    if newbNode:
-                        setattr(stmt, attrName, newbNode)
-                else: #encountered for the first time
-                    if sourceDom.findSubject(uri):
-                        #generate a new bNode label
-                           
-                        #todo: this check doesn't handle detect inner list bnodes
-                        #most of the time this is ok because the whole list will get removed below
-                        #but if the bNode is used by a inner list we're not removing this will lead to a bug
-                        
-                        #label used in the model, so we need to rename this bNode
-                        newbNode = generateBnode()
-                        bNodes[uri] = newbNode
-                        setattr(stmt, attrName, newbNode)
-                    else:
-                        bNodes[uri] = None
-            else:                
-                if not bNodes.has_key(uri):                    
-                    resNode = updateDOM.findSubject(uri)
-                    if resNode and resNode.isCompound() and sourceDom.findSubject(uri):
-                        #if the list or container resource appears in the source DOM we need to compare it
-                        #because just adding its statements with existing list statements would mess things up
-                        #note: thus we must assume the list in the updateDom is complete                         
-                        replacingListResources.append(resNode)
-                    bNodes[uri] = None
-        updateStatement('subject')        
-        if stmt.objectType == OBJECT_TYPE_RESOURCE:
-            updateStatement('object')
-    #todo: the updateDOM will still have the old bnode labels, which may mess up authorization
-            
-    additions, removals, reordered = diffResources(sourceDom,replacingListResources)
-    assert [getattr(x, 'stmt') for x in additions] or not len(additions) #should be all predicate nodes
-
-    #now filter out any statements that already exist in the source dom:
-    #(note: won't match statements with bNodes since they have been renamed
-    alreadyExists = []
-    newStmts = []
-    for stmt in stmts:
-        resNode = sourceDom.findSubject(stmt.subject)
-        if resNode and resNode.findPredicate(stmt):
-            alreadyExists.append(stmt)
-        else:
-            newStmts.append(stmt)
-    
-    if authorize:
-        #get all the predicates in the updatedom except the ones in replacingListResources        
-        newResources = [x for x in updateDOM.childNodes if x not in replacingListResources]
-        newPredicates = reduce(lambda l, s: l.extend(
-            [p for p in s.childNodes if p.stmt not in alreadyExists]) or l,
-                                       newResources, additions)
-        authorize(newPredicates, removals, reordered)
-        
-    #return statements to add, list resource nodes to remove
-    #note: additions should contained by stmts, so we don't need to return them
-    return newStmts, reordered.keys() 
 
 ##########################################################################
 ## RxPath extension functions
@@ -1287,7 +1220,61 @@ def getURIFromElement(context, nodeset=None):
         return namespace + getURIFragmentFromLocal(local)
     else:
         return getURIFromElementName(node)
-       
+
+def getReified(context, nodeset):
+    reifications = []
+    for node in nodeset:
+        if hasattr(node,'stmt'):
+            reifiedURIs=node.ownerDocument.model.findStatementIDs(node.stmt)
+            reifications.extend([node.ownerDocument.findSubject(uri)
+                                 for uri in reifiedURIs])
+    return reifications
+
+def getGraphPredicates(context, uri):
+    uri = StringValue(uri)
+    predicates = []
+    doc = context.node.ownerDocument
+    statements = doc.model.getStatements(context=uri)
+    for stmt in statements:
+        assert stmt.scope == uri
+        subjectNode = doc.findSubject(stmt.subject)
+        predNode = subjectNode.findPredicate(stmt)
+        assert predNode
+        predicates.append(predNode)
+    return predicates
+
+def rdfDocument(context, object,type='unknown', nodeset=None):
+    #note: XSLT only
+    type = StringValue(type)
+    oldDocReader = context.processor._docReader
+    class RDFDocReader:
+        def __init__(self, uri2prefixMap, type, schemaClass):
+            self.uri2prefixMap = uri2prefixMap
+            self.type = type
+            self.schemaClass = schemaClass
+            
+        def parse(self, isrc): 
+            contents = isrc.stream.read()
+            isrc.stream.close()
+            stmts = parseRDFFromString(contents, isrc.uri, self.type)            
+            return RxPathDOMFromStatements(stmts, self.uri2prefixMap, isrc.uri,
+                                           self.schemaClass)
+
+    nsRevMap = getattr(context.node.ownerDocument, 'nsRevMap', None)
+    schemaClass = getattr(context.node.ownerDocument, 'schemaClass',
+                                                      defaultSchemaClass)
+    context.processor._docReader = RDFDocReader(nsRevMap, type,defaultSchemaClass)
+    from Ft.Xml.Xslt import XsltFunctions
+    result = XsltFunctions.Document(context, object, nodeset)
+    context.processor._docReader = oldDocReader
+    return result
+
+#def XML2RDF(context, nodeset, uri,type=None):
+#    uri = StringValue(uri)
+#    assert len(nodeset) == 1, 'only one root node in nodeset supported'
+#    nsRevMap = getattr(context.node.ownerDocument, 'nsRevMap', None)
+#    return RxPathDOMFromStatements(parseRDFFromDOM(nodeset[0]), nsRevMap, uri)
+            
 RFDOM_XPATH_EXT_NS = None #todo: put these in an extension namespace?
 BuiltInExtFunctions = {
 (RFDOM_XPATH_EXT_NS, 'is-predicate'): isPredicate,
@@ -1303,8 +1290,13 @@ BuiltInExtFunctions = {
 (RFDOM_XPATH_EXT_NS, 'local-name-from-uri'): getLocalNameFromURI,
 (RFDOM_XPATH_EXT_NS, 'namespace-uri-from-uri'): getNamespaceURIFromURI,
 (RFDOM_XPATH_EXT_NS, 'uri'): getURIFromElement,
-}
 
+(RFDOM_XPATH_EXT_NS, 'get-statement-uris'): getReified,
+(RFDOM_XPATH_EXT_NS, 'get-graph-predicates'): getGraphPredicates,
+(RFDOM_XPATH_EXT_NS, 'rdfdocument'): rdfDocument,
+}
+from Ft.Xml.Xslt import XsltContext
+XsltContext.XsltContext.functions[(RFDOM_XPATH_EXT_NS, 'rdfdocument')] = rdfDocument
 ##########################################################################
 ## "monkey patches" to Ft.XPath
 ##########################################################################
@@ -1343,15 +1335,6 @@ def Id(context, object):
 XPath.CoreFunctions.CoreFunctions[(EMPTY_NAMESPACE, 'id')] = Id
 XPath.Context.Context.functions[(EMPTY_NAMESPACE, 'id')] = Id
 XsltContext.XsltContext.functions[(EMPTY_NAMESPACE, 'id')] = Id
-
-#fix bug in Ft.Rdf.Statement:
-def cmpStatements(self,other):
-    if isinstance(other,Statement):        
-        return cmp( (self.subject,self.predicate,self.object, self.objectType, self.scope),
-                    (other.subject,other.predicate, other.object, self.objectType, other.scope))
-    return cmp(str(self),str(other)) #should this be here?
-
-Statement.__cmp__ = cmpStatements
 
 from xml.dom import Node
 
@@ -1539,7 +1522,7 @@ XPath.ParsedExpr.ParsedPathExpr.evaluate = _ParsedPathExpr_evaluate
 
 #patch XPath.ParsedNodeTest.QualifiedNameTest:
 _QualifiedNameTest_oldMatch = XPath.ParsedNodeTest.QualifiedNameTest.match.im_func
-def _QualifiedNameTest_match(self, context, node, principalType=Node.ELEMENT_NODE):
+def _QualifiedNameTest_match(self, context, node, principalType=Node.ELEMENT_NODE):    
     if not hasattr(node, 'matchName'):
         return _QualifiedNameTest_oldMatch(self, context, node, principalType)
     else:
@@ -1627,5 +1610,5 @@ def ExpressionWrapper_evaluate(self,context):
      raise utils.NestedException(MessageSource.EXPRESSION_POSITION_INFO % (
          self.element.baseUri, self.element.lineNumber,
          self.element.columnNumber, self.original, tb.getvalue()),
-                       useNested = True)
+                       useNested = False)
 AttributeInfo.ExpressionWrapper.evaluate = ExpressionWrapper_evaluate

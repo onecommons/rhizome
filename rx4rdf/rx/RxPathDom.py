@@ -36,15 +36,17 @@
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 '''
-import xml.dom
+
 from rx import RxPath, utils, DomTree
-from xml.dom import NotSupportedErr, HierarchyRequestErr, NotFoundErr
-from xml.dom import IndexSizeErr
-from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL
-from Ft.Xml import SplitQName, XML_NAMESPACE
 from utils import NotSet
-from rx.RxPath import RDF_MS_BASE, RDF_SCHEMA_BASE
+from RxPath import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL
+from RxPath import RDF_MS_BASE, RDF_SCHEMA_BASE
+
+import xml.dom
+from xml.dom import NotSupportedErr, HierarchyRequestErr, NotFoundErr,IndexSizeErr
+from Ft.Xml import SplitQName, XML_NAMESPACE
 import sys, copy
+
 from rx import logging #for python 2.2 compatibility
 log = logging.getLogger("RxPath")
 
@@ -162,7 +164,8 @@ class Node(xml.dom.Node, object):
         if len(self.childNodes):
             if cmpPredicate is None:
                 #ugh... the default comparison logic choose the right operand's __cmp__
-                #      over the left operand's __cmp__ if its an old-style class and the left is a new-style class!
+                #      over the left operand's __cmp__ if its an old-style
+                #      class and the left is a new-style class!
                 cmpPredicate = lambda x, y: x.__cmp__(y)
             index = utils.bisect_left(self.childNodes, key, cmpPredicate, lo, hi)
 
@@ -437,6 +440,14 @@ class Resource(Element):
     def getModelStatements(self):
         return reduce(lambda l, p: l.extend(p.getModelStatements()) or l,
                         self.childNodes, [])
+
+    def findPredicate(self, stmt):
+        '''returns the child node that represents the statement or None if not found.'''
+        #todo: if we're not a list we could use bisect
+        for predicate in self.childNodes:
+            if predicate.stmt == stmt:
+                return predicate
+        return None
         
     def replaceChild(self, newChild, oldChild):
         '''
@@ -490,7 +501,8 @@ class Subject(Resource):
         nextList = None
         for stmt in stmts:                      
             if stmt.predicate == RDF_MS_BASE+'first':
-                stmt.subject = self.uri #make the subject the head of the list
+                #change the subject to the head of the list
+                stmt = RxPath.Statement(self.uri, *stmt[1:]) 
                 self._doAppendChild(children, Predicate(stmt, self, listID=listID))
             elif stmt.predicate == RDF_MS_BASE+'rest':
                 if stmt.object != RDF_MS_BASE+'nil':
@@ -536,17 +548,9 @@ class Subject(Resource):
         for ordinal in ordinals:
             stmt = containerItems[ordinal]
             realPredicate = stmt.predicate
-            stmt.predicate = RDF_SCHEMA_BASE+u'member'
+            stmt = RxPath.Statement(stmt[0], RDF_SCHEMA_BASE+u'member', *stmt[2:])
             self._doAppendChild(children, Predicate(stmt, self, listID=realPredicate))            
         return children
-
-    def findPredicate(self, stmt):
-        '''returns the child node that represents the statement or None if not found.'''
-        #todo: if we're not a list we could use bisect
-        for predicate in self.childNodes:
-            if predicate.stmt == stmt:
-                return predicate
-        return None
 
     def insertBefore(self, newChild, refChild):
         '''
@@ -562,19 +566,26 @@ class Subject(Resource):
         
         newChild.normalize()
         if not looksLikePredicate(newChild):
-            raise HierarchyRequestErr("can't add to this resource: the child %s doesn't look like a predicate" % newChild)        
+            raise HierarchyRequestErr("can't add to this resource: the child "
+                                "%s doesn't look like a predicate" % newChild)
         predicateURI = RxPath.getURIFromElementName(newChild)
-            #append and insertbefore establish order, if rdf:_n need to (add and remove) each following statement
-            #rewrite predicate based on rdf:_n or listID or bNode
+        #append and insertbefore establish order, if rdf:_n need to
+        # (add and remove) each following statement
+        #rewrite predicate based on rdf:_n or listID or bNode        
         stmtID = newChild.getAttributeNS(RDF_MS_BASE,'ID')
+        #todo: if stmtID we need to update model.reifiedIDs (transactionally)
+        #      and add statement triples (see Statement.reify() )
+        assert not stmtID, 'rdf:ID attribute not yet supported' #todo
         datatype = newChild.getAttributeNS(RDF_MS_BASE,'datatype')
         lang  = newChild.getAttributeNS(XML_NAMESPACE,'lang')
         listID = newChild.getAttributeNS(None,'listID')
-        if newChild.getAttributeNS(RDF_MS_BASE,'resource'): #for concision, allow the use of a rdf:resource attribute instead of a child element
+        #for concision, allow the use of a rdf:resource attribute instead of a child element
+        if newChild.getAttributeNS(RDF_MS_BASE,'resource'):            
             object = newChild.getAttributeNS(RDF_MS_BASE, 'resource')
             assert object
             objectType = OBJECT_TYPE_RESOURCE            
-        elif newChild.firstChild is None: #if no children assign an empty string as the object            
+        elif newChild.firstChild is None:
+            #if no children assign an empty string as the object            
             object = ''
             objectType = datatype or lang or OBJECT_TYPE_LITERAL            
         elif newChild.firstChild.nodeType == Node.TEXT_NODE:
@@ -589,7 +600,8 @@ class Subject(Resource):
                 else: qname = 'about'
                 newChild.firstChild.setAttributeNS(RDF_MS_BASE, qname, object)
             objectType = OBJECT_TYPE_RESOURCE
-        stmt = RxPath.Statement(self.uri, predicateURI, object, statementUri=stmtID, objectType=objectType)
+        stmt = RxPath.Statement(self.uri, predicateURI, object,
+                                        objectType=objectType)
         
         retVal = self.addStatement(stmt, listID, refChild)
 
@@ -601,39 +613,60 @@ class Subject(Resource):
         
     def addStatement(self, stmt, listID = '', refChild = None):  
         try:
+            assert stmt.subject == self.uri
+            stmt = RxPath.MutableStatement(*stmt)
+            if not stmt.scope: #don't change if already set
+                scope = self.ownerDocument.currentContexts[-1]
+                #work-around 4Suite bug in Statement.toTuple():
+                if scope is None: scope = ''
+                stmt.scope = scope
+            else:
+                scope = stmt.scope
+            
             if stmt.predicate == RDF_MS_BASE+'first':
                 #we're a list so we need to follow the insert order
                 #set defaults as if we're the first item in the list                 
                 previousListId = None                
                 if refChild:
                     #previousListId = 
-                    raise NotSupportedErr("inserting items into lists not yet supported") #todo #todo: predicateNode = self._doInsertBefore()
+                    raise NotSupportedErr(
+                        "inserting items into lists not yet supported")
+                    #todo: predicateNode = self._doInsertBefore()
                 else:
-                    for i in xrange(len(self.childNodes)-1, -1, -1): #iterate through in reverse order                        
+                    for i in xrange(len(self.childNodes)-1, -1, -1):
+                        #iterate through in reverse order                        
                         if self.childNodes[i].stmt.predicate == RDF_MS_BASE+'first':
                             previousListId = self.childNodes[i].listID
                             break                    
                 if previousListId: #we found a previous item in the list
-                    if not listID: #create new node if not specified in the newChild element
+                    if not listID:
+                        #create new node if not specified in the newChild element
                         listID = RxPath.generateBnode()
                     else:                        
                         #make sure using this list id isn't used elsewhere
-                        listStmts = self.ownerDocument.model.getStatements(listID, RDF_MS_BASE+'first')
+                        listStmts = self.ownerDocument.model.getStatements(
+                                                listID, RDF_MS_BASE+'first')
                         for listStmt in listStmts:                            
                             if stmt.object != listStmt.object:
-                                raise HierarchyRequestErr("model error: list resource %s already used" % str(listID))
+                                raise HierarchyRequestErr("model error: "
+                                "list resource %s already used" % str(listID))
                             else:                                
                                 previousListStmts = self.ownerDocument.model.getStatements(
                                                 previousListId, RDF_MS_BASE+'rest')
                                 if previousListStmts:
                                     if previousListStmts[0].object == listID:
-                                        log.debug('add statement failed: statement already exists: %s' % stmt)
+                                        log.debug('add statement failed: '
+                                        'statement already exists: %s' % (stmt,))
                                         return None
-                                    elif previousListStmts[0].object != RDF_MS_BASE+'nil': #rdf:nil gets removed below
-                                        raise HierarchyRequestErr("model error: list statement %s already exists but in different order" % str(listID))
-                        
+                                    elif (previousListStmts[0].object !=
+                                                  RDF_MS_BASE+'nil'):
+                                        #rdf:nil gets removed below
+                                        raise HierarchyRequestErr("model error:"
+        "list statement %s already exists but in different order" % str(listID))
+                    #append the new list node to the end of list
                     previousRestListStmt = RxPath.Statement(previousListId,
-                        RDF_MS_BASE+'rest', listID, objectType=OBJECT_TYPE_RESOURCE)
+                        RDF_MS_BASE+'rest', listID,
+                        objectType=OBJECT_TYPE_RESOURCE, scope=scope)
                     self.ownerDocument.model.addStatement( previousRestListStmt)
                 else: #this statement is the first item in the list, so our subject will be head list resource
                     assert not listID or listID == self.uri, `listID` + '==' + `self.uri`
@@ -645,20 +678,29 @@ class Subject(Resource):
                 else:
                     if previousListId:
                         #we assume must have been a <previousListId, rdf:rest, rdf:nil> statement
-                        oldPreviousRestStmt = RxPath.Statement(previousListId,
-                            RDF_MS_BASE+'rest', RDF_MS_BASE+'nil', objectType=OBJECT_TYPE_RESOURCE)
-                        self.ownerDocument.model.removeStatement( oldPreviousRestStmt )
-                    predicateNode = Predicate(stmt, self, None, self.lastChild, listID = listID)
+                        #oldPreviousRestStmt = RxPath.Statement(previousListId,
+                        #                RDF_MS_BASE+'rest', RDF_MS_BASE+'nil',
+                        #                    objectType=OBJECT_TYPE_RESOURCE)
+                        oldPreviousRestStmts = self.ownerDocument.model.getStatements(
+                                                previousListId, RDF_MS_BASE+'rest',RDF_MS_BASE+'nil')
+                        assert len(oldPreviousRestStmts) == 1
+                        for oldNilStmt in oldPreviousRestStmts:
+                            self.ownerDocument.model.removeStatement( oldNilStmt )
+                    predicateNode = Predicate(stmt, self, None, self.lastChild,
+                                                                  listID=listID)
                     if self.ownerDocument.addTrigger:
                         self.ownerDocument.addTrigger(predicateNode)
                     self._doAppendChild(self.childNodes, predicateNode)
                     self._firstChild = self._childNodes[0]
                     self._lastChild = self._childNodes[-1]
+                    #terminate the list
                     restListStmt = RxPath.Statement(listID, RDF_MS_BASE+'rest',
-                            RDF_MS_BASE+'nil', objectType=OBJECT_TYPE_RESOURCE)
+                        RDF_MS_BASE+'nil', objectType=OBJECT_TYPE_RESOURCE,
+                                                                scope=scope)
                     self.ownerDocument.model.addStatement( restListStmt)                
                 #update statement with the real subject, the listID
                 stmt.subject = listID
+                stmt = RxPath.Statement(*stmt) #must be read-only 
                 self.ownerDocument.model.addStatement( stmt )
                 self.ownerDocument.schema.addToSchema( [stmt] )
             elif stmt.predicate == RDF_SCHEMA_BASE+'member': 
@@ -667,8 +709,9 @@ class Subject(Resource):
                 ordinal = 0
                 for i in xrange(len(self.childNodes)-1, -1, -1): #iterate through in reverse order
                     if self.childNodes[i].listID:
-                        assert self.childNodes[i].listID.startswith(RDF_MS_BASE+'_')
-                        ordinal = int(stmt.predicate[len(RDF_MS_BASE+'_'):])
+                        childListID = self.childNodes[i].listID
+                        assert childListID.startswith(RDF_MS_BASE+'_')
+                        ordinal = int(childListID[len(RDF_MS_BASE+'_'):])
                         break
                 ordinal += 1                
                 if listID:
@@ -680,14 +723,18 @@ class Subject(Resource):
                                 stmt.subject, listID)
                 if containerStmts:
                     if len(containerStmts) > 1:
-                        raise  HierarchyRequestErr("model error: %s is used more than once for the same container %s" % str(listID), str(stmt.subject))
+                        raise  HierarchyRequestErr("model error: %s is used"
+    "more than once for the same container %s" % str(listID), str(stmt.subject))
                     if containerStmts[0].object == stmt.object:
-                        log.debug('add statement failed: statement already exists: %s' % stmt)
+                        log.debug(
+                    'add statement failed: statement already exists: %s'%(stmt,))
                         return None
                     else:
-                        raise HierarchyRequestErr("model error: container statement %s already exists but in different order" % str(listID))
-                
-                predicateNode = Predicate(stmt, self, None, self.lastChild, listID = listID)
+                        raise HierarchyRequestErr("model error: container "
+            "statement %s already exists but in different order" % str(listID))
+
+                predicateNode = Predicate(RxPath.Statement(*stmt), self,
+                                          None, self.lastChild, listID=listID)
                 if self.ownerDocument.addTrigger:
                     self.ownerDocument.addTrigger(predicateNode)
                 self._doAppendChild(self.childNodes, predicateNode)
@@ -696,28 +743,33 @@ class Subject(Resource):
                                 
                 #update statement with the real predicate, the listID
                 stmt.predicate = listID                
-                self.ownerDocument.model.addStatement( stmt )
-            else:                
-                if self.childNodes and self.childNodes[-1].stmt.predicate in \
-                   [ RDF_MS_BASE + 'first', RDF_SCHEMA_BASE + 'member' ]:
+                self.ownerDocument.model.addStatement(RxPath.Statement(*stmt))
+            else: #regular statement
+                if self.childNodes and self.childNodes[-1].stmt.predicate in [
+                   RDF_MS_BASE + 'first', RDF_SCHEMA_BASE + 'member' ]:
                     # the resource is a container or rdf list so insert
                     # this non-ordering statement before any of those                    
                     for i in xrange(len(self.childNodes) ):
                         #find the first ordering predicate
-                        if self.childNodes[i].stmt.predicate in [ RDF_MS_BASE + 'first', RDF_SCHEMA_BASE + 'member' ]:
+                        if self.childNodes[i].stmt.predicate in [
+                            RDF_MS_BASE+'first', RDF_SCHEMA_BASE+'member']:
                             hi = i-1
                             break
                 else:
                     hi = None
+                    
+                stmt = RxPath.Statement(*stmt) #must be read-only 
                 predicateNode = self._orderedInsert(stmt, Predicate,
-                    lambda x, y: cmp(x.stmt, y), hi = hi, notify=self.ownerDocument.addTrigger)
+                    lambda x, y: cmp(x.stmt, y), hi = hi,
+                                notify=self.ownerDocument.addTrigger)
                 self.ownerDocument.model.addStatement( stmt )
                 self.ownerDocument.schema.addToSchema( [stmt] )
             self.revision += 1        
             self.ownerDocument.revision += 1
             return predicateNode 
-        except IndexError: #thrown by _orderedInsert: statement already exists in the model
-            log.debug('add statement failed: statement already exists: %s' % stmt)
+        except IndexError:
+            #thrown by _orderedInsert: statement already exists in the model
+            log.debug('add statement failed: statement already exists: '+str(stmt))
             return None 
 
     def removeChild(self, oldChild, removingResource=False):
@@ -751,7 +803,8 @@ class Subject(Resource):
             if previousListItem:
                 #first, remove the statement that asserts this item follows it
                 previousRestListStmt = RxPath.Statement(
-                        previousListItem.listID, RDF_MS_BASE+'rest', oldChild.listID, objectType=OBJECT_TYPE_RESOURCE)
+                        previousListItem.listID, RDF_MS_BASE+'rest',
+                        oldChild.listID, objectType=OBJECT_TYPE_RESOURCE)
                 self.ownerDocument.model.removeStatement( previousRestListStmt )
                     
             #remove the rdf:rest triple for this item
@@ -760,24 +813,34 @@ class Subject(Resource):
             self.ownerDocument.model.removeStatement( oldRestListStmt )
             
             if previousListItem:                
-                #add a statement that linking the previous item with the following item or with rdf:nill
+                #add a statement that linking the previous item
+                #with the following item or with rdf:nill
                 newRestListStmt = RxPath.Statement(previousListItem.listID,
                     RDF_MS_BASE+'rest', restObject, objectType=OBJECT_TYPE_RESOURCE)
                 self.ownerDocument.model.addStatement( newRestListStmt)
-            #else: no previous item. it looks like according to the rdf syntax spec sect. 7.2.19
-            #      that we should remove this resource and replace it with rdf:nil, but that's way too much work
+            #else: no previous item.
+            #      it looks like according to the rdf syntax spec sect. 7.2.19
+            #      that we should remove this resource and replace it with
+            #      rdf:nil, but that's way too much work
                     
-            #the subject of the item is really listID, set that so we can remove the correct statement below
-            oldChild.stmt.subject = oldChild.listID
-        
-        if oldChild.stmt.predicate == RDF_SCHEMA_BASE+'member':
+            #the subject of the item is really listID, set that so we can
+            #remove the correct statement below
+            oldStmt = RxPath.MutableStatement(*oldChild.stmt)            
+            oldStmt.subject = oldChild.listID        
+        elif oldChild.stmt.predicate == RDF_SCHEMA_BASE+'member':
             #restore the orginal predicate before removing the statement from the model 
             assert oldChild.listID
-            oldChild.stmt.predicate = oldChild.listID
-            #we don't bother reordering the sibling rdf:_n because their order is still preserved after removing this on
+            oldStmt = RxPath.MutableStatement(*oldChild.stmt)
+            oldStmt.predicate = oldChild.listID
+            #we don't bother reordering the sibling rdf:_n because their order
+            #is still preserved after removing this on
             #(if not monotonic)
-        self.ownerDocument.model.removeStatement( oldChild.stmt ) #handle exception here?
-        self.ownerDocument.schema.removeFromSchema([oldChild.stmt])
+        else:
+            oldStmt = oldChild.stmt
+            
+        oldStmt = RxPath.Statement(*oldStmt) #must be read-only 
+        self.ownerDocument.model.removeStatement(oldStmt) #handle exception here?
+        self.ownerDocument.schema.removeFromSchema([oldStmt])
         self._doRemoveChild(self._childNodes, oldChild)        
         self.revision += 1
         self.ownerDocument.revision += 1
@@ -944,7 +1007,8 @@ class Object(Resource):
         
         newIter = iter(self.source.childNodes)
         oldIter = iter(self._childNodes)
-        #note: we only update next/previousSibling but not _childNodes so that we don't mess up the child list iterator
+        #note: we only update next/previousSibling but not _childNodes so that
+        #we don't mess up the child list iterator
         old = None
         old, last = getNextOrAppend() 
         if old is not None:
@@ -987,13 +1051,8 @@ class Object(Resource):
 
 class BasePredicate(Element):
     __attributes = None
-    RDF_ID_EXPR = 'self.stmt.uri'
-    #the current model implementations don't support inferring refication ids    
-    #uncomment RDF_ID_EXPR below if you want to enable rdf:ID with models that don't handle reifications
-    #note: this may be expensive and doesn't properly handle modifications to reification statements
-    #RDF_ID_EXPR = 'self.getID()'
     
-    builtInAttr = { (RDF_MS_BASE, u'ID') : RDF_ID_EXPR,
+    builtInAttr = { 
                     (None, u'listID') : 'self.listID',
                     (None, u'uri') : 'self.stmt.predicate',
                     (XML_NAMESPACE, u'lang'): "self.lang",
@@ -1007,7 +1066,7 @@ class BasePredicate(Element):
     #  how this change happens depends on whether is a Predicate or a RecursivePredicate
     def __init__(self,stmt, parent, listID):
         self.ownerDocument = self.rootNode = parent.ownerDocument        
-        self.stmt = copy.copy(stmt)
+        self.stmt = stmt
         self.listID=listID
         
         qname, self.namespaceURI, self.prefix, self.localName = \
@@ -1035,24 +1094,30 @@ class BasePredicate(Element):
 
     def getModelStatements(self):
         '''
-        Returns a list of statements this Predicate Element represents as they appear in model.
-        This will be different from the stmt property in the case of RDF lists and container predicates.
-        Usually one statement but may be up to three if the Predicate node is a list item.        
+        Returns a list of statements this Predicate Element represents
+        as they appear in model. This will be different from the stmt
+        property in the case of RDF lists and container predicates.
+        Usually one statement but may be up to three if the Predicate
+        node is a list item.
         '''
         if self.listID:
-            stmt = copy.copy(self.stmt)
+            stmt = RxPath.Statement(*self.stmt)
             if self.stmt.predicate == RDF_SCHEMA_BASE+'member':
-                stmt.predicate = self.listID
+                #replace predicate with listID
+                stmt = RxPath.Statement(stmt[0], self.listID, *stmt[2:])
                 return (stmt,)
             else:
-                stmt.subject = self.listID            
+                #replace subject with listID
+                stmt = RxPath.Statement(self.listID, *stmt[1:])                
                 listStmts = [ stmt ]
                 if self.previousSibling and self.previousSibling.listID:
-                    listStmts.append( RxPath.Statement(self.previousSibling.listID,
-                        RDF_MS_BASE+'rest', self.listID, objectType=OBJECT_TYPE_RESOURCE) )
+                    listStmts.append( RxPath.Statement(
+                    self.previousSibling.listID, RDF_MS_BASE+'rest', self.listID,
+                    objectType=OBJECT_TYPE_RESOURCE, scope=stmt.scope))
                 if self.nextSibling is None:
-                    listStmts.append( RxPath.Statement( self.listID, RDF_MS_BASE+'rest',
-                                    RDF_MS_BASE+'nil', objectType=OBJECT_TYPE_RESOURCE))
+                    listStmts.append( RxPath.Statement( self.listID,
+                        RDF_MS_BASE+'rest', RDF_MS_BASE+'nil',
+                        objectType=OBJECT_TYPE_RESOURCE, scope=stmt.scope))
                 return tuple(listStmts)
         else:
             return (self.stmt, )
@@ -1145,16 +1210,6 @@ class BasePredicate(Element):
             return None
 
     datatype = property(_get_datatype)
-
-    __id = NotSet
-    def getID(self):
-        if self.__id is NotSet:
-            findID = getattr(self.ownerDocument.model, 'findStatementID', None)
-            if findID:
-                self.__id = findID(self.stmt)
-            else:
-                self.__id = None
-        return self.__id            
 
     def matchName(self, namespaceURI, local):
         return self.ownerDocument.schema.isCompatibleProperty(self.stmt.predicate,
@@ -1387,26 +1442,40 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     nextIndex = 0 #never used
     defaultNsRevMap = { RDF_MS_BASE : 'rdf', RDF_SCHEMA_BASE : 'rdfs' }
     
-    def __init__(self, model, nsRevMap = None, modelUri=None, schemaClass = RxPath.RDFSSchema):
+    def __init__(self, model, nsRevMap = None, modelUri=None,
+                        schemaClass = RxPath.defaultSchemaClass,useContexts=True):
         self.rootNode = self
         self.ownerDocument = self #todo: this violates the W3C DOM spec i think but fixes some bugs
         self.model = model
+        self.subjectDict = {}
         self.nsRevMap = nsRevMap or self.defaultNsRevMap.copy()
         if self.nsRevMap.get(RDF_MS_BASE) is None:
             self.nsRevMap[RDF_MS_BASE] = 'rdf'
         if self.nsRevMap.get(RDF_SCHEMA_BASE) is None:
             self.nsRevMap[RDF_SCHEMA_BASE] = 'rdfs'
 
-        self.revision = 0
-        self.schemaClass = schemaClass
-        #we need to set the schema up now so that the schema from the model isn't
-        #added as part of a transaction that may get rolled by
-        self.schema = schemaClass(model.getStatements())
         if modelUri: 
             self.stringValue=self.modelUri=modelUri
         else:
             self.stringValue =self.modelUri=RxPath.generateBnode()
 
+        self.revision = 0
+        if useContexts:
+            self.initContext = self.modelUri
+            self.currentContexts = [self._newContextURI(self.modelUri)]
+        else:
+            self.initContext = None
+            self.currentContexts = [None]
+                    
+        self.schemaClass = schemaClass
+        #we need to set the schema up now so that the schema from the model isn't
+        #added as part of a transaction that may get rolled by
+        self.schema = schemaClass(model.getStatements())
+
+    def _newContextURI(self, uri):
+        from Ft.Lib import Time 
+        return 'context:'+uri+'_'+str(Time.FromPythonTime()).replace(':','_')
+        
     def __cmp__(self, other):
         if self is other:
             return 0
@@ -1448,14 +1517,20 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     lastChild = property(_get_lastChild)
 
     def toSubjectNodes(self):                
-        uris = self.model.getResources()        
+        uris = self.model.getResources(self.schema)        
         children = []
-        for uri in uris:            
-            self._doAppendChild(children, Subject(uri, self))
+        for uri in uris:
+            s = Subject(uri, self)
+            self._doAppendChild(children, s)
+            self.subjectDict[uri] = s
             
         return children
 
     def findSubject(self, uri):
+        self.childNodes #make sure childNodes exist
+        s = self.subjectDict.get(uri)
+        if s: return s
+    
         #todo for this to work:
         # need to make Subject.next, prevSibling on demand
         # when creating _childNodes use the subjects stored in WeakValueDictionary, then clear it out
@@ -1475,7 +1550,12 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         if node.uri != uri: 
             return None    
         else:
+            print 'found subject in not in dict!', uri #todo: why is this happening?            
             return node
+
+    def getModelStatements(self):
+        return reduce(lambda l, p: l.extend(p.getModelStatements()) or l,
+                        self.childNodes, [])
                 
     def normalize(self): pass
 
@@ -1496,8 +1576,10 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         if self.removeTrigger:
            self.removeTrigger(oldChild)
 
+        del self.subjectDict[oldChild.uri]
+        
         for predicate in tuple(oldChild.childNodes):
-            log.debug("removing statement %s" % predicate.stmt)
+            log.debug("removing statement " + str(predicate.stmt))
             list = None
             if removeListObjects:
                 #if the object is a list 
@@ -1530,7 +1612,8 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         
         newChild.normalize()
         if not looksLikeResource(newChild):
-            raise HierarchyRequestErr("can't add this resource: the child doesn't look like a resource")
+            raise HierarchyRequestErr(
+            "can't add this resource: the child doesn't look like a resource")
         uri = newChild.getAttributeNS(RDF_MS_BASE,'about')
         if not uri: #generate a bNode if the element has no URI reference
             uri = RxPath.generateBnode()
@@ -1538,15 +1621,23 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         log.debug('attempting to adding resource %s' % uri)
         subjectNode = self.findSubject(uri)
         if not subjectNode:
-            subjectNode = self._orderedInsert(uri, Subject, lambda x, y: cmp(x.uri, y),
-                                            notify=self.newResourceTrigger) #todo: catch this exception?
+            #todo: catch this exception?
+            subjectNode = self._orderedInsert(uri, Subject,
+                lambda x, y: cmp(x.uri, y), notify=self.newResourceTrigger)     
             #self.model.addResource(uri)
+            self.subjectDict[uri] = subjectNode
             self.revision += 1
-        if not (newChild.namespaceURI == RDF_MS_BASE and newChild.localName == 'Description'):
+        if not (newChild.namespaceURI == RDF_MS_BASE
+                and newChild.localName == 'Description'):
             #add class assertion            
             typeName = RxPath.getURIFromElementName(newChild)
-            log.debug('attempting to adding type statement %s for %s' % (typeName, uri))
-            typeStmt = RxPath.Statement(uri, RDF_MS_BASE+'type', typeName, objectType=OBJECT_TYPE_RESOURCE)
+            log.debug('attempting to adding type statement %s for %s'
+                      % (typeName, uri))
+            scope = self.ownerDocument.currentContexts[-1]
+            #work-around 4Suite bug in Statement.toTuple():
+            if scope is None: scope = ''            
+            typeStmt = RxPath.Statement(uri, RDF_MS_BASE+'type', typeName,
+                objectType=OBJECT_TYPE_RESOURCE, scope=scope)
             try:
                 predicateNode = subjectNode._orderedInsert(typeStmt, Predicate,
                             lambda x, y: cmp(x.stmt, y), notify=self.addTrigger)
@@ -1555,7 +1646,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
                 self.revision += 1
             except IndexError:
                 #thrown by _orderedInsert: statement already exists in the model
-                log.debug('type statement %s already exists for %s' % (typeName, uri))              
+                log.debug('type statement %s already exists for %s' % (typeName, uri))
                 
         for child in newChild.childNodes: 
             subjectNode.appendChild(child)
@@ -1576,6 +1667,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         subjectNode = self._orderedInsert(uri, Subject, lambda x, y: cmp(x.uri, y),
                                                 notify=self.newResourceTrigger)
         #self.model.addResource(uri)
+        self.subjectDict[uri] = subjectNode
         return subjectNode
 
     def removeResource(self, uri, removeListObjects=False):
@@ -1588,11 +1680,13 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         if subject:
             self.removeChild(subject, removeListObjects)
             
-    def evalXPath(self, xpath, nsMap = None, vars=None, extFunctionMap = None, node = None, expCache=None):
+    def evalXPath(self, xpath, nsMap = None, vars=None, extFunctionMap = None,
+                  node = None, expCache=None):
         node = node or self
         #print node    
         context = RxPath.XPath.Context.Context(node,
-                    varBindings = vars, extFunctionMap = extFunctionMap, processorNss = nsMap)
+                    varBindings = vars, extFunctionMap = extFunctionMap,
+                                               processorNss = nsMap)
         #extModuleList = os.environ.get("EXTMODULES","").split(":"))
         return RxPath.evalXPath(xpath, context, expCache)
 
@@ -1601,15 +1695,26 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         This is used by the cache to return a key that uniquely
         represents this node and current state of the DOM
         '''
-        #todo: return a value that isn't tied to this in-node in memory representation
-        #e.g. the set of RDF contexts that comprise this model
-        return (id(self),  self.revision)
+        from rx import MRUCache
+        if self.initContext is not None:
+            #the DOM store uses InvalidationKey to invalidate the cache
+            #during rollback
+            return MRUCache.InvalidationKey((self.currentContexts[0],))
+        else:    
+            return (id(self),  self.revision)
 
-    def commit(self, **kw):
+    def commit(self, **kw):        
         self.model.commit(**kw)
         self.schema.commit(**kw)
 
+        if self.initContext is not None:
+            self.currentContexts = [self._newContextURI(self.initContext)]
+        else:
+            self.currentContexts = [None]
+
     def rollback(self):
+        self.currentContexts = self.currentContexts[:1]
+        
         self.model.rollback()
         self.schema.rollback()
         #to remove the changes we need to rollback we just force the
@@ -1624,16 +1729,29 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         #nodes and have the various getters check compare that to see
         #if they need to regenerate themselves
         self._childNodes = None
+        self.subjectDict = {}
         self.revision += 1 #note that revision is also used as part of cache keys
+
+    def pushContext(self,uri):
+        self.currentContexts.append(uri)
+        #todo update context dependency metadata
+
+    def popContext(self):
+        assert len(self.currentContexts) > 1
+        self.currentContexts.pop()
+        
 
 import traceback, sys, re
 
 def invokeRxSLT(RDFPath, stylesheetPath):
-    _4suiteModel, db = utils.deserializeRDF( RDFPath )
-    model = RxPath.FtModel(_4suiteModel)
-    RxPathDom = RxPath.createDOM(model)
+    #_4suiteModel, db = RxPath.deserializeRDF( RDFPath )
+    #model = RxPath.FtModel(_4suiteModel)
+    
+    uri = RxPath.Uri.OsPathToUri(modelPath)
+    model = RxPath.MemModel(RxPath.parseRDFFromURI(uri))    
+    rxPathDom = RxPath.createDOM(model)
     stylesheetContents = file(stylesheetPath).read()    
-    return RxPath.applyXslt(RxPathDom, stylesheetContents)
+    return RxPath.applyXslt(rxPathDom, stylesheetContents)
 
 def main(argv=sys.argv):
     modelPath = None
@@ -1693,10 +1811,13 @@ usage:
             #for n in res:
             #    Ft.Xml.Lib.Print.PrettyPrint(n)
 
+    
+    uri = RxPath.Uri.OsPathToUri(modelPath)
+    model = RxPath.MemModel(RxPath.parseRDFFromURI(uri))
+        
     #model = RxPath.initRedlandHashBdbModel('test-bdb', file(modelPath))    
-    from rx import utils
-    model, db = utils.deserializeRDF( modelPath )
-    model = RxPath.FtModel(model)
+    #model, db = RxPath.deserializeRDF( modelPath )
+    #model = RxPath.FtModel(model)
     
     ns =[ ('http://rx4rdf.sf.net/ns/archive#', u'a'),
           ('http://rx4rdf.sf.net/ns/wiki#', u'wiki'),

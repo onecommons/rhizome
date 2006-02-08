@@ -6,16 +6,17 @@
     http://rx4rdf.sf.net    
 '''
 import StringIO, copy
-from rx import utils
-from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL
-from Ft.Rdf import BNODE_BASE, BNODE_BASE_LEN,RDF_MS_BASE,RDF_SCHEMA_BASE
-from Ft.Rdf.Statement import Statement
+from rx import RxPathUtils
+from RxPathUtils import BNODE_BASE, BNODE_BASE_LEN,RDF_MS_BASE,RDF_SCHEMA_BASE
+from RxPathUtils import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL,Statement
 
 class BaseSchema(object):
     '''
     A "null" schema that does nothing. Illustrates the minimum
     interfaces that must be implemented.
     '''
+    def __init__(self, stmts = None, autocommit=False):
+        pass
     
     def isCompatibleType(self, testType, wantType):
         '''
@@ -46,7 +47,9 @@ class BaseSchema(object):
         that the resource is the subject of may be given.
         '''
         return []
-       
+
+    def inferResources(self, resourcesDict, predicatesDict, stmts): pass
+    
     def addToSchema(self, stmts): pass
     def removeFromSchema(self, stmts): pass
     
@@ -168,7 +171,8 @@ class RDFSSchema(BaseSchema):
 <http://www.w3.org/2000/01/rdf-schema#Literal> <http://www.w3.org/2000/01/rdf-schema#comment> "The class of literal values, eg. textual strings and integers." .
 '''
     rdfSchema = [Statement(unicode(stmt[0]), unicode(stmt[1]), unicode(stmt[2]),
-       objectType=unicode(stmt[3])) for stmt in utils.parseTriples(StringIO.StringIO(schemaTriples))]
+       objectType=unicode(stmt[3])) for stmt in RxPathUtils._parseTriples(
+                                               StringIO.StringIO(schemaTriples))]
     
     #statements about RDF resources are missing from the RDFS schema
     rdfAdditions = [Statement(x[0], x[1], x[2], objectType=OBJECT_TYPE_RESOURCE)
@@ -263,6 +267,13 @@ class RDFSSchema(BaseSchema):
         for key, value in map.items():
             close(closure, key, value)
         return dict([(x, y.keys()) for x, y in closure.items()])
+
+    def inferResources(self, resourcesDict, predicatesDict, stmts):
+        resourcesDict.update( predicatesDict )
+        for x in self.requiredProperties + self.requiredClasses:
+            resourcesDict[x] = 1
+        #todo: a more complete approach would be to call _baseSchema.findStatements()
+        #on each resource and add any new resources in the resulting statements
 
     def findStatements(self, uri, explicitStmts):
         stmts = []
@@ -425,4 +436,4 @@ class RDFSSchema(BaseSchema):
 
         self.inTransaction = False
         
-#_baseSchema = RDFSSchema()            
+defaultSchemaClass = RDFSSchema
