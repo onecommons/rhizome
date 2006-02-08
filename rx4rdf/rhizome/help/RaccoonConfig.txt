@@ -26,7 +26,7 @@ __include__('../rhizome/rhizome-config.py')
 #default: 'http://' + socket.getfqdn() + '/'
 BASE_MODEL_URI='http://example.com/'
 
-#STORAGE_PATH the location of the RDF model. Usually a file path but the appropriate value depends on 'initModel'
+#STORAGE_PATH the location of the RDF model. Usually a file path but the appropriate value depends on 'domStoreFactory'
 STORAGE_PATH = 'mywebsite.nt'
 
 #domStoreFactory is the class or factory function the Raccoon will call to instantiate application's DOM store
@@ -34,7 +34,7 @@ STORAGE_PATH = 'mywebsite.nt'
 #default is DomStore.RxPathDomStore
 def createRedlandDomStore():
   from rx import RxPath,DomStore
-  return DomStore.RxPathDomStore(RxPath.initRedlandHashBdbModel)
+  return DomStore.RxPathDomStore(RxPath.RedlandHashBdbModel)
 domStoreFactory = createRedlandDomStore
 
 #transactionLog is the path of the transactionLog. The transactionLog records in NTriples format a log 
@@ -437,13 +437,5 @@ validateExternalRequest=rhizome.validateExternalRequest
 #and notCacheableDict conforms to NOT_CACHEABLE_FUNCTIONS
 #default is lambda *args: None
 authorizeXPathFuncs=rhizome.authorizeXPathFuncs
-
-#MODEL_UPDATE_PREDICATE is the URI reference for the property that will be used 
-#Setting this will result in Raccoon adding a statement like
-#<MODEL_RESOURCE_URI> <MODEL_UPDATE_PREDICATE> "random string".
-#every time a change to model is committed. 
-#(It will also remove the prior statement if it exists.)
-#default: '' (no update statement is added)
-MODEL_UPDATE_PREDICATE = 'http://rx4rdf.sf.net/ns/wiki#model-update-id'
 
 
