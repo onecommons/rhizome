@@ -7,7 +7,7 @@
 """
 from __future__ import generators
 import os.path
-import os, sys, sha, types, re
+import os, sys, sha, types, re, copy
 from stat import *
 from time import *
 from types import *
@@ -15,30 +15,16 @@ from binascii import unhexlify, b2a_base64
 
 from rx.htmlfilter import * #for backwards compatiblity
 
-from Ft.Rdf import Util, Model, Statement, OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, OBJECT_TYPE_UNKNOWN
-from Ft.Rdf.Drivers import Memory
-
-from Ft.Lib import Uuid, Uri
-import Ft.Rdf
-#note: because we change these values here other modules need to import utils
-#before importing any Ft.Rdf modules
-Ft.Rdf.BNODE_BASE = 'bnode:'
-Ft.Rdf.BNODE_BASE_LEN = len('bnode:')
-from Ft.Rdf import BNODE_BASE, BNODE_BASE_LEN
-
-_bNodeCounter  = 0
-#like this so this will be a valid bNode token (NTriples only allows alphanumeric, no _ or - etc.
-_sessionBNodeUUID = "x%032xx" % Uuid.GenerateUuid()
-
-def generateBnode(name=None):
-    """
-    Generates blank nodes (bnodes), AKA anonymous resources
-    """
-    global _bNodeCounter, _sessionBNodeUUID
-    _bNodeCounter += 1
-    name = name or `_bNodeCounter`    
-    return BNODE_BASE + _sessionBNodeUUID +  name
-
+if sys.version_info < (2, 3):
+    def enumerate(collection):
+        'Generates an indexed series:  (0,coll[0]), (1,coll[1]) ...'     
+        i = 0
+        it = iter(collection)
+        while 1:
+            yield (i, it.next())
+            i += 1
+    __builtins__.enumerate = enumerate
+    
 class NotSetType(object):
     '''use when None is a valid value'''
     
@@ -47,6 +33,27 @@ NotSet = NotSetType()
 def kw2dict(**kw):
     #not needed in python 2.3, dict ctor does the same thing
     return kw
+
+def flattenSeq(args, depth=0xFFFF):
+    '''
+    >>> list(flattenSeq([ [1,2], 3, [4,5]]))
+    [1, 2, 3, 4, 5]
+    >>> list(flattenSeq([ [1,2], 3, [4,5]], 0 ))
+    [[1, 2], 3, [4, 5]]
+    >>>
+    >>> list(flattenSeq([ [1,2], 3, [4,5]], 1 ))
+    [1, 2, 3, 4, 5]
+    >>>
+    >>> list(flattenSeq([ [1,2], 3, [4,[5] ]], 1 ))
+    [1, 2, 3, 4, [5]]
+'''
+    
+    for a in args:
+        if depth > 0 and isinstance(a, (list,type, GeneratorType) ):
+            for i in flattenSeq(a, depth-1):
+                yield i
+        else:
+            yield a
 
 def bisect_left(a, x, cmp=cmp, lo=0, hi=None):
     """
@@ -70,63 +77,158 @@ def bisect_left(a, x, cmp=cmp, lo=0, hi=None):
         else: hi = mid
     return lo
 
-def createThreadLocalProperty(name, fget=True, fset=True, fdel=True, doc=None, **kw):
-    '''
-    usage:
-      class foo(object):
-         aThreadLocalAttribute = utils.createThreadLocalProperty('__aThreadLocalAttribute')
+import threading
+try:
+    threading.local
+except AttributeError:
+    #for versions < Python 2.4
+    #copied from 2.4's _threading_local.py
+    class _localbase(object):
+        __slots__ = '_local__key', '_local__args', '_local__lock'
 
-    A KeyError will be thrown when attempting to get an attribute that has not been set in the current thread.
-    For example, if an attribute is set in __init__() and then retrieved in another thread.
-    To avoid this, pass an initValue argument, whose value will be used to initialize the attribute.
-        
-    Deleting an attribute will delete it for all threads.
-    '''
-    import thread
-    if kw.has_key('initValue'):
-        initAttr = True
-        initValue =  kw['initValue']
-    else:
-        initAttr = False
-    initAttrFunc = kw.get('initValueFunc')
+        def __new__(cls, *args, **kw):
+            self = object.__new__(cls)
+            key = '_local__key', 'thread.local.' + str(id(self))
+            object.__setattr__(self, '_local__key', key)
+            object.__setattr__(self, '_local__args', (args, kw))
+            object.__setattr__(self, '_local__lock', RLock())
 
-    def getThreadLocalAttr(self):    
-        attr = getattr(self, name, None)
-        if attr is None:
-            attr = {}
-            setattr(self, name, attr)
-        if initAttr:            
-            return attr.setdefault(thread.get_ident(), initValue)
-        if initAttrFunc and not attr.has_key(thread.get_ident()):
-            value = initAttrFunc(self)
-            attr[thread.get_ident()] = value
-            return value
+            if args or kw and (cls.__init__ is object.__init__):
+                raise TypeError("Initialization arguments are not supported")
+
+            # We need to create the thread dict in anticipation of
+            # __init__ being called, to make sire we don't cal it
+            # again ourselves.
+            dict = object.__getattribute__(self, '__dict__')
+            currentThread().__dict__[key] = dict
+
+            return self
+
+    def _patch(self):
+        key = object.__getattribute__(self, '_local__key')
+        d = currentThread().__dict__.get(key)
+        if d is None:
+            d = {}
+            currentThread().__dict__[key] = d
+            object.__setattr__(self, '__dict__', d)
+
+            # we have a new instance dict, so call out __init__ if we have
+            # one
+            cls = type(self)
+            if cls.__init__ is not object.__init__:
+                args, kw = object.__getattribute__(self, '_local__args')
+                cls.__init__(self, *args, **kw)
         else:
-            return attr[thread.get_ident()]
-    
-    def setThreadLocalAttr(self, value):        
-        attr = getattr(self, name, None)
-        if attr is None:
-            attr = {}
-            setattr(self, name, attr)            
-        attr[thread.get_ident()] = value
+            object.__setattr__(self, '__dict__', d)
 
-    if fget:
-        fget = getThreadLocalAttr
-    else:
-        fget = None
+    class local(_localbase):
 
-    if fset:
-        fset = setThreadLocalAttr
-    else:
-        fset = None
+        def __getattribute__(self, name):
+            lock = object.__getattribute__(self, '_local__lock')
+            lock.acquire()
+            try:
+                _patch(self)
+                return object.__getattribute__(self, name)
+            finally:
+                lock.release()
 
-    if fdel:
-        fdel = lambda self: delattr(self, name)
-    else:
-        fdel = None
+        def __setattr__(self, name, value):
+            lock = object.__getattribute__(self, '_local__lock')
+            lock.acquire()
+            try:
+                _patch(self)
+                return object.__setattr__(self, name, value)
+            finally:
+                lock.release()
+
+        def __delattr__(self, name):
+            lock = object.__getattribute__(self, '_local__lock')
+            lock.acquire()
+            try:
+                _patch(self)
+                return object.__delattr__(self, name)
+            finally:
+                lock.release()
+
+
+        def __del__():
+            threading_enumerate = enumerate
+            __getattribute__ = object.__getattribute__
+
+            def __del__(self):
+                key = __getattribute__(self, '_local__key')
+
+                try:
+                    threads = list(threading_enumerate())
+                except:
+                    # if enumerate fails, as it seems to do during
+                    # shutdown, we'll skip cleanup under the assumption
+                    # that there is nothing to clean up
+                    return
+
+                for thread in threads:
+                    try:
+                        __dict__ = thread.__dict__
+                    except AttributeError:
+                        # Thread is dying, rest in peace
+                        continue
+
+                    if key in __dict__:
+                        try:
+                            del __dict__[key]
+                        except KeyError:
+                            pass # didn't have anything in this thread
+
+            return __del__
+        __del__ = __del__()
         
-    return property(fget, fset, fdel, doc)
+    from threading import currentThread, enumerate, RLock
+        
+    threading.local = local 
+        
+class object_with_threadlocals(object):    
+    '''
+    Creates an attribute whose value will be local to the current
+    thread.
+    Deleting an attribute will delete it for all threads.
+
+    usage:
+    >>> class HasThreadLocals(object_with_threadlocals):
+            def __init__(self, bar):
+                #set values that will initialize across every thread
+                self.initThreadLocals(tl1 = 1, tl2 = bar)
+    '''
+
+    class _threadlocalattribute(property):
+        def __init__(self, propname, *args, **kw):
+            self.name = propname
+            return super(object_with_threadlocals._threadlocalattribute,
+                                                 self).__init__(*args, **kw)
+    
+    def __init__(self, **kw):
+        return self.initThreadLocals(**kw)
+        
+    def initThreadLocals(self, **kw):    
+        self._locals = threading.local()
+        for propname, initValue in kw.items():
+            defaultValueAttrName = '__' + propname + '_initValue'
+            setattr(self, defaultValueAttrName, initValue)
+            prop = getattr(self, propname, None)
+            if not isinstance(prop, object_with_threadlocals._threadlocalattribute):
+                self._createThreadLocalProp(propname, defaultValueAttrName)
+
+    def _createThreadLocalProp(self, propname, defaultValueAttrName):
+        def get(self):
+            try:
+                return getattr(self._locals, propname)
+            except AttributeError:
+                return getattr(self, defaultValueAttrName)
+
+        def set(self, value):
+            setattr(self._locals, propname, value)
+            
+        prop = self._threadlocalattribute(propname, get, set, doc='thread local property')
+        setattr(self.__class__, propname, prop)        
 
 def htmlQuote(data):
     return data.replace('&','&amp;').replace('<','&lt;').replace('>','&gt;')
@@ -388,195 +490,6 @@ def walkDir(path, fileFunc, *funcArgs, **kw):
         del kw['dirFunc']
         return dirFunc(path, lambda *args, **kw: _walkDir(path, recurse, args, kw), *funcArgs, **kw)
 
-#see w3.org/TR/rdf-testcases/#ntriples 
-#todo: assumes utf8 encoding and not string escapes for unicode 
-Removed = object()
-Comment = object()
-def parseTriples(lines, bNodeToURI = lambda x: x, charencoding='utf8'):
-    remove = False
-    for line in lines:
-        line = line.strip()
-        if not line: #trailing whitespace
-            break;
-        if not isinstance(line, unicode):
-           line = line.decode(charencoding)            
-        if line.startswith('#!remove'): #this extension to NTriples allows us to incrementally update a model using NTriples
-            remove = True
-            continue
-        elif line[0] == '#': #comment
-            remove = False
-            continue        
-        subject, predicate, object = line.split(None,2)
-        if subject.startswith('_:'):
-            subject = subject[2:] #bNode
-            subject = bNodeToURI(subject)
-        else:
-            subject = subject[1:-1] #uri
-            
-        if predicate.startswith('_:'):
-            predicate = predicate[2:] #bNode
-            predicate = bNodeToURI(predicate)
-        else:
-            assert predicate[0] == '<' and predicate[-1] == '>', 'malformed predicate: %s' % predicate
-            predicate = predicate[1:-1] #uri
-            
-        object = object.strip()        
-        if object[0] == '<': #if uri
-            object = object[1:object.find('>')]
-            objectType = OBJECT_TYPE_RESOURCE
-        elif object.startswith('_:'):
-            object = object[2:object.rfind('.')].strip()
-            object = bNodeToURI(object)
-            objectType = OBJECT_TYPE_RESOURCE
-        else:                        
-            quote = object[0] #add support for using either ' or " (spec says just ")
-            endquote = object.rfind(quote)
-            literal = object[1:endquote]
-            if literal.find('\\') != -1:
-                #use split and join to replace even pairs of // with /
-                #without have the resulting single / accidently escape the next character
-                unescaped = literal.split(r'\\') 
-                escaped = [x.replace('\\' + quote, quote).replace(r'\n', '\n').
-                             replace(r'\r', '\r').replace(r'\t', '\t') for x in unescaped]
-                literal = '\\'.join(escaped) 
-            if object[endquote+1]=='@':
-                lang = object[endquote+2:object.rfind('.')].strip()
-                objectType = lang
-            elif object[endquote+1]=='^':                
-                objectType = object[endquote+3:object.rfind('.')].strip()
-            else:    
-                objectType = OBJECT_TYPE_LITERAL
-            object = literal
-        #print "parsed: ", subject, predicate, object
-        if remove:
-            remove = False
-            yield (Removed, (subject, predicate, object, objectType))
-        else:
-            if objectType != OBJECT_TYPE_RESOURCE or object:
-                #hack to handle malformed NTriples doc -- skip statements that have <> as the object
-                yield (subject, predicate, object, objectType)
-
-def DeserializeFromN3File(n3filepath, driver=Memory, dbName='', create=0, scope='',
-                        modelName='default', model=None):
-    #todo: rename this function to ...NTFile
-    if not model:
-        if create:
-            db = driver.CreateDb(dbName, modelName)
-        else:
-            db = driver.GetDb(dbName, modelName)
-        db.begin()
-        model = Model.Model(db)
-    else:
-        db = model._driver
-        
-    if isinstance(n3filepath, ( type(''), type(u'') )):
-        stream = file(n3filepath, 'r+')
-    else:
-        stream = n3filepath
-        
-    #bNodeMap = {}
-    #makebNode = lambda bNode: bNodeMap.setdefault(bNode, generateBnode(bNode))
-    makebNode = lambda bNode: BNODE_BASE + bNode
-    for stmt in parseTriples(stream,  makebNode):
-        if stmt[0] is Removed:            
-            stmt = stmt[1]
-            model.remove( Statement.Statement(stmt[0], stmt[1], stmt[2], '', scope, stmt[3]) )
-        else:
-            model.add( Statement.Statement(stmt[0], stmt[1], stmt[2], '', scope, stmt[3]) )                
-    #db.commit()
-    return model, db
-
-def deserializeRDF(modelPath, driver=Memory, dbName='', scope='', modelName='default', fileType=None):
-    if not fileType:
-        if modelPath[-3:] == '.mk':
-            fileType = 'mk'
-        elif modelPath[-3:] == '.nt':
-            fileType = 'nt'
-        elif modelPath[-4:] == '.rdf':
-            fileType = 'xml'
-            
-    if fileType == 'mk':
-        from rx import metakitdriver
-        db =  metakitdriver.GetDb(modelPath, modelName)
-        model = Model.Model(db)            
-    elif fileType == 'nt':
-        model, db = DeserializeFromN3File(modelPath,driver, dbName, False, scope, modelName)
-    elif fileType == 'xml':
-        try:
-            #if rdflib is installed, use its RDF/XML parser because it doesn't suck            
-            import rdflib.TripleStore
-            ts = rdflib.TripleStore.TripleStore()
-            ts.parse(Uri.OsPathToUri(modelPath))
-            from Ft.Rdf.Drivers import Memory    
-            db = Memory.CreateDb('', 'default')
-            import Ft.Rdf.Model
-            model = Ft.Rdf.Model.Model(db)
-            import RxPath
-            if not RxPath.useRDFLibParser:
-                raise ImportError()
-
-            #print 'parsing', modelPath, 'with rdflib'
-            model.add( list(RxPath.rdflib2Statements(ts.triples( (None, None, None)))) )
-        except ImportError:
-            model, db = Util.DeserializeFromUri(Uri.OsPathToUri(modelPath),
-                                               driver, dbName, False, scope) 
-    else: #todo: add support for rxml
-        raise 'unknown file type reading RDF: %s, only .rdf, .nt and .mk supported' % os.path.splitext(modelPath)[1]
-    return model, db
-
-def convertToNTriples(path, fileType=None):
-    import StringIO
-    model, db = deserializeRDF(path,fileType=fileType)
-    moreTriples = StringIO.StringIO()                  
-    stmts = model.statements()
-    writeTriples(stmts, moreTriples)
-    return moreTriples.getvalue() 
-                   
-def writeTriples(stmts, stream):
-    subject = 0
-    predicate = 1
-    object = 2
-    objectType = 5
-    if stmts and isinstance(stmts, (type([]), type(()) )) and isinstance(
-                    stmts[0], Statement.Statement):
-        stmts = Model.Model(None)._unmapStatements(stmts)
-    for stmt in stmts:       
-       if stmt[0] is Comment:
-           stream.write("#" + stmt[1].encode('utf8') + "\n")
-           continue
-
-       if stmt[0] is Removed:
-           stream.write("#!remove\n")
-           stmt = stmt[1]
-       if stmt[subject].startswith(BNODE_BASE):
-            stream.write('_:' + stmt[subject][BNODE_BASE_LEN:].encode('utf8') ) 
-       else:
-            stream.write("<" + stmt[subject].encode('utf8') + ">")
-       if stmt[predicate].startswith(BNODE_BASE):
-            stream.write( '_:' + stmt[predicate][BNODE_BASE_LEN:].encode('utf8') ) 
-       else:            
-           stream.write(" <" + stmt[predicate].encode('utf8') + ">")
-       if stmt[objectType] == OBJECT_TYPE_RESOURCE:
-            if stmt[object].startswith(BNODE_BASE):
-                stream.write(' _:' + stmt[object][BNODE_BASE_LEN:].encode('utf8')  + ".\n") 
-            else:
-                stream.write(" <" + stmt[object].encode('utf8')  + "> .\n")
-       else:           
-           #escaped = repr(stmt[object])
-           #if escaped[0] = 'u': 
-           #    escaped = escaped[2:-1] #repr uses ' instead of " for string (and so doesn't escape ")
-           #else:
-           #    escaped = escaped[1:-1]
-           escaped = stmt[object].replace('\\', r'\\').replace('\"', r'\"').replace('\n', r'\n').replace('\r', r'\r').replace('\t', r'\t').encode('utf8')
-           if stmt[objectType] in [OBJECT_TYPE_LITERAL, OBJECT_TYPE_UNKNOWN]:
-               stream.write(' "' + escaped + '" .\n')
-           elif stmt[objectType].find(':') == -1: #must be a lang code
-               stream.write(' "' + escaped + '"@' + stmt[objectType].encode('utf8'))
-               stream.write(" .\n")
-           else: #objectType must be a URI
-               stream.write(' "' + escaped + '"^^' + stmt[objectType].encode('utf8'))
-               stream.write(" .\n")
-
 def sanitizeFilePath(filepath): #as in "sanity"
     if sys.platform != 'win32':
         return filepath    
@@ -672,166 +585,6 @@ def getVolumeInfo(path):
         return volumeName, volumeType, volSerialNumber
     else:
         assert 0, 'NYI!' #todo
-
-class Res(dict):
-    '''simplify building RDF statements. dict-like object representing a resource with a dict of property/values
-       usage:
-       Res.nsMap = { ... } #global namespace map
-       
-       res = Res(resourceName, nsMap) #2nd param is optional instance override of global nsMap
-       
-       res['q:name'] = 'foo' #add a statement with property 'q:name' and object literal 'foo'
-       
-       res['q:name'] = Res('q:name2') #add a statement with property 'q:name' and object resource 'q:name2'
-       
-       #if prefix not found in nsMap it is treated as an URI
-       res['http://foo'] = Res('http://bar') #add a statement with property http://foo and object resource 'http://bar'
-
-       #if resourceName starts with '_:' it is treated as a bNode
-       res['_:bNode1']
-       
-       #if you want multiple statements with the same property, use a list as the value, e.g.:
-       res.setdefault('q:name', []).append(child)
-       
-       #retrieve the properties in the resource's dictionary as a NTriples string
-       res.toTriples()
-
-       #return a NTriples string by recursively looking at each resource that is the object of a statement
-       res.toTriplesDeep()
-    '''
-    
-    nsMap =  { 'owl': 'http://www.w3.org/2002/07/owl#',
-           'rdf' : 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
-            'rdfs' : 'http://www.w3.org/2000/01/rdf-schema#' }
-
-    def __init__(self, uri=None, nsMap = None):
-        if nsMap is not None:
-            self.nsMap = nsMap
-        if uri is None:
-            uri = '_:'+ generateBnode()[BNODE_BASE_LEN:]
-        self.uri = self.getURI(uri)
-
-    def __eq__(self, other):
-        return self.uri == other.uri
-
-    def __ne__(self, other):
-        return self.uri != other.uri
-    
-    def __cmp__(self, other):
-        return cmp(self.uri, other.uri)
-
-    def __hash__(self):
-        return hash(self.uri)        
-
-    def __getitem__(self, key):
-        return super(Res, self).__getitem__(self.getURI(key))
-    
-    def __setitem__(self, key, item):    
-        return super(Res, self).__setitem__(self.getURI(key), item)
-
-    def __delitem__(self, key):
-        return super(Res, self).__delitem__(self.getURI(key))
-
-    def __contains__(self, key):
-        return super(Res, self).__contains__(self.getURI(key))
-
-    def getURI(self, key):
-        if key.startswith('_:'):
-            return key #its a bNode
-        index = key.find(':')
-        if index == -1: #default ns
-            prefix = ''
-            local = key
-        else:
-            prefix = key[:index]
-            local = key[index+1:]
-        if self.nsMap.get(prefix) is not None:
-            return self.nsMap[prefix] + local 
-        else:#otherwise assume its a uri
-            return key
-    
-    def toStatementsDeep(self):
-        stmts = []
-        curlist = [ self ]
-        done = [ self ]
-        while curlist:
-            #print [x.uri for x in reslist], [x.uri for x in done]
-            res = curlist.pop()
-            stmts2, reslist = res.toStatements(done)
-            done.extend(reslist)
-            curlist.extend(reslist)
-            stmts.extend(stmts2) 
-        return stmts
-        
-    def toStatements(self, doneList = None):
-        stmts = []
-        reslist = []
-        if self.uri.startswith('_:'):
-            s = BNODE_BASE+self.uri[2:]
-        else:
-            s = self.uri
-        for p, v in self.items():
-            if p.startswith('_:'):
-                p = BNODE_BASE + p[2:] #but note that in RDF, its technically illegal for the predicate to be a bnode 
-            if not isinstance(v, (type(()), type([])) ):
-                v = (v,)
-            for o in v:                                    
-                if isinstance(o, Res):                    
-                    if o.uri.startswith('_:'):
-                        oUri = BNODE_BASE+o.uri[2:]
-                    else:
-                        oUri = o.uri
-                    stmts.append(Statement.Statement(s, p, oUri, objectType=OBJECT_TYPE_RESOURCE))
-                    if doneList is not None and o not in doneList:
-                        reslist.append(o)
-                else: #todo: datatype, lang                    
-                    stmts.append(Statement.Statement(s, p, o, objectType=OBJECT_TYPE_LITERAL))
-        if doneList is None:
-            return stmts
-        else:
-            return stmts, reslist
-
-    def toTriplesDeep(self):
-        t = ''
-        curlist = [ self ]
-        done = [ self ]
-        while curlist:
-            #print [x.uri for x in reslist], [x.uri for x in done]
-            res = curlist.pop()
-            t2, reslist = res.toTriples(done)
-            done.extend(reslist)
-            curlist.extend(reslist)
-            t += t2
-        return t
-
-    def toTriples(self, doneList = None):
-        triples = ''
-        reslist = []
-        if not self.uri.startswith('_:'):
-            s = '<' + self.uri + '>'
-        else:
-            s = self.uri
-        for p, v in self.items():
-            if not p.startswith('_:'):
-                p = '<' + p + '>'
-            if not isinstance(v, (type(()), type([])) ):
-                v = (v,)
-            for o in v:                                    
-                triples += s + ' ' + p
-                if isinstance(o, Res):
-                    if o.uri.startswith('_:'):
-                        triples += ' '+ o.uri + '. \n'
-                    else:
-                        triples += ' <'+ o.uri + '>. \n'                        
-                    if doneList is not None and o not in doneList:
-                        reslist.append(o)
-                else: #todo: datatype, lang
-                    escaped = o.replace('\\', r'\\').replace('\"', r'\"').replace('\n', r'\n').replace('\r', r'\r').replace('\t', r'\t')
-                    triples += ' "' + escaped.encode('utf8') + '" .\n'
-        if doneList is None:
-            return triples
-        else:
-            return triples, reslist
     
 class InterfaceDelegator:
     '''assumes only methods will be called on this object and the methods always return None'''
@@ -844,6 +597,45 @@ class InterfaceDelegator:
         
     def __getattr__(self, name):
         return lambda *args, **kw: self.call(name, args, kw)
+
+class Bitset(object):
+    '''
+>>> bs = Bitset()
+>>> bs[3] = 1
+>>> [i for i in bs]
+[False, False, False, True]
+    '''
+    
+    def __init__(self):
+        self.bits = 0
+        self._size = 0
+                
+    def __setitem__(self, i, v):
+        if v:
+            self.bits |= (1<<i)
+        else:
+            self.bits &= ~(1<<i)
+
+        if i+1 > self._size:
+            self._size = i+1
+            
+    def __getitem__(self, i):
+        return bool(self.bits & (1<<i))
+
+    def __nonzero__(self):
+        return bool(self.bits)
+        
+    def __len__(self):
+        return self._size
+
+    def __iter__(self):
+        for i in xrange(self._size):
+            yield self[i]
+
+    def append(self, on):
+         self.bits <<= 1
+         if on:
+             self.bits |= 1
 
 class Singleton(type):
     '''from http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/102187
@@ -905,9 +697,9 @@ class NestedException(Exception):
             self.msg = msg
         self.nested_exc_info = sys.exc_info()
         self.useNested = useNested
-        if useNested:
+        if useNested and self.nested_exc_info[0]:
             if self.nested_exc_info[1]:
-                args = self.nested_exc_info[1].args
+                args = getattr(self.nested_exc_info[1], 'args', ())
             else: #nested_exc_info[1] is None, a string must have been raised
                 args = self.nested_exc_info[0]
         else:
@@ -919,7 +711,6 @@ class DynaException(Exception):
         if not msg is None:
             self.msg = msg        
         Exception.__init__(self, msg)
-
     
 class DynaExceptionFactory(object):
     '''
@@ -950,68 +741,195 @@ class DynaExceptionFactory(object):
 try:
     from Ft.Xml import XPath, Xslt, Lib, EMPTY_NAMESPACE
     import Ft.Xml.Xslt.XPathExtensions
-    def _visit(self, fields, pre=None, post=None):
+
+    def _visit(self, fields, pre=None, post=None):        
+        return pre(self, fields, *(post or ()))
+        
         if pre:
-            pre(self)
+            if not pre(self):
+                return False
         for field in fields:
             if field is not None:
-                field.visit(pre=pre, post=post)
+                if not field.visit(pre=pre, post=post):
+                    return False
         if post:
-            post(self)            
+            if not post(self):
+                return False
+        return True
             
-    def _visit0(self, pre=None, post=None):        
+    def _visit0(self, pre=None, post=None):
+        return pre(self, (), *(post or ()))    
+    
         if pre:
-            pre(self)
+            if not pre(self):
+                return False
         if post:
-            post(self)            
-        
+            if not post(self):
+                return False
+        return True
+    
     def _visitlr(self, pre=None, post=None):
-        _visit(self, [self._left, self._right], pre=pre, post=post)
+        return _visit(self, ['_left', '_right'], pre=pre, post=post)
 
     def _additiveVisit(self, pre=None, post=None):
-        if pre:
-            pre(self)
+        fields = []
         if not self._leftLit:            
-            self._left.visit(pre=pre, post=post)
+            fields.append('_left')
         if not self._rightLit:
-            self._right.visit(pre=pre, post=post)
+            fields.append('_right')
+
+        return pre(self, fields, *(post or ()))
+
+        if pre:
+            if not pre(self):
+                return False
+        if not self._leftLit:            
+            if not self._left.visit(pre=pre, post=post):
+                return False
+        if not self._rightLit:
+            if not self._right.visit(pre=pre, post=post):
+                return False
         if post:
-            post(self)            
+            if not post(self):
+                return False
+        return True
                             
-    XPath.ParsedExpr.FunctionCall.visit = lambda self, pre=None, post=None: _visit(self, self._args, pre, post)
+    XPath.ParsedExpr.FunctionCall.visit = lambda self, pre=None, post=None: _visit(self, range(len(self._args)), pre, post)
     XPath.ParsedExpr.ParsedNLiteralExpr.visit = _visit0
     XPath.ParsedExpr.ParsedLiteralExpr.visit = _visit0    
     XPath.ParsedExpr.ParsedVariableReferenceExpr.visit = _visit0
     XPath.ParsedExpr.ParsedUnionExpr.visit = _visitlr
     XPath.ParsedExpr.ParsedPathExpr.visit = _visitlr #may have implicit decendent-or-self step too
     XPath.ParsedExpr.ParsedFilterExpr.visit = \
-            lambda self, pre=None, post=None: _visit(self, [self._filter, self._predicates], pre, post)
+            lambda self, pre=None, post=None: _visit(self, ['_filter', '_predicates'], pre, post)
     XPath.ParsedExpr.ParsedOrExpr.visit = _visitlr
     XPath.ParsedExpr.ParsedAndExpr.visit = _visitlr
     XPath.ParsedExpr.ParsedEqualityExpr.visit = _visitlr
     XPath.ParsedExpr.ParsedRelationalExpr.visit = _visitlr
     XPath.ParsedExpr.ParsedMultiplicativeExpr.visit = _visitlr
     XPath.ParsedExpr.ParsedAdditiveExpr.visit = _additiveVisit
-    XPath.ParsedExpr.ParsedUnaryExpr.visit = lambda self, visitor: _visit(self, [self._exp], pre, post)
+    XPath.ParsedExpr.ParsedUnaryExpr.visit = lambda self, visitor: _visit(self, ['_exp'], pre, post)
     XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath.visit = \
-                    lambda self, pre=None, post=None: _visit(self, [self._rel], pre, post)
-    XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath.visit = \
-                    lambda self, pre=None, post=None: _visit(self, [self._left, self._right], order='pre')
+                    lambda self, pre=None, post=None: _visit(self, ['_rel'], pre, post)
+    #has implicit decendent-or-self step too:
+    XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath.visit = _visitlr
     XPath.ParsedAbsoluteLocationPath.ParsedAbsoluteLocationPath.visit = \
-                    lambda self, pre=None, post=None: _visit(self, [self._child], pre, post)
+                    lambda self, pre=None, post=None: _visit(self, ['_child'], pre, post)
     XPath.ParsedAxisSpecifier.AxisSpecifier.visit = _visit0
     XPath.ParsedNodeTest.NodeTestBase.visit = _visit0
     XPath.ParsedPredicateList.ParsedPredicateList.visit = \
-                    lambda self, pre=None, post=None: _visit(self, self._predicates, pre, post)
+                    lambda self, pre=None, post=None: _visit(self, range(len(self._predicates)), pre, post)
     XPath.ParsedRelativeLocationPath.ParsedRelativeLocationPath.visit = _visitlr
     XPath.ParsedStep.ParsedStep.visit = \
-            lambda self, pre=None, post=None: _visit(self, [self._axis, self._nodeTest, self._predicates], pre, post)
+            lambda self, pre=None, post=None: _visit(self, ['_axis', '_nodeTest', '_predicates'], pre, post)
     XPath.ParsedStep.ParsedAbbreviatedStep.visit = _visit0
     XPath.ParsedStep.ParsedNodeSetFunction.visit = \
-            lambda self, pre=None, post=None: _visit(self, [self._function, _self._predicates], pre, post)
+            lambda self, pre=None, post=None: _visit(self, ['_function', '_predicates'], pre, post)
     Xslt.XPathExtensions.SortedExpression.visit = \
-            lambda self, pre=None, post=None: _visit(self, [self.expression], pre, post)
+            lambda self, pre=None, post=None: _visit(self, ['expression'], pre, post)
     Xslt.XPathExtensions.RtfExpr.visit = _visit0
+
+    class _Ancestors(list):
+        
+        def __setitem__(self, i, value):
+            node, field = self[i]
+            if isinstance(node, XPath.ParsedExpr.FunctionCall):            
+                node._args[field] = value
+            elif isinstance(node, XPath.ParsedPredicateList.ParsedPredicateList):
+                node._predicates[field] = value
+            else:
+                setattr(node, field, value)
+
+    class XPathExprVisitor(object):
+        DESCEND = -1
+        STOP = 0
+        NEXT = 1
+            
+        def __init__(self):
+            self.ancestors = _Ancestors()
+            self.currentNode = None
+            self.currentFields = None
+
+        def _dispatch(self, node, fields, *args):
+            nodeName = node.__class__.__name__
+            if nodeName.startswith('FunctionCall'):
+                nodeName = 'FunctionCall'
+            func = getattr(self, nodeName, None)
+            if not func:
+                #flatten class hierarchy:
+                if isinstance(node, XPath.ParsedAxisSpecifier.AxisSpecifier):
+                    nodeName = 'AxisSpecifier'
+                elif isinstance(node, XPath.ParsedNodeTest.NodeTestBase):
+                    nodeName = 'NodeTestBase'
+                func = getattr(self, nodeName, None)
+            if func:            
+                ret = func(node,*args)
+            else:
+                ret = self.DESCEND
+            if ret == self.DESCEND:
+                return self.descend(node, fields, *args)
+            else:
+                return ret
+
+        def getAncestors(self, reversed=False):
+            if reversed:
+                rev = copy.copy(self.ancestors)
+                rev.reverse()
+                return rev
+            else:
+                return self.ancestors
+                        
+        def descend(self, node=None, fields=None, *args):
+            '''
+            Visit methods may call this with a modified list of fields.
+            '''
+            if node is None:
+                node = self.currentNode
+            if fields is None:
+                fields = self.currentFields
+
+            if isinstance(node, XPath.ParsedExpr.FunctionCall):            
+                attr = '_args'
+            elif isinstance(node, XPath.ParsedPredicateList.ParsedPredicateList):
+                attr = '_predicates'
+            else:
+                attr = None
+                
+            stopped = False
+            remainingFields = []
+            for field in fields:
+                if stopped:
+                    remainingFields.append(fields)
+                else:
+                    if attr:
+                        fieldValue = getattr(node, attr)[field]
+                    else:
+                        fieldValue = getattr(node, field)
+                    if fieldValue:
+                        self.ancestors.append( (node, field) )
+                        try:
+                            res = fieldValue.visit(self.visit, args)
+                        finally:
+                            self.ancestors.pop()
+                        if res == self.STOP:
+                            stopped = True
+                            
+            self.currentFields = remainingFields
+            if stopped:
+                return self.STOP
+            else:
+                return self.NEXT
+
+        def visit(self, node, fields, *args):
+            oldNode = self.currentNode
+            oldFields = self.currentFields            
+            self.currentNode = node
+            self.currentFields = fields
+            try:
+                return self._dispatch(node, fields, *args)
+            finally:
+                self.currentNode = oldNode
+                self.currentFields = oldFields
 
     def _iter(self, fields):
         yield self
@@ -1051,8 +969,8 @@ try:
     XPath.ParsedExpr.ParsedUnaryExpr.__iter__ = lambda self: _iter(self, [self._exp])
     XPath.ParsedAbbreviatedAbsoluteLocationPath.ParsedAbbreviatedAbsoluteLocationPath.__iter__ = \
                     lambda self: _iter(self, [self._rel])
-    XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath.__iter__ = \
-                    lambda self: _iter(self, [self._left, self._right])
+    #has implicit decendent-or-self step too:
+    XPath.ParsedAbbreviatedRelativeLocationPath.ParsedAbbreviatedRelativeLocationPath.__iter__ = _iterlr
     XPath.ParsedAbsoluteLocationPath.ParsedAbsoluteLocationPath.__iter__ = \
                     lambda self: _iter(self, [self._child])
     XPath.ParsedAxisSpecifier.AxisSpecifier.__iter__ = _iter0
@@ -1062,7 +980,7 @@ try:
     XPath.ParsedStep.ParsedStep.__iter__ = \
             lambda self: _iter(self, [self._axis, self._nodeTest, self._predicates])
     XPath.ParsedStep.ParsedAbbreviatedStep.__iter__ = _iter0
-    XPath.ParsedStep.ParsedNodeSetFunction.__iter__ = lambda self: _iter(self, [self._function, _self._predicates])
+    XPath.ParsedStep.ParsedNodeSetFunction.__iter__ = lambda self: _iter(self, [self._function, self._predicates])
     Xslt.XPathExtensions.SortedExpression.__iter__ = lambda self: _iter(self, [self.expression])
     Xslt.XPathExtensions.RtfExpr.__iter__ = _iter0
 
