@@ -32,12 +32,12 @@ class UseNode(object):
         return str(self.size) + ','+ str(self.hkey) + ',' + str(self.value)
 
 class InvalidationKey(tuple):
-    '''
-    Sub-class of tuple used for marking that a part of a key should be added to a validation cache.
-    Only works when digestKey=True.
-    '''
+    ''' Sub-class of tuple used for marking that a part of a key
+    should be added to a validation cache. The exclude argument will exclude
+    this tuple from the cache key. '''
+
     exclude = False
-    
+
     def __new__(cls, seq, exclude=False):
         it = tuple.__new__(cls, seq)
         if exclude:
@@ -145,13 +145,15 @@ class MRUCache:
             keydigest = hkey = args # use tuple of args as default key for first stage LU            
             #warning: kw args will not be part of key
 
+        assert not (isinstance(hkey, InvalidationKey) and hkey.exclude
+                    ), 'key can not be an excluded InvalidationKey'
         if self.digestKey:                   
             digester = md5.new()
             _getKeyDigest(hkey, invalidateKeys, digester)
             keydigest = digester.hexdigest()
         else:
             #we still want to find invalidatation keys
-            _getKeyDigest(hkey, invalidateKeys, None)
+            keydigest = _removeExcludedInvalidationKeys(hkey, invalidateKeys)
 
         try:
             node = self.nodeDict[keydigest]
@@ -228,16 +230,19 @@ class MRUCache:
             self.nodeDict[keydigest] = self.mru      # add new key->node mapping
             
             if invalidateKeys:
-                #we can associate invalidation keys with many nodes to enable cache invalidation
+                #we can associate invalidation keys with many nodes to enable cache invalidation                
                 for ikey in invalidateKeys:
                     newWeakrefDict = weakref.WeakKeyDictionary()
                     weakrefDict = self.invalidateDict.setdefault(ikey, newWeakrefDict)
-                    #we assign weakrefDict as the item value because invalidateDict is a WeakValueDictionary
-                    #so the only strong reference to the weakrefDict are the items themselves
-                    #this way, when the last key is remove from the weak key dictionary,
-                    #the dictionary will be garbage collected too
-                    weakrefDict[self.mru] = weakrefDict 
-
+                    #add the attribute "strongref" because
+                    #invalidateDict is a WeakValueDictionary so the
+                    #only strong reference to the weakrefDict with the
+                    #node its themselves this way, when the last key
+                    #is remove from the weak key dictionary, the
+                    #dictionary will be garbage collected too
+                    weakrefDict[self.mru] = weakrefDict
+                    self.mru.strongref = weakrefDict
+                    
             return value
             
         # Here we have a valid node. Just update its position in linked lru list
@@ -262,8 +267,11 @@ class MRUCache:
         return value
 
     def invalidate(self, key):
-        currentNodes = self.invalidateDict.get(key)    
+        idk = self.invalidateDict.keys()
+        idv = self.invalidateDict.values()
+        currentNodes = self.invalidateDict.get(key)        
         if currentNodes is not None:
+            #import pprint; pprint.pprint([x.hkey for x in currentNodes.keys()])
             for node in currentNodes.keys(): #we need a copy since currentNodes may change
                 self.removeNode(node)
             try:
@@ -340,3 +348,13 @@ def _getKeyDigest(keys, invalidateKeys, keyDigest):
         else:
             keyDigest.update( str(keys) )
 
+def _removeExcludedInvalidationKeys(keys, invalidateKeys):
+    #note: will still return the outmost tuple even if it is an excluded invalidationKey
+    if isinstance(keys, tuple):
+        #return a new keys tuple excluding any InvalidationKeys set to exclude
+        #as a side-effect, add any InvalidationKeys found to invalidationKeys
+        return tuple([_removeExcludedInvalidationKeys(key, invalidateKeys)
+                      for key in keys
+                       if not (isinstance(key, InvalidationKey) and
+                       (invalidateKeys.append(key) or key.exclude)) ])
+    return keys
