@@ -317,8 +317,8 @@ No results found.
     <tr>    
     <td><a href="site:///{$subjectUrl}" ><xsl:value-of select='$subjectName' /></a></td>    
 
-        <!-- /*/*[is-property(@uri,'uri')] -->
-    <td><a href='site:///search?search=%2F*%2F*%5Bis-property%28%40uri%2C%27{f:escape-url(./@uri)}%27%29%5D&amp;searchType=RxPath&amp;view=html&amp;title=Property%20Usage'>
+        <!-- /*/*[is-subproperty-of(@uri,'uri')] -->
+    <td><a href='site:///search?search=%2F*%2F*%5Bis-subproperty-of%28%40uri%2C%27{f:escape-url(./@uri)}%27%29%5D&amp;searchType=RxPath&amp;view=html&amp;title=Property%20Usage'>
         <xsl:value-of select='$predicateName' /></a>
     </td>        
     

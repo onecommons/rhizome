@@ -95,4 +95,4 @@ actions = { 'http-request' : [
         #note: if no match raccoon.default_not_found() will be invoked
     ] }
     
-    
+defaultPageName = '/' #so each app can use its own defaultPageName    

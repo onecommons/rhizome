@@ -349,12 +349,11 @@ aschange
         <xsl:if test="($phase = '#ALL') 
 	or (../sch:phase[@id= ($phase)]/sch:active[@pattern= current()/@id])
 	or (../phase[@id= ($phase)]/active[@id= current()/@id])">
-		<xsl:apply-templates/>
-		<!--
+		<!-- aschange
 		<axsl:template match="text()" priority="-1" mode="M{count(preceding-sibling::*)}">
 			<-!- strip characters -!->
 		</axsl:template>
-		-->
+		-->		
         </xsl:if>
 	</xsl:template>
 
@@ -371,7 +370,7 @@ aschange
                     <xsl:message>Markup Error: no context attribute in &lt;rule></xsl:message>
                 </xsl:if>
 
-<!-- as change
+<!-- aschange
 		<axsl:template match="{@context}" priority="{4000 - count(preceding-sibling::*)}" mode="M{count(../preceding-sibling::*)}">
 			<xsl:call-template name="process-rule">
 				<xsl:with-param name="id" select="@id"/>
