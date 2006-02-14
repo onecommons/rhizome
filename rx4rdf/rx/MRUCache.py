@@ -17,6 +17,7 @@ _defexception('not cacheable')
 class UseNode(object):
     """For linked list kept in most-recent .. least-recent *use* order"""
 
+    sideEffects = None
     #we can't use slots if we want weak refs to this object (needs to add __weakrefs__)
     #__slots__ = ['value','hkey','older','newer', 'sideEffects', 'size', ]
 

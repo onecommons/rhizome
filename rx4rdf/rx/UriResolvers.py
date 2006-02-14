@@ -112,7 +112,7 @@ class SiteUriResolver(Uri.SchemeRegistryResolver):
         if path.startswith('path:'):
             #print 'path', path
             path = path[len('path:'):]
-
+        path = urllib.url2pathname(path)
         prefix = self.findPrefix(path)
         return os.path.abspath(os.path.join(prefix, path))
 
@@ -162,10 +162,10 @@ class SiteUriResolver(Uri.SchemeRegistryResolver):
         return '' #no safe prefix
                              
     def resolvePathScheme(self, uri, base=None):
-        path = uri
+        path = urllib.url2pathname(uri)
         if path.startswith('path:'):
             #print 'path', path
-            path = uri[len('path:'):]
+            path = path[len('path:'):]
 
         unauthorized = False
         for prefix in self.path:

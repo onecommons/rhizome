@@ -207,8 +207,8 @@ def addResource(model, scope, resource, resourceElem, rxNSPrefix,nsMap,
                 listID = p.getAttributeNS(EMPTY_NAMESPACE, 'list')
             if not listID:
                 listID = RxPath.generateBnode()            
-            model.addStatement( Statement(resource, predicate, listID, id,
-                                                  OBJECT_TYPE_RESOURCE, scope))
+            model.addStatement( Statement(resource, predicate, listID,
+                                                OBJECT_TYPE_RESOURCE, scope))
             listType = getAttributefromQName(p, rxNSPrefix, 'listType')
             if not listID:
                 listType = p.getAttributeNS(EMPTY_NAMESPACE, 'listType')

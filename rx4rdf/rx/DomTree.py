@@ -310,13 +310,13 @@ class Node(_Node, _ComputedAttributes, object): #change to derive from object fo
         try:
             self.childNodes.remove(oldChild)
         except ValueError:
-            import sys
-            print 'should eq', oldChild.parentNode == self.childNodes[0].parentNode and self.childNodes[0].alias == oldChild.alias
-            print oldChild.parentNode, self.childNodes[0].parentNode, self.childNodes[0].alias, oldChild.alias 
-            print>>sys.stderr, 'self', self, id(self), type(self)        
-            print>>sys.stderr, 'oldchild', oldChild
-            print>>sys.stderr, 'firstchild', self.firstChild 
-            print>>sys.stderr, 'childNodes', self.childNodes
+            #import sys
+            #print 'should eq', oldChild.parentNode == self.childNodes[0].parentNode and self.childNodes[0].alias == oldChild.alias
+            #print oldChild.parentNode, self.childNodes[0].parentNode, self.childNodes[0].alias, oldChild.alias 
+            #print>>sys.stderr, 'self', self, id(self), type(self)        
+            #print>>sys.stderr, 'oldchild', oldChild
+            #print>>sys.stderr, 'firstchild', self.firstChild 
+            #print>>sys.stderr, 'childNodes', self.childNodes
             #print>>sys.stderr, oldChild.parentNode, self.childNodes[0].parentNode 
             #print>>sys.stderr, oldChild.alias, self.childNodes[0].alias
             

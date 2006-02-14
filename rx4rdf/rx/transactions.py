@@ -250,14 +250,8 @@ class RaccoonTransactionState(TransactionState):
         self.retVal = None
 
 class RaccoonTransactionService(TransactionService,utils.object_with_threadlocals):
-    #__metaclass__ = utils.hasthreadlocalattributes
-    
     lock = None
     stateFactory = RaccoonTransactionState
-
-    #state = utils.threadlocalattribute(RaccoonTransactionState())
-    #state = utils.createThreadLocalProperty('__state',
-    #                                initValue = RaccoonTransactionState())
 
     def __init__(self, server):        
         self.server = server

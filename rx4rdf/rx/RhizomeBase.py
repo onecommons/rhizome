@@ -51,7 +51,6 @@ class RhizomeBase(object):
         def initConstants(varlist, default):
             return raccoon.assignVars(self, kw, varlist, default)
 
-        self.server.APPLICATION_MODEL += RxPath.RDFSSchema.schemaTriples
         
         initConstants( ['MAX_MODEL_LITERAL'], -1)        
         

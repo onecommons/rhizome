@@ -197,8 +197,8 @@ class RhizomeAuth(RhizomeBase):
                         if subject:
                             nodeset.append(subject)
                         else:
-                            self.log.warning(
-                                "subject of %s not found" % str(stmt) )
+                            pass#self.log.warning(
+                            #    "subject of %s not found" % str(stmt) )
 
             nodeset = [p for p in nodeset
                         if (not membershipList or p in membershipList) 

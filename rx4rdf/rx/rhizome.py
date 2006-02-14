@@ -1,5 +1,5 @@
 """
-    Helper classes for Rhizome
+    Facade for the modules that implement Rhizome functionality
     These classes includes functionality dependent on the Rhizome schemas
     and so aren't included in the Raccoon module.
 

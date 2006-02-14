@@ -163,6 +163,15 @@ def site2httpCacheKey(field, context, notCacheableXPathFunctions):
             return getKeyFromValue(value)
     #else: not specified when getting XSLT (which relying on params)
     return ()
+
+def queryFuncCacheKey(field, context, notCacheableXPathFunctions):
+    key = []
+    #this is a list of nested xpath expression used by the Query AST
+    for compExpr in field._func.xpathExprs:
+        key.append( getKeyFromXPathExp(compExpr, context,
+                                notCacheableXPathFunctions) )
+
+    return tuple(key)
     
 DefaultNotCacheableFunctions = dict([(x, None) for x in [ 
         (FT_EXT_NAMESPACE, 'iso-time'),        
@@ -191,6 +200,7 @@ DefaultNotCacheableFunctions.update({
     ('http://exslt.org/dynamic','evaluate'):lambda*args:evaluateKey((0,),*args),
     (RXWIKI_XPATH_EXT_NS, 'map') : lambda *args: evaluateKey( (1,), *args),
     (RXWIKI_XPATH_EXT_NS, 'fixup-urls'): site2httpCacheKey,
+    (None, 'evalRxPathQuery') : queryFuncCacheKey,
 })
 
 for functionName in ['date','time', 'year', 'leap-year', 'month-in-year',

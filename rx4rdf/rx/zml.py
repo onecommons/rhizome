@@ -637,7 +637,7 @@ class MarkupMap(object):
     '''
     #block
     UL, OL, LI, DL, DD, DT = 'UL', 'OL', 'LI', 'DL', 'DD', 'DT', 
-    P, HR, PRE, BLOCKQUOTE, SECTION = 'P', 'HR', 'PRE', 'BLOCKQUOTE', 'SECTION'
+    P, HR, PRE, BLOCKQUOTE, SECTION = 'P', 'HR', 'PRE', 'BLOCKQUOTE','SECTION'
     blockElems = [ 'UL', 'OL', 'LI', 'DL', 'DD', 'DT', 'P', 'HR', 'PRE',
                    'BLOCKQUOTE', 'SECTION'] 
     #header
@@ -664,7 +664,9 @@ class MarkupMap(object):
                                OLCHAR : [self.OL, self.LI],
                                ':' : [self.DL, self.DD ],
                                '+' : [self.DL, self.DT ],
-                               '|' : [self.TABLE, self.TR] }
+                               '|' : [self.TABLE, self.TR],
+                               #'!' : [self.DIV,self.H1]
+                               }
 
         #rough order in which block elements can appear,
         #from outermost to innermost
@@ -696,8 +698,12 @@ class MarkupMap(object):
         or
         self.wikiStructure['!'] = ( self.SECTION, self.TITLE)
         '''
-        return getattr(self, self.headerElems[level-1]) #evaluate lazily
-                
+        if self.wikiStructure.get('!'):
+            return ( (self.DIV,(('class',"'H"+str(level)+"'" ),) ),          
+                     getattr(self, self.headerElems[level-1]) ) #evaluate lazily
+        else:
+            return getattr(self, self.headerElems[level-1])
+            
     def mapAnnotationsToMarkup(self, annotationsRoot, name):
         #get the first node of the annotation, which can be either an element
         #or a string
@@ -1398,8 +1404,14 @@ class ParseState(object):
                 if not parent: 
                     st.pushWikiStack(helem)
                     done = True
-                else:
-                    structureElem = helem #use helem instead of parent
+                else:                    
+                    #use helem instead of parent, lineElem
+                    if lineElem:                        
+                        structureElem = helem[0]
+                        lineElem = helem[1]
+                    else:
+                        structureElem = helem
+                    
             if not done:
                 if lead == '|': #tables don't nest
                     level = 1
@@ -1761,7 +1773,7 @@ class XMLParser(HTMLFilter):
         k = super(XMLParser, self).parse_endtag(i)
         if self.completed:        
             self.rawdata = self.rawdata[k:]
-            print 'rd', self.rawdata
+            #print 'rd', self.rawdata
             raise StopTokenizing        
         return k
 

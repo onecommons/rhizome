@@ -397,7 +397,7 @@ class Resource(Element):
         for n in self.childNodes:
             if (n.nodeType == Node.ELEMENT_NODE and n.localName == 'type'
                     and n.namespaceURI == RDF_MS_BASE):
-                type = n.childNodes[0].uri
+                type = n.childNodes[0].uri                
                 if self.ownerDocument.schema.isCompatibleType(type, 
                     namespaceURI + RxPath.getURIFragmentFromLocal(local)):
                         return True
@@ -520,9 +520,12 @@ class Subject(Resource):
         If the RDF list or container has non-membership statements (usually just rdf:type) those will appear first.
         '''
         stmts = self.ownerDocument.model.getStatements(self.uri) #we assume list will be sorted
-        stmts.extend( self.ownerDocument.schema.findStatements(self.uri, stmts) )
         children = []
         containerItems = {}
+        if self.uri == 'bnode:x61b4a091c00f4ca4b6bd157e0fd2285bx1':
+            print 'lst', len(stmts)
+            import pprint; pprint.pprint(stmts)
+        
         listItem = nextList = None        
         for stmt in stmts:
             assert stmt.subject == self.uri, `self.uri` + '!=' + `stmt.subject`
@@ -533,8 +536,10 @@ class Subject(Resource):
                     nextList = stmt.object                    
             elif stmt.predicate.startswith(RDF_MS_BASE+'_'): #rdf:_n
                 ordinal = int(stmt.predicate[len(RDF_MS_BASE+'_'):])
-                containerItems[ordinal] = stmt
-            else:
+                containerItems[ordinal] = stmt            
+            elif not (stmt.predicate == RDF_MS_BASE+u'type' and 
+                       stmt.object == RDF_SCHEMA_BASE+u'Resource'):
+                #don't include the redundent rdf:type rdfs:Resource statement
                 self._doAppendChild(children, Predicate(stmt, self))
 
         if listItem:
@@ -550,6 +555,10 @@ class Subject(Resource):
             realPredicate = stmt.predicate
             stmt = RxPath.Statement(stmt[0], RDF_SCHEMA_BASE+u'member', *stmt[2:])
             self._doAppendChild(children, Predicate(stmt, self, listID=realPredicate))            
+        if self.uri == 'bnode:x61b4a091c00f4ca4b6bd157e0fd2285bx1':
+            print 'lst', len(children)
+            print children
+
         return children
 
     def insertBefore(self, newChild, refChild):
@@ -702,7 +711,6 @@ class Subject(Resource):
                 stmt.subject = listID
                 stmt = RxPath.Statement(*stmt) #must be read-only 
                 self.ownerDocument.model.addStatement( stmt )
-                self.ownerDocument.schema.addToSchema( [stmt] )
             elif stmt.predicate == RDF_SCHEMA_BASE+'member': 
                 if refChild:
                     raise NotSupportedErr("inserting items into lists not yet supported") #todo
@@ -763,7 +771,6 @@ class Subject(Resource):
                     lambda x, y: cmp(x.stmt, y), hi = hi,
                                 notify=self.ownerDocument.addTrigger)
                 self.ownerDocument.model.addStatement( stmt )
-                self.ownerDocument.schema.addToSchema( [stmt] )
             self.revision += 1        
             self.ownerDocument.revision += 1
             return predicateNode 
@@ -840,7 +847,6 @@ class Subject(Resource):
             
         oldStmt = RxPath.Statement(*oldStmt) #must be read-only 
         self.ownerDocument.model.removeStatement(oldStmt) #handle exception here?
-        self.ownerDocument.schema.removeFromSchema([oldStmt])
         self._doRemoveChild(self._childNodes, oldChild)        
         self.revision += 1
         self.ownerDocument.revision += 1
@@ -1470,7 +1476,9 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         self.schemaClass = schemaClass
         #we need to set the schema up now so that the schema from the model isn't
         #added as part of a transaction that may get rolled by
-        self.schema = schemaClass(model.getStatements())
+        self.schema = schemaClass(model)
+        if isinstance(self.schema, RxPath.Model):
+            self.model = self.schema
 
     def _newContextURI(self, uri):
         from Ft.Lib import Time 
@@ -1487,19 +1495,8 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     
     def _get_childNodes(self):
         if self._childNodes is None:
-            self._childNodes = self.toSubjectNodes()
-            #todo: remove this temporary hack
-            if not self.schema:
-                #set this the first time the DOM is loaded
-                self.schema = self.schemaClass()
-                stmts = self.model.getStatements()
-                self.schema.addToSchema(stmts)                                
-                
-            if self._childNodes:
-                self._firstChild = self._childNodes[0]
-                self._lastChild = self._childNodes[-1]
-            else:
-                self._firstChild = self._lastChild = None            
+            self._toSubjectNodes()
+            assert self._childNodes is not None                
         return self._childNodes 
     
     childNodes = property(_get_childNodes)
@@ -1516,15 +1513,46 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     
     lastChild = property(_get_lastChild)
 
-    def toSubjectNodes(self):                
-        uris = self.model.getResources(self.schema)        
-        children = []
-        for uri in uris:
-            s = Subject(uri, self)
-            self._doAppendChild(children, s)
-            self.subjectDict[uri] = s
+    def _toSubjectNodes(self):                
+        children = []        
+        lists = {}
+        lastSubject = None
+        islist = False
+        
+        #don't include rdf:List resources as a Subject node
+        for stmt in self.model.getStatements():
+            #assumes statements are sorted properly
+            if stmt.subject != lastSubject:                
+                if lastSubject and not islist:
+                    s = Subject(lastSubject, self)
+                    self._doAppendChild(children, s)
+                    self.subjectDict[lastSubject] = s
             
-        return children
+                lastSubject = stmt.subject
+                islist = False
+            
+            if (stmt.object == RDF_MS_BASE+'List' and stmt.predicate == RDF_MS_BASE+'type'
+                or stmt.predicate == RDF_MS_BASE+'first'):
+                lists.setdefault(stmt.subject, 1)
+                islist = True #in case we're not inferring the type            
+            elif stmt.predicate == RDF_MS_BASE+'rest':
+                lists[stmt.object] = 0 #not at the head of the list
+        if lastSubject and not islist:
+            s = Subject(lastSubject, self)
+            self._doAppendChild(children, s)
+            self.subjectDict[lastSubject] = s
+        
+        self._childNodes = children
+        if self._childNodes:
+            self._firstChild = self._childNodes[0]
+            self._lastChild = self._childNodes[-1]
+        else:
+            self._firstChild = self._lastChild = None            
+        
+        for uri, head in lists.items():
+            if head:
+                subjectNode = self._orderedInsert(uri, Subject, lambda x, y: cmp(x.uri, y))        
+                self.subjectDict[uri] = subjectNode                
 
     def findSubject(self, uri):
         self.childNodes #make sure childNodes exist
@@ -1550,7 +1578,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         if node.uri != uri: 
             return None    
         else:
-            print 'found subject in not in dict!', uri #todo: why is this happening?            
+            #print 'found subject in not in dict!', uri #todo: why is this happening?            
             return node
 
     def getModelStatements(self):
@@ -1642,7 +1670,6 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
                 predicateNode = subjectNode._orderedInsert(typeStmt, Predicate,
                             lambda x, y: cmp(x.stmt, y), notify=self.addTrigger)
                 self.model.addStatement( typeStmt )
-                self.schema.addToSchema( [typeStmt] )
                 self.revision += 1
             except IndexError:
                 #thrown by _orderedInsert: statement already exists in the model
@@ -1705,7 +1732,6 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
 
     def commit(self, **kw):        
         self.model.commit(**kw)
-        self.schema.commit(**kw)
 
         if self.initContext is not None:
             self.currentContexts = [self._newContextURI(self.initContext)]
@@ -1716,7 +1742,6 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         self.currentContexts = self.currentContexts[:1]
         
         self.model.rollback()
-        self.schema.rollback()
         #to remove the changes we need to rollback we just force the
         #DOM's nodes to be regenerated from the model by null-ing out
         #childNodes and then incrementing revision.

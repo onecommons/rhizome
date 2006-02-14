@@ -1,14 +1,10 @@
-from __future__ import generators
-from rx import utils, RxPath
-from rx.RxPath import Tupleset
-from utils import XPath, flattenSeq, GeneratorType
-from Ft.Lib import boolean
-from Ft.Xml import EMPTY_NAMESPACE
-from Ft.Xml.XPath import _comparisons, ParsedExpr
-from xml.dom import Node
-import operator, copy, sys
-
 '''
+ RxPath query engine, including an implementation of RDF Schema.
+
+    Copyright (c) 2004-5 by Adam Souzis <asouzis@users.sf.net>
+    All rights reserved, see COPYING for details.
+    http://rx4rdf.sf.net    
+
 RxPath query engine
 
 Given an XPath expression and a context, execute the following steps:
@@ -83,6 +79,24 @@ of the result set, one for each row.
 7. Convert the result set to a node set as described in the previous
 step.
 '''
+from __future__ import generators
+from rx import utils, RxPath
+from rx.RxPath import Tupleset
+from utils import XPath, flattenSeq, GeneratorType
+from Ft.Lib import boolean
+from Ft.Xml import EMPTY_NAMESPACE
+from Ft.Xml.XPath import ParsedExpr
+try:
+    from Ft.Xml.XPath import _comparisons
+    eq = _comparisons.eq
+    ne = _comparisons.eq
+except ImportError:
+    #must be an older version of 4Suite
+    eq = lambda a, b: a == b
+    ne = lambda a, b: a != b
+    
+from xml.dom import Node
+import operator, copy, sys
 
 class QueryException(Exception): pass
 
@@ -96,15 +110,16 @@ class ReplaceRxPathSubExpr(utils.XPathExprVisitor):
     '''
     #todo move modifications in _ParsedAbbreviatedRelativeLocationPath_evaluate to here
 
-    def __init__(self, context, expr, checkPos = False, describe=False):
+    def __init__(self, context, expr, checkPos = False, explain=False):
         super(ReplaceRxPathSubExpr,self).__init__()
         self.context = context
         self.abortIfPositionDependent = checkPos
         
         #when the beginRxPath is set we replace with the first encountered
         #path expression with of FunctionCall
-        self.beginRxPath = context.node.__module__.lower().startswith('rx')
-        self.describe= describe
+        self.beginRxPath = context.node and context.node.__module__.lower().startswith('rx')
+        self.explain= explain
+        self.changed = False
         self.resultExpr = expr
         expr.visit(self.visit)
         
@@ -122,22 +137,26 @@ class ReplaceRxPathSubExpr(utils.XPathExprVisitor):
     def createRxPathQueryClosure(self):
         #for now we can assume the exp is an absolute path or exp is a relative path
         #and the context node is an RxPath document 
-        ast = Path2AST(self.context, self.currentNode,describe=self.describe)
+        ast = Path2AST(self.context, self.currentNode,explain=self.explain)
         #todo if parent is a PathExp than the left side is a $var or a func()
         #we'll need to replace it with the closure func and pass the left side to it
         #this can't happen now as we don't support relPaths yet
         astRoot = ast.currentOpStack[0]
 
-        name = 'evalRxPath:' + repr(astRoot)
-        funcCall = XPath.ParsedExpr.FunctionCall(name, (None,name), () )
+        name = 'evalRxPathQuery'
+        dummyArg = XPath.ParsedExpr.ParsedLiteralExpr( repr(astRoot) )
+        
+        funcCall = XPath.ParsedExpr.FunctionCall1(name, (None,name), (dummyArg,) )
 
-        def evaluateQuery(context):
+        def evaluateQuery(context, dummy):
+            #we just want a representation of the AST stored in the XPath expression
+            #so we pass it in as a argument that is ignored 
             doc = context.node.rootNode
             
-            queryContext = QueryContext(context, doc.model, describe=self.describe) 
+            queryContext = QueryContext(context, doc.model, explain=self.explain) 
             result = astRoot.evaluate(SimpleQueryEngine(),queryContext)
 
-            if self.describe:
+            if self.explain:
                 return result
             
             if isinstance(result, NodesetTupleset):
@@ -148,11 +167,13 @@ class ReplaceRxPathSubExpr(utils.XPathExprVisitor):
                     finalpos = result.position
                 else:
                     finalpos = -1
-                #return list(result) #todo
-                return [row2Node(doc, row, finalpos) for row in result]
-                    
+                #return list(result ) 
+                return filter(None, [row2Node(doc, row, finalpos) for row in result])
+        
+        evaluateQuery.xpathExprs = ast.xpathExprs
         funcCall._func = evaluateQuery
 
+        self.changed = True
         if self.ancestors:
             #the current field of the parent node to the new function
             self.ancestors[-1] = funcCall
@@ -165,14 +186,14 @@ class ReplaceRxPathSubExpr(utils.XPathExprVisitor):
     def FunctionCall(self, node):
         #todo: if leftside of PathExpr: if node.name in rxpathfuncs: self.beginRxPath = True
         if self.abortIfPositionDependent:
-            (prefix, local) = exp._key
+            (prefix, local) = node._key
             if prefix:
                 try:
                     expanded = (self.context.processorNss[prefix], local)
                 except:
                     raise XPath.RuntimeException(RuntimeException.UNDEFINED_PREFIX, prefix)
             else:
-                expanded = self._key
+                expanded = node._key
 
             if expanded in PosDependentFuncs:
                 raise PositionDependentException()
@@ -188,7 +209,7 @@ class ReplaceRxPathSubExpr(utils.XPathExprVisitor):
         #todo:
         if self.beginRxPath and self.contextIsRoot:
             #replace this with a RxPathQueryFunc and stop
-            createRxPathQueryClosure(self, node)
+            self.createRxPathQueryClosure(node)
             #self.parent
             self.beginRxPath = False        
         return -1
@@ -235,11 +256,16 @@ def row2Node(doc, row, finalPos = -1):
     while 1:
         stmt = row[start:stop]
         node = doc.findSubject(stmt[0])
+        if not node: #inner list resources might not show up
+            return None        
         if finalPos != SUB_POS:
-            assert len(stmt) >= 5
+            assert len(stmt) >= 5, `stmt` + `finalPos` + `node` + `row`
             node = node.findPredicate(stmt )
-            assert node
+            if not node:
+                return None #some stmts like rdf:type rdfs:Resource don't show up
             if finalPos != PRED_POS:
+                assert finalPos != SCOPE_POS
+                assert finalPos != OBJTYPE_POS, 'not yet implemented'
                 node = node.firstChild
         break
         start+=5; stop+=5
@@ -276,9 +302,9 @@ except ImportError:
     from Ft.Xml.XPath.Types import *#old 4Suite
 ObjectType = object #4suite bug: missing from XPathTypes.__all__
 
-XPathTypes = ( ObjectType, NodesetType,StringType,NumberType,BooleanType)
+XPathTypes = ( NodesetType,StringType,NumberType,BooleanType)
 
-QueryOpTypes = ( ObjectType, Tupleset, StringType, NumberType, BooleanType )
+QueryOpTypes = ( Tupleset, StringType, NumberType, BooleanType )
 NullType = None
 
 class QueryOp(object):
@@ -303,6 +329,7 @@ class QueryOp(object):
                     return False
             return True
         else:
+            #todo: abspath and funcs that don't depend on context node are independent
             return False
 
     def getPosition(self):
@@ -373,7 +400,7 @@ class SelectOp(QueryOp):
              with = ' with ' + repr(self.xpathExp)
          else:
              with = ''
-         pos = 'select ' + str(self.getPosition()) + ' from ' + str(self.joinPosition)
+         pos = 'select ' + str(self.finalPosition) + ' from ' + str(self.joinPosition)
          return pos + ' where(' + args + ')' + with
 
     #def __iter__(self):
@@ -517,8 +544,14 @@ class InOp(BooleanOp):
         return engine.costInOp(self, context)
 
 class EqOp(BooleanOp):
+
+    def __init__(self, op='eq'):
+        self.args = []
+        self.op = op
+        
     def __repr__(self):
-        return '(' + ' = '.join( [repr(a) for a in self.args] ) + ')'
+        op = self.op == 'eq' and ' = ' or ' != '
+        return '(' + op.join( [repr(a) for a in self.args] ) + ')'
 
     def evaluate(self, engine, context):
         return engine.evalEqOp(self, context)
@@ -559,6 +592,8 @@ class ConstantOp(QueryOp):
         return -1
     
     def __repr__(self):
+        if isinstance(self.value, Tupleset):
+            return 'Nodeset' #we don't want to muddy up are nice determistic string
         return repr(self.value)
 
     def evaluate(self, engine, context):
@@ -602,22 +637,30 @@ SupportedFuncs = {
       QueryFuncMetadata(lambda *args: False, BooleanType, None, True,
                         lambda *args: 0),
 }
-    
+
+
+def getFuncOp(name):
+    if isinstance(name, (unicode, str)):
+        name = (EMPTY_NAMESPACE, name)
+    funcMetadata = SupportedFuncs[name]
+    return funcMetadata.opFactory(name,funcMetadata)
+
 class QueryContext(object):
     
-    def __init__(self, xpathContext, initModel, pos=-1, modelContext = '', describe=False):
+    def __init__(self, xpathContext, initModel, pos=-1, modelContext = '', explain=False):
         self.xpathContext = xpathContext
         self.initialModel = initModel        
         self.currentTupleset = initModel
         self.currentPosition = pos
         self.modelContext = modelContext
-        self.describe=describe
+        self.explain=explain
+        self.joinTupleset = initModel
 
     def __copy__(self):
         copy = QueryContext(self.xpathContext, self.initialModel,
-                            self.currentPosition,self.modelContext)
+                        self.currentPosition,self.modelContext,self.explain)
         copy.currentTupleset = self.currentTupleset
-        copy.describe=self.describe
+        copy.joinTupleset= self.currentTupleset
         return copy
         
         
@@ -646,19 +689,20 @@ class Path2AST(utils.XPathExprVisitor):
             -> literal 
     '''                  
             
-    def __init__(self, context, expr,position=-1, describe=False):
+    def __init__(self, context, expr,position=-1, explain=False):
         super(Path2AST,self).__init__() 
         self.context = context
         self.currentOpStack = []
         self.initialPosition = position
         self.inPredicate = False
-        self.describe = describe
+        self.explain = explain
+        self.xpathExprs = []
         expr.visit(self.visit)
 
     def _pathInPredicate(self):
         if self.inPredicate:
             astVisitor = Path2AST(self.context, self.currentNode,
-                                  self.currentOpStack[0].finalPosition,describe=self.describe)
+                                  self.currentOpStack[0].finalPosition,explain=self.explain)
             self.currentOpStack[-1].appendArg(astVisitor.currentOpStack[0])
             return 1 #next
         else:
@@ -686,12 +730,17 @@ class Path2AST(utils.XPathExprVisitor):
         if self._startStep(): 
             return 1 #handled, move on
 
-        #we don't handle this now so treat the right side as unhandled
-        newExpVisitor = ReplaceRxPathSubExpr(self.context, exp._right,describe=self.describe)
-        self.currentOpStack[-1].xpathExp = newExpVisitor.resultExpr
-
         #handle the left side
         self.descend(exp, ['_left'])
+        
+        #we don't handle this now so treat the right side as unhandled
+        newExpVisitor = ReplaceRxPathSubExpr(self.context, exp._right,explain=self.explain)
+        exp._right = newExpVisitor.resultExpr
+        exp._left = XPath.ParsedStep.ParsedAbbreviatedStep(False)
+        self.currentOpStack[-1].xpathExp = exp
+        self.xpathExprs.append( exp )
+        self.currentOpStack[-1].finalPosition -= 1
+        
         return 1 #next
         
     def ParsedRelativeLocationPath(self, exp):
@@ -706,15 +755,24 @@ class Path2AST(utils.XPathExprVisitor):
         else:
             stop = self._step(exp._axis._axis)
             if not stop:
-                self._handleNodeTest(self.currentOpStack[-1], exp._nodeTest)
-                try:
-                    retVal = self.descend(exp,['_predicates'])
-                except PositionDependentException:
+                if self._handleNodeTest(self.currentOpStack[-1], exp._nodeTest):
+                    try:
+                        retVal = self.descend(exp,['_predicates'])
+                    except PositionDependentException:
+                        retVal = self.STOP
+                else:
                     retVal = self.STOP
-
+                
                 if retVal == self.STOP:
                     #encountered a position dependent predicate
-                    self.currentOpStack[-1].xpathExp = self._extractPathRemainder()
+                    selectOp = self.currentOpStack[-1]
+                    selectOp.xpathExp = self._extractPathRemainder()
+                    self.xpathExprs.append( selectOp.xpathExp )
+                    assert selectOp.finalPosition > -1
+                    if selectOp.finalPosition == OBJTYPE_POS:
+                        selectOp.finalPosition = PRED_POS
+                    else:
+                        selectOp.finalPosition -= 1
                     return 0
                 return 1 #next
             else:
@@ -733,33 +791,47 @@ class Path2AST(utils.XPathExprVisitor):
     def _handleNodeTest(self, selectOp, nodeTest):
         nodeType, key = nodeTest.getQuickKey(self.context.processorNss)
 
-        if not nodeType:
+        if selectOp.finalPosition == OBJTYPE_POS:
+            #set by predicate attribute step:
+            #selectOp.finalPosition = PRED_POS
+            #handle xml:lang, rdf:datatype, listid, uri
+            return False
+        elif not nodeType:
             assert repr(nodeTest) == 'node()'
-            return #no-op: matches everything
+            return True#no-op: matches everything
         if selectOp.finalPosition == OBJ_POS:
-            if isinstance(nodeTest, XPath.ParsedNodeTest.PrincipalTypeTest):
-                assert repr(nodeTest) == '*'
-                return#todo: object type test
-            elif nodeType == Node.TEXT_NODE:
-                return#todo: object type test
+            if isinstance(nodeTest, XPath.ParsedNodeTest.PrincipalTypeTest
+                                            ) or nodeType == Node.TEXT_NODE:
+                literalMatch = nodeType == Node.TEXT_NODE
+                if not literalMatch:
+                    assert repr(nodeTest) == '*'
+                eq = EqOp(literalMatch and 'ne' or 'eq')                
+                eq.appendArg(SelectOp(OBJTYPE_POS))
+                eq.appendArg(ConstantOp(RxPath.OBJECT_TYPE_RESOURCE))
+                selectOp.finalPosition = OBJTYPE_POS
+                selectOp.appendArg(eq)
+                selectOp.finalPosition = OBJ_POS
+                return True
         elif nodeType != Node.ELEMENT_NODE:
             #anything else will never match
             selectOp.appendArg(ConstantOp(False))
-            return
+            return True
         elif isinstance(nodeTest, XPath.ParsedNodeTest.PrincipalTypeTest):
             assert repr(nodeTest) == '*'
-            return #no-op: matches everything
+            return True #no-op: matches everything
 
         #at this point nodeTest will be either a local name,
         #qualfied name or namespace test
         if key is None: #namespace test
             nameUri = self.context.processorNss[nodeTest._prefix] + '*'
-            #todo
+            return False #todo
         else:
             namespaceURI = key[0] or '' #this will be None if LocalName 
             nameUri = namespaceURI + RxPath.getURIFragmentFromLocal(key[1])
         
-        if selectOp.finalPosition == SUB_POS or selectOp.finalPosition == OBJ_POS:
+        if selectOp.finalPosition == OBJ_POS:
+            return False #todo
+        if selectOp.finalPosition == SUB_POS:#or selectOp.finalPosition == OBJ_POS:
             #type match: /foo is equivalent to /*[is-subclass-of(rdf:type,uri('foo'))]
             #:= subquery that with 2 predicates: predicate = rdf:type and object in subclass list
             op = SelectOp(selectOp.finalPosition)
@@ -791,6 +863,7 @@ class Path2AST(utils.XPathExprVisitor):
                 op.appendArg(ConstantOp(sub))
 
         selectOp.appendArg(op)
+        return True
 
     def ParsedPredicateList(self, exp):
         #create a AndOp with each predicate
@@ -822,10 +895,11 @@ class Path2AST(utils.XPathExprVisitor):
     def visitUnsupportedExpr(self, exp, funcFactory = AnyFuncOp):
         assert self.inPredicate
         #we need to still look for function calls that depend on the context position
-        visitor = ReplaceRxPathSubExpr(self.context, exp,checkPos = True,describe=self.describe)
+        visitor = ReplaceRxPathSubExpr(self.context, exp,checkPos = True,explain=self.explain)
         subexpr = visitor.resultExpr
         funcOp = funcFactory()
         funcOp.xpathExp = subexpr
+        self.xpathExprs.append( exp )
         self.currentOpStack[-1].appendArg( funcOp )
         return 1
 
@@ -844,7 +918,6 @@ class Path2AST(utils.XPathExprVisitor):
         visitNumberUnsupportedExpr
 
     def _visitWithOp(self, op):
-        oldOp = self.currentOp
         self.currentOpStack.append(op)
         try:
             self.descend()
@@ -890,13 +963,13 @@ class Path2AST(utils.XPathExprVisitor):
                     else:
                         #todo: support Nodeset ConstantOps containing predicates
                         return False
-        #else:
-        #    if not lexpr.isIndependent() or not rexpr.isIndependent():
-        #        #EqOp doesn't support operand that not independent from the results
-        #        #todo: putting this check here is a hack
-        #        print 'wah4'
-        #        return False
 
+        #optimization: if an expression is a Constant with a nodeset containing a single node
+        #we can always convert it to a string for the comparison
+        if (rtype == NodesetTupleset and isinstance(rexpr, ConstantOp)
+            and len(rexpr.value.nodeset) == 1):
+            #optimization
+            rexpr.value = RxPath.StringValue(rexpr.value.nodeset)
         return True
         
     def ParsedEqualityExpr(self, exp):
@@ -906,25 +979,33 @@ class Path2AST(utils.XPathExprVisitor):
         #because we need to map the implicit string conversion to a
         #adjust the predicate if it is a predicate
         assert self.inPredicate
-                
-        if exp._op == '=':
-            eqOp = EqOp()
-            oldOp = self.currentOpStack[-1]
-            self.currentOpStack.append(eqOp)
-            try:                
-                self.descend()
-                            
-                lexpr, rexpr = eqOp.getArgs() #must have 2 args
-                
-                if (self.coerceToString(lexpr, rexpr) and 
-                    self.coerceToString(rexpr, lexpr)):
-                    #the query engine can handle the operands
-                    oldOp.appendArg( eqOp)
+        eqOp = EqOp(exp._op == '=' and 'eq' or 'ne')
+        oldOp = self.currentOpStack[-1]
+        self.currentOpStack.append(eqOp)
+        try:                
+            currentExprs = self.xpathExprs[:]
+             
+            self.descend()
+                        
+            lexpr, rexpr = eqOp.getArgs() #must have 2 args
+
+            for expr in (lexpr, rexpr):
+                if (expr.getType() == NodesetTupleset and isinstance(expr, ConstantOp)
+                    and len(expr.value.nodeset) == 0):
+                    #optimization
+                    #nodeset equality means this expression will never be true
+                    oldOp.appendArg( getFuncOp('false') )
+                    self.xpathExprs = currentExprs #revert 
                     return 1
-            finally:
-                self.currentOpStack.pop()
-                assert oldOp is self.currentOpStack[-1], (oldOp,self.currentOpStack[-1])            
-        #else: support != #todo
+                
+            if (self.coerceToString(lexpr, rexpr) and 
+                self.coerceToString(rexpr, lexpr)):
+                #the query engine can handle the operands
+                oldOp.appendArg( eqOp)
+                return 1
+        finally:
+            self.currentOpStack.pop()
+            assert oldOp is self.currentOpStack[-1], (oldOp,self.currentOpStack[-1])            
 
         return self.visitBooleanUnsupportedExpr(exp)
     
@@ -938,7 +1019,7 @@ class Path2AST(utils.XPathExprVisitor):
             except:
                 raise XPath.RuntimeException(RuntimeException.UNDEFINED_PREFIX, prefix)
         else:
-            expanded = self._key
+            expanded = exp._key
 
         if expanded in PosDependentFuncs:
             raise PositionDependentException()
@@ -985,6 +1066,7 @@ class Path2AST(utils.XPathExprVisitor):
         
     def ParsedVariableReferenceExpr(self, exp):
         assert self.inPredicate
+        #todo: we need to add a VarRef op to enable this to be used inside XSLT? 
         value = exp.evaluate(self.context)
         if (isinstance(value, (int, long, float)) and
             isinstance(self.ancestors[-1][0],XPath.ParsedPredicateList.ParsedPredicateList)):
@@ -992,6 +1074,7 @@ class Path2AST(utils.XPathExprVisitor):
         elif isinstance(value, NodesetType):
             #todo handle nodeset, make sure not RxPath elements or all in the same position
             #otherwise can handle the parent node
+            self.xpathExprs.append(exp) #we need to extract a key
             self.currentOpStack[-1].appendArg(ConstantOp(value)) 
             return 1
         else:
@@ -1021,7 +1104,7 @@ class Path2AST(utils.XPathExprVisitor):
             #change exp to the ParsedRelativeLocationPath
             parent, field = self.ancestors[-1]
             if field == '_right':
-                #wrong? what if are steps has predicates that can't be handled?
+                #todo: wrong? what if are steps has predicates that can't be handled?
                 #construct a new ParsedRelativeLocationPath?
 
                 #already handled by the SelectOp, so do nothing
@@ -1031,7 +1114,7 @@ class Path2AST(utils.XPathExprVisitor):
             exp = topMost                        
 
         #analyze the rest of the expression for nested absolute paths
-        subexpr = ReplaceRxPathSubExpr(self.context, exp,checkPos = False,describe=self.describe)        
+        subexpr = ReplaceRxPathSubExpr(self.context, exp,checkPos = False,explain=self.explain)        
         return subexpr.resultExpr
         
     def _step(self, axis):
@@ -1050,12 +1133,16 @@ class Path2AST(utils.XPathExprVisitor):
                 stop = True
         elif axis == 'parent':
             if pos > SUB_POS:
-                selectOp.finalPosition -= 1
+                if pos == OBJTYPE_POS:
+                    selectOp.finalPosition = PRED_POS
+                else:
+                    selectOp.finalPosition -= 1
             else:                
                 stop = True
         elif axis == 'attribute': 
-            if pos != PRED_POS:
-                #todo: handle xml:lang, rdf:datatype, listid, uri
+            if pos == PRED_POS:
+                selectOp.finalPosition = OBJTYPE_POS
+            else:
                 stop = True                
             #the only valid attribute for the other elements is "about",
             #which is the same as the string-value and so this is a no-op                
@@ -1063,7 +1150,9 @@ class Path2AST(utils.XPathExprVisitor):
             stop = True
 
         if stop:
-            self.currentOpStack[-1].xpathExp = self._extractPathRemainder()
+            exp = self._extractPathRemainder()
+            self.currentOpStack[-1].xpathExp = exp
+            self.xpathExprs.append( exp )
         return stop
 
 
@@ -1086,12 +1175,13 @@ class SimpleTupleset(Tupleset):
             #assume its a sequence
             self.generator = lambda: iter(generatorFuncOrSeq)
             self.seqSize = len(generatorFuncOrSeq)
-            self.hint = generatorFuncOrSeq
+            self.hint = hint or generatorFuncOrSeq
         else:
             self.generator = generatorFuncOrSeq
             self.seqSize = sys.maxint
             self.hint = hint #for debugging purposes
         self.op=op #for debugging
+        self.cache = None
 
     def size(self):    
         return self.seqSize
@@ -1099,7 +1189,10 @@ class SimpleTupleset(Tupleset):
     def filter(self, conditions=None):        
         '''Returns a iterator of the tuples in the set
            where conditions is a position:value mapping
-        '''                
+        '''    
+        #if self.cache is None:
+        #    self.cache = list(self.generator())
+        #for row in self.cache:
         for row in self.generator():
             if conditions:
                 for pos, test in conditions.iteritems():
@@ -1110,11 +1203,11 @@ class SimpleTupleset(Tupleset):
             else:
                 yield row
 
-    def describe(self, out, indent=''):        
+    def explain(self, out, indent=''):        
         print >>out, indent,'SimpleTupleset',hex(id(self)), 'for', self.op, 'with:'
         indent += ' '*4
         if isinstance(self.hint, Tupleset):            
-            self.hint.describe(out,indent)
+            self.hint.explain(out,indent)
         else:
             print >>out, self.hint
 
@@ -1164,7 +1257,7 @@ def joinTuples(tableA, tableB, joinFunc):
     for rowA in tableA:
         for resultRow in joinFunc(rowA, tableB, lastRowA):            
             yield rowA, resultRow
-        lastRowA = rowA
+        lastRowA = rowA, resultRow
 
 def crossJoin(rowA,tableB,lastRowA):
     '''cross join'''
@@ -1172,6 +1265,25 @@ def crossJoin(rowA,tableB,lastRowA):
         yield row
     
 class Join(RxPath.Tupleset):
+    '''
+    Corresponds to an join of two tuplesets
+    Can be a inner join or right outer join, depending on joinFunc
+    '''
+    def __init__(self, left, right, joinFunc=crossJoin, op=''):
+        self.left = left
+        self.right = right
+        self.joinFunc = joinFunc
+
+    def getJoinType(self):
+        return self.joinFunc.__doc__
+
+    def explain(self, out, indent=''):        
+        print >>out, indent, 'Join',hex(id(self)),'with:',self.getJoinType()
+        indent += ' '*4
+        self.left.explain(out,indent)
+        self.right.explain(out,indent)        
+            
+class IterationJoin(Join):
     '''
     Corresponds to an join of two tuplesets
     Can be a inner join or right outer join, depending on joinFunc
@@ -1204,17 +1316,101 @@ class Join(RxPath.Tupleset):
                     #todo: if joinFunc is a right outer join,
                     #test that right isn't null                    
                     yield rowA
+                    lastRowA = rowA, right
                     break;
-                lastRowA = rowA
-        return SimpleTupleset(getInner, self)
+                
+        return SimpleTupleset(getInner, self, op='left_inner')
 
-    def describe(self, out, indent=''):        
-        print >>out, indent, 'Join',hex(id(self)),'with:',self.joinFunc.__doc__
-        indent += ' '*4
-        self.left.describe(out,indent)
-        self.right.describe(out,indent)        
+class MergeJoin(Join):
+    '''
+    Assuming the left and right tables are ordered by the columns 
+    used by the join condition, do synchronized walk through of each table.
+    '''
+        
+    def __init__(self, left, right, lpos, rpos, op=''):
+        self.left = left
+        self.right = right
+        self.leftJoinSlice = lpos
+        self.rightJoinSlice = rpos
+        
+    def _filter(self, conditions=None):
+        li = iter(self.left)
+        ri = iter(self.right)
+        lpos = self.leftJoinSlice 
+        rpos=self.rightJoinSlice
+        
+        l = li.next(); r = ri.next()
+        while 1:        
+            while l[lpos] < r[rpos]:
+                l = li.next() 
+            while r[rpos] < l[lpos]:
+                r = ri.next()        
+            if l[lpos] == r[rpos]:
+                #inner join 
+                if conditions:
+                    row = l + r
+                    for key, value in conditions.iteritems():
+                        if row[key] != value:
+                            break
+                    else:
+                        yield l, r
+                else:
+                    yield l, r
+                l = li.next();
+    
+    def filter(self, conditions=None):
+        for left, right in self._filter(conditions):
+            yield left+right
             
+    def left_inner(self):
+        '''
+        Returns iterator of the left inner rows
+        '''
+        def getInner():
+            for left, right in self._filter():
+                yield left
 
+        return SimpleTupleset(getInner, self, op='MergeJoin.left_inner')
+
+    def getJoinType(self):
+        return 'ordered merge'
+
+class ObsoleteJoin(Join):
+    #todo remove
+    '''
+    Corresponds to an join of two tuplesets
+    Can be a inner join or right outer join, depending on joinFunc
+    '''
+        
+    def filter(self, conditions=None):
+        keys = dict([(k[0],1) for k in self.right])
+        
+        if conditions and 0 in conditions:
+            if conditions[0] not in keys:
+                return
+                
+        for row in self.left.filter(conditions):
+            joinkey = row[0]
+            if joinkey in keys:
+                yield row
+    
+        #if self.left.filter > len(keys)
+        conditions = dict(conditions or {})
+        
+        for key in self.right:
+            conditions[0]=key
+            for row in self.left.filter(conditions):
+                yield row
+            
+    def left_inner(self):
+        '''
+        Returns iterator of the left inner rows
+        '''
+        return self
+        
+    def getJoinType(self):
+        return 'merge'
+        
 class Projection(RxPath.Tupleset):
     '''
     Corresponds to a nodeset with all nodes of the same type (position)
@@ -1235,6 +1431,27 @@ class Projection(RxPath.Tupleset):
         self.distinct=distinct
         self.op=op #for debugging
 
+    def toStatements(self, context):
+        if self.position == 0: 
+            model = _findModel(self.tupleset)
+            if model:
+                return model
+            
+            def getRowsForSubjects():
+                lastSubject = None
+                for row in self:
+                    #print 'subject', row
+                    subject = row[0]
+                    if subject != lastSubject:
+                        lastSubject = subject
+                        for stmt in context.initialModel.filter(
+                            {0 : subject}):
+                            yield stmt
+                            
+            return SimpleTupleset(getRowsForSubjects,self,op='PROJECT toStatements')
+        else:
+            return self.tupleset
+        
     def filter(self, conditions=None):
         #if conditions:
         #    assert (len(conditions) <= self.position+1), conditions
@@ -1265,15 +1482,14 @@ class Projection(RxPath.Tupleset):
     def left_inner(self):
         return Projection(self.tupleset.left_inner(), self.position, op='left_inner of ' + self.op)
 
-    def describe(self, out, indent=''):        
+    def explain(self, out, indent=''):        
         print >>out, indent,'Projection', hex(id(self)), self.position, \
               self.distinct and 'DISTINCT' or '','for', self.op,'using:'
         indent += ' '*4
-        self.tupleset.describe(out,indent)
+        self.tupleset.explain(out,indent)
     
 class Union(RxPath.Tupleset):
     '''
-    Currently unused
     Corresponds to a nodeset containing nodes of different node types
     '''
     def __init__(self, projections=None,op=''):
@@ -1287,11 +1503,14 @@ class Union(RxPath.Tupleset):
             for row in tupleset.filter(conditions):
                  yield row
 
-    def describe(self, out, indent=''):        
+    def toStatements(self, context):
+        return Union([t.toStatements(context) for t in self.tuplesets],op='UNION toStatements')
+        
+    def explain(self, out, indent=''):        
         print >>out, indent, 'Union', hex(id(self)),'for', self.op, 'with:'
         indent += ' '*4
         for t in self.tuplesets:
-            t.describe(out,indent)
+            t.explain(out,indent)
 
 
 class NodesetTupleset(RxPath.Tupleset):
@@ -1313,13 +1532,25 @@ class NodesetTupleset(RxPath.Tupleset):
         for node in self.nodeset:
             yield [node] 
 
-    def describe(self, out, indent=''):
+    def toStatements(self, context):
+        from rx import RxPathDom
+        
+        def getStatements():
+            for node in self.nodeset:
+                if isinstance(node, RxPathDom.Object):
+                    node = node.parentNode #get predicate
+                for stmt in node.getModelStatements():
+                    yield stmt        
+                                
+        return SimpleTupleset(getStatements,self,op='NODESET toStatements')
+
+    def explain(self, out, indent=''):
         print >>out, indent, 'NodesetTuple',repr(self.hintXPath),'using:'
         indent += ' '*4
         if self.hintResultSet:
-            self.hintResultSet.describe(out,indent)
+            self.hintResultSet.explain(out,indent)
         else:
-            print indent, 'None'
+            print >>out, indent, 'None'
         
     def __contains__(self, row):
         if not self.nodeset or not row:
@@ -1327,20 +1558,48 @@ class NodesetTupleset(RxPath.Tupleset):
         
         if len(row) > 1:
             #convert row to a nodeset
-            value = [ row2Node(self.nodeset[0].rootNode, row) ]
+            row = row2Node(self.nodeset[0].rootNode, row)
+            if not row:
+                return False        
+            value =  [ row ]
         else:
             #row is just a single value
             value = row[0]
-        return ParsedExpr._nodeset_compare(_comparisons.eq,
-                                    value, self.nodeset)
+        return ParsedExpr._nodeset_compare(eq, value, self.nodeset)
+    
+    def __repr__(self):
+        return repr(self.nodeset)
+
+def _findModel(tupleset):
+    if isinstance(tupleset, Union):
+        tuplesets = tupleset.tuplesets
+    else:
+        tuplesets = (tupleset,)
+    for tupleset in tuplesets:
+        if isinstance(tupleset, Union):
+            model = _findModel(tupleset)
+            if model:
+                return model
+            continue
         
-def xpathEquality(left, right):
+        while isinstance(tupleset, Projection):
+            tupleset = tupleset.tupleset
+        
+        if isinstance(tupleset, RxPath.Model):
+            return tupleset
+                
+    return None
+    
+def xpathEquality(left, right, op='eq'):
     '''equivalent to XPath equality semantics'''
     if (isinstance(left, NodesetTupleset) and 
        isinstance(right, NodesetTupleset)):
         #hacky optimiziation
-        return ParsedExpr._nodeset_compare(_comparisons.eq,
-                                    left.nodeset, right.nodeset)
+        if op == 'eq':
+            cmpfunc = eq
+        else:
+            cmpfunc = ne        
+        return ParsedExpr._nodeset_compare(cmpfunc,left.nodeset,right.nodeset)
     elif isinstance(left,Tupleset) and isinstance(right,Tupleset):
         #if an item appears in both sets return True
         #(note: we've already took care of string value conversion)
@@ -1349,17 +1608,27 @@ def xpathEquality(left, right):
             tmp = left
             left = right
             right = tmp
-        for row in left:
-            if row in right:
-                return True
-        return False
+        if op == 'eq':
+            for row in left:
+                if row in right:
+                    return True
+        else:
+            for lrow in left:
+                for rrow in right:
+                    if lrow != rrow:
+                        return True
+        return False            
     elif isinstance(right,Tupleset):
         #swap
         tmp = left
         left = right
         right = tmp
     elif not isinstance(left,Tupleset):
-        return right == left #neither is a Tupleset
+        #neither is a Tupleset
+        if op == 'eq':
+            return right == left
+        else:
+            return right != left
 
     #now left is tupleset, right is a simple type
     if isinstance(right,(bool,BooleanType)):
@@ -1368,7 +1637,14 @@ def xpathEquality(left, right):
         else:
             return not left.asBool()
     else:
-        return [right] in left
+        if op == 'eq':
+            return [right] in left
+        else: 
+            assert op=='ne'
+            for row in left:
+                if [right] != row:
+                    return True
+            return False
                 
 class SimpleQueryEngine(object):
 
@@ -1378,13 +1654,13 @@ class SimpleQueryEngine(object):
         else:
             return 1000 #todo: better analysis ;)
 
-    def xpathEvaluate(self, exp, context, rows, pos):        
-        nodeset = [row2Node(context.node.rootNode, row, pos)
-                                                       for row in rows]
-        print 'xpeval', nodeset
-        print 'source', list(rows)
-        #print repr(exp)
-
+    def xpathEvaluate(self, exp, context, rows, pos):
+        if pos > -1:            
+            nodeset = filter(None, [row2Node(context.node.rootNode, row, pos)
+                                                            for row in rows])
+        else:
+            nodeset = [context.node.rootNode]
+        
         state = context.copy()
         size = len(nodeset)
         res = []        
@@ -1395,7 +1671,7 @@ class SimpleQueryEngine(object):
             if res:
                 assert isinstance(res, NodesetType)
                 assert isinstance(subRt, NodesetType)
-                res = RxPath.Set.Union(res,subRt) #todo: is Union necessary?  
+                res = res+subRt #RxPath.Set.Union(res,subRt) #todo: is Union necessary?  
             else:
                 res = subRt#can be anytype
         context.set(state)
@@ -1406,16 +1682,15 @@ class SimpleQueryEngine(object):
         evaluate the selectOp's predicates on the given row
         '''
         result = self._evalAnd(args, context)
-
+        if op.finalPosition > -1:# and op.joinPosition < 0:
+            result = Projection(result, op.finalPosition,op='Indep SelectOp')
+            
         if not op.xpathExp:
-            if op.finalPosition > -1:
-                return Projection(result, op.finalPosition,op='Indep SelectOp')
-            else:
-                return result
+            return result
         else:            
             assert isinstance(result, Tupleset)
-            #print 'final', list(result)
-            if context.describe:
+            
+            if context.explain:
                 return NodesetTupleset([], op.xpathExp, result) 
             nodeset = self.xpathEvaluate(op.xpathExp, context.xpathContext,
                                                     result, op.finalPosition)
@@ -1428,67 +1703,38 @@ class SimpleQueryEngine(object):
                 for arg in flattenOp(preds, AndOp):
                      yield (arg.cost(self, context), i, arg)
 
-
         args = [x for x in getArgs()]
 
-        #todo:
         if not args and not op.xpathExp:
             if op.finalPosition > -1:
-                return Projection(context.currentTupleset, op.finalPosition,op='NoOpSelectOp')
+                if op.joinPosition == 0: 
+                    tupleset = context.currentTupleset
+                else:
+                    tupleset = context.currentTupleset
+                return Projection(tupleset, op.finalPosition,op='NoOpSelectOp')
             else:
                 return context.currentTupleset
         
         args.sort() #sort by cost
         #args.reverse()
         
-        context = copy.copy(context)
-        if op.joinPosition < 0: #if absolute
-            context.currentTupleset = context.initialModel            
-        else: #relative            
-            if context.currentTupleset is not context.initialModel:                
-                if op.joinPosition == PRED_POS:
-                    #the current model for this selection will be all the statements
-                    #from the initial model with statements that matches the subject
-                    #and predicate of the statments in the current model                                
-                    joinMap = { PRED_POS : PRED_POS, SUB_POS : SUB_POS}
-                else:
-                    #the current model for this selection will be all the statements
-                    #from the initial model whose subject matches the subject or
-                    #object of the statments in the current model                
-                    #e.g. /*/bar/*[foo] the "foo" selectop will have the object as the subject                
-                    joinMap = { op.joinPosition : SUB_POS}
-
-                #joinfunc is equivalent to something like:
-                #select initial.* from initial, current
-                #where initial.object = current.subject
-                #       and (filterconditions(initial.*))
-                filterOps = {SCOPE_POS : context.modelContext}
-                def joinFunc(leftRow, rightTable, lastRow):
-                    '''Dependent SelectOp join'''
-                    
-                    #print op.joinPosition, leftRow[0], lastRow and lastRow[0]
-                    if lastRow and leftRow[:op.joinPosition+1] == lastRow[:op.joinPosition+1]:
-                        #hack: simulate group_by (assumes rows are ordered)
-                        return
-                        
-                    for key, value in joinMap.items():
-                        filterOps[value] = leftRow[key]
-
-                    for row in rightTable.filter(filterOps):
-                        context.currentTupleset = SimpleTupleset((row,))
-                        if self._matchesPredicates(op, args, context).asBool():
-                            #print 'jmatch', row, op
-                            yield row
-
-                join = Join(context.currentTupleset, context.initialModel, joinFunc, op='DepSelectOp')
-                if op.getPosition() > -1:
-                    return Projection(join, op.getPosition(),op='DepSelectOp') #join #todo!! row2Node 
-                else:
-                    return join
-
-        #either absolute or relative to the initial model, so join isn't necessary
-        #print [repr(a) for a in args]        
-        return self._matchesPredicates(op, args, context) 
+        right = self._matchesPredicates(op, args, context)
+ 
+        if op.joinPosition == 0:                          
+            if _findModel(right):
+                #everything matches
+                return context.currentTupleset
+            elif _findModel(context.currentTupleset) or _findModel(context.joinTupleset): 
+                #current model is all the statements, so no need to join
+                return Projection(right, 0,op='Subject SelectOp')
+            else:
+                 #todo: order issue if joinPos == object 
+                lslice = slice( op.joinPosition, op.joinPosition+1)
+                rslice = slice( 0, 1) #subject               
+                return MergeJoin(context.joinTupleset, right, lslice,rslice)
+        else:
+            #either absolute or relative to the initial model, so join isn't necessary
+            return right
                     
     def costSelectOp(self, op, context):
         args = list(flattenSeq(op.predicates))
@@ -1499,14 +1745,17 @@ class SimpleQueryEngine(object):
         else:
             cost = 1.0
         cost += self.xpathExpCost(op.xpathExp, context)
-        
+        if op.finalPosition == 1: #assume matching predicates are more expensive
+            cost += 5
+        if op.finalPosition == OBJTYPE_POS:
+            cost += 10
         #if op.joinPosition < 0: #its absolute:
         #    cost /= 10          #independent thus cheaper?
         return cost 
 
     def _evalFuncOp(self, op, args, context):
         if op.xpathExp:
-            if context.describe:
+            if context.explain:
                 if op.isIndependent():
                     return NodesetTupleset([], op.xpathExp)
                 else:
@@ -1548,10 +1797,11 @@ class SimpleQueryEngine(object):
             joinPos = context.currentPosition            
             def joinFunc(leftRow, rightTable, lastRow):
                 '''Dependent evaluation of func'''
-                if lastRow and leftRow[:joinPos+1] == lastRow[:joinPos+1]:
-                    #hack: simulate group_by, assumes rows are ordered
+                if lastRow and leftRow[:joinPos+1] == lastRow[0][:joinPos+1]:
+                    #optimization, assumes left rows are ordered
+                    #if the dependent columns are the same don't bother re-calculating the value
                     #print 'anyfunc groupby', leftRow[:joinPos+1]
-                    return
+                    yield lastRow[1]
 
                 jcontext = copy.copy( context )
                 jcontext.currentTupleset = SimpleTupleset((leftRow,))
@@ -1572,9 +1822,14 @@ class SimpleQueryEngine(object):
                     if result: #todo: hack: we can do this optimization
                         #because currently this will always be evaluated as bool
                         yield [result]
-
-            return Join(context.currentTupleset, SimpleTupleset(), joinFunc)
-        
+            
+ #           if context.currentPosition == 0:
+ #               current = Projection(context.currentTupleset, 0,op='AnyFunc')
+ #           else:
+ #               current = context.currentTupleset 
+ #           return IterationJoin(current, SimpleTupleset(op="AnyFunc: "+ repr(op)), joinFunc)
+            return IterationJoin(context.currentTupleset.toStatements(context), SimpleTupleset(op="AnyFunc: "+ repr(op)), joinFunc)
+         
     def costAnyFuncOp(self, op, context):        
         if op.metadata.costFunc:
             cost = op.metadata.costFunc(self, context)        
@@ -1613,12 +1868,12 @@ class SimpleQueryEngine(object):
                 context.currentPosition = pos
 
             result = self.evaluateToBoolean(arg, context)
-                        
+            
             if isinstance(result, Tupleset):
-               context.currentTupleset = result
+                context.currentTupleset = result
             else:
                 if not result:
-                    return SimpleTupleset(op='evalAnd') #nothing matches 
+                    return SimpleTupleset(op='evalAndEmpty') #nothing matches 
 
         return context.currentTupleset           
 
@@ -1711,83 +1966,96 @@ class SimpleQueryEngine(object):
             leftValue = left.evaluate(self, context)                    
         if right.isIndependent():
             rightValue = right.evaluate(self, context)        
-        return self._evalEq(left, right, context, leftValue, rightValue)
+        return self._evalEq(left, right, context, leftValue, rightValue, op.op)
 
     def _selectWithValue(self, context, selectop, value):
         #optimization:
         #if we know the selectop's final position and
         #the other side is a simple value we can filter by that value
         #before evaluating the selectop
-        independent = selectop.isIndependent()
-        if independent:
-            #absolute, need to change it to relative:
-            selectop.joinPosition = selectop.finalPosition
-            tupleset = context.initialModel
-        else:
-            tupleset = context.currentTupleset
+        assert selectop.joinPosition > -1
+        
         context = copy.copy( context )
-        context.currentTupleset = SimpleTupleset(lambda: tupleset.filter(
+        if selectop.joinPosition < 1: #for 0 (join on subject) or -1 (absolute, no join)
+            context.joinTupleset =  context.currentTupleset
+            tupleset = context.initialModel.toStatements(context) 
+        else: #no join -1 (absolute) or pred or obj
+            tupleset = context.currentTupleset.toStatements(context)
+        
+        context.currentTupleset = SimpleTupleset(
+                    lambda: tupleset.filter(
                     #todo: modelContext?
-                    {selectop.finalPosition : value}), tupleset,op='selectWithValue')
+                    {selectop.finalPosition : value}), tupleset,
+                    op='selectWithValue '+ value)
+            
+        return selectop.evaluate(self, context)
 
-        context.initialModel = context.currentTupleset #todo
-        #print 'opt', list(context.currentTupleset)
-        #return context.currentTupleset
-
-        #print value, list(context.currentTupleset)
-        #print repr(selectop)
-        result = selectop.evaluate(self, context) #will return a Projection of a Join
-        #import pprint
-        #pprint.pprint( list(result) )
-        
-        if independent:
-            selectop.joinPosition = -1 #restore independence
-        return result
-        
-    def _evalEq(self, left, right, context, leftValue, rightValue):
+        #if the current tupleset isn't the model, do a mergejoin to avoid 
+        #filtering linearly 
+        #this is only a win if the current tupleset is large and most rows don't match
+        #compareSlice = slice(selectop.finalPosition, selectop.finalPosition+1)
+        #context.joinTupleset = MergeJoin(tupleset, 
+        #        SimpleTupleset(lambda: context.initialModel.filter(
+        #            #todo: modelContext?
+        #            {selectop.finalPosition : value}), context.initialModel,
+        #            op='selectWithValue '+ value),
+        #        compareSlice, compareSlice)
+        #return selectop.evaluate(self, context) #will return a Projection of a Join
+    
+    def _evalEq(self, left, right, context, leftValue, rightValue, op='eq'):
         if leftValue is None or rightValue is None:
             #one or both are dependent: return a Tupleset
-
-            #print 'lop', repr(left)
-            #print 'rop', repr(right), type(right)
-            #print 'lv', leftValue, 'rv', rightValue
             
             #first, try to optimize:
-            if isinstance(left, SelectOp):
-                if left.getPosition() > -1 and (rightValue is not None
-                                    and not isinstance(rightValue, Tupleset)):
-                    #print 'optimize!!'
-                    return self._selectWithValue(context, left, rightValue)
-            elif isinstance(right, SelectOp):                
-                if right.getPosition() > -1 and (leftValue is not None
-                                    and not isinstance(leftValue, Tupleset)):
-                    #print 'optimize!!'
-                    return self._selectWithValue(context, right, leftValue)
-                    
+            if op == 'eq':
+                if isinstance(left, SelectOp):
+                    if left.getPosition() > -1 and (rightValue is not None
+                                        and not isinstance(rightValue, Tupleset)):
+                        return self._selectWithValue(context, left, rightValue)
+                elif isinstance(right, SelectOp):                
+                    if right.getPosition() > -1 and (leftValue is not None
+                                        and not isinstance(leftValue, Tupleset)):
+                        return self._selectWithValue(context, right, leftValue)
+            
+            context = copy.copy( context )        
             def joinFunc(leftRow, rightTable,lastLeftRow):
                 '''Dependent EqOp join'''
+                
                 jcontext = copy.copy( context )
-                jcontext.currentTupleset = SimpleTupleset((leftRow,))
-                #print leftRow                
+                jcontext.currentTupleset = SimpleTupleset((leftRow,),op='eqJoinFunc')
 
+            #def compareFunc():
+            #    '''Dependent EqOp'''
+                
                 if leftValue is None:
                     jleftValue = left.evaluate(self, jcontext)
-                    
                 else:
                     jleftValue = leftValue
-
+                
                 if rightValue is None:
                     jrightValue = right.evaluate(self, jcontext)
                 else:
                     jrightValue = rightValue
 
-                result = xpathEquality(jleftValue, jrightValue)
+                result = xpathEquality(jleftValue, jrightValue, op)
                 if result:
                     yield [result]
+            
+            #return SimpleTupleset(compareFunc, op='EqOp')
+            
+            #if not isinstance(leftValue, Tupleset):
+            #    leftValue = SimpleTupleset((leftValue,) )
+            
+            #joinFunc(): leftRow, rightTable
+                
+            #    result = xpathEquality(jleftValue, jrightValue, op)
+            #    if result:
+            #        yield [result]
                         
-            return Join(context.currentTupleset, SimpleTupleset(), joinFunc)
+            return IterationJoin(context.currentTupleset, 
+                    SimpleTupleset(hint=right, op='EqOp'+repr(left)), joinFunc)
         else: #both are independent
-            return xpathEquality(leftValue, rightValue)
+            return xpathEquality(leftValue, rightValue, op)
                                     
     def costEqOp(self, op, context):
         assert len(op.args) == 2        

@@ -182,9 +182,9 @@ class OldParseState(ParseState):
             if inBlockQuote: #close block quote
                 while wikiStructureStack.get(st.mm.BLOCKQUOTE, 0):
                     st.popWikiStack() #will decrement wikiStructureStack
-            else: #open block quote
-                st.pushWikiStack(st.mm.BLOCKQUOTE)
-                wikiStructureStack[st.mm.BLOCKQUOTE] = 1
+            #else: #open block quote #todo HACK!
+            st.pushWikiStack(st.mm.BLOCKQUOTE)
+            wikiStructureStack[st.mm.BLOCKQUOTE] = 1
             return
             
         if string.startswith('----'):
@@ -212,7 +212,12 @@ class OldParseState(ParseState):
                     st.toClose += 1
                     done = True
                 else:
-                    structureElem = helem #use helem instead of parent
+                    #use helem instead of parent, lineElem
+                    if lineElem:                        
+                        structureElem = helem[0]
+                        lineElem = helem[1]
+                    else:
+                        structureElem = helem
             if not done:
                 if lead == '|': #tables don't nest
                     level = 1

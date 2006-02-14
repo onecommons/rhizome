@@ -73,15 +73,25 @@ class Statement(tuple, BaseStatement):
 
     def __eq__(self, other):
         #for now don't compare scope        
-        return self[:4] == other[:4]
+        if isinstance(other, (tuple,list)):
+            return self[:4] == other[:4]
+        else:
+            return False
 
     def __ne__(self, other):
         #for now don't compare scope        
-        return self[:4] != other[:4]
+        if isinstance(other, (tuple,list)):
+            return self[:4] != other[:4]
+        else:
+            return False
     
     def __cmp__(self, other):
         #for now don't compare scope
-        return cmp(self[:4],other[:4])
+        if isinstance(other, (tuple,list)):
+            return cmp(self[:4],other[:4])
+        else:
+            return False
+
         
 class MutableStatement(list, BaseStatement):
     __slots__ = ()
@@ -99,15 +109,24 @@ class MutableStatement(list, BaseStatement):
 
     def __eq__(self, other):
         #for now don't compare scope        
-        return self[:4] == other[:4]
+        if isinstance(other, (tuple,list)):
+            return self[:4] == other[:4]
+        else:
+            return False
 
     def __ne__(self, other):
         #for now don't compare scope        
-        return self[:4] != other[:4]
-
+        if isinstance(other, (tuple,list)):
+            return self[:4] != other[:4]
+        else:
+            return False
+    
     def __cmp__(self, other):
         #for now don't compare scope
-        return cmp(self[:4],other[:4])
+        if isinstance(other, (tuple,list)):
+            return cmp(self[:4],other[:4])
+        else:
+            return False
         
     #def append(self, o): raise TypeError("append() not allowed")
     def extend(self, o): raise TypeError("extend() not allowed")
@@ -180,8 +199,9 @@ def parseRDFFromString(contents, baseuri, type='unknown', scope=None):
             except:
                 #hmmm, try our NTriples parser
                 try:
-                    return NTriples2Statements(
-                                StringIO.StringIO(contents), scope)
+                    #convert generator to list to force parsing now 
+                    return list(NTriples2Statements(
+                                StringIO.StringIO(contents), scope))
                 except:
                     #maybe its n3 or turtle, but we can't detect that
                     #but we'll try rxml_zml
@@ -230,15 +250,18 @@ def parseRDFFromString(contents, baseuri, type='unknown', scope=None):
                     return RxPath.redland2Statements(stream, scope) 
                 except ImportError:
                     #fallback to 4Suite's obsolete parser
-                    from Ft.Rdf import Util
-                    model, db=Util.DeserializeFromString(contents,driver,
-                                                         dbName,False,baseuri)
-                    statements = RxPath.Ft2Statements(model.statements())
-                    #we needed to set the scope to baseuri for the parser to
-                    #resolve relative URLs, so we now need reset the scope
-                    for s in statements:
-                        s.scope = scope
-                    return statements
+                    try:
+                        from Ft.Rdf import Util
+                        model, db=Util.DeserializeFromString(contents,driver,
+                                                             dbName,False,baseuri)
+                        statements = RxPath.Ft2Statements(model.statements())
+                        #we needed to set the scope to baseuri for the parser to
+                        #resolve relative URLs, so we now need reset the scope
+                        for s in statements:
+                            s.scope = scope
+                        return statements
+                    except ImportError:
+                        raise ParseException("no RDF/XML parser installed")
     except:
         raise ParseException()
 
@@ -291,8 +314,10 @@ def serializeRDF(statements, type, uri2prefixMap=None,
         #not the subject of any statements, so don't include them
         #also skip list resources, they will displayed as objects
         subjects = [s.subject for s in statements]
+        str(rdfDom.childNodes) #todo!!
         nodes = [node for node in rdfDom.childNodes
                      if node.uri in subjects and not node.isCompound()]
+        #print nodes
         contents = rxml.getRXAsZMLFromNode(nodes, nsMap,
                                 fixUp=fixUp, fixUpPredicate=fixUpPredicate)
         if type == 'rxml_xml':

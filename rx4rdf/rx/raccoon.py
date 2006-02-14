@@ -299,7 +299,8 @@ the Action is run (default is False).
         lock = None
         DefaultDisabledContentProcessors = []        
                     
-        expCache = MRUCache.MRUCache(0, XPath.Compile)    
+        expCache = MRUCache.MRUCache(0, XPath.Compile, sideEffectsFunc = 
+            lambda cacheValue,sideEffects,*args: setattr(cacheValue,'fromCache',True))    
                 
         requestsRecord = None
         log = log        
@@ -332,10 +333,11 @@ the Action is run (default is False).
                      appBase='/', model_uri=None, appName='',
                      #dictionary of config settings, overrides the config
                      appVars=None):
-
+            
             self.initThreadLocals(requestContext=None, inErrorHandler=0, 
                                    previousResolvers=None)
 
+            #variables you want made available to anyone during this request
             self.requestContext = [{}] #stack of dicts
             configpath = a or self.DEFAULT_CONFIG_PATH
             self.source = m
@@ -848,7 +850,8 @@ the Action is run (default is False).
                     result, contextNode, retVal = self._doActionsBare(
                                     sequence, kw, contextNode, retVal)
             except:
-                exc_info = sys.exc_info()                
+                #print newTransaction, self.txnSvc.state.timestamp
+                exc_info = sys.exc_info()
                 if isinstance(exc_info[1], ActionWrapperException):
                     result, contextNode, retVal = exc_info[1].state
                     exc_info = exc_info[1].nested_exc_info
@@ -1494,7 +1497,6 @@ the Action is run (default is False).
 <meta name="robots" content="noindex" />
 </head><body>
 <h2>HTTP Error 404</h2>
-
 <p><strong>404 Not Found</strong></p>
 <p>The Web server cannot find the file or script you asked for.
 Please check the URL to ensure that the path is correct.</p>
@@ -1610,8 +1612,11 @@ Please check the URL to ensure that the path is correct.</p>
                     debugFileName = 'debug-wiki.pkl'
                 flags = sys.version_info[:2] < (2, 3) and 'b' or 'U'
                 requests = pickle.load(file(debugFileName, 'r'+flags))
+                
                 import repr
-                rpr = repr.Repr(); rpr.maxdict = 20; rpr.maxlevel = 2;
+                rpr = repr.Repr()
+                rpr.maxdict = 20 
+                rpr.maxlevel = 2
                 for i, request in enumerate(requests):
                     verb = getattr( request[1].get('_request'),'method', 'request')
                     login = request[1].get('_session',{}).get('login','')
@@ -1619,10 +1624,7 @@ Please check the URL to ensure that the path is correct.</p>
                     #print form variables
                     print>>out, rpr.repr(dict([(k, v) for k, v in request[1].items()
                                         if isinstance(v, (unicode, str, list))]))
-                    #pprint.pprint( dict([(k, v) for k, v in request[1].items()
-                    #    if isinstance(v, (unicode, str, list))]), out)
-                    #print>>out, 'request', request[0], request[1].get('about',''), request[1].get(
-                    #        'action',''), request[1].get('_session',{}).get('login','')
+
                     root.handleHTTPRequest(request[0], request[1])
             elif '-x' not in mainArgs:
                 #if -x (execute cmdline and exit) we're done

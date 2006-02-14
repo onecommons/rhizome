@@ -185,7 +185,7 @@ except AttributeError:
     from threading import currentThread, enumerate, RLock
         
     threading.local = local 
-        
+
 class object_with_threadlocals(object):    
     '''
     Creates an attribute whose value will be local to the current
@@ -199,12 +199,6 @@ class object_with_threadlocals(object):
                 self.initThreadLocals(tl1 = 1, tl2 = bar)
     '''
 
-    class _threadlocalattribute(property):
-        def __init__(self, propname, *args, **kw):
-            self.name = propname
-            return super(object_with_threadlocals._threadlocalattribute,
-                                                 self).__init__(*args, **kw)
-    
     def __init__(self, **kw):
         return self.initThreadLocals(**kw)
         
@@ -222,13 +216,21 @@ class object_with_threadlocals(object):
             try:
                 return getattr(self._locals, propname)
             except AttributeError:
-                return getattr(self, defaultValueAttrName)
+                value = getattr(self, defaultValueAttrName)
+                setattr(self._locals, propname, value)
+                return value
 
         def set(self, value):
             setattr(self._locals, propname, value)
             
-        prop = self._threadlocalattribute(propname, get, set, doc='thread local property')
-        setattr(self.__class__, propname, prop)        
+        prop = self._threadlocalattribute(propname, get, set, doc='thread local property for ' + propname)
+        setattr(self.__class__, propname, prop)                 
+
+    class _threadlocalattribute(property):
+        def __init__(self, propname, *args, **kw):
+            self.name = propname
+            return property.__init__(self, *args, **kw)
+    
 
 def htmlQuote(data):
     return data.replace('&','&amp;').replace('<','&lt;').replace('>','&gt;')
@@ -249,7 +251,8 @@ def diff(new, old, cutoffOffset = -100, sep = '\n'):
 ##def merge3(base, first, second):
 ##    #compare first set changes with second set of changes
 ##    #if any of the ranges overlap its a conflict
-##    #for each change 
+##    #for each change
+
 ##    
 ##    old = old.split(sep) 
 ##    new = new.split(sep)     
@@ -835,6 +838,10 @@ try:
             node, field = self[i]
             if isinstance(node, XPath.ParsedExpr.FunctionCall):            
                 node._args[field] = value
+                if field < 3:
+                    fieldName = '_arg' + str(field)
+                    if hasattr(node, fieldName):
+                        setattr(node, fieldName, value)
             elif isinstance(node, XPath.ParsedPredicateList.ParsedPredicateList):
                 node._predicates[field] = value
             else:

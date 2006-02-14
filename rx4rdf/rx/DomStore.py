@@ -151,10 +151,7 @@ class RxPathDomStore(DomStore):
                                     schemaClass = self.schemaFactory)
         self.dom.addTrigger = self.addTrigger
         self.dom.removeTrigger = self.removeTrigger
-        self.dom.newResourceTrigger = self.newResourceTrigger
-        #we need to set this up now so that the schema from the model isn't
-        #added as part of a transaction that may get rolled-back:
-        self.dom.schema = self.dom.schemaClass(self.dom.model.getStatements())                
+        self.dom.newResourceTrigger = self.newResourceTrigger              
         
         #associate the queryCache with the DOM Document
         self.dom.queryCache = requestProcessor.queryCache 
