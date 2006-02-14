@@ -1,6 +1,6 @@
 Rx4RDF and Rhizome Changelog
 ============================
-Changes in Version 0.6.0 (xxx xx, 2006)
+Changes in Version 0.x.x (xxx xx, 200x)
 ----------------------------------------
 * RxPath: Replaced rdf:ID attribute with get-statement-uris() function
 * RxPath: add rdfDocument() XPath function (invoke from XSLT/RxSLT only)
@@ -36,6 +36,9 @@ Changes in Version 0.6.0 (xxx xx, 2006)
 ** GRDDL XSLT stylesheets
 ** save.xml invokes shred() when saving content
 ** have import command shred unless new --noshred option is used
+* raccoon: path: URI resolver nows escapes URLs properly
+* Rhizome: search.xsl - fix property links
+* RxPath: revamped RDFS schema support, now includes type inference based on rdfs:range or rdfs:domain.
 
 Changes in Version 0.5.1 (Oct 21, 2005)
 ----------------------------------------

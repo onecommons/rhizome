@@ -4,7 +4,7 @@ import sys, glob, os, os.path, tempfile
 from distutils.core import setup
 #import py2exe
 
-version_string = "0.5.1"
+version_string = "0.6.0"
 
 PACKAGE_NAME = 'rx4rdf'
 
@@ -89,7 +89,7 @@ setup(name=PACKAGE_NAME,
 	  author="Adam Souzis",
 	  author_email="asouzis@users.sf.net",      
 	  url="http://rx4rdf.sf.net",
-	  download_url="http://sourceforge.net/project/showfiles.php?group_id=85676",
+	  download_url="http://prdownloads.sourceforge.net/rx4rdf/rx4rdf-"+version_string+".tar.gz?download",
 	  license = "GNU GPL",
 	  platforms = ["any"],	  
 	  classifiers = filter(None, classifiers.split("\n")),
