@@ -16,10 +16,9 @@ _defexception('not cacheable')
 
 class UseNode(object):
     """For linked list kept in most-recent .. least-recent *use* order"""
-
-    sideEffects = None
-    #we can't use slots if we want weak refs to this object (needs to add __weakrefs__)
-    #__slots__ = ['value','hkey','older','newer', 'sideEffects', 'size', ]
+    
+    __slots__ = ['value','hkey','older','newer', 'sideEffects', 'size',
+                 'strongref', '__weakref__']
 
     def __init__(self, value, hkey, older=None, newer=None):
         self.value = value  # as returned by user valueCalc function
@@ -28,6 +27,7 @@ class UseNode(object):
         self.older = older  # link to node not as recently used as current
         self.newer = newer  # Note that list is circular: mru.newer is lru
                             # and lru.older is mru, which is the reference point.
+        self.sideEffects = None
                             
     def __repr__(self):
         return str(self.size) + ','+ str(self.hkey) + ',' + str(self.value)

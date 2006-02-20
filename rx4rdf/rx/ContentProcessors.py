@@ -340,7 +340,7 @@ class XSLTContentProcessor(ContentProcessor):
         if not uri:
             res = kw.get('__handlerResource')
             if res:
-                uri = kw['__server__'].evalXPath("string(./wiki:name)", node=res)
+                uri = kw['__server__'].evalXPath("string(./wiki:name)", node=res[0])
             else:
                 uri = kw['__server__'].evalXPath(
                     'string( (/a:NamedContent[wiki:revisions/*/*'
