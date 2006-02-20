@@ -606,7 +606,8 @@ class RhizomeBase(object):
                 handlesAction=None, actionType='http://rx4rdf.sf.net/ns/archive#NamedContent',
                 baseURI=None, owner='http://rx4rdf.sf.net/site/accounts/admin',
                 accessTokens=None, authorizationGroup='', keywords=None,
-                contentLength = None, digest = None, createdOn = "1057919732.750"):
+                contentLength = None, digest = None, createdOn = "1057919732.750",
+                extraProps=None):
         '''
         Convenience function for adding an item the model. Returns a string of triples.
         '''
@@ -667,6 +668,10 @@ class RhizomeBase(object):
             if actionType:
                 nameUriRef['wiki:action-for-type'] = Res(actionType)
 
+        if extraProps:
+            for (p, v) in extraProps:
+                nameUriRef[p] = Res(v)
+                
         if accessTokens:
             nameUriRef['auth:guarded-by'] = [Res(x) for x in accessTokens]
             

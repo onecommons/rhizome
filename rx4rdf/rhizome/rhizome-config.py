@@ -45,6 +45,7 @@ resourceQueries=[
 #no match, raise an error that will invoke the not found page
 "wf:error(concat('page not found: ', $_name), 404)",  
 ]
+#todo: retry all with concat($_name,'/', $_defaultName)
 
 rhizome.findResourceAction = findResourceAction = Action(resourceQueries)
 #we want the first Action to set the $__account variable
@@ -583,7 +584,15 @@ rhizome._addItemTuple('validate-schema', loc='path:validate-schema.xml', disposi
 rhizome._addItemTuple('site-theme', loc='path:site-theme.xsl', disposition='complete', format='rxslt'), 
 #added in 0.6.0:
 rhizome._addItemTuple('xml-shred.xsl', loc='path:xml-shred.xsl', format='http://www.w3.org/1999/XSL/Transform'),
-
+rhizome._addItemTuple('faq-shredder.xsl', loc='path:faq-shredder.xsl', format='http://www.w3.org/1999/XSL/Transform',
+        extraProps=[('dataview:doctypeTransformation','wiki:doctype-faq')] ),
+rhizome._addItemTuple('faqviewer', loc='path:faqviewer.xsl', disposition='entry', format='rxslt',
+            handlesAction=['view'], actionType='wiki:faq'), 
+#rhizome._addItemTuple('todo2document.xsl', loc='path:changes2document.xsl', format='http://www.w3.org/1999/XSL/Transform', 
+#                disposition='template', doctype='document', handlesDoctype='todo'),
+#rhizome._addItemTuple('s5-template',loc='path:s5-template.xsl', format='rxslt', 
+#                        disposition='complete', handlesDisposition='s5-template'), 
+    
 #administration pages
 rhizome._addItemTuple('administration', loc='path:administer.xsl', disposition='entry', format='rxslt', title="Administration"), 
 rhizome._addItemTuple('new-role-template', loc='path:new-role-template.txt', handlesAction=['new'], actionType='auth:Role',
@@ -619,8 +628,8 @@ rhizome._addItemTuple('print-template',loc='path:print-template.xsl',
 rhizome._addItemTuple('spec2html.xsl', loc='path:spec2html.xsl', format='http://www.w3.org/1999/XSL/Transform', 
     disposition='complete', handlesDoctype='specification'),
 rhizome._addItemTuple('docbook2document.xsl', loc='path:docbook2document.xsl', format='http://www.w3.org/1999/XSL/Transform', 
-    disposition='template', doctype='document', handlesDoctype='docbook')]
-#+ rhizome._addItemTuple('todo2document.xsl', loc='path:todo2document.xsl', format='http://www.w3.org/1999/XSL/Transform', disposition='template', doctype='document', handlesDoctype='todo'),
+    disposition='template', doctype='document', handlesDoctype='docbook'),
+]
   
 #sample pages
 templateList += [rhizome._addItemTuple('index',loc='path:index.zml', format='zml', label=None, 
@@ -630,7 +639,6 @@ rhizome._addItemTuple('ZMLSandbox', format='zml', label=None, disposition='entry
 	contents="Feel free to [edit|?action=edit] this page to experiment with [ZML]..."),
 rhizome._addItemTuple('RxMLSandbox',loc='path:RxMLSandbox.xsl', format='rxslt', label=None, keywords=None,
                         disposition='entry', title="RxML Sandbox"),               	
-
 #help pages
 rhizome._addItemTuple('help',loc='path:help/help.zml', format='zml', disposition='entry', keywords=['help']),
 rhizome._addItemTuple('ZML',loc='path:help/ZML.zml', format='zml', disposition='entry', keywords=['help']),
@@ -1288,6 +1296,7 @@ itemDispositions = [
      ('http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template', 'RxML Template'), 
      ('http://rx4rdf.sf.net/ns/wiki#item-disposition-print', 'Printable'),
      ('http://rx4rdf.sf.net/ns/wiki#item-disposition-short-display', 'Summary'),
+#     ('http://rx4rdf.sf.net/ns/wiki#item-disposition-s5-template', 'S5 Template'), 
 ]
 
 docTypes = [ ('http://rx4rdf.sf.net/ns/wiki#doctype-faq', 'FAQ', 'text/xml'),
@@ -1297,6 +1306,7 @@ docTypes = [ ('http://rx4rdf.sf.net/ns/wiki#doctype-faq', 'FAQ', 'text/xml'),
    ('http://rx4rdf.sf.net/ns/wiki#doctype-docbook', 'DocBook', 'text/xml'), 
    ('http://rx4rdf.sf.net/ns/wiki#doctype-schematron', 'Schematron', 'text/xml', 
                                              "http://www.ascc.net/xml/schematron"), 
+   #('http://rx4rdf.sf.net/ns/wiki#doctype-todo', 'Todo', 'text/xml'),
    #todo: uncomment this when we can hide it from users
    #('http://rx4rdf.sf.net/ns/wiki#doctype-wiki', 'Wiki', 'text/html'), 
    ]
