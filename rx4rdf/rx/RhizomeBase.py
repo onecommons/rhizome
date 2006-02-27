@@ -149,7 +149,9 @@ class RhizomeBase(object):
                         'http://rx4rdf.sf.net/ns/wiki#item-format-zml']
         raccoon.assignVars(zmlContentProcessor, kw, ['undefinedPageIndicator',
                         'externalLinkIndicator', 'interWikiLinkIndicator'], 1)
-        
+        raccoon.assignVars(zmlContentProcessor, kw, ['ZMLDefaultVersion'],
+                                                       zml.defaultZMLVersion)
+                                                     
         self.shredders = dict([ (x.uri, x) for x in kw.get('shredders', [])])
 
         self.uninitialized = False
@@ -590,13 +592,16 @@ class RhizomeBase(object):
 
     def _addItemTuple(self, name, keywords=('built-in',),
                         accessTokens=['base:save-only-token'], **kw):
-        #this function is a confusing hack -- don't use it
+        #this function is a confusing hack -- only should be used by rhizome-config.py
         if keywords:
             #only add 'built-in' when other keywords are specified
             if 'built-in' not in keywords:
                 keywords = keywords + ['built-in']
         else:
             keywords = ()
+
+        if kw['format'] == 'zml' and 'zmlVersion' not in kw:
+            kw['zmlVersion'] = '0.7' #todo upgrade built-in content to latest zml
         return (name, self.addItem(name, keywords=keywords,
                                    accessTokens=accessTokens, **kw))
 
@@ -607,7 +612,7 @@ class RhizomeBase(object):
                 baseURI=None, owner='http://rx4rdf.sf.net/site/accounts/admin',
                 accessTokens=None, authorizationGroup='', keywords=None,
                 contentLength = None, digest = None, createdOn = "1057919732.750",
-                extraProps=None):
+                extraProps=None, zmlVersion=None):
         '''
         Convenience function for adding an item the model. Returns a string of triples.
         '''
@@ -637,6 +642,8 @@ class RhizomeBase(object):
         contentbNode['rdf:type'] = Res('a:ContentTransform')
         
         contentbNode['a:transformed-by'] = Res(kw2uri(format, 'wiki:item-format-') )
+        if zmlVersion:
+            contentbNode['wiki:zml-version'] = zmlVersion
 
         assert not (loc and contents)
         if loc:

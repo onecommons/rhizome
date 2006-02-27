@@ -638,6 +638,7 @@ class MarkupMap(object):
     #block
     UL, OL, LI, DL, DD, DT = 'UL', 'OL', 'LI', 'DL', 'DD', 'DT', 
     P, HR, PRE, BLOCKQUOTE, SECTION = 'P', 'HR', 'PRE', 'BLOCKQUOTE','SECTION'
+    #BLOCKQUOTE = ('div', (('class',"'section'"),) )
     blockElems = [ 'UL', 'OL', 'LI', 'DL', 'DD', 'DT', 'P', 'HR', 'PRE',
                    'BLOCKQUOTE', 'SECTION'] 
     #header

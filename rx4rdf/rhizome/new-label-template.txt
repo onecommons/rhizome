@@ -1,3 +1,5 @@
+#?zml0.7 markup
+rx:
  prefixes:
      wiki: `http://rx4rdf.sf.net/ns/wiki#
      a: `http://rx4rdf.sf.net/ns/archive#

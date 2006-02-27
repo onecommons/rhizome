@@ -429,6 +429,7 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
                 line += indent + getResourceNameFromURI(object) + NL
                 
         return line
+
     if fixUp: #if fixUp we assume we're outputing xml/html not zml
         doQuote = lambda s: '`' + utils.htmlQuote(s)
     else:
@@ -449,8 +450,10 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
     
     if includeRoot:
         indent += INDENT
-        root + '#?zml markup' + NL
-        root += INITINDENT + rxPrefix + 'rx:' + NL        
+        root += '#?zml0.7 markup' + NL
+        root += INITINDENT + rxPrefix + 'rx:' + NL
+    elif not fixUp: #if fixUp we assume we're outputing xml/html not zml
+        root += '#?zml0.7 markup' + NL
 
     if not isinstance(resourceNodes, (type([]), type(()) )):
         resourceNodes = [ resourceNodes ]

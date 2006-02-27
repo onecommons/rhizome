@@ -433,14 +433,14 @@ class RhizomeContent(RhizomeBase):
         return utils.patch(base,patch)
 
     def startShredding(self, context, resource, format, content):
-        format = raccoon.StringValue(format)
-        if format in ['http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate',
+        formatString = raccoon.StringValue(format)        
+        if formatString in ['http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate',
                       'http://www.w3.org/1999/XSL/Transform',
                       'http://rx4rdf.sf.net/ns/wiki#item-format-rxslt']:
             #treat these formats as plain xml -- we just want to analyze
             #them, not execute them
             format = 'http://rx4rdf.sf.net/ns/wiki#item-format-xml'
-        elif format not in self.shredders:
+        elif formatString not in self.shredders:
             #don't try to shred unsupported formats
             #todo: processContents should support a default content processor
             return raccoon.XFalse

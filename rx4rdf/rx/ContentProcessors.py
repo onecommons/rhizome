@@ -417,6 +417,8 @@ class ZMLContentProcessor(ContentProcessor):
     externalLinkIndicator=True
     interWikiLinkIndicator=True
 
+    ZMLDefaultVersion=0
+
     def getInterWikiMap(self):
         return {}
     
@@ -440,7 +442,16 @@ class ZMLContentProcessor(ContentProcessor):
         
     def processContents(self, result, kw, contextNode, contents):
         self.processZMLSideEffects(contextNode, kw)
-        contents = zml.zmlString2xml(contents,self.markupMapFactory)
+        #allow default zml version to be overriden per content
+        #we assume result is a:ContentTransform/a:transformed-by/*,
+        zmlVersion = 0
+        if not isinstance(result, (str, unicode)):
+            zmlVersion = kw['__server__'].evalXPath(
+                'number(../../wiki:zml-version)', node = result[0])
+        if not zmlVersion:
+            zmlVersion = float(self.ZMLDefaultVersion) or zml.defaultZMLVersion
+        contents = zml.zmlString2xml(contents,self.markupMapFactory,
+                                               zmlVersion=zmlVersion)
         #todo: optimize: don't fix up links if doctype is set
         #since we're gonna do that again anyway
         #fixes up site://links
