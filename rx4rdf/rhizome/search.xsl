@@ -54,7 +54,7 @@
 <xsl:param name='maxHeight' select='200'/>
 <script language="JavaScript">
 <xsl:comment>
-function resizeForIframe(iframeWin, iframeId)
+function resizeForIframe(iframeWin, iframeId, itemname)
 {	
     var width = iframeWin.document.body.scrollWidth
     var height = iframeWin.document.body.scrollHeight

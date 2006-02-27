@@ -14,6 +14,7 @@
 <xsl:param name="_name" />
 <xsl:param name="previous:about" />
 <xsl:param name="previous:frameid" />
+<xsl:param name="previous:itemname" />
 
 <xsl:output method='html' encoding='UTF-8' indent='no' />
     
@@ -49,7 +50,8 @@
 
 </head>
 <!-- we need scrolling on to get the correct content size, but then turn it off -->
-<body onload="this.parent.resizeForIframe(this, '{$previous:frameid}'); this.document.body.style.overflow='hidden'">
+<body onload="if (parent.resizeForIframe) parent.resizeForIframe(this, '{$previous:frameid}', '{$previous:itemname}');
+              this.document.body.style.overflow='hidden'">
 
     <div class='short-display'>
       	<xsl:call-template name="display-content" >
