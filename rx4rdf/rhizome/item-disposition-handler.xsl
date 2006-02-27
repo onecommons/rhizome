@@ -35,7 +35,7 @@ Completed <b><xsl:value-of select='$previous:action'/></b> of <a href="{$itemurl
         <xsl:when test='$previous:error'>
             Error <b><xsl:value-of select='$previous:error'/></b> 
         </xsl:when>
-        <xsl:when test='$previous:redirect or not($_contents)'>
+        <xsl:when test='$previous:redirect or not($_contents or $previous:_itemHandlerDisposition)'>
             <!-- allow handler page to redirect to another page-->
             <xsl:variable name='_dispositionDisposition' 
               select="wf:assign-metadata('_dispositionDisposition', 
