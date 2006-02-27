@@ -10,6 +10,7 @@
 		xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
 		xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
 		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header auth" >
+<xsl:import href='path:edit-tags.xsl' />
 <xsl:output method='xhtml' omit-xml-declaration="yes" encoding="UTF-8" indent='no' />
 <xsl:param name="about" />
 <xsl:param name="_name" />
@@ -52,132 +53,6 @@
 	<xsl:value-of select='$text' />
 	</option>
 </xsl:template>
-
-<xsl:template name="write-keywords">
-<xsl:param name="topics" />
-<xsl:param name="width" select='40' />
-<xsl:param name="field-name" select='"keywords"' />
-<xsl:param name="add-script" select='true()' />
-
-<xsl:if test='$add-script'>
-    <script language="JavaScript">
-    <xsl:comment><![CDATA[    
-        function domouseout(e, fromElement){  
-          var toElement = (e && e.relatedTarget) || window.event.toElement;
-          var currElement = toElement;
-          while (currElement != fromElement)
-          {
-             currElement = currElement.parentNode;
-             if (!currElement) {
-                //reached the top, must be outside the div so hide it after a tiny delay
-                var closure = function() { divSetVisible(fromElement, false);};
-                setTimeout(closure, 500);  
-                return true;    
-            }        
-          }  
-        }
-        
-        function updateEditField(e, inputID) {
-          var elem = (e && e.currentTarget ) || window.event.srcElement;
-          var remove = !elem.checked;
-          if (remove) {
-            document.getElementById(inputID).value = document.getElementById(inputID).value.replace(elem.value, '');
-          }
-          else {
-            document.getElementById(inputID).value = document.getElementById(inputID).value + elem.value + ' ';
-          }
-        }
-
-       function getAbsX(elt) { return (elt.x) ? elt.x : getAbsPos(elt,"Left"); }
-       function getAbsY(elt) { return (elt.y) ? elt.y : getAbsPos(elt,"Top"); }
-       function getAbsPos(elt,which) {
-        	iPos = 0;
-        	while (elt != null) {
-        	    iPos += elt["offset" + which];
-        	    elt = elt.offsetParent;
-        	}
-        	return iPos;
-      }
-       
-      function showOrHide(textId, divId) {
-       var selDiv = document.getElementById(divId);
-       if (selDiv.style.display=='none') 
-       {    
-          var selTxt = document.getElementById(textId);         
-          selDiv.style.top = (getAbsY(selTxt)+selTxt.offsetHeight+1) + 'px';
-          selDiv.style.left = getAbsX(selTxt) +'px';
-          selDiv.style.width = selTxt.offsetWidth + 'px';
-          
-          //selDiv.style.display='block';
-          divSetVisible(selDiv, true);
-       }
-       else {
-          //selDiv.style.display='none'; 
-          divSetVisible(selDiv, false);
-       }
-     }
-
-    function divSetVisible(DivRef, state)
-    {
-        var IfrRef = document.all ? document.getElementById('DivShim') : null;
-        if(state) {
-          DivRef.style.display = "block";
-          if (IfrRef) {//IE hack
-            IfrRef.style.width = DivRef.offsetWidth;
-            IfrRef.style.height = DivRef.offsetHeight;
-            IfrRef.style.top = DivRef.style.top;
-            IfrRef.style.left = DivRef.style.left;
-            IfrRef.style.zIndex = DivRef.style.zIndex - 1;
-            IfrRef.style.display = "block";            
-          }
-        }
-        else {
-           DivRef.style.display = "none";
-           if (IfrRef)
-              IfrRef.style.display = "none";
-        }
-    }      
-    ]]> 
-    //</xsl:comment>
-    </script>    
-</xsl:if>
-
-    <xsl:variable name='keywords'>
-         <xsl:for-each select='$topics'>          
-           <xsl:value-of select='f:if(namespace-uri-from-uri(.)=concat($BASE_MODEL_URI,"kw#"),local-name-from-uri(.), name-from-uri(.))'/>
-           <xsl:text> </xsl:text>
-         </xsl:for-each>
-    </xsl:variable>    
-
-	<input TYPE="text" NAME="{$field-name}" VALUE="{$keywords}" SIZE="{$width}" MAXLENGTH="200" id='{$field-name}Txt' />	 
-	<img src="site:///arrow_up.gif" onmousedown="this.src='site:///arrow_down.gif'" style='vertical-align: bottom'
-	    onload="this.height=document.getElementById('{$field-name}Txt').offsetHeight"
-	    onmouseup="this.src='site:///arrow_up.gif'" onmouseout="this.src='site:///arrow_up.gif'"
-	    onclick="showOrHide('{$field-name}Txt', '{$field-name}Div');" />
-
-     <div style='border: solid gray 1px; background-color: #ffffdd; display: none; z-index: 2; position: absolute' 
-       id='{$field-name}Div' onmouseout="domouseout(event, this)" >    
-       
-        <xsl:for-each select='/wiki:Keyword | id(/*/wiki:about/*)' >
-          <xsl:variable name='kwValue' select='f:if(namespace-uri-from-uri(.)=concat($BASE_MODEL_URI,"kw#"),
-                                                        local-name-from-uri(.), name-from-uri(.))' />   
-                                                                                                                       
-          <input type="checkbox" value="{$kwValue}" onclick="updateEditField(event, '{$field-name}Txt')">
-            <xsl:if test="contains($keywords,$kwValue)">
-               <xsl:attribute name='checked'>checked</xsl:attribute>
-            </xsl:if>
-          </input>
-          <a href="site:///keywords/{local-name-from-uri(.)}?about={f:escape-url(.)}" title='{rdfs:comment}' >
-            <xsl:value-of select='$kwValue' />
-          </a>
-          <br/>
-        </xsl:for-each>
-    </div> 
-   <xsl:comment>hack for IE</xsl:comment> 
-   <iframe id="DivShim" src="javascript:false;" scrolling="no" frameborder="0"
-           style="position:absolute; top:0px; left:0px; display:none;">
-   </iframe>       
-</xsl:template>
 	
 <xsl:template match="/" name="edit-main" >
 <xsl:param name="itemname" select="$target" />
@@ -203,7 +78,7 @@
 
 <script language="JavaScript">
 <xsl:comment>
-function resizeForIframe(iframeWin, iframeId)
+function resizeForIframe(iframeWin, iframeId, itemname)
 {	
     var width = iframeWin.document.body.scrollWidth;
     var height = iframeWin.document.body.scrollHeight;    
@@ -213,8 +88,37 @@ function resizeForIframe(iframeWin, iframeId)
       //save.xml sets the frameid variable used by the iframe-display-handler
       //with the new save time because save and reedit needs it so that there isn't a conflict when re-saving
       document.getElementById("startTime").value = iframeId;
+      actionPageName = itemname;
+      if (document.edit.itemname.type == 'text') {        
+        //we must have just created the page, so change form to make the name immutable
+        var title = document.getElementById('page-title');
+        if (title) title.innerHTML = itemname;
+        
+        var newInput = null;
+        if (document.all) {
+            //IE won't let you change the "type" attribute on input elements 
+            newInput = document.createElement("input type='hidden'");
+        } else {
+            newInput = document.createElement("input");        
+            newInput.type = 'hidden';
+        }        
+        newInput.name = 'itemname';
+        newInput.value = itemname;
+        document.edit.replaceChild(newInput, document.edit.itemname);        
+
+        var radio1 = document.edit.anonymous[0];        
+        var radio2 = document.edit.anonymous[1];
+        radio1.parentNode.removeChild(radio1);
+        radio2.parentNode.removeChild(radio2);
+        var anonLabel = document.getElementById('anonymous-label');
+        anonLabel.parentNode.removeChild(anonLabel);        
+        var nameLabel = document.getElementById('name-label');        
+        nameLabel.parentNode.removeChild(nameLabel);
+      }      
     }
 }
+
+var actionPageName = '<xsl:value-of select="f:if($item,$itemname,'save')"/>';
 
 function OnSubmitEditForm()
 {
@@ -222,29 +126,26 @@ function OnSubmitEditForm()
   if (actionField != null)
      actionField.parentNode.removeChild(actionField);     
 
-  if(document.editFormPressed == 'Preview')
-  {
+  if(document.editFormPressed == 'Preview') {
    document.edit.action ="site:///preview?frameid=previewFrame";
    document.edit.target ="preview";
-  }
-  else
-  if(document.editFormPressed == 'Save' || document.editFormPressed == 'Save (keep editing)')
-  {	
+  } else if(document.editFormPressed == 'Save' || 
+        document.editFormPressed == 'Save (keep editing)') {	
     reedit = document.editFormPressed == 'Save (keep editing)'    
-    document.edit.action ="site:///<xsl:value-of select="f:if($item,$itemname,'save')"/>";
-    if (reedit)
-    {    
+    document.edit.action ="site:///"+actionPageName;
+    if (reedit) {    
         //goes in preview iframe
         document.edit.target ="preview";               
         document.edit.action += '?_itemHandlerDisposition=http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-short-display' 
-    }
-    else
+    } else {
         document.edit.target ="_self";
+    }
 
     var newEditAction = document.getElementById("startTime").cloneNode(false)
     newEditAction.name = 'action'
     newEditAction.id = 'action'
-    newEditAction.value = "<xsl:value-of select="f:if($item,'save','creation')"/>";
+    //if creating a page for the first time set action to 'creation'
+    newEditAction.value = actionPageName == 'save' ? 'creation' : 'save'; 
     document.edit.appendChild(newEditAction);
   }
   return true;
@@ -255,24 +156,24 @@ function OnSubmitEditForm()
 <form name="edit" method="POST" accept-charset="UTF-8" onSubmit="return OnSubmitEditForm();" 
     action="site:///{f:if($item,$itemname, 'save')}" enctype="multipart/form-data">    
 	<xsl:if test='string-length($itemname) > 0'>		
-	    <input TYPE="hidden" NAME="itemname" VALUE="{$itemname}" />
+	    <input type="hidden" name="itemname" value="{$itemname}" />
 	    <xsl:if test="not(wf:has-metadata('title'))">
 	        <xsl:variable name='title' select="wf:assign-metadata('title', concat('Editing ', $itemname))" />
 	    </xsl:if>
 	</xsl:if>	
 	<xsl:if test='string-length($itemname)=0'>
-	    <input TYPE="radio" NAME="anonymous" checked="checked" VALUE="" /> 
-	    <label for="itemname">Name</label><input TYPE="text" NAME="itemname" VALUE="" SIZE="20" MAXLENGTH="100" />	    
-	    <input TYPE="radio" NAME="anonymous" VALUE="on" /><label for="anonymous">Anonymous</label>
+	    <input type="radio" name="anonymous" checked="checked" value="" /> 
+	    <label id='name-label' for="itemname">name</label><input type="text" name="itemname" value="" size="20" MAXLENGTH="100" />	    
+	    <input type="radio" name="anonymous" value="on" /><label id='anonymous-label' for="anonymous">Anonymous</label>
 	    <xsl:if test="not(wf:has-metadata('title'))">
 	        <xsl:variable name='title' select="wf:assign-metadata('title', 'New Item')" />
 	    </xsl:if>
 	    <br/>
     </xsl:if>
-    <label for='title'>Title</label> <input TYPE="text" NAME="title" VALUE="{$item/wiki:title}" SIZE="80" MAXLENGTH="100" />
+    <label for='title'>Title</label> <input type="text" name="title" value="{$item/wiki:title}" size="80" MAXLENGTH="100" />
     <br/>
-	<input TYPE="hidden" NAME="startTime" id="startTime" VALUE="{wf:current-time()}" />
-	Upload File:<input TYPE='file' name='file' />
+	<input type="hidden" name="startTime" id="startTime" value="{wf:current-time()}" />
+	Upload File:<input type='file' name='file' />
 	<xsl:choose>
     <xsl:when test="$item/a:contents/a:ContentTransform/a:transformed-by = 'http://rx4rdf.sf.net/ns/wiki#item-format-binary'">         	    
       <br/>The content of the item is in binary format and can not be edited. To modify the content, upload a replacement.
@@ -312,12 +213,13 @@ function OnSubmitEditForm()
     <div id='more' style='border: 1px; display: none'>    
     <button type='button' onclick="document.getElementById('more').style.display='none'; 
     document.getElementById('less').style.display='block';">&lt;&lt;Less</button>
-    Output Type: 
+    <!--
+    Output type: 
 	<select name="doctype" size="1" width="100">
 	    <xsl:call-template name="add-option" >
 	        <xsl:with-param name="text">N/A</xsl:with-param>
 	        <xsl:with-param name="value" />
-	        <!-- select this only when the item exists and it has no doctype -->
+	        <!-!- select this only when the item exists and it has no doctype -!->
 	        <xsl:with-param name="selected" select="f:if($item, not($item/wiki:doctype))" />
 	    </xsl:call-template>	
         <xsl:for-each select="/wiki:DocType">
@@ -329,7 +231,8 @@ function OnSubmitEditForm()
             </xsl:call-template>
 	</xsl:for-each>
 	</select>    
-	Item&#xa0;Type:&#xa0;<select name="disposition" size="1" width="100">	
+	-->
+	Item&#xa0;type:&#xa0;<select name="disposition" size="1" width="100">	
         <xsl:for-each select="/wiki:ItemDisposition">
             <xsl:variable name="i" select="." />
             <xsl:call-template name="add-option" >
@@ -358,9 +261,8 @@ function OnSubmitEditForm()
                         $__account/auth:has-role/*/wiki:default-edit-token))" />                
             </xsl:call-template>
 	    </xsl:for-each>
-	</select>
-	<br />
-	<label for='change_comment'>Label:&#xa0;</label><select name="label" size="1" width="100">	
+	</select>	
+	&#xa0;<label for='label'>Label:&#xa0;</label><select name="label" size="1" width="100">	
 	    <xsl:call-template name="add-option" >
             <xsl:with-param name="text" select="''" />
             <xsl:with-param name="value" select="''" />
@@ -379,15 +281,16 @@ function OnSubmitEditForm()
             </xsl:call-template>
     	</xsl:for-each>
 	</select>		
-	&#xa0;<label for='change_comment'>Change comment:&#xa0;</label><input TYPE="text" NAME="change_comment" VALUE="" SIZE="60" MAXLENGTH="200" />
+    <br /><input type="checkbox" name="shred" value="on" checked='checked' /><label for='shred'>Shred.</label>
+	&#xa0;<label for='change_comment'>Change comment:&#xa0;</label><input type="text" name="change_comment" value="" size="60" MAXLENGTH="200" />
 	</div>
     </div>	
-	<input TYPE="SUBMIT" name="preview" onClick="document.editFormPressed=this.value" VALUE="Preview" />	
-    &#xa0;<input TYPE="SUBMIT" name="save" onClick="document.editFormPressed=this.value" VALUE="Save" />      
-    &#xa0;<input TYPE="SUBMIT" name="save" onClick="document.editFormPressed=this.value" VALUE="Save (keep editing)" />      
-    &#xa0;<input TYPE="checkbox" NAME="minor_edit" VALUE="on" /><label for='minor_edit'>This is a minor edit.</label>
+	<input type="SUBMIT" name="preview" onClick="document.editFormPressed=this.value" value="Preview" />	
+    &#xa0;<input type="SUBMIT" name="save" onClick="document.editFormPressed=this.value" value="Save" />      
+    &#xa0;<input type="SUBMIT" name="save" onClick="document.editFormPressed=this.value" value="Save (keep editing)" />      
+    &#xa0;<input type="checkbox" name="minor_edit" value="on" /><label for='minor_edit'>This is a minor edit.</label>
     <xsl:if test="$metadata" >
-        <input TYPE="hidden" NAME="metadata" VALUE="{$metadata}" />
+        <input type="hidden" name="metadata" value="{$metadata}" />
     </xsl:if>
     </form>
     <iframe src='' name='preview' id='previewFrame' width='100%' height='0'/>
