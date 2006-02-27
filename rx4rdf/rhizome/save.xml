@@ -122,42 +122,13 @@
          <auth:guarded-by rdf:resource='{$authtoken}'/>
        </xu:append>
     </xu:if>
-
-    <xu:define-template name='addKeyword'>
-       <xu:variable name='kwUri' select="wf:evaluate('uri($kw)')" /> 
-       <xu:append select='$resource'>  
-         <wiki:about rdf:resource='{$kwUri}' />         
-       </xu:append>      
-       
-       <xu:if test='not(/wiki:Keyword[.=$kwUri])'>
-           <!-- not found, add a keyword resource -->
-           <xu:append select='/'>
-             <wiki:Keyword rdf:about='{$kwUri}'>
-                <wiki:name>keywords/<xu:value-of select="$kw"/></wiki:name>
-             </wiki:Keyword>
-           </xu:append>
-       </xu:if>
-    </xu:define-template>
-        
+    
     <xu:if test='wf:has-metadata("keywords")'>                
-         <xu:remove select='$resource/wiki:about'/>
-         <xu:for-each select='wf:split(wf:get-metadata("keywords"))'>
-           <xu:if test='string($current)'>
-             <!-- in case the user used commas -->
-             <xu:for-each select='wf:split($current, ",")'>
-                <xu:if test='string($current)'>
-                    <!-- if the keyword doesn't have a prefix put it in the 'kw' namespace  
-                    we url escape the keyword in case the specified name has invalid characters
-                    -->            
-                   <xu:variable name='kw' select="f:if(contains($current,':') , 
-                        $current, concat('kw:', f:escape-url($current)) )" />
-                   <xu:call-template name='addKeyword'/>
-                </xu:if> 
-             </xu:for-each>      
-           </xu:if>
-         </xu:for-each>
+        <xu:variable name='keywords' select='wf:get-metadata("keywords")' />
+        <xu:include href="path:replacetags.xml" />
+        <xu:call-template name='replaceKeywords'/>
     </xu:if>    
-           
+                   
     <xu:variable name="formatTransformURI" select="wf:generate-bnode()"/>                
     
     <!-- don't bother saving the last revision if this was just a minor edit
@@ -366,6 +337,10 @@
             <!-- we do this last in case, after we know we were authorized to add the above properties-->        
             <a:contents>
                 <a:ContentTransform rdf:about="{$formatTransformURI}" >
+                   <xu:if test='$format = "http://rx4rdf.sf.net/ns/wiki#item-format-zml"'>
+                   <!-- update when we change the default ZML format -->
+                    <wiki:zml-version>0.7</wiki:zml-version>
+                   </xu:if>
                    <a:transformed-by rdf:resource="{$format}" />
                    <a:contents>
                      <xu:copy-of select="wf:save-contents($itemname, $format, $contents,
@@ -380,8 +355,9 @@
 
     <xu:variable name='contextURI' select="concat('context:', $formatTransformURI)" />
 
+    <xu:if test='wf:get-metadata("shred")'>
     <xu:append select='/' to-graph='{$contextURI}'>
-       <xu:variable name='shredded' select='wf:shred($resource, $format, $contents)' />
+       <xu:variable name='shredded' select='wf:shred($resource, /*[.=$formatTransformURI]/a:transformed-by/*, $contents)' />
        <xu:if test='$shredded'>
            <a:RDFSource>             
                 <a:from-source rdf:resource="{$formatTransformURI}" />
@@ -391,15 +367,16 @@
                     add inverse of a:from-source
                 -->
             </a:RDFSource>
-       </xu:if>            
+       </xu:if>
     </xu:append>
+    </xu:if>
     
     <!-- todo need to assign $revision  
     <xu:if test='wf:has-metadata("revision-metadata")'>
         <xu:variable name='save-metadata' select="wf:save-rdf(f:replace('#this#', concat('{',$revision,'}'), $revision-metadata))" />
     </xu:if>
     -->
-    <xu:variable name='frameid' select="wf:assign-metadata('frameid', $current-time)" /> <!-- used by the iframe-display-handler -->                            
+    <xu:variable name='frameid' select="wf:assign-metadata('frameid', $current-time)" /> <!-- used by the short-display-handler --> 
 
     <xu:if test='$format = "http://rx4rdf.sf.net/ns/wiki#item-format-binary"'>
        <!-- use this hack until we support binary XPath variables in stylesheets-->
