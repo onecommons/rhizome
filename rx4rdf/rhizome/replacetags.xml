@@ -1,0 +1,50 @@
+<xu:modifications version="1.0" xmlns:xu="http://www.xmldb.org/xupdate"
+		    xmlns:a="http://rx4rdf.sf.net/ns/archive#" 
+		    xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" 
+		    xmlns:f = 'http://xmlns.4suite.org/ext' 
+		    xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'		    
+		    xmlns:request-header = 'http://rx4rdf.sf.net/ns/raccoon/http-request-header#'
+			xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
+			xmlns:dc='http://purl.org/dc/elements/1.1/'
+			xmlns:foaf="http://xmlns.com/foaf/0.1/"
+			xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"			
+			xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >
+
+    <xu:define-template name='addKeyword'>
+       <!-- params: $kw, $resource -->
+       <xu:variable name='kwUri' select="wf:evaluate('uri($kw)')" /> 
+       <xu:append select='$resource'>  
+         <wiki:about rdf:resource='{$kwUri}' />         
+       </xu:append>      
+       
+       <xu:if test='not(/wiki:Keyword[.=$kwUri])'>
+           <!-- not found, add a keyword resource -->
+           <xu:append select='/'>
+             <wiki:Keyword rdf:about='{$kwUri}'>
+                <wiki:name>keywords/<xu:value-of select="$kw"/></wiki:name>
+             </wiki:Keyword>
+           </xu:append>
+       </xu:if>
+    </xu:define-template>
+
+    <xu:define-template name='replaceKeywords'>
+       <!-- params: $keywords, $resource -->
+         <xu:remove select='$resource/wiki:about'/>
+         <xu:for-each select='wf:split($keywords)'>
+           <xu:if test='string($current)'>
+             <!-- in case the user used commas -->
+             <xu:for-each select='wf:split($current, ",")'>
+                <xu:if test='string($current)'>
+                    <!-- if the keyword doesn't have a prefix put it in the 'kw' namespace  
+                    we url escape the keyword in case the specified name has invalid characters
+                    -->            
+                   <xu:variable name='kw' select="f:if(contains($current,':') , 
+                        $current, concat('kw:', f:escape-url($current)) )" />
+                   <xu:call-template name='addKeyword'/>
+                </xu:if> 
+             </xu:for-each>      
+           </xu:if>
+         </xu:for-each>
+    </xu:define-template>
+
+</xu:modifications>
