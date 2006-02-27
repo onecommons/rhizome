@@ -81,6 +81,7 @@ No comments yet.
           | <a target="rhizome-main" 
              href="site:///edit?title=Add%20Comment&amp;metadata={f:escape-url($metadata)}">Advanced Edit</a>
           <br/>
+          <input type='hidden' name='shred' value='on' />
           <input name="submit" type="submit" value="OK" /> 
           
 </form>
