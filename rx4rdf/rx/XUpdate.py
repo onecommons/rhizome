@@ -580,7 +580,7 @@ class Processor:
                     
                     reader = Domlette.NonvalidatingReader
                     xupdate = reader.parseUri(href)
-                    for n in xupdate:
+                    for n in xupdate.childNodes:
                         self.visit(context, n, preserveSpace)                                    
                 else:
                     raise Exception("Unknown xupdate element: %s.  This may just be an implementation gap" % node.localName)
