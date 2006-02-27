@@ -1,0 +1,40 @@
+<xu:modifications version="1.0" xmlns:xu="http://www.xmldb.org/xupdate"
+		    xmlns:a="http://rx4rdf.sf.net/ns/archive#" 
+		    xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" 
+		    xmlns:f = 'http://xmlns.4suite.org/ext' 
+		    xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'		    
+		    xmlns:request-header = 'http://rx4rdf.sf.net/ns/raccoon/http-request-header#'
+			xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
+			xmlns:dc='http://purl.org/dc/elements/1.1/'
+			xmlns:foaf="http://xmlns.com/foaf/0.1/"
+			xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"			
+			xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >
+
+     <xu:variable name='resource' select='/wiki:Bookmark[wiki:about-url=$url]' />
+
+     <xu:if test='not($resource)'>
+	   <xu:append select="/"> 
+         <wiki:Bookmark>     
+           <wiki:about-url rdf:resource="{$url}" /> 
+           <rdfs:label><xu:value-of select="$url"/></rdfs:label>
+         </wiki:Bookmark> 
+       </xu:append>
+       <xu:variable name='resource' select='/wiki:Bookmark[wiki:about-url=$url]' />
+     </xu:if>
+                           
+     <xu:append select="$resource">       
+       <xu:if test='$title'>
+           <xu:remove select="$resource/wiki:title" />
+          <wiki:title><xu:value-of select="$title"/></wiki:title>
+        </xu:if>
+
+       <xu:remove select="$resource/wiki:notes" />
+       <xu:if test='$notes'>
+          <wiki:notes><xu:value-of select="$notes"/></wiki:notes>
+       </xu:if>     
+     </xu:append>
+    
+    <xu:include href="path:replacetags.xml" />
+    <xu:call-template name='replaceKeywords'/>
+
+</xu:modifications>

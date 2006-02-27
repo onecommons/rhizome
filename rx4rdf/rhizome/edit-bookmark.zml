@@ -1,0 +1,66 @@
+#?zml0.7 markup
+#?raccoon-format http://rx4rdf.sf.net/ns/wiki#item-format-rxslt
+ x:stylesheet (version="1.0" xmlns:x="http://www.w3.org/1999/XSL/Transform",
+     xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+     xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#',
+     xmlns:f = 'http://xmlns.4suite.org/ext',
+     xmlns:a="http://rx4rdf.sf.net/ns/archive#",
+     xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#",
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#",
+     xmlns:auth="http://rx4rdf.sf.net/ns/auth#",
+     xmlns:foaf="http://xmlns.com/foaf/0.1/",
+     exclude-result-prefixes = "f wf a wiki rdf rdfs auth foaf"
+     ) 
+  x:import href='edit-tags.xsl'
+  x:param name="__resource"
+  x:param name="action"
+  x:param name="url"
+  x:param name="title"
+  x:param name="notes"
+  x:param name="keywords"
+  x:param name="BASE_MODEL_URI" 
+  x:output (method='xhtml' omit-xml-declaration="yes" encoding="UTF-8" indent='yes' 
+doctype-public="-//W3C//DTD XHTML 1.0 Transitional//EN" 
+doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd")
+     
+  x:template match='/':  	    
+   html
+    head
+    body
+        #if action == edit than we're editing an existing bookmark
+        x:variable name='bookmark' select='f:if($action="edit", $__resource)' 
+    
+        x:variable name='url' select='f:if($bookmark, $bookmark/wiki:about-url, wf:get-metadata("url",""))' 
+    
+        p: 
+          x:value-of disable-output-escaping='yes' select='''f:if($bookmark,concat("Edit Bookmark of \<a href='",$url,"'>",$url,"\</a>"), "Create Bookmark")'''
+   
+        form (action="site:///save-bookmark" 
+                accept-charset='UTF-8' method='post'):
+         table:         
+             x:choose
+              x:when test='not($bookmark)': 
+               tr: 
+                 td: `*URL:     
+                 td: input type=text name=url value='{$url}' size="50"
+              x:otherwise:
+                 input type=hidden name=url value="{$url}"
+             tr:
+                 td: `Title:     
+                 td: input type=text name=title value="{f:if($bookmark, $bookmark/wiki:title, wf:get-metadata('title',''))}" size="50" maxlength="100"
+             tr: 
+                 td: `Notes:          
+                 td: 
+                    textarea name="notes" rows="12" cols="38"
+                      x:value-of select="f:if($bookmark, $bookmark/wiki:notes, wf:get-metadata('notes',''))"
+             tr: 
+                 r'''
+    	&#xa0;<label for='keywords'><a href='site:///keywords'>Keywords:</a>&#xa0;</label>
+    		
+        <x:call-template name='write-keywords'>
+          <x:with-param name='topics' select='$bookmark/wiki:about' />
+        </x:call-template>        
+                 '''
+             tr:              
+                 td:                
+                   button type=submit: `Save
