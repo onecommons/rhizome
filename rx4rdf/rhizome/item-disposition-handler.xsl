@@ -36,20 +36,25 @@ Completed <b><xsl:value-of select='$previous:action'/></b> of <a href="{$itemurl
             Error <b><xsl:value-of select='$previous:error'/></b> 
         </xsl:when>
         <xsl:when test='$previous:redirect or not($_contents or $previous:_itemHandlerDisposition)'>
+            <script>    
+            //if we're in a popup window, close it
+            if (window.name == 'smallActionPopup')
+               setTimeout('window.close()', 2000); 
+            else //redirect
+               location.replace("<xsl:value-of select='f:if($previous:redirect,$previous:redirect, wf:fixup-urls($itemurl))'/>");
+            </script>
+
             <!-- allow handler page to redirect to another page-->
             <xsl:variable name='_dispositionDisposition' 
               select="wf:assign-metadata('_dispositionDisposition', 
                   /*[.='http://rx4rdf.sf.net/ns/wiki#item-disposition-complete'])" /> 
-            <xsl:variable name="dummy2" select="wf:assign-metadata('response-header:status', 302)"/>
-            <xsl:variable name="dummy3" select="wf:assign-metadata('response-header:Location', 
-               f:if($previous:redirect,$previous:redirect, wf:fixup-urls($itemurl)) )"/>
+
             <xsl:variable name="dummy4" select="wf:assign-metadata('session:message', string($message))"/>
-            You should be redirected shortly...    
         </xsl:when>
         <xsl:otherwise>    
             <script>    
             //if we're in a popup window, close it
-            if (window.name == 'small-action-popup')
+            if (window.name == 'smallActionPopup')
                setTimeout('window.close()', 2000);
             </script>
             <xsl:value-of disable-output-escaping='yes' select="$message" />		
@@ -62,7 +67,7 @@ Completed <b><xsl:value-of select='$previous:action'/></b> of <a href="{$itemurl
      </xsl:choose>    
     </div>
 
-    <!-- hack! add a parameter so we can override this item handler disposition (which is normally entry) -->
+    <!-- hack! set this so we can override this item handler disposition (which is normally entry) -->
     <xsl:if test="$previous:_itemHandlerDisposition" >
       <xsl:variable name='_dispositionDisposition' 
          select="wf:assign-metadata('_dispositionDisposition', /*[.=$previous:_itemHandlerDisposition])" />
