@@ -7,7 +7,7 @@
 '''
 
 from __future__ import generators
-import types
+import re, types
 try:
     import cStringIO
     StringIO = cStringIO
@@ -419,16 +419,12 @@ def _parseTriples(lines, bNodeToURI = lambda x: x, charencoding='utf8'):
             object = bNodeToURI(object)
             objectType = OBJECT_TYPE_RESOURCE
         else:                        
-            quote = object[0] #add support for using either ' or " (spec says just ")
+            quote = object[0] 
             endquote = object.rfind(quote)
             literal = object[1:endquote]
             if literal.find('\\') != -1:
-                #use split and join to replace even pairs of // with /
-                #without have the resulting single / accidently escape the next character
-                unescaped = literal.split(r'\\') 
-                escaped = [x.replace('\\' + quote, quote).replace(r'\n', '\n').
-                             replace(r'\r', '\r').replace(r'\t', '\t') for x in unescaped]
-                literal = '\\'.join(escaped) 
+                literal = re.sub(r'(\\[tnr"\\])|(\\u[\dA-F]{4})|(\\U[\dA-F]{8})', 
+                     lambda m: str(m.group(0)).decode('unicode_escape'), literal)
             if object[endquote+1]=='@':
                 lang = object[endquote+2:object.rfind('.')].strip()
                 objectType = lang
@@ -448,7 +444,13 @@ def _parseTriples(lines, bNodeToURI = lambda x: x, charencoding='utf8'):
                 yield (subject, predicate, object, objectType, graph)
         graph = None
                    
-def writeTriples(stmts, stream):
+def writeTriples(stmts, stream, enc='utf8'):
+    r'''
+    stmts is an iterable of a statements (or the equivalent tuples)
+
+    Note that the default encoding is 'utf8'; to conform with standard NTriples spec,
+    use 'ascii' instead.
+    '''
     subject = 0
     predicate = 1
     object = 2
@@ -457,44 +459,64 @@ def writeTriples(stmts, stream):
     
     for stmt in stmts:       
        if stmt[0] is Comment:
-           stream.write("#" + stmt[1].encode('utf8') + "\n")
+           stream.write("#" + stmt[1].encode(enc, 'backslashreplace') + "\n")
            continue
        if stmt[0] is Removed:
            stream.write("#!remove\n")
            stmt = stmt[1]
            
        if stmt[scope]:
-           stream.write("#!graph "+stmt[scope].encode('utf8')+"\n")
+           stream.write("#!graph "+stmt[scope].encode(enc)+"\n")
        if stmt[subject].startswith(BNODE_BASE):
-            stream.write('_:' + stmt[subject][BNODE_BASE_LEN:].encode('utf8') ) 
+            stream.write('_:' + stmt[subject][BNODE_BASE_LEN:].encode(enc) ) 
        else:
-            stream.write("<" + stmt[subject].encode('utf8') + ">")
+            stream.write("<" + stmt[subject].encode(enc) + ">")
        if stmt[predicate].startswith(BNODE_BASE):
-            stream.write( '_:' + stmt[predicate][BNODE_BASE_LEN:].encode('utf8') ) 
+            stream.write( '_:' + stmt[predicate][BNODE_BASE_LEN:].encode(enc) ) 
        else:            
-           stream.write(" <" + stmt[predicate].encode('utf8') + ">")
+           stream.write(" <" + stmt[predicate].encode(enc) + ">")
        if stmt[objectType] == OBJECT_TYPE_RESOURCE:
             if stmt[object].startswith(BNODE_BASE):
-                stream.write(' _:' + stmt[object][BNODE_BASE_LEN:].encode('utf8')  + ".\n") 
+                stream.write(' _:' + stmt[object][BNODE_BASE_LEN:].encode(enc)  + " .\n") 
             else:
-                stream.write(" <" + stmt[object].encode('utf8')  + "> .\n")
+                stream.write(" <" + stmt[object].encode(enc)  + "> .\n")
        else:           
-           #escaped = repr(stmt[object])
-           #if escaped[0] = 'u': 
-           #    escaped = escaped[2:-1] #repr uses ' instead of " for string (and so doesn't escape ")
-           #else:
-           #    escaped = escaped[1:-1]
-           escaped = (stmt[object].replace('\\', r'\\').replace('\"', r'\"')
-                     .replace('\n', r'\n').replace('\r', r'\r')
-                     .replace('\t', r'\t').encode('utf8'))
-           if stmt[objectType] == OBJECT_TYPE_LITERAL:
-               stream.write(' "' + escaped + '" .\n')
-           elif stmt[objectType].find(':') == -1: #must be a lang code
-               stream.write(' "' + escaped + '"@' + stmt[objectType].encode('utf8'))
-               stream.write(" .\n")
-           else: #objectType must be a RDF datatype
-               stream.write(' "' + escaped + '"^^' + stmt[objectType].encode('utf8'))
-               stream.write(" .\n")
+            escaped = (stmt[object].replace('\\', r'\\').encode(enc, 'backslashreplace'))
+            #fix differences between python and ntriples escaping:
+            #* ascii range is escaped as \xXX instead of \u00XX,
+            #* hex digits are lowercase instead of upper
+            def fixEscaping(match):
+                s = match.group(0)
+                if s[0] == '\\':
+                    if s == r'\\':
+                        return r'\\'
+                    elif s[1] == 'x':
+                        return r'\u00' + s[2:].upper()
+                    else:
+                        assert s[1] in ('U','u')
+                        return '\\' + s[1] + s[2:].upper()
+                elif s[0] == '\n':
+                    return r'\n'
+                elif s[0] == '\r':
+                    return r'\r'
+                elif s[0] == '\t':
+                    return r'\t'
+                elif s[0] == '"':
+                    return r'\"'
+                else:
+                    return '\u00' + hex(ord(s[0]))[2:].upper()
+                                
+            escaped = re.sub(r'(\\\\)|(\\x[\da-f]{2})|(\\u[\da-f]{4})'
+                             r'|(\\U[\da-f]{8})|([\0-\31"])', fixEscaping, escaped)
+           
+            if stmt[objectType] == OBJECT_TYPE_LITERAL:
+                stream.write(' "' + escaped + '" .\n')
+            elif stmt[objectType].find(':') == -1: #must be a lang code
+                stream.write(' "' + escaped + '"@' + stmt[objectType].encode(enc))
+                stream.write(" .\n")
+            else: #objectType must be a RDF datatype
+                stream.write(' "' + escaped + '"^^' + stmt[objectType].encode(enc))
+                stream.write(" .\n")
 
 class Res(dict):
     ''' Simplifies building RDF statements with a dict-like object
