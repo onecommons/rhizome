@@ -102,6 +102,7 @@ class QueryException(Exception): pass
 
 class PositionDependentException(QueryException): pass
 
+count = 0
 class ReplaceRxPathSubExpr(utils.XPathExprVisitor):
     '''
     Visits an XPath expression and, whenever it encounters a AbsoluteLocationPath
@@ -167,8 +168,14 @@ class ReplaceRxPathSubExpr(utils.XPathExprVisitor):
                     finalpos = result.position
                 else:
                     finalpos = -1
-                #return list(result ) 
-                return filter(None, [row2Node(doc, row, finalpos) for row in result])
+                #print list(result )
+                try:
+                    return filter(None, [row2Node(doc, row, finalpos) for row in result])
+                except:
+                    print 'bad result',list(result )
+                    print repr(astRoot)
+                    result.explain(sys.stdout)
+                    raise
         
         evaluateQuery.xpathExprs = ast.xpathExprs
         funcCall._func = evaluateQuery
@@ -572,7 +579,7 @@ class ConstantOp(QueryOp):
             elif isinstance(value, type(True)):
                 value = boolean.bool(value)
             elif isinstance(value, NodesetType):
-                value = NodesetTupleset(value)
+                value = NodesetTupleset(value, {})
         self.value = value
         
     def getType(self):
@@ -1374,42 +1381,6 @@ class MergeJoin(Join):
 
     def getJoinType(self):
         return 'ordered merge'
-
-class ObsoleteJoin(Join):
-    #todo remove
-    '''
-    Corresponds to an join of two tuplesets
-    Can be a inner join or right outer join, depending on joinFunc
-    '''
-        
-    def filter(self, conditions=None):
-        keys = dict([(k[0],1) for k in self.right])
-        
-        if conditions and 0 in conditions:
-            if conditions[0] not in keys:
-                return
-                
-        for row in self.left.filter(conditions):
-            joinkey = row[0]
-            if joinkey in keys:
-                yield row
-    
-        #if self.left.filter > len(keys)
-        conditions = dict(conditions or {})
-        
-        for key in self.right:
-            conditions[0]=key
-            for row in self.left.filter(conditions):
-                yield row
-            
-    def left_inner(self):
-        '''
-        Returns iterator of the left inner rows
-        '''
-        return self
-        
-    def getJoinType(self):
-        return 'merge'
         
 class Projection(RxPath.Tupleset):
     '''
@@ -1458,7 +1429,7 @@ class Projection(RxPath.Tupleset):
 
         distinct = self.distinct
         last = None
-        
+
         for row in self.tupleset:
             result = row[:self.groupby_offset]
             if distinct:                
@@ -1512,7 +1483,6 @@ class Union(RxPath.Tupleset):
         for t in self.tuplesets:
             t.explain(out,indent)
 
-
 class NodesetTupleset(RxPath.Tupleset):
     '''
     Presents a XPath nodeset as a tupleset
@@ -1521,8 +1491,9 @@ class NodesetTupleset(RxPath.Tupleset):
     and for testing whether it is empty or not.
     '''
 
-    def __init__(self, nodeset, hintXPath=None, hintResultSet=None):
+    def __init__(self, nodeset, mapping, hintXPath=None, hintResultSet=None):
         self.nodeset = nodeset
+        self.mapping = mapping
         #for debugging purposes
         self.hintXPath =hintXPath
         self.hintResultSet = hintResultSet
@@ -1543,6 +1514,15 @@ class NodesetTupleset(RxPath.Tupleset):
                     yield stmt        
                                 
         return SimpleTupleset(getStatements,self,op='NODESET toStatements')
+
+    def leftinnerhack(self):
+        #todo: can this be used as left_inner()?
+        def getLeftInner():
+            keys = self.mapping.keys()
+            keys.sort()
+            for pos, row in keys:
+                yield row
+        return SimpleTupleset(getLeftInner,self,op='left_inner of NODESET')
 
     def explain(self, out, indent=''):
         print >>out, indent, 'NodesetTuple',repr(self.hintXPath),'using:'
@@ -1655,34 +1635,42 @@ class SimpleQueryEngine(object):
             return 1000 #todo: better analysis ;)
 
     def xpathEvaluate(self, exp, context, rows, pos):
-        if pos > -1:            
-            nodeset = filter(None, [row2Node(context.node.rootNode, row, pos)
-                                                            for row in rows])
+        if pos > -1:
+            rows = list(rows)
+            nodeset = [row2Node(context.node.rootNode,row,pos) for row in rows]
         else:
             nodeset = [context.node.rootNode]
+            rows = [None]
+                
+        result = []
+        mapping = {} #map rows to results
         
-        state = context.copy()
-        size = len(nodeset)
-        res = []        
-        for pos in range(size):
-            context.position, context.size = pos + 1, size                          
-            context.node = nodeset[pos] 
-            subRt = exp.evaluate(context)
-            if res:
-                assert isinstance(res, NodesetType)
-                assert isinstance(subRt, NodesetType)
-                res = res+subRt #RxPath.Set.Union(res,subRt) #todo: is Union necessary?  
-            else:
-                res = subRt#can be anytype
+        state = context.copy()    
+        size = len(filter(None, nodeset) )
+        pos = 0        
+        for outerPos, srcNode in enumerate(nodeset):
+            if srcNode:                
+                context.position, context.size = pos + 1, size                          
+                context.node = srcNode
+                subRt = exp.evaluate(context)
+                if subRt:
+                    mapping[(outerPos, rows[outerPos])] = subRt
+                if result:
+                    assert isinstance(result, NodesetType)
+                    assert isinstance(subRt, NodesetType)                    
+                    result = result+subRt #RxPath.Set.Union(res,subRt) #todo: is Union necessary?  
+                else:
+                    result = subRt#can be anytype
+                pos += 1
         context.set(state)
-        return res
-
+        return result, mapping
+        
     def _matchesPredicates(self, op, args, context):
         '''
         evaluate the selectOp's predicates on the given row
         '''
         result = self._evalAnd(args, context)
-        if op.finalPosition > -1:# and op.joinPosition < 0:
+        if op.getPosition() > -1:# and op.joinPosition < 0:
             result = Projection(result, op.finalPosition,op='Indep SelectOp')
             
         if not op.xpathExp:
@@ -1691,11 +1679,11 @@ class SimpleQueryEngine(object):
             assert isinstance(result, Tupleset)
             
             if context.explain:
-                return NodesetTupleset([], op.xpathExp, result) 
-            nodeset = self.xpathEvaluate(op.xpathExp, context.xpathContext,
+                return NodesetTupleset([], {}, op.xpathExp, result) 
+            nodeset, mapping = self.xpathEvaluate(op.xpathExp, context.xpathContext,
                                                     result, op.finalPosition)
             assert isinstance(nodeset, NodesetType)
-            return NodesetTupleset(nodeset,op.xpathExp) 
+            return NodesetTupleset(nodeset,mapping, op.xpathExp, result) 
         
     def evalSelectOp(self, op, context):
         def getArgs():
@@ -1707,11 +1695,8 @@ class SimpleQueryEngine(object):
 
         if not args and not op.xpathExp:
             if op.finalPosition > -1:
-                if op.joinPosition == 0: 
-                    tupleset = context.currentTupleset
-                else:
-                    tupleset = context.currentTupleset
-                return Projection(tupleset, op.finalPosition,op='NoOpSelectOp')
+                return Projection(context.currentTupleset, op.finalPosition,
+                                                              op='NoOpSelectOp')
             else:
                 return context.currentTupleset
         
@@ -1719,13 +1704,15 @@ class SimpleQueryEngine(object):
         #args.reverse()
         
         right = self._matchesPredicates(op, args, context)
- 
+            
         if op.joinPosition == 0:                          
             if _findModel(right):
                 #everything matches
                 return context.currentTupleset
             elif _findModel(context.currentTupleset) or _findModel(context.joinTupleset): 
                 #current model is all the statements, so no need to join
+                if isinstance(right, NodesetTupleset):
+                    right = right.leftinnerhack()  
                 return Projection(right, 0,op='Subject SelectOp')
             else:
                  #todo: order issue if joinPos == object 
@@ -1733,7 +1720,7 @@ class SimpleQueryEngine(object):
                 rslice = slice( 0, 1) #subject               
                 return MergeJoin(context.joinTupleset, right, lslice,rslice)
         else:
-            #either absolute or relative to the initial model, so join isn't necessary
+            #either absolute or relative to the initial model, so join isn't necessary            
             return right
                     
     def costSelectOp(self, op, context):
@@ -1757,19 +1744,20 @@ class SimpleQueryEngine(object):
         if op.xpathExp:
             if context.explain:
                 if op.isIndependent():
-                    return NodesetTupleset([], op.xpathExp)
+                    return NodesetTupleset([], {}, op.xpathExp)
                 else:
-                    return NodesetTupleset([], op.xpathExp, context.currentTupleset) 
+                    return NodesetTupleset([], {}, op.xpathExp, context.currentTupleset) 
             
             if op.isIndependent():
                 #this isn't supported right now, but could be for absolute paths
                 #and XPath functions that don't depend on the context node                
                 result = op.xpathExp.evaluate(context.xpathContext)
+                mapping = {} #todo?
             else:
-                result = self.xpathEvaluate(op.xpathExp, context.xpathContext,
+                result, mapping = self.xpathEvaluate(op.xpathExp, context.xpathContext,
                                 context.currentTupleset, context.currentPosition)
             if isinstance(result, NodesetType):
-                return NodesetTupleset(result)
+                return NodesetTupleset(result, mapping, op.xpathExp, context.currentTupleset)
             else:
                 return result
         else:
