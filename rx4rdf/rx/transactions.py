@@ -283,10 +283,15 @@ class RaccoonTransactionService(TransactionService,utils.object_with_threadlocal
         '''
         This is intended to be set as the DOMStore's removeTrigger
         '''
+        from rx import RxPathDom
         if self.isActive():
             state = self.state
-            state.removals.append(node)
-            isnew = node.parentNode in state.newResources
+            if isinstance(node, RxPathDom.Resource):
+                state.removals.extend(node.childNodes)
+                isnew = node in state.newResources                
+            else:
+                state.removals.append(node)
+                isnew = node.parentNode in state.newResources
             kw = {'_removed' : [node], '_isnew' : isnew,
                   '_newResources': state.newResources}
             self._runActions('before-remove', kw)
