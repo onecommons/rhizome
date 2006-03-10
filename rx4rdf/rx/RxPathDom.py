@@ -108,7 +108,11 @@ class Node(xml.dom.Node, object):
     docIndex = property(_get_docIndex)
 
     def __cmp__(self, other):
-        return cmp(self.docIndex, other.docIndex)
+        try:
+            return cmp(self.docIndex, other.docIndex)
+        except:
+            print self, other
+            raise
 
     def __ne__(self, other): #so __eq__ is called instead of __cmp__
         return not self.__eq__(other)
@@ -357,20 +361,33 @@ class Resource(Element):
     attributes = property(_get_attributes)
 
     def _get_childNodes(self):
+        #if self._childNodes:
+        #    childNodes = self._childNodes()
+        #    if not childNodes: #gc'd
+        #       childNodes = self.ownerDocument.childrenCache.get(self)
+        #       self._childNodes = weakref.ref( childNodes )
+        #    else: childNodes = childNodes()
+        #hashCalc(self): self.getKey(), valueCalc: dummy(self.toPredicateNodes()), sizeCalc(value): len(value())
         if self._childNodes is None:            
-            self._childNodes = self.toPredicateNodes()
-            if self._childNodes:
+            childNodes = self.toPredicateNodes()
+            if childNodes:                
+                self._childNodes = childNodes
                 self._firstChild = self._childNodes[0]
                 self._lastChild = self._childNodes[-1]
             else:
                 self._firstChild = self._lastChild = None
+                self._childNodes = []
         return self._childNodes 
     
     childNodes = property(_get_childNodes)
     
     def _get_firstChild(self):
         self._get_childNodes()
-        return self._firstChild
+        fc = self._firstChild
+        if fc is None:
+            return None
+        else:
+            return fc #fc() #weakref
     
     firstChild = property(_get_firstChild)    
         
@@ -466,10 +483,14 @@ class Resource(Element):
         return self.insertBefore(newChild, None)
     
     def __repr__(self):
-        return "<pResourceElem at %X: <%s>, %d children>" % (
+        if self._childNodes is None:
+            return "<pResourceElem at %X: <%s>, ? children>" % (
+                id(self), self.uri)
+        else:
+            return "<pResourceElem at %X: <%s>, %d children>" % (
             id(self),
             self.uri,
-            len(self.childNodes)
+            len(self._childNodes)
             )
 
 class Subject(Resource):    
@@ -497,7 +518,9 @@ class Subject(Resource):
             return self.ownerDocument == other.ownerDocument and self.uri == other.uri 
     
     def _addListItem(self, children, listID):
-        stmts = self.ownerDocument.model.getStatements(listID)
+        stmts = self.ownerDocument.filterScope(
+            self.ownerDocument.model.getStatements(listID))
+        
         nextList = None
         for stmt in stmts:                      
             if stmt.predicate == RDF_MS_BASE+'first':
@@ -520,11 +543,9 @@ class Subject(Resource):
         If the RDF list or container has non-membership statements (usually just rdf:type) those will appear first.
         '''
         stmts = self.ownerDocument.model.getStatements(self.uri) #we assume list will be sorted
+        stmts = self.ownerDocument.filterScope(stmts)
         children = []
         containerItems = {}
-        if self.uri == 'bnode:x61b4a091c00f4ca4b6bd157e0fd2285bx1':
-            print 'lst', len(stmts)
-            import pprint; pprint.pprint(stmts)
         
         listItem = nextList = None        
         for stmt in stmts:
@@ -555,9 +576,6 @@ class Subject(Resource):
             realPredicate = stmt.predicate
             stmt = RxPath.Statement(stmt[0], RDF_SCHEMA_BASE+u'member', *stmt[2:])
             self._doAppendChild(children, Predicate(stmt, self, listID=realPredicate))            
-        if self.uri == 'bnode:x61b4a091c00f4ca4b6bd157e0fd2285bx1':
-            print 'lst', len(children)
-            print children
 
         return children
 
@@ -1480,6 +1498,9 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         if isinstance(self.schema, RxPath.Model):
             self.model = self.schema
 
+    def filterScope(self, stmts):
+        return stmts
+
     def _newContextURI(self, uri):
         from Ft.Lib import Time 
         return 'context:'+uri+'_'+str(Time.FromPythonTime()).replace(':','_')
@@ -1496,7 +1517,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     def _get_childNodes(self):
         if self._childNodes is None:
             self._toSubjectNodes()
-            assert self._childNodes is not None                
+            assert self._childNodes is not None
         return self._childNodes 
     
     childNodes = property(_get_childNodes)
@@ -1514,14 +1535,15 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     lastChild = property(_get_lastChild)
 
     def _toSubjectNodes(self):                
-        children = []        
+        children = []
+        objects = {}
         lists = {}
         lastSubject = None
         islist = False
         
         #don't include rdf:List resources as a Subject node
-        for stmt in self.model.getStatements():
-            #assumes statements are sorted properly
+        for stmt in self.filterScope(self.model.getStatements()):
+            #assumes statements are sorted properly            
             if stmt.subject != lastSubject:                
                 if lastSubject and not islist:
                     s = Subject(lastSubject, self)
@@ -1531,17 +1553,21 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
                 lastSubject = stmt.subject
                 islist = False
             
-            if (stmt.object == RDF_MS_BASE+'List' and stmt.predicate == RDF_MS_BASE+'type'
-                or stmt.predicate == RDF_MS_BASE+'first'):
+            if (stmt.object == RDF_MS_BASE+'List' and stmt.predicate ==
+                RDF_MS_BASE+'type' or stmt.predicate == RDF_MS_BASE+'first'):
                 lists.setdefault(stmt.subject, 1)
-                islist = True #in case we're not inferring the type            
-            elif stmt.predicate == RDF_MS_BASE+'rest':
+                islist = True #in case we're not inferring the type
+                    
+            if stmt.predicate == RDF_MS_BASE+'rest':
                 lists[stmt.object] = 0 #not at the head of the list
+            elif stmt.objectType == OBJECT_TYPE_RESOURCE:
+                objects[stmt.object] = 1
+                
         if lastSubject and not islist:
             s = Subject(lastSubject, self)
             self._doAppendChild(children, s)
             self.subjectDict[lastSubject] = s
-        
+
         self._childNodes = children
         if self._childNodes:
             self._firstChild = self._childNodes[0]
@@ -1552,12 +1578,19 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         for uri, head in lists.items():
             if head:
                 subjectNode = self._orderedInsert(uri, Subject, lambda x, y: cmp(x.uri, y))        
+                self.subjectDict[uri] = subjectNode
+
+        #make sure all resources included as children, even those that just appear as an object
+        for uri in objects:
+            if uri not in self.subjectDict:
+                subjectNode = self._orderedInsert(uri, Subject, lambda x, y: cmp(x.uri, y))        
                 self.subjectDict[uri] = subjectNode                
 
     def findSubject(self, uri):
         self.childNodes #make sure childNodes exist
         s = self.subjectDict.get(uri)
         if s: return s
+        #todo: sometime subjectDict gives us a false negative
     
         #todo for this to work:
         # need to make Subject.next, prevSibling on demand
@@ -1730,7 +1763,12 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         else:    
             return (id(self),  self.revision)
 
-    def commit(self, **kw):        
+    def commit(self, **kw):
+        #scope = self.currentContexts[-1]
+        #if scope and kw.get('source') and notallremoves:    
+        #   self.model.addStatement(Statement(scope, 'created_by',
+        #       RxPath.StringValue(kw['source']),OBJECT_TYPE_RESOURCE, scope))
+               
         self.model.commit(**kw)
 
         if self.initContext is not None:
@@ -1765,6 +1803,21 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         assert len(self.currentContexts) > 1
         self.currentContexts.pop()
         
+
+class ContextDoc(Document):
+    '''
+    ContextDocs are currently read-only.
+    '''
+    #todo: enforce readonly-ness
+    
+    def __init__(self, basedoc, contexturis):
+        self.contexturis = contexturis[:]
+        self.basedoc = basedoc
+        super(ContextDoc, self).__init__(basedoc.model, basedoc.nsRevMap,
+                                         basedoc.modelURI, basedoc.schemaClass)        
+                             
+    def filterScope(self,stmts):
+        return [s for s in stmts if not s.scope or s.scope in self.contexturis]
 
 import traceback, sys, re
 

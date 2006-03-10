@@ -139,13 +139,45 @@ def applyXUpdate(rdfdom, xup = None, vars = None, extFunctionMap = None, uri='fi
     if xup is None:
         xupInput = InputSource.DefaultFactory.fromUri(uri)
     else:
-        xupInput = InputSource.DefaultFactory.fromString(xup, uri) 
+        xupInput = InputSource.DefaultFactory.fromString(xup, uri)
     xupdate = xureader.parse(xupInput)
     if extFunctionMap:
         extFunctionMap.update(BuiltInExtFunctions)
     else:
         extFunctionMap = BuiltInExtFunctions    
     processor.execute(rdfdom, xupdate, vars, extFunctionMap = extFunctionMap)
+
+def _compileXPath(xpath, context, expCache=None, useEngine=None):
+    if expCache:
+        compExpr = expCache.getValue(xpath)#, context)
+        #todo support the caching of ReplaceRxPathSubExpr
+        #e.g. def cacheKey():
+        #  if (useEngine and context and context.node is rxpath: extract context.vars
+        #todo: nsMap should be part of the key -- until then clear the cache if you change that!
+    else:
+        compExpr = XPath.Compile(xpath)
+
+    #so we can change useQueryEngine anytime    
+    useEngine = useEngine is None and useQueryEngine or useEngine 
+    
+    origCompExpr = compExpr
+    if useEngine and getattr(compExpr, 'fromCache', False):
+        #if skipQuery is set, its a regular XPath expr
+        if getattr(compExpr, 'skipQuery', False):
+            useEngine = False
+        else:
+            #don't modify the compExpr saved in the cache
+            compExpr = XPath.Compile(xpath)
+    
+    if useEngine:
+        import RxPathQuery
+        transform = RxPathQuery.ReplaceRxPathSubExpr(context, compExpr)
+        if transform.changed:
+            compExpr = transform.resultExpr
+        else:
+            origCompExpr.skipQuery = True
+
+    return compExpr    
 
 cumTime = 0
 cumAnaTime = 0 
@@ -160,37 +192,9 @@ def evalXPath(xpath, context, expCache=None, queryCache=None, useEngine=None):
     from time import time as timer
     start = timer() 
     
-    if expCache:
-        compExpr = expCache.getValue(xpath)#, context)
-        #def valuefunc(xpath, context=None):
-        #if useEngine and context and context.node is rxpath
-        #def cacheKey():
-        #   (useEngine and context and context.node is rxpath,
-        #   context.vars.... which ones!?!
-        #todo: nsMap should be part of the key -- until then clear the cache if you change that!
-    else:
-        compExpr = XPath.Compile(xpath)
-    
-    useEngine = useEngine is None and useQueryEngine or useEngine #so we can change useQueryEngine anytime
-    
-    origCompExpr = compExpr
-    if useEngine and getattr(compExpr, 'fromCache', False):
-        if getattr(compExpr, 'skipQuery', False):
-            useEngine = False
-        else:
-            #don't modify the compExpr saved in the cache
-            compExpr = XPath.Compile(xpath)
-    
-    if useEngine:
-        import RxPathQuery
-        transform = RxPathQuery.ReplaceRxPathSubExpr(context, compExpr)
-        if transform.changed:
-            compExpr = transform.resultExpr
-        else:
-            origCompExpr.skipQuery = True
+    compExpr =_compileXPath(xpath, context, expCache, useEngine)
     
     analyzeTime = timer() - start
-    #start = timer()
         
     if queryCache:
         res = queryCache.getValue(compExpr, context)         
@@ -405,6 +409,16 @@ def getGraphPredicates(context, uri):
         predicates.append(predNode)
     return predicates
 
+def findGraphURIs(context, nodeset):
+    scopes = {}
+    for node in nodeset:
+        if hasattr(node,'stmt'):
+            if stmt.scope:
+                scopeRes = node.ownerDocument.findSubject(stmt.scope)
+                assert scopeRes
+                scopes[stmt.scope]= scopeRes
+    return scopes.values()
+
 def rdfDocument(context, object,type='unknown', nodeset=None):
     #note: XSLT only
     type = StringValue(type)
@@ -436,6 +450,12 @@ def rdfDocument(context, object,type='unknown', nodeset=None):
 #    assert len(nodeset) == 1, 'only one root node in nodeset supported'
 #    nsRevMap = getattr(context.node.ownerDocument, 'nsRevMap', None)
 #    return RxPathDOMFromStatements(parseRDFFromDOM(nodeset[0]), nsRevMap, uri)
+
+def getContextDoc(context, nodeset):
+    contexturis = [n.uri for n in nodeset if isResource([n])]
+    if not contexturis:
+        return []
+    return [ RxPathDom.ContextDoc(nodeset[0].rootNode,contexturis) ]        
             
 RFDOM_XPATH_EXT_NS = None #todo: put these in an extension namespace?
 BuiltInExtFunctions = {
