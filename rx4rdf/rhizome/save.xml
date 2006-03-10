@@ -14,7 +14,15 @@
                 number($startTime) &lt; /*[wiki:name=$itemname]/a:last-modified'>
         <xu:message text="Conflict: Item has been modified after you started editing this item!" terminate="yes" />
     </xu:if>
-    
+
+    <xu:if test="not($__account/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser') and 
+         not(/*[.=concat($BASE_MODEL_URI, 'create-nospam-token')][.=$__account/auth:has-rights-to/* or .=$__account/auth:has-role/*/auth:has-rights-to/*])">         
+        <!-- If the user doesn't have the create-nospam-token access token, do a spam check -->
+        <xu:if test="wf:is-spam($request-header:remote-addr, $request-header:user-agent, $contents)">
+            <xu:message text="Refusing to save contents: it looks like spam." terminate="yes" />
+        </xu:if>
+   </xu:if>
+
     <xu:variable name='current-time' select="wf:current-time()"/>
 
     <!-- if anonymous was selected treat the itemname as the folder path 
@@ -35,71 +43,24 @@
     <!-- update the external metadata context with the possibly new itemname value -->
     <xu:if test="wf:assign-metadata('itemname', $itemname)" />
     
-    <xu:variable name='resource' select='/*[wiki:name=$itemname]' />
+    <xu:variable name='resource' select='/a:NamedContent[wiki:name=$itemname]' />
         
     <xu:variable name = 'contents' select="f:if(wf:get-metadata('file'), wf:get-metadata('file'), $contents)" />
-
-    <xu:define-template name='getOrCreateFolder'>
-    <!--
-    requires 2 variables to be set: $folderPath and $parentName (initial value should be an empty string)
-    exits with $folder set to the deepest folder resource    
-    -->
-    
-      <!-- get the next segment: the substring stopping at the next / after parentName -->
-      <xu:variable name='folderName' select="concat($parentName, substring-before( substring($folderPath, string-length($parentName)+1 ), '/'))" />
-      <xu:if test='$folderName != $parentName'>  <!-- stop at the last segment (we assume its not a folder) -->
-          <xu:variable name='folder' select='/wiki:Folder[wiki:name=$folderName]'/>            
-          <xu:if test='not($folder)'>
-              <xu:append select='/'>
-                <!-- the final slash is there to distinguish it from a a:NamedContent resource with the same URI,
-                     it has no impact on URI resolution
-                -->
-                <wiki:Folder rdf:about='{wf:get-nameURI($folderName)}/' >
-                  <wiki:name><xu:value-of select="$folderName" /></wiki:name>
-                </wiki:Folder>
-              </xu:append>
-              <!-- now that we've created it, rebind the variable -->
-              <xu:variable name='folder' select='/wiki:Folder[wiki:name=$folderName]'/>
-              
-              <xu:if test='$parentName'>
-                   <!-- removes trailing slash from parentName and the folder with that name -->
-                  <xu:variable name='parentFolder' select='/wiki:Folder[wiki:name=substring($parentName, 1, string-length($parentName)-1)]'/>
-                  <xu:append select='$parentFolder'>
-                      <wiki:has-child>
-                        <xu:attribute name="rdf:resource"><xu:value-of select="$folder"/></xu:attribute>
-                      </wiki:has-child>
-                  </xu:append>             
-              </xu:if>          
-          </xu:if>
-          <xu:variable name='parentName' select="concat($folderName, '/')"/>            
-          <xu:call-template name='getOrCreateFolder'/>                        
-      </xu:if>          
-    </xu:define-template>
     
     <!-- if the wikiname does not exist, add it now -->    
     <xu:if test='not($resource)'>
         <xu:append select='/'>
-			<a:NamedContent>
-			<xu:attribute name="rdf:about"><xu:value-of select="wf:get-nameURI($itemname)"/></xu:attribute>
-			<wiki:name><xu:value-of select="$itemname" /></wiki:name>
-			<xu:if test='$isAnonymous'>
-			  <wiki:name-type rdf:resource='{uri("wiki:name-type-anonymous")}'/>
-			</xu:if>
-			<!-- add empty list resource that will be appended to below -->
-			<wiki:revisions><rdf:List/></wiki:revisions>			
+			<a:NamedContent rdf:about='{wf:get-nameURI($itemname)}'>
+			   <wiki:name><xu:value-of select="$itemname" /></wiki:name>
+			   <xu:if test='$isAnonymous'>
+			     <wiki:name-type rdf:resource='{uri("wiki:name-type-anonymous")}'/>
+			   </xu:if>
+			   <!-- add empty list resource that will be appended to below -->
+			   <wiki:revisions><rdf:List/></wiki:revisions>			
 			</a:NamedContent>
         </xu:append>
         <!-- now that we've created it, rebind the variable -->
-        <xu:variable name='resource' select='/*[wiki:name=$itemname]' />
-                
-        <xu:if test='contains($itemname, "/")'>
-          <xu:variable name='folderPath' select="$itemname" />
-          <xu:variable name='parentName' select='""'/>
-          <xu:call-template name='getOrCreateFolder'/>
-          <xu:append select='$folder'>
-              <wiki:has-child rdf:resource='{$resource}'/>
-          </xu:append>          
-        </xu:if>
+        <xu:variable name='resource' select='/*[wiki:name=$itemname]' />                
     </xu:if>
 
     <xu:if test='wf:has-metadata("metadata")'>
@@ -338,7 +299,7 @@
             <a:contents>
                 <a:ContentTransform rdf:about="{$formatTransformURI}" >
                    <xu:if test='$format = "http://rx4rdf.sf.net/ns/wiki#item-format-zml"'>
-                   <!-- update when we change the default ZML format -->
+                   <!-- update version when we change the default ZML format -->
                     <wiki:zml-version>0.7</wiki:zml-version>
                    </xu:if>
                    <a:transformed-by rdf:resource="{$format}" />
@@ -383,5 +344,11 @@
        <xu:if test="wf:assign-metadata('_disposition', 'http://rx4rdf.sf.net/ns/wiki#item-disposition-complete')" />
        <xu:message terminate='no' text="Binary content saved." />
     </xu:if>
-
+    
+     <xu:if test='$format = "http://rx4rdf.sf.net/ns/wiki#item-format-python"
+           or $format = "http://rx4rdf.sf.net/ns/wiki#item-format-rxupdate"
+           or $format = "http://rx4rdf.sf.net/ns/wiki#item-format-rxslt" '>
+           <!-- don't try to display pages with these formats after save -->
+          <xu:variable name='noredirect' select="wf:assign-metadata('no-redirect', 1)" /> <!-- used by the item-disposition-handler --> 
+     </xu:if>
 </xu:modifications>

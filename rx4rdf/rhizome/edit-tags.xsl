@@ -11,6 +11,8 @@
 		xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
 		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header auth" >
 
+<xsl:variable name='expires' select="wf:assign-metadata('response-header:expires', '-1')" />	
+
 <xsl:template name="write-keywords">
 <xsl:param name="topics" />
 <xsl:param name="width" select='40' />

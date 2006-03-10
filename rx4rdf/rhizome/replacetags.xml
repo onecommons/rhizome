@@ -10,6 +10,15 @@
 			xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"			
 			xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >
 
+<!--
+This page defines the replaceKeywords template and can be included and called 
+in save handlers to allow tags to be associated with a resource.
+
+replaceKeywords takes two parameters:
+$keywords is string a containing either comma or space separated of tags
+$resource is the resource the tags will be associated with
+-->
+
     <xu:define-template name='addKeyword'>
        <!-- params: $kw, $resource -->
        <xu:variable name='kwUri' select="wf:evaluate('uri($kw)')" /> 

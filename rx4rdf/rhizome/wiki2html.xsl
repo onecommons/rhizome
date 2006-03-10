@@ -2,7 +2,8 @@
 xmlns:wf="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#" 
 xmlns:f="http://xmlns.4suite.org/ext" 
 xmlns:previous = 'http://rx4rdf.sf.net/ns/raccoon/previous#'
-exclude-result-prefixes="previous f wf">
+xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" 
+exclude-result-prefixes="previous f wf wiki">
 <!--
 note: this template is only called if the 'wiki' doctype is set. 
 As an optimization it only set when one of these config options are set: 
@@ -10,7 +11,18 @@ As an optimization it only set when one of these config options are set:
  (see rhizome.processZMLSideEffects() )
 -->
 <x:param name='_APP_BASE'/>
+<x:param name='_disposition' />
+<x:param name='__store'/>
 <x:output method='xhtml' omit-xml-declaration="yes" encoding="UTF-8" indent='no' />
+
+<x:template match='div[@class="section"]'>
+
+<x:variable name='classname' select="f:if($_disposition='http://rx4rdf.sf.net/ns/wiki#item-disposition-s5-template', 'slide', 'section')" />
+
+<div class='{$classname}'>
+ <x:apply-templates/>
+</div>
+</x:template>
 
 <x:template match='a'>
 <!--
@@ -19,9 +31,10 @@ if not found
 otherwise
     <a copy-attributes><img>text</a>
 -->
-    <x:choose>
-    <!-- the href has already been converted from a site: url to an http: url, so we need to convert it back to an internal name -->
-    <x:when test='@undefined and not(wf:has-page(f:if(starts-with(@href,$_APP_BASE), substring-after(@href, $_APP_BASE), @href )))'>        
+
+
+    <x:choose> 
+    <x:when test='@undefined and $__store/wiki:MissingPage/wiki:name = wf:name-from-url(@href)'>
         <a>
         <x:copy-of select="@node()[.!='IgnorableMetadata']" />
         <x:apply-templates/><sup>?</sup></a>

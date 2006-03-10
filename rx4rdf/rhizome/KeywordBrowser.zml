@@ -9,10 +9,14 @@ x:stylesheet (version="1.0", xmlns:x="http://www.w3.org/1999/XSL/Transform",
     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#",
     xmlns:auth="http://rx4rdf.sf.net/ns/auth#",
     xmlns:sets='http://exslt.org/sets',
+    xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#',
     exclude-result-prefixes = "f wf a wiki rdf rdfs auth sets"
     ) 
     x:import href='search.xsl'
     x:param name='__resource'
+    
+    x:variable name='expires' select="wf:assign-metadata('response-header:expires', '-1')" 
+    
     #if the disjunction and topics parameters aren't specified, see if this page is handling a Keyword resource
     x:param name='disjunction' select='''f:if($__resource/rdf:type = 'http://rx4rdf.sf.net/ns/wiki#Keyword', 
                concat("[wiki:about='", $__resource, "']"), "[wiki:about]")'''

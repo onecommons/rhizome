@@ -7,12 +7,20 @@
     
     <xu:remove select="$__resource" />
 
-    <!-- remove the has-child statement if its a child of a folder -->
-    <xu:remove select="/*/wiki:has-child[.=$__resource]" />
+    <!-- don't try to display a page that no longer exists! -->
+    <xu:variable name='noredirect' select="wf:assign-metadata('no-redirect', 1)" /> <!-- used by the item-disposition-handler --> 
+
+    <!-- remove any shredded statements from this resource-->
+    <xu:variable name='graphSource' select="/*[a:from-source = ($__resource/wiki:revisions/*/rdf:first/*)[last()]/a:contents/*]" />
+    <xu:if test='$graphSource'>
+         <xu:remove select='get-graph-predicates($graphSource/a:entails)' />
+    </xu:if>
+
     <!-- delete external contents if necessary 
     todo: need to implement this: 
       * what about revisions?
       * need to authenticate for delete-contents function
     <xu:variable name="dummy" select="wf:delete-contents($__resource)"/>
     -->
+    
 </xu:modifications>

@@ -8,6 +8,7 @@
         xmlns:wf="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#" 
         xmlns:f = 'http://xmlns.4suite.org/ext' 
         xmlns:response-header="http://rx4rdf.sf.net/ns/raccoon/http-response-header#"   
+        xmlns:session = 'http://rx4rdf.sf.net/ns/raccoon/session#'
         exclude-result-prefixes = "f a wiki rdf previous wf response-header error" 
         >
     <xsl:param name="error:userMsg" />
@@ -18,6 +19,7 @@
     
 <xsl:output method='xhtml' omit-xml-declaration="yes" encoding="UTF-8" indent='no' />    
 <xsl:template match="/">  
+    <xsl:variable name='expires' select="wf:assign-metadata('response-header:expires', '-1')" />	
     <xsl:variable name='_robots' select="wf:assign-metadata('_robots', 'nofollow,noindex')" />
     <!-- use the same item template as the page that contained the error; 
       if $_disposition has not have been set yet, get the wiki:item-disposition 
@@ -30,6 +32,9 @@
         /*[.=wf:get-metadata('previous:_itemHandlerDisposition', 
              'http://rx4rdf.sf.net/ns/wiki#item-disposition-entry')], $dispStep1))" />       
 
+    <!-- remove any message that may have been set -->
+    <xsl:variable name="removeMessage" select="wf:remove-metadata('session:message')"/>
+    
     <div class='message'>
     <xsl:choose>    
     <xsl:when test='$error:userMsg'>        

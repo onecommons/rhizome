@@ -63,6 +63,11 @@ doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"
 <xsl:variable name='removeMessage' select="wf:remove-metadata('session:message')" /> 
 
 <xsl:template match="/">
+<xsl:if test='$message'>
+ <!-- don't cache a page with a message alert -->
+    <xsl:variable name='expires' select="wf:assign-metadata('response-header:expires', '-1')" />	
+</xsl:if>
+
 <html>
 <head>
 <title><xsl:value-of select="$title" /></title>
@@ -157,6 +162,9 @@ doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"
 
     <a href="site:///edit">New Page</a><br/><a href="site:///keyword-browser">Browse by Keyword</a><br/><a href=
 "site:///search?{$recent-pages-query}&amp;searchType=RxPath&amp;view=list&amp;title=Recently%20Changed%20Pages">Recent Changes</a><br/><a href="site:///administration">Administration</a><br/><a href="site:///help">Help and FAQ</a>
+
+<br/><a href="site:///search?search=%2Fwiki%3AMissingPage&amp;searchType=RxPath&amp;view=list&amp;title=Wanted%20Pages">Wanted Pages</a>
+
 </xsl:template>
 
 <xsl:template name="actions-bar" >

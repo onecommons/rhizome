@@ -30,6 +30,9 @@
 <f:output method="{f:if($view='ntriples', 'text', 'xhtml')}" indent='yes' omit-xml-declaration="yes" encoding="UTF-8" />
 -->
 <xsl:output method="xhtml" indent='yes' omit-xml-declaration="yes" encoding="UTF-8" />
+
+<xsl:variable name='expires' select="wf:assign-metadata('response-header:expires', '-1')" />	
+
 <xsl:variable name="searchExp">     
      <xsl:choose>
         <xsl:when test="$searchType='Simple'">                     
@@ -279,7 +282,7 @@ No results found.
         order="{$sortKeyOrder}" case-order="{$sortKeyCaseOrder}"/> 
 
   <xsl:if test='not($properties-table)'>
-    <xsl:variable name='relUrl' select="f:if(self::a:NamedContent, concat(./wiki:name, '?'), concat('.?about=', f:escape-url(.)))" />
+    <xsl:variable name='relUrl' select="f:if(self::a:NamedContent, concat(./wiki:name, '?'), concat(./wiki:name, '?about=', f:escape-url(.)))" />
     <xsl:variable name='resName' select="f:if(./wiki:name, ./wiki:name, f:if(./rdfs:label,./rdfs:label, name-from-uri(.)))" />
     
     <tr>

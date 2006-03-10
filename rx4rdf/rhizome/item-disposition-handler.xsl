@@ -15,6 +15,7 @@
     <xsl:param name="previous:error" />
     <xsl:param name="previous:about" />
     <xsl:param name="previous:redirect" />
+    <xsl:param name="previous:no-redirect" />
     <xsl:param name="previous:_itemHandlerDisposition" />
     <xsl:param name="_contents" />	
     
@@ -35,7 +36,7 @@ Completed <b><xsl:value-of select='$previous:action'/></b> of <a href="{$itemurl
         <xsl:when test='$previous:error'>
             Error <b><xsl:value-of select='$previous:error'/></b> 
         </xsl:when>
-        <xsl:when test='$previous:redirect or not($_contents or $previous:_itemHandlerDisposition)'>
+        <xsl:when test='$previous:redirect or not($previous:no-redirect or $_contents or $previous:_itemHandlerDisposition)'>
             <script>    
             //if we're in a popup window, close it
             if (window.name == 'smallActionPopup')

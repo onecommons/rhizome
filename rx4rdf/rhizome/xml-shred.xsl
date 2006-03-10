@@ -32,19 +32,15 @@
 
 <!-- support for XML vocabularies that don't use namespaces -->
    <xsl:template match='/faqs | /faq | /document | /section | /specification | 
-                        /set | /book | /chapter | /article' >
+                   /todo | /set | /book | /chapter | /article' >
    
       <xsl:variable name='doctype' 
          select="f:if(name(.)='faq' or name(.)='faqs', 'http://rx4rdf.sf.net/ns/wiki#doctype-faq',
          f:if(name(.)='document' or name(.)='section', 'http://rx4rdf.sf.net/ns/wiki#doctype-document',
+         f:if(name(.)='todo', 'http://rx4rdf.sf.net/ns/wiki#doctype-todo',
          f:if(name(.)='specification', 'http://rx4rdf.sf.net/ns/wiki#doctype-specification',
          f:if(name(.)='set' or name(.)='book' or name(.)='chapter' or name(.)='article', 
-                                    'http://rx4rdf.sf.net/ns/wiki#doctype-docbook'))))" />
-
-      <xsl:message terminate='no'>
-        <xsl:value-of select="concat($doctype, name(.)) "/>
-      </xsl:message>
-
+                                    'http://rx4rdf.sf.net/ns/wiki#doctype-docbook')))))" />
        
        <xsl:call-template name='set-doctype'>
          <xsl:with-param name='doctype' select='$doctype' />     
@@ -78,10 +74,6 @@
 
       <xsl:variable name='doctypeTransformName' 
            select='$__store/*[wiki:handles-doctype=$doctype]/wiki:name' />
-
-      <xsl:message terminate='no'>
-        <xsl:value-of select="concat($doctypeTransformName) "/>
-      </xsl:message>
 
       <xsl:if test='$doctypeTransformName'>      
         <xsl:variable name='dummy1' 
@@ -140,8 +132,61 @@
     <xsl:template match="text()|@*">
     </xsl:template>
    
-   <!-- mode = html @href -->
+ <xsl:template match='a | area'>
+    <xsl:if test='@href'>
+       <xsl:call-template name='add-urlref'>
+        <xsl:with-param name='url' select='@href' />
+       </xsl:call-template>
+    </xsl:if>
+    <xsl:apply-templates />
+ </xsl:template>
 
+ <xsl:template name='add-urlref'>
+  <xsl:param name='pagename' select='$__resource/wiki:name' />
+  <xsl:param name='url' select='.' />
+  <xsl:param name='relation' select='"wiki:links-to"' />
+  
+  <xsl:variable name='absurl'>
+    <xsl:choose>
+     <!-- anchor: ignore -->
+     <xsl:when test="starts-with($url,'#')"></xsl:when>
+
+    <!-- absolute site:/// URL -->
+    <xsl:when test="starts-with($url,'site:/')"><xsl:value-of select='$url' /></xsl:when>
+        
+     <!-- relative site: url, convert to absolute site: URL -->
+     <xsl:when test="starts-with($url,'site:')"><xsl:value-of select=
+       "f:resolve-url(concat('site:///', $pagename), substring($url,6))" /></xsl:when>
+
+     <!-- when doesn't it contain a ':' assume it's a relative url -->
+     <xsl:when test="not(contains($url,':'))"><xsl:value-of 
+        select="f:resolve-url(concat('site:///', $pagename), $url)" /></xsl:when>     
+
+      <!-- external -->
+     <xsl:otherwise><xsl:value-of select="." /></xsl:otherwise>
+    </xsl:choose>
+  </xsl:variable>   
+
+   <xsl:if test='$absurl'>     
+     <xsl:if test="starts-with($absurl, 'site:')" >
+       <xsl:variable name="name" select="wf:name-from-url($absurl)" />
+       <xsl:if test="not(wf:has-page($name))" >
+        <xupdate:append select='/'>
+            <wiki:MissingPage rdf:about='{wf:get-nameURI($name)}'>
+              <wiki:name><xsl:value-of select="$name" /></wiki:name>
+            </wiki:MissingPage>
+        </xupdate:append> 
+       </xsl:if>
+     </xsl:if>
+    
+     <xupdate:append select='$__resource'>
+        <xsl:element name='{$relation}'> 
+            <xsl:attribute name='rdf:resource'><xsl:value-of select="$absurl" /></xsl:attribute>
+        </xsl:element>  
+     </xupdate:append> 
+   </xsl:if>
+ </xsl:template>
+   
    <xsl:template match='/testshredder' >
       <!-- used by the unit tests -->
       <xupdate:append select='$__resource'>

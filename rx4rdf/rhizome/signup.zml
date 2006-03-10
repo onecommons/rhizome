@@ -9,12 +9,15 @@
      xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#",
      xmlns:auth="http://rx4rdf.sf.net/ns/auth#",
      xmlns:foaf="http://xmlns.com/foaf/0.1/",
+     xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#',
      exclude-result-prefixes = "f wf a wiki rdf rdfs auth foaf"
      ) 
   x:param name="__resource"
   x:param name="action"
   x:param name="__passwordHashProperty"
-   
+  
+  x:variable name='expires' select="wf:assign-metadata('response-header:expires', '-1')" 
+  
   x:template match='/':  	    `
     x:variable name='account' select='f:if($action!="new", $__resource)'
     x:variable name='user' select='/foaf:Person[foaf:holdsAccount = $account]'

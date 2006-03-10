@@ -17,6 +17,7 @@
 
 <!-- this edit page is always html, not the content's mimetype -->
 <xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />
+<xsl:variable name='expires' select="wf:assign-metadata('response-header:expires', '-1')" />	
 
 <xsl:variable name='revision' select="($__resource/wiki:revisions/*/rdf:first/*)[last()]" />
 <xsl:variable name='transforms' select="$revision//a:contents/*" />	
