@@ -79,15 +79,16 @@ class SiteUriResolver(Uri.SchemeRegistryResolver):
         if base:
            uri = self.normalize(uri, base)
         elif old4Suite:
-            #workaround bug in older 4Suite, base resolve does check supportedSchemes
+            #workaround bug in older 4Suite, base resolve doesn't check supportedSchemes
             self.normalize(uri, uri)
+
         if self.uriwhitelist:
             for regex in self.uriwhitelist:
                 if re.match(regex,uri):
                     break
             else:
                 raise UriException(UriException.RESOURCE_ERROR, uri, 'Unauthorized') 
-        elif self.uriblacklist:
+        if self.uriblacklist:
             for regex in self.uriblacklist:
                 if re.match(regex,uri):
                     raise UriException(UriException.RESOURCE_ERROR, uri, 'Unauthorized') 
