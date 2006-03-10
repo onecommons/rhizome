@@ -22,6 +22,7 @@ else:
     import urllib, re
     from Ft.Xml.Lib.Print import PrettyPrint
     from Ft.Xml.Xslt import XSL_NAMESPACE
+    from Ft.Lib import Uri
 
     try:
         import cPickle
@@ -440,6 +441,7 @@ the Action is run (default is False).
             self.defaultPageName = kw.get('defaultPageName', 'index')
             #cache settings:                
             initConstants( ['LIVE_ENVIRONMENT', 'useEtags'], 1)
+            self.defaultExpiresIn = kw.get('defaultExpiresIn', 3600)
             initConstants( ['XPATH_CACHE_SIZE','ACTION_CACHE_SIZE'], 1000)
             initConstants( ['XPATH_PARSER_CACHE_SIZE',
                             'STYLESHEET_CACHE_SIZE'], 200)
@@ -623,12 +625,14 @@ the Action is run (default is False).
                     self.previousResolvers.append(
                         InputSource.DefaultFactory.resolver )
                     InputSource.DefaultFactory.resolver = self.resolver
+                    Uri.BASIC_RESOLVER = self.resolver
                     
                     return self.doActions(sequence, kw, retVal=initVal,
                                           errorSequence=errorSequence,
                                           newTransaction=newTransaction)
                 finally:
-                    InputSource.DefaultFactory.resolver = self.previousResolvers.pop()
+                    oldResolver = self.previousResolvers.pop()
+                    Uri.BASIC_RESOLVER = InputSource.DefaultFactory.resolver = oldResolver
                             
         STOP_VALUE = u'2334555393434302' #hack
         
@@ -689,26 +693,32 @@ the Action is run (default is False).
             return vars, extFuncs
 
         def evalXPath(self, xpath,  vars=None, extFunctionMap=None, node=None):
-            #print 'eval node', node        
+            #print 'eval node', node
+            oldResolver = Uri.BASIC_RESOLVER
             try:
-                node = node or self.domStore.dom
-                if extFunctionMap is None:
-                    extFunctionMap = self.extFunctions
-                if vars is None:
-                   vars = {}
-                #we also set this in __doActionsBare()
-                vars[ (None, '__context')] = [ node ] 
-                context = XPath.Context.Context(node, varBindings = vars,
-                            extFunctionMap = extFunctionMap,
-                            processorNss = self.nsMap)
-                return self.domStore.evalXPath(xpath, context, expCache =
-                               self.expCache, queryCache = self.queryCache)
-            except (RuntimeException), e:
-                if e.errorCode == RuntimeException.UNDEFINED_VARIABLE:                            
-                    self.log.debug(e.message) #undefined variables are ok
-                    return None
-                else:
-                    raise
+                Uri.BASIC_RESOLVER = self.resolver
+                try:                    
+                    node = node or self.domStore.dom
+                    if extFunctionMap is None:
+                        extFunctionMap = self.extFunctions
+                    if vars is None:
+                       vars = {}
+                    #we also set this in __doActionsBare()
+                    vars[ (None, '__context')] = [ node ] 
+                    context = XPath.Context.Context(node, varBindings = vars,
+                                extFunctionMap = extFunctionMap,
+                                processorNss = self.nsMap)
+                    return self.domStore.evalXPath(xpath, context, expCache =
+                                   self.expCache, queryCache = self.queryCache)
+                except (RuntimeException), e:                    
+                    if e.errorCode == RuntimeException.UNDEFINED_VARIABLE:                            
+                        self.log.debug(e.message) #undefined variables are ok
+                        return None
+                    else:
+                        raise
+            finally:
+                Uri.BASIC_RESOLVER = oldResolver
+            
 
         def __assign(self, actionvars, kw, contextNode, debug=False):
             context = XPath.Context.Context(None, processorNss = self.nsMap)
@@ -1448,6 +1458,15 @@ the Action is run (default is False).
                         #an http request must return a string
                         #(not unicode, for example)
                         result = str(result) 
+
+                    if (self.defaultExpiresIn and
+                        'expires' not in kw['_response'].headerMap):
+                        if self.defaultExpiresIn == -1:
+                            expires = '-1'
+                        else:                             
+                            expires = time.strftime("%a, %d %b %Y %H:%M:%S GMT",
+                                            time.gmtime(time.time() + self.defaultExpiresIn))
+                        kw['_response'].headerMap['expires'] = expires
                     
                     #if mimetype is not set, make another attempt
                     if not kw['_response'].headerMap.get('content-type'):
@@ -1469,6 +1488,7 @@ the Action is run (default is False).
                         if etags and resultHash in [x.strip() for x in etags.split(',')]:
                             kw['_response'].headerMap['status'] = "304 Not Modified"
                             return ''
+                        
                     return result
             finally:
                 self.requestContext.pop()
