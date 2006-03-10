@@ -47,6 +47,19 @@ transactionLog=/logs/auditTrail.nt
 #default is True
 SECURE_FILE_ACCESS = True
 
+#DEFAULT_URI_SCHEMES specifies which URL schemes can be resolved.
+#default is ['file','data'] (no URL schemes that allow network access)
+DEFAULT_URI_SCHEMES = ['http', 'https', 'file', 'ftp', 'data', 'gopher'] #all supported schemes
+
+#uriResolveWhitelist is a list of regular expressions. URL resolution will only be allowed if 
+#the URL matches one of its regular expressions.
+#default: uriResolveWhitelist = [] (if the list is empty, resolve all URLs)
+uriResolveWhitelist = ['(file:|data:|site:|path:).*', 'http://localhost.*']
+
+#uriResolveBlacklist is a list of regex strings where if any match the URL, resolution is denied.
+#default: uriResolveBlacklist = [] 
+uriResolveBlacklist = ['http://(www\.)?evilsite.com/.*' ]
+
 #authorizationDigests is a dictionary used by RequestProcessor.authorizeByDigest
 #to create a whitelist of content that processed. By default it is used for the Python content processor
 #(see authorizeContentProcessors setting below).
@@ -119,6 +132,16 @@ DEFAULT_MIME_TYPE='text/plain'
 #default is the value of BASE_MODEL_URI
 MODEL_RESOURCE_URI = 'http://example.org/rhizomeapp/2/20/2004'
 
+: never expires 31536000, already expired: -1, don't expires: 0 or None, default 3600 (1 hour)
+
+#defaultExpiresIn specifis what to do about Expires HTTP response header if it 
+#hasn't already set by the application. If it's value is 0 or None the header 
+#will not be sent, otherwise the value is the number of seconds in the future 
+#that responses should expire. To indicate that they already expired set it to -1;
+#to indicate that they never expires set it to 31536000 (1 year).
+#default is 3600 (1 hour)
+defaultExpiresIn = 0 #disable setting the Expires header by default
+
 #if useEtags is True, If-None-Match request headers are honors and an etag based 
 #on a MD5 hash of the response content will be set with every response
 #default is True
@@ -138,10 +161,10 @@ __argv__   #list of arguments intended for this configuration file
 __configpath__ #stack of configuration file paths, __configpath__[-1] is always the current file
                #__configpath__[-2], if it exists, would be the config file currently including this one, and so on.
 
-#################################################
+###############################################################################
 ## rhizome-specific configuration variables 
-## this are only used when including rhizome into your config
-#################################################
+## this are only used when including rhizome-config.py into your config file
+###############################################################################
 
 #MAX_MODEL_LITERAL when saving a page, any content whose length is greater then this will be saved to disk. 
 #default is -1 (disable save to disk) 
@@ -223,6 +246,17 @@ blacklistedAttributes = { 'style': '.*', } #remove any inline style attribute
 #default: see utils.BlackListHTMLSanitizer
 blacklistedContent = { 'style': 'javascript:|@import' }
 
+#if the following two properies are set, before saving content Rhizome will invoke the Akismet 
+#service to check if the content is spam (unless the user has the create-nospam-token access token)
+#See http://akismet.com/ for more info. 
+
+#akismetKey is your free WordPress API key
+#default: ''
+akismetKey = '79deadbeef31'
+#akismetUrl is the url to your blog or wiki
+#default: ''
+akismetUrl = 'http://mywiki.example.net'
+
 #the following settings can be turned on to give your site a wiki like look and feel
 
 #if undefinedPageIndicator is True then links to internal pages that haven't been defined will be displayed with ? 
@@ -245,6 +279,10 @@ interWikiLinkIndicator=True
 #default is 'site:///intermap.txt'
 interWikiMapURL=''
 
+#ZMLDefaultVersion indicates the version of the ZML syntax that should be assumed when 
+#the ZML header (e.g. #?zml0.7) is missing from ZML text.
+#default: the value of zml.defaultZMLVersion (currently 0.7)
+ZMLDefaultVersion = 0.8 #set default to latest experimental version 
 #content indexing 
 
 #INDEX_DIR is the directory the content index will be stored in
@@ -350,7 +388,9 @@ DEFAULT_TRIGGER='http-request'
 
 #globalRequestVars is a list of request metadata variables that should be preserved 
 #when invoking callActions() (e.g. to invoke templates or an error handler)
-#default is [] (but the system will always adds: ['_docpath', '_name', '_noErrorHandling'])
+#default is [] (but Raccoon will always adds the following: 
+#   '_name', '_noErrorHandling', '__store', '_APP_BASE', and '__readOnly')
+
 globalRequestVars = [ '__account', '_static', '_disposition' ] 
 
 #contentProcessors is a list used by RequestProcessor.processContents to specify
@@ -390,23 +430,11 @@ extFunctions = {
 NOT_CACHEABLE_FUNCTIONS= {('http://example.com/extfuncs', 'delete-everything') : 0 }
 
 #getPrincipleFunc is function that is called to retrieve the 
-#application-specific Principle (in the security sense) object 
+#application-specific Principal (in the security sense) object 
 #for the current request context.
 #It takes one argument that is the dictionary of metadata for the current request
 #default: lambda kw: '' 
 getPrincipleFunc = lambda kw: kw.get('__account','')
-
-#authorizeAdditions and authorizeRemovals are functions that are called when 
-#updating the application's model to provide fine-grained authentication of
-#each statement added and removed
-#their signatures looks like:
-#def authorizeAdditions(additions, removals, reordered, user)
-#where the first 3 arguments are the same as the tuple returned by RxPath.diffResources()
-#and the fourth is the principle returned by getPrincipleFunc
-#They should raise raccoon.NotAuthorized if the update is unauthorized.
-#default: None
-authorizeAdditions=rhizome.authorizeAdditions
-authorizeRemovals=rhizome.authorizeRemovals
 
 #authorizeMetadata is a function that is called whenever one of Raccoon's XXX-metadata 
 #XPath extension functions is called. 
@@ -429,13 +457,17 @@ authorizeMetadata=rhizome.authorizeMetadata
 validateExternalRequest=rhizome.validateExternalRequest
 
 #authorizeXPathFuncs is a function that is invoked on start up to 
-#allow the application to modifies a copy of the extFunctions dictionary. 
-#This modified dictionary is used by XSLT, RxSLT, and RxUpdate stylesheets
+#allow the application to modify a copy of the extFunctions dictionary. 
+#(i.e. to update it with functions that do an authorization before invoking 
+#the XPath function.) This modified dictionary is used when authorization is 
+#needed (e.g. when processing XSLT, RxSLT, and RxUpdate stylesheets).
 #Its signature looks like:
 #def authorizeXPathFuncs(extFunctions, notCacheableDict)
 #where extFunctions is a copy of the dictionary of XPath functions
-#and notCacheableDict conforms to NOT_CACHEABLE_FUNCTIONS
+#and notCacheableDict is a copy of NOT_CACHEABLE_FUNCTIONS
 #default is lambda *args: None
 authorizeXPathFuncs=rhizome.authorizeXPathFuncs
 
-
+#shredders is a list of ContentProcessors that are invoked during the shredding process
+#default: see rhizome-config.py
+shredders = [ rx.ContentProcessors.RDFShredder() ]
