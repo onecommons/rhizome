@@ -12,7 +12,7 @@
     <xsl:param name="_previousContext" />		        
     <xsl:param name="response-header:content-type"/>    
 
-    <xsl:output method='html' encoding='UTF-8' indent='no' />
+    <xsl:output method='xhtml' encoding='UTF-8' indent='no' />
     
 <xsl:template match="/">
 
