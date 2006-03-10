@@ -159,13 +159,14 @@ rhizome.findRevisionAction.assign("_label", '$label',
 
 #finally have a resource, get its content
 contentQueries=[
-'.//a:contents/text()', #content stored in model
+#external file
+'wf:openurl(wf:ospath2pathuri($externalfile))', 
+#content stored in model
+'.//a:contents/text()', 
 #contents externally editable 
 'wf:openurl( .//a:contents/a:ContentLocation/wiki:alt-contents)', 
 #contents stored externally
 'wf:openurl( .//a:contents/a:ContentLocation)', 
-#external file
-'wf:openurl(wf:ospath2pathuri($externalfile))', 
 ]
 
 rhizome.findContentAction = Action(contentQueries, 
@@ -379,6 +380,8 @@ actions = {
      #for example, to prevent reserved identifiers from being used.
         
     'before-prepare': [ 
+        Action(['''wf:request('update-triggers', '_noErrorHandling', 1,
+                '_added', $_added, '_removed', $_removed)''']),
         recheckAuthorizations,
         classAuthenticateNewResourceAction,
 #        classAuthenticateAddsAction,
@@ -477,6 +480,8 @@ extFunctions = {
 
 (RXWIKI_XPATH_EXT_NS, 'shred') :  rhizome.startShredding,
 (RXWIKI_XPATH_EXT_NS, 'shred-with-xslt') :  rhizome.shredWithStylesheet,
+(RXWIKI_XPATH_EXT_NS, 'is-spam') :  rhizome.isSpam,
+(RXWIKI_XPATH_EXT_NS, 'name-from-url'): rhizome.nameFromURL,
 }
 
 NOT_CACHEABLE_FUNCTIONS = {
@@ -528,7 +533,8 @@ authorizeXPathFuncs=rhizome.authorizeXPathFuncs
 ## Define the template for a Rhizome site
 ##############################################################################
 
-templateList = [rhizome._addItemTuple('_not_found',loc='path:_not_found.xsl', format='rxslt', disposition='entry'),
+templateList = [rhizome._addItemTuple('_not_found',loc='path:_not_found.xsl', format='rxslt', disposition='entry',
+                    handlesAction=['view'], actionType='wiki:MissingPage'),
  rhizome._addItemTuple('edit',loc='path:edit.xsl', format='rxslt', disposition='entry', handlesAction=['edit', 'new']),
  rhizome._addItemTuple('save',loc='path:save.xml', format='rxupdate', disposition='handler', handlesAction=['save', 'creation']),
  rhizome._addItemTuple('confirm-delete',loc='path:confirm-delete.xsl', format='rxslt', disposition='entry', 
@@ -565,7 +571,6 @@ rhizome._addItemTuple('rxml-template-handler',loc='path:rxml-template-handler.xs
                         disposition='entry', handlesDisposition='rxml-template'),               
 rhizome._addItemTuple('generic-new-template', loc='path:generic-new-template.txt', handlesAction=['new'], actionType='rdfs:Resource',
             disposition='rxml-template', format='text', title='Create New Resource'), 
-#rhizome._addItemTuple('rxml2rdf',loc='path:rxml2rdf.py', format='python', disposition='complete'),
 rhizome._addItemTuple('process-rdfsandbox',loc='path:process-rdfsandbox.xsl', format='rxslt', disposition='complete'),
 rhizome._addItemTuple('default-error-handler', loc='path:default-error-handler.xsl', disposition='entry', doctype='xhtml', format='rxslt'), 
 rhizome._addItemTuple('xslt-error-handler', loc='path:xslt-error-handler.xsl', disposition='entry', doctype='xhtml', format='rxslt'), 
@@ -596,6 +601,7 @@ rhizome._addItemTuple('save-bookmark', format='rxupdate', disposition='handler',
                       handlesAction=['save', 'creation'], actionType='wiki:Bookmark'),
 rhizome._addItemTuple('replacetags.xml', loc='path:replacetags.xml', disposition='complete', format='xml'),
 rhizome._addItemTuple('edit-tags.xsl', loc='path:edit-tags.xsl', disposition='complete', format='xml'),
+rhizome._addItemTuple('update-triggers',loc='path:update-triggers.xml', format='rxupdate', disposition='complete'),
 #rhizome._addItemTuple('todo2document.xsl', loc='path:changes2document.xsl', format='http://www.w3.org/1999/XSL/Transform', 
 #                disposition='template', doctype='document', handlesDoctype='todo'),
 #rhizome._addItemTuple('s5-template',loc='path:s5-template.xsl', format='rxslt', 
@@ -748,7 +754,6 @@ if not adminShaPassword:
 
 authorizationDigests = { 
     'My4pn2M3AXwU9vro1UIoBnELsS0=' : 1, #for diff-revisions.py
-    'pXao2iheSFZspAFb0v/GtDbSGGM=' : 1, #for rxml2rdf.py
 }
 
 #rxml
@@ -1391,6 +1396,8 @@ APPLICATION_MODEL += schema
 
 #add the "wiki" schema -- not much here right now
 wikiSchema ='''
+  wiki:links-to:   rdfs:subPropertyOf: wiki:references
+  wiki:appendage-to:   rdfs:subPropertyOf: wiki:references
   #wiki:appendage-to is a property that indicates that 
   #a resource doesn't stand on its own
   #but rather is subordinate to the object of statement
