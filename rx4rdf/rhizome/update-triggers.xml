@@ -1,0 +1,92 @@
+<xu:modifications version="1.0" xmlns:xu="http://www.xmldb.org/xupdate"
+		    xmlns:a="http://rx4rdf.sf.net/ns/archive#" 
+		    xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" 
+		    xmlns:f = 'http://xmlns.4suite.org/ext' 
+		    xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'		    
+			xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
+			xmlns:dc='http://purl.org/dc/elements/1.1/'
+			xmlns:foaf="http://xmlns.com/foaf/0.1/"
+			xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"			
+			xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >
+
+<!-- this file is invoked before a transaction commits -->
+
+    <xu:define-template name='getOrCreateFolder'>
+    <!--
+    requires 2 variables to be set: $folderPath and $parentName (initial value should be an empty string)
+    exits with $folder set to the deepest folder resource    
+    -->
+    
+      <!-- get the next segment: the substring stopping at the next / after parentName -->
+      <xu:variable name='folderName' select="concat($parentName, substring-before( substring($folderPath, string-length($parentName)+1 ), '/'))" />
+      <xu:if test='$folderName != $parentName'>  <!-- stop at the last segment (we assume its not a folder) -->
+          <xu:variable name='folder' select='/wiki:Folder[wiki:name=$folderName]'/>            
+          <xu:if test='not($folder)'>
+              <xu:append select='/'>
+                <!-- the final slash is there to distinguish it from a a:NamedContent resource with the same URI,
+                     it has no impact on URI resolution
+                -->
+                <wiki:Folder rdf:about='{wf:get-nameURI($folderName)}/' >
+                  <wiki:name><xu:value-of select="$folderName" /></wiki:name>
+                </wiki:Folder>
+              </xu:append>
+              <!-- now that we've created it, rebind the variable -->
+              <xu:variable name='folder' select='/wiki:Folder[wiki:name=$folderName]'/>
+              
+              <xu:if test='$parentName'>
+                   <!-- removes trailing slash from parentName and the folder with that name -->
+                  <xu:variable name='parentFolder' select='/wiki:Folder[wiki:name=substring($parentName, 1, string-length($parentName)-1)]'/>
+                  <xu:append select='$parentFolder'>
+                      <wiki:has-child>
+                        <xu:attribute name="rdf:resource"><xu:value-of select="$folder"/></xu:attribute>
+                      </wiki:has-child>
+                  </xu:append>             
+              </xu:if>          
+          </xu:if>
+          <xu:variable name='parentName' select="concat($folderName, '/')"/>            
+          <xu:call-template name='getOrCreateFolder'/>                        
+      </xu:if>          
+    </xu:define-template>
+
+<xu:for-each select='$_added/self::wiki:name'>   
+   <xu:if test='not($current/parent::wiki:MissingPage)'>
+        <!-- remove any missing page marker if it exists  -->   
+       <xu:variable name='missingpages' select='/wiki:MissingPage[wiki:name = $current]' />
+       <xu:if test='$missingpages'>
+         <xu:remove select='$missingpages' />
+       </xu:if>
+
+     <!-- if the name looks like a path, associate the name with the folder -->
+        <xu:if test='contains($current, "/")'>
+          <xu:variable name='folderPath' select="$current" />
+          <xu:variable name='parentName' select='""'/>
+          <xu:call-template name='getOrCreateFolder'/>
+          <xu:append select='$folder'>
+              <wiki:has-child rdf:resource='{$current/..}'/>
+          </xu:append>          
+        </xu:if>        
+  </xu:if>
+</xu:for-each>
+
+<xu:for-each select='$_removed/self::wiki:name'>
+   <!-- remove the has-child statement if it's a child of a folder -->
+   <xu:remove select="/*/wiki:has-child[.=$current/..]" />
+</xu:for-each>
+
+<xu:message text="removing {$_removed}" terminate="no" />
+
+<xu:for-each select='$_removed/self::wiki:links-to'>
+    <xu:message text="removing links-to {$current}, name: {wf:name-from-url($current)}" terminate="no" />
+
+    <xu:variable name='name' select='wf:name-from-url($current)' />   
+    <xu:if test='$name'>
+        <xu:variable name='missingpage' select='/wiki:MissingPage[wiki:name = $name]' />          
+        <!-- if we are removing a link to a missing resource 
+              and no one else links to it, remove it -->
+        <xu:if test='$missingpage and not(/*/wiki:links-to = $missingpage)' >
+            <xu:remove select='$missingpage' />
+        </xu:if>
+    </xu:if>
+</xu:for-each>
+
+</xu:modifications>
