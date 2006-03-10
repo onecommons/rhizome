@@ -50,7 +50,6 @@ class RhizomeBase(object):
         
         def initConstants(varlist, default):
             return raccoon.assignVars(self, kw, varlist, default)
-
         
         initConstants( ['MAX_MODEL_LITERAL'], -1)        
         
@@ -103,7 +102,8 @@ class RhizomeBase(object):
         self.interWikiMapURL = kw.get('interWikiMapURL', 'site:///intermap.txt')
         initConstants( ['useIndex'], 1)
         initConstants( ['RHIZOME_APP_ID'], '')
-
+        initConstants( ['akismetKey','akismetUrl'], '')
+        
         self.passwordHashProperty = kw.get('passwordHashProperty',
                                           self.BASE_MODEL_URI+'password-hash')
         self.secureHashSeed = kw.get('SECURE_HASH_SEED', self.defaultSecureHashSeed)
@@ -217,7 +217,8 @@ class RhizomeBase(object):
         return text
 
     def makeRequest(self, context, name, *args):        
-        #only http-request trigger is secure
+        #we have this instead of a more general run-actions function
+        #because only the http-request trigger is secure
         kw = self.server._xpathArgs2kw(args)
         result, kw = self.server.requestDispatcher.invokeEx__(name, kw)        
         if hasattr(result, 'read'): #if result is a stream
@@ -226,17 +227,22 @@ class RhizomeBase(object):
             item = unicode(str(result), 'utf8')
         return result
 
-    def hasPage(self, context, resultset = None):
+    def nameFromURL(self, context, resultset):
         '''
         return true if the page has been defined
         '''
-        if resultset is None:
-            resultset = context.node
         url = raccoon.StringValue(resultset)
 
+        #if the URL has already been converted from a site: url to an http: url
+        #convert it back to an internal name
+        if url.startswith( self.server.appBase):
+            url = url[len(self.server.appBase):]
+        elif url[:5] == 'site:':
+            url = url[5:]
         #it'd be better to normalize the url with the (relative) doc url
         #but for now rely on the fact that our fixed up links will always
         #include the full path (e.g. ../foo/bar instead of ./bar)
+        
         index = 0
         for c in url:
             if c not in './':
@@ -252,7 +258,19 @@ class RhizomeBase(object):
             index = url.find('#')
             if index > -1:
                 url = url[:index]
+        
+        schemePos = url.find('://')
+        if schemePos > -1:
+            return u'' #it's an absolute URL, skip it
+        else:
+            return url                
 
+    def hasPage(self, context, resultset):
+        '''
+        return true if the page has been defined
+        '''
+        url = raccoon.StringValue(resultset)
+        
         kw = { '_name' : url }
         self.server.doActions([self.checkForResourceAction], kw)
         if (kw['__resource'] and kw['__resource'] != [self.server.domStore.dom]
@@ -466,6 +484,32 @@ class RhizomeBase(object):
         #return a nodeset containing the root element of the doc
         #print >>sys.stderr, 'sc', xmlDoc.documentElement
         return [ xmlDoc.documentElement ]
+
+    def isSpam(self, context, user_ip, user_agent, contents):        
+        if not (self.akismetKey or self.akismetUrl):
+            return raccoon.XFalse #no check
+
+        from rx import akismet, __version__
+        try:
+            akismet.USERAGENT = "Rhizome/" + str(__version__)
+            
+            real_key = akismet.verify_key(self.akismetKey,self.akismetUrl)
+            if real_key:
+                user_ip, user_agent, contents = (raccoon.StringValue(user_ip),
+                    raccoon.StringValue(user_agent), raccoon.StringValue(contents))
+                
+                is_spam = akismet.comment_check(self.akismetKey,self.akismetUrl,                    
+                  user_ip, user_agent, comment_content=contents)
+                if is_spam:
+                    return raccoon.XTrue
+                else:
+                    return raccoon.XFalse
+            else:
+                self.log.warning('akismet.verify_key failed')
+                return raccoon.XFalse
+        except akismet.AkismetError, e:            
+            self.log.warning('error invoking akismet API: %s %s' % (e.response, e.statuscode))
+            return raccoon.XFalse
 
     ###text indexing ###
     #todo:
