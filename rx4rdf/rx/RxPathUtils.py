@@ -314,10 +314,8 @@ def serializeRDF(statements, type, uri2prefixMap=None,
         #not the subject of any statements, so don't include them
         #also skip list resources, they will displayed as objects
         subjects = [s.subject for s in statements]
-        str(rdfDom.childNodes) #todo!!
         nodes = [node for node in rdfDom.childNodes
                      if node.uri in subjects and not node.isCompound()]
-        #print nodes
         contents = rxml.getRXAsZMLFromNode(nodes, nsMap,
                                 fixUp=fixUp, fixUpPredicate=fixUpPredicate)
         if type == 'rxml_xml':
@@ -348,19 +346,22 @@ def serializeRDF(statements, type, uri2prefixMap=None,
                             serializer.set_namespace(prefix, uri)
                 return serializer.serialize_model_to_string(model)
             except ImportError:
-                #fall back to 4Suite
-                from Ft.Rdf.Drivers import Memory    
-                db = Memory.CreateDb('', 'default')
-                import Ft.Rdf.Model
-                model = Ft.Rdf.Model.Model(db)
-                model.add(statements)                
-                from Ft.Rdf.Serializers.Dom import Serializer as DomSerializer
-                serializer = DomSerializer()
-                outdoc = serializer.serialize(model, nsMap = uri2prefixMap)
-                stringIO = StringIO.StringIO()
-                from Ft.Xml.Lib.Print import PrettyPrint
-                PrettyPrint(outdoc, stream=stringIO)
-                return stringIO.getvalue()
+                try:
+                    #fall back to 4Suite
+                    from Ft.Rdf.Drivers import Memory    
+                    db = Memory.CreateDb('', 'default')
+                    import Ft.Rdf.Model
+                    model = Ft.Rdf.Model.Model(db)
+                    model.add(statements)                
+                    from Ft.Rdf.Serializers.Dom import Serializer as DomSerializer
+                    serializer = DomSerializer()
+                    outdoc = serializer.serialize(model, nsMap = uri2prefixMap)
+                    stringIO = StringIO.StringIO()
+                    from Ft.Xml.Lib.Print import PrettyPrint
+                    PrettyPrint(outdoc, stream=stringIO)
+                    return stringIO.getvalue()
+                except ImportError:
+                    raise ParseException("no RDF/XML serializer installed")
     elif type == 'ntriples':
         stringIO = StringIO.StringIO()
         writeTriples(statements, stringIO)
@@ -446,7 +447,7 @@ def _parseTriples(lines, bNodeToURI = lambda x: x, charencoding='utf8'):
                    
 def writeTriples(stmts, stream, enc='utf8'):
     r'''
-    stmts is an iterable of a statements (or the equivalent tuples)
+    stmts is an iterable of statements (or the equivalent tuples)
 
     Note that the default encoding is 'utf8'; to conform with standard NTriples spec,
     use 'ascii' instead.
