@@ -27,6 +27,7 @@ Changes in Version 0.x.x (xxx xx, 200x)
 ** enable viewing and editing of RDF in all supported formats (RDF/XML, NTriples, RxML, Turtle)
    on these pages: edit-metadata, default-resource-viewer, view-metadata and search
 * raccoon: fix bug where uncacheable XSLT stylesheets where being cached
+* raccoon: fix bug where has- and get-metadata calls weren't being added to XSLT cache keys
 * RxPath: add MemModel, an efficient in-memory Model; clean up Model constructors
 * RxPath: remove dependencies on 4Suite Rdf package; now optional
 * Rhizome: add shredding support:
@@ -36,9 +37,22 @@ Changes in Version 0.x.x (xxx xx, 200x)
 ** GRDDL XSLT stylesheets
 ** save.xml invokes shred() when saving content
 ** have import command shred unless new --noshred option is used
+** extract hyper-links out of XHTML, add wiki:links-to statements
+** extract FAQ resources out of Forrest FAQ XML
+** extract doctype out of XML, removed Doctype dropdown from edit.xsl
+* Add support for keeping track of links to missing pages.
 * raccoon: path: URI resolver nows escapes URLs properly
 * Rhizome: search.xsl - fix property links
 * RxPath: revamped RDFS schema support, now includes type inference based on rdfs:range or rdfs:domain.
+* Rhizome: fix the "Save (keep editing)" option the Edit page.
+* Rhizome: save current default zml version when creating content and use it later if necessary
+* Rhizome: inital support for collaborative bookmarks
+* Rhizome: support for the Akismet anti-spam service (to activate, set the akismetKey and akismetUrl config vars)
+* XUpdate: get xupdate:include element working
+* Rhizome: add update-triggers.xml, moved folder creation and cleanup code there.
+* Rhizome: factored out keyword editing and saving into new edit-tags.xsl and replacetags.xml files
+* RxPath: add simple optimizing query engine 
+* Raccoon: add defaultExpiresIn config setting for setting expires header if its not already set (default: 1 hour)
 
 Changes in Version 0.5.1 (Oct 21, 2005)
 ----------------------------------------
