@@ -7,6 +7,8 @@ defaultPhase='revalidate' >
 <ns prefix="foaf" uri="http://xmlns.com/foaf/0.1/" />
 <ns prefix="previous" uri='http://rx4rdf.sf.net/ns/raccoon/previous#' />
 
+<!-- _added and _removed are not defined, set them to be every predicate 
+    and an empty nodeset, respectively -->
 <let name='previous:_added' value='/*/*'   />
 <let name='previous:_removed' value='/..' />
 
@@ -24,7 +26,7 @@ defaultPhase='revalidate' >
     <rule context='$previous:_added/self::wiki:name'>
       <!-- iso schematron -->
        <let name='wikiName' value='.' />
-       <assert test='count(/*[wiki:name = $wikiName]) = 1' >   
+       <assert test='count(/*[wiki:name = $wikiName]) = count($wikiName)' >   
           <!-- 1.5: too slow 
            <key name='wikiName' match='/*/wiki:name' path='.' />
            <assert test="count(key('wikiName', .)) = 1" >
