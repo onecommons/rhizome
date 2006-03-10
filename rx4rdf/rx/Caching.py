@@ -58,6 +58,18 @@ from xml.dom import Node as _Node
 from rx import logging #for python 2.2 compatibility
 log = logging.getLogger("raccoon")
 
+class VarRefKey(tuple):
+    '''
+    Sub-class of tuple used for marking that a key to a variable reference    
+    '''
+    existenceTest=False
+    
+    def __new__(cls, seq, existenceTest=False):
+        it = tuple.__new__(cls, seq)
+        if existenceTest:
+            it.existenceTest = existenceTest
+        return it
+    
 ##############################################################################################
 ## The following functions are used to calculate the key for XPath extension
 ## functions or XSLT extension elements
@@ -97,7 +109,7 @@ def getHasMetadataCacheKey(field, context, notCacheableXPathFunctions):
             #the variables available for examination
             #(nor the contextNode and that's easier to test for)
             raise MRUCache.NotCacheable
-        return (varRef, context.varBindings.has_key(varRef))
+        return VarRefKey( (varRef, context.varBindings.has_key(varRef)), True)
     else:
         raise MRUCache.NotCacheable
 
@@ -123,7 +135,7 @@ def getGetMetadataCacheKey(field, context, notCacheableXPathFunctions):
         except:
             raise MRUCache.NotCacheable
 
-        return (varRef._key, getKeyFromValue(value))
+        return VarRefKey( (varRef._key, getKeyFromValue(value)) )
     else:
         raise MRUCache.NotCacheable
 
@@ -378,6 +390,15 @@ def isStyleSheetCacheable(key, styleSheet, source, uri):
 ## caching functions used by the XSLT and RxSLT content processors
 ## to cache the results of processing the stylesheet
 ###################################################################
+
+def _getVarRefs(key, varRefs):
+    if isinstance(key, tuple):
+        if isinstance(key, VarRefKey):
+            varRefs.append(key)
+            return
+        
+        for subkey in key:
+            _getVarRefs(subkey, varRefs)    
               
 def getXsltCacheKeyPredicate(styleSheetCache, styleSheetNotCacheableFunctions,
                                     styleSheetContents, sourceContents, kw,
@@ -386,12 +407,12 @@ def getXsltCacheKeyPredicate(styleSheetCache, styleSheetNotCacheableFunctions,
     Returns a key that uniquely identifies the result of processing this stylesheet
     considering the input source and referenced parameters.
     '''
-    getKey = getattr(contextNode.ownerDocument, 'getKey', None)
+    getKey = getattr(contextNode, 'getKey', None)
     if getKey:
-        docKey = getKey()
+        nodeKey = getKey()
     else:
-        docKey = id(contextNode.ownerDocument)
-    key=[styleSheetContents, styleSheetUri, sourceContents, contextNode, docKey]
+        nodeKey = id(contextNode)
+    key=[styleSheetContents, styleSheetUri, sourceContents, nodeKey]
 
     styleSheet = styleSheetCache.getValue(styleSheetContents, styleSheetUri)                  
     try:
@@ -408,26 +429,39 @@ def getXsltCacheKeyPredicate(styleSheetCache, styleSheetNotCacheableFunctions,
     else:
         key.extend(styleSheetKeys)
 
+    def addVarRefToKey(ns, local, existTest=False):
+        if ns:
+            processorNss = { 'x' : ns}
+            qname = 'x:'+ local
+        else:
+            processorNss = { }
+            qname = local
+        #note: we don't really need the contextNode     
+        context = XPath.Context.Context(contextNode, processorNss = processorNss)
+        if HasMetaData(kw, context, qname):
+            if existTest:
+                value = True
+            else:
+                value = getKeyFromValue(GetMetaData(kw, context, qname))
+            key.append( ((ns, local), value) )
+        else:
+            key.append( (ns, local) )
+
+    #we extract the values of varrefs in a second step to allow styleSheetKeys to be
+    #associated with the static contents of the stylesheet
+    varRefs = []
+    _getVarRefs(tuple(styleSheetKeys), varRefs)
+    for varref in varRefs:
+        ns,local = varref[0]
+        addVarRefToKey(ns,local, varref.existenceTest)
+
     #the top level xsl:param element determines the parameters of the stylesheet: extract them          
     topLevelParams = [child for child in styleSheet.children 
         if child.expandedName[0] == XSL_NAMESPACE and child.expandedName[1] == 'param']
-       
-    for var in topLevelParams:
-        #note: we don't really need the contextNode     
-        #var._name is (ns, local)
-        if var._name[0]:
-            processorNss = { 'x' : var._name[0]}
-            qname = 'x:'+ var._name[1]
-        else:
-            processorNss = { }
-            qname = var._name[1]
-         
-        context = XPath.Context.Context(contextNode, processorNss = processorNss)
-        if HasMetaData(kw, context, qname): 
-            value = GetMetaData(kw, context, qname)
-            key.append( ( var._name, getKeyFromValue(value)) )
-        else:
-            key.append( var._name )
+    
+    for var in topLevelParams:                
+        addVarRefToKey(*var._name)#var._name is (ns, local)
+                    
     return tuple(key)
 
 def xsltSideEffectsCalc(cacheValue, resultNodeset, kw, contextNode, retVal):
