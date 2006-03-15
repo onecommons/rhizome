@@ -4,6 +4,13 @@
 #todo: allow an app to run with appBase=/ and another app with a different appBase on the same hostname
 #todo: when the config file (and included config files) have changed the app will reload itself
 #todo: option for tomcat like autodeployment: add rule that checks if directory exists and look for config file
+
+try:
+    serverConfig =__argv__[__argv__.index("-s")+1]
+    STORAGE_TEMPLATE =  file(serverConfig).read()
+    xmlConfig = True
+except (IndexError, ValueError):        
+    pass #no XML config file specified
                 
 from rx import rxml
 
@@ -14,7 +21,7 @@ nsMap = { 'config' : 'http://rx4rdf.sf.net/ns/raccoon/config#' }
 #if appBase is missing it defaults default to '/'
 #if appBase and hostname is missing the app matches any URL
 #
-#The resource URI is used the BASE_MODEL_URI of the app
+#The resource URI is used as the BASE_MODEL_URI of the app
 #and appBase and appName correspond to equivalent config settings
 #If any of these are set in the app's config file, those settings
 #will override the value that appear here.
@@ -26,8 +33,22 @@ nsMap = { 'config' : 'http://rx4rdf.sf.net/ns/raccoon/config#' }
 #   config:config-path: "foo/blank-config.py"
 #   config:path: "foo"
 #   config:hostname: 'foo.net'
+#   config:hostname: 'foo.org'
 #   config:disabled: '' #not disabled
 #''')
+#
+# If the -x <server.xml> option is used, an XML file can be specified instead. 
+# Here is a server.xml file equivalent to the above example:
+#<server xmlns='http://rx4rdf.sf.net/ns/raccoon/config#' >
+#  <host model-uri='http://www.foo.com/'
+#     config-path="test-links.py"
+#     path="."
+#     appBase="/bar"
+#     appName="bar" >
+#   <hostname>foo.net</hostname>
+#   <hostname>foo.org</hostname>
+# </host>
+#</server>
 
 if locals().get('xmlConfig'):
  from rx.DomStore import XMLDomStore
