@@ -12,8 +12,10 @@ try:
 except (IndexError, ValueError):        
     pass #no XML config file specified
                 
-from rx import rxml
+reloadAppConfig = False
 
+from rx import rxml
+                
 nsMap = { 'config' : 'http://rx4rdf.sf.net/ns/raccoon/config#' }
 
 #Each application resource can have zero or one appBase properties, but 0 or more hostnames
@@ -51,53 +53,58 @@ nsMap = { 'config' : 'http://rx4rdf.sf.net/ns/raccoon/config#' }
 #</server>
 
 if locals().get('xmlConfig'):
- from rx.DomStore import XMLDomStore
- domStoreFactory = XMLDomStore 
- findAppAction = Action(
-    ['''/config:server/config:host[not(@disabled)][@config-path]
-        [not(@appBase) or starts-with($_name, substring(@appBase,2) )]
-        [not(config:hostname) or 
-        config:hostname[f:ends-with(wf:split($request-header:host,':')[1], .)]]''', 
-    "/config:server/config:host[@default-app][not(@disabled)]",            
-    ],  
-    #create a HTTPRequestProcessor for the app 
-    action = lambda result, kw, contextNode, retVal, __argv__=__argv__: 
-       HTTPRequestProcessor(
-         a= kw['__server__'].evalXPath('string(@config-path)', node=result[0]), 
-         p= os.path.abspath(kw['__server__'].evalXPath('string(@path)', node=result[0])),
-         appBase = kw['__server__'].evalXPath('string(@appBase)', node=result[0]),
-         appName=kw['__server__'].evalXPath('string(@appName)', node=result[0]),                     
-         model_uri = str(kw['__server__'].evalXPath('string(@model-uri)', node=result[0])),
-         argsForConfig=__argv__
-          ),
-    #cache the HTTPRequestProcessor using the app's model URI as the key 
-    cachePredicate = lambda resultNodeset, kw, contextNode, retVal: 
-        kw['__server__'].evalXPath('string(@model-uri)', node=resultNodeset[0]),
-    )
+    from rx.DomStore import XMLDomStore
+    domStoreFactory = XMLDomStore 
+     
+    findAppQueries = ['''/config:server/config:host[not(@disabled)][@config-path]
+            [not(@appBase) or starts-with($_name, substring(@appBase,2) )]
+            [not(config:hostname) or 
+            config:hostname[f:ends-with(wf:split($request-header:host,':')[1], .)]]''', 
+        "/config:server/config:host[@default-app][not(@disabled)]", ]
+    
+    def getRequestProcessorArgs(result, kw, contextNode):
+        root = kw['__server__']
+        node = result[0]
+        return dict(a= root.evalXPath('string(@config-path)', node=node), 
+             p= os.path.abspath(root.evalXPath('string(@path)', node=node)),
+             appBase = root.evalXPath('string(@appBase)', node=node),
+             appName=root.evalXPath('string(@appName)', node=node),                     
+             model_uri = str(root.evalXPath('string(@model-uri)', node=node))
+             )    
 
+    cachePredicate = lambda resultNodeset, kw, contextNode, retVal: \
+        kw['__server__'].evalXPath('string(@model-uri)', node=resultNodeset[0])
 else:
-  findAppAction = Action([
-  #find the application that matches the URI's hostname and/or base path
-   '''/*[not(config:disabled)][config:config-path]
+    findAppQueries = [
+    #find the application that matches the URI's hostname and/or base path
+    '''/*[not(config:disabled)][config:config-path]
           [not(config:appBase) or starts-with($_name, substring(config:appBase,2))]
           [not(config:hostname) or 
            config:hostname[f:ends-with(wf:split($request-header:host,':')[1], .)]
           ]''',                        
-   "/*[config:default-app][not(config:disabled)]",
-   ],      
-   #create a HTTPRequestProcessor for the app
-   action = lambda result, kw, contextNode, retVal, __argv__=__argv__: 
-    HTTPRequestProcessor(
-      a= kw['__server__'].evalXPath('string(config:config-path)', node=result[0]), 
-      p= os.path.abspath(kw['__server__'].evalXPath('string(config:path)', node=result[0])),
-      appBase = kw['__server__'].evalXPath('string(config:appBase)', node=result[0]),
-      appName=kw['__server__'].evalXPath('string(config:appName)', node=result[0]),
-      model_uri = str(StringValue(result)), argsForConfig=__argv__
-     ),
-   #cache the HTTPRequestProcessor using the app's model URI as the key 
-   cachePredicate = lambda resultNodeset, kw, contextNode, retVal: StringValue(resultNodeset),            
-            )
+    "/*[config:default-app][not(config:disabled)]",
+    ]
 
+    def getRequestProcessorArgs(result, kw, contextNode):
+        root = kw['__server__']
+        node = result[0]
+        return dict(a= root.evalXPath('string(config:config-path)', node=node), 
+             p= os.path.abspath(root.evalXPath('string(config:path)', node=node)),
+             appBase = root.evalXPath('string(config:appBase)', node=node),
+             appName=root.evalXPath('string(config:appName)', node=node),                     
+             model_uri = str(StringValue(result))
+             )
+
+    cachePredicate = lambda resultNodeset, kw, contextNode, retVal: StringValue(resultNodeset)
+    
+def getRequestProcessor(result, kw, contextNode, retVal,
+        __argv__=__argv__, reloadAppConfig=reloadAppConfig,
+        getRequestProcessorArgs=getRequestProcessorArgs):    
+    args = getRequestProcessorArgs(result, kw, contextNode)
+    args['argsForConfig']=__argv__    
+    retVal = HTTPRequestProcessor(**args)
+    return retVal
+                 
 def delegateRequest(result, kw, contextNode, retVal): 
     if retVal:  
         result = retVal.handleHTTPRequest(kw['_name'], kw['_request'].paramMap)
@@ -109,9 +116,17 @@ def delegateRequest(result, kw, contextNode, retVal):
                morsel['path'] = retVal.appBase
         return result
     return None
+ 
+_findAppAction = Action(
+    findAppQueries,  
+    #create a HTTPRequestProcessor for the app 
+    action = getRequestProcessor,
+    #cache the HTTPRequestProcessor using the app's model URI as the key 
+    cachePredicate = cachePredicate    
+    )
 
 actions = { 'http-request' : [
-        findAppAction, #find the associated app (i.e. the HTTPRequestProcessor)
+        _findAppAction, #find the associated app (i.e. the HTTPRequestProcessor)
         FunctorAction(delegateRequest, [0,1,2,3]), #delegate the request to it
         #note: if no match raccoon.default_not_found() will be invoked
     ] }
