@@ -11,7 +11,9 @@
     http://rx4rdf.sf.net    
 """
 import HTMLParser, re, sys
-    
+#fix bug in HTMLParser, need to handle comments in cdata tags like <script>
+HTMLParser.interesting_cdata = re.compile(r'<(/|\Z|!--)')
+
 class HTMLFilter(HTMLParser.HTMLParser, object):
     def __init__(self, out):
         HTMLParser.HTMLParser.__init__(self)
