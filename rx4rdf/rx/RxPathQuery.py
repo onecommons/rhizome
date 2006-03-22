@@ -168,9 +168,20 @@ class ReplaceRxPathSubExpr(utils.XPathExprVisitor):
                     finalpos = result.position
                 else:
                     finalpos = -1
+
                 #print list(result )
+                subjects = {}
                 try:
-                    return filter(None, [row2Node(doc, row, finalpos) for row in result])
+                    nodeset = []
+                    for row in result:                        
+                        if finalpos == 0:
+                            if row[0] in subjects:
+                                continue
+                            subjects[ row[0] ] = 1
+                        node = row2Node(doc, row, finalpos)
+                        if node:
+                            nodeset.append(node)
+                    return nodeset
                 except:
                     print 'bad result',list(result )
                     print repr(astRoot)
@@ -739,22 +750,19 @@ class Path2AST(utils.XPathExprVisitor):
 
         #handle the left side
         self.descend(exp, ['_left'])
-        
-        #we don't handle this now so treat the right side as unhandled
-        newExpVisitor = ReplaceRxPathSubExpr(self.context, exp._right,explain=self.explain)
-        exp._right = newExpVisitor.resultExpr
         exp._left = XPath.ParsedStep.ParsedAbbreviatedStep(False)
+        #we don't handle this now so treat the right side as unhandled
+        exp = self._extractPathRemainder()
         self.currentOpStack[-1].xpathExp = exp
         self.xpathExprs.append( exp )
         self.currentOpStack[-1].finalPosition -= 1
-        
         return 1 #next
-        
+            
     def ParsedRelativeLocationPath(self, exp):
         if self._startStep(): 
             return 1 #handled, move on
         else:
-            return -1 
+            return -1 #descend
     
     def ParsedStep(self, exp):
         if self._startStep(): 
@@ -1097,6 +1105,8 @@ class Path2AST(utils.XPathExprVisitor):
         
         exp = self.currentNode
         assert isinstance(exp, (XPath.ParsedStep.ParsedStep,
+                            XPath.ParsedAbbreviatedRelativeLocationPath.
+                                    ParsedAbbreviatedRelativeLocationPath,
                                XPath.ParsedStep.ParsedAbbreviatedStep)), exp
 
         topMost = None
@@ -1106,7 +1116,7 @@ class Path2AST(utils.XPathExprVisitor):
                 topMost = ancestor
             else:
                 break
-
+            
         if topMost:            
             #change exp to the ParsedRelativeLocationPath
             parent, field = self.ancestors[-1]
@@ -1637,11 +1647,20 @@ class SimpleQueryEngine(object):
     def xpathEvaluate(self, exp, context, rows, pos):
         if pos > -1:
             rows = list(rows)
-            nodeset = [row2Node(context.node.rootNode,row,pos) for row in rows]
+            nodeset = []
+            subjects = {}
+            for row in rows:
+                if pos == 0:
+                    if row[0] in subjects:
+                        nodeset.append(None)
+                        continue
+                    else:
+                        subjects[row[0] ] = 1 
+                nodeset.append(row2Node(context.node.rootNode,row,pos) )
         else:
             nodeset = [context.node.rootNode]
             rows = [None]
-                
+            
         result = []
         mapping = {} #map rows to results
         
@@ -1649,16 +1668,21 @@ class SimpleQueryEngine(object):
         size = len(filter(None, nodeset) )
         pos = 0        
         for outerPos, srcNode in enumerate(nodeset):
-            if srcNode:                
+            if srcNode:
                 context.position, context.size = pos + 1, size                          
                 context.node = srcNode
                 subRt = exp.evaluate(context)
                 if subRt:
-                    mapping[(outerPos, rows[outerPos])] = subRt
+                    currow = rows[outerPos]
+                    if isinstance(currow, list):
+                        currow = tuple(currow)
+                    mapping[outerPos, currow] = subRt
                 if result:
                     assert isinstance(result, NodesetType)
-                    assert isinstance(subRt, NodesetType)                    
-                    result = result+subRt #RxPath.Set.Union(res,subRt) #todo: is Union necessary?  
+                    assert isinstance(subRt, NodesetType)                                        
+                    oldres = result
+                    result = result+subRt
+                    #result = RxPath.Set.Union(result,subRt) #todo: is Union necessary?
                 else:
                     result = subRt#can be anytype
                 pos += 1
