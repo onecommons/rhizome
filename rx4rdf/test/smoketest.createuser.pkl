@@ -685,7 +685,7 @@ p287
 a(dp288
 S'about'
 p289
-S'http://emo/accounts/foo'
+S'test:accounts/foo'
 p290
 sS'loginname'
 p291
