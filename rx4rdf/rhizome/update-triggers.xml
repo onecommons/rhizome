@@ -9,7 +9,10 @@
 			xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"			
 			xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >
 
-<!-- this file is invoked before a transaction commits -->
+<!-- this file is invoked before a transaction commits 
+   Note that the (predicate) nodes in $_removed have already been removed 
+   so they will have no parent (subject) nodes.
+-->
 
     <xu:define-template name='getOrCreateFolder'>
     <!--
@@ -72,8 +75,6 @@
    <!-- remove the has-child statement if it's a child of a folder -->
    <xu:remove select="/*/wiki:has-child[.=$current/..]" />
 </xu:for-each>
-
-<xu:message text="removing {$_removed}" terminate="no" />
 
 <xu:for-each select='$_removed/self::wiki:links-to'>
     <xu:message text="removing links-to {$current}, name: {wf:name-from-url($current)}" terminate="no" />
