@@ -448,8 +448,8 @@ class ZMLContentProcessor(ContentProcessor):
         if not isinstance(result, (str, unicode)):
             zmlVersion = kw['__server__'].evalXPath(
                 'number(../../wiki:zml-version)', node = result[0])
-        if not zmlVersion:
-            zmlVersion = float(self.ZMLDefaultVersion) or zml.defaultZMLVersion
+        if not zmlVersion or zmlVersion != zmlVersion: #handle NaN
+            zmlVersion = float(self.ZMLDefaultVersion) or zml.defaultZMLVersion        
         contents = zml.zmlString2xml(contents,self.markupMapFactory,
                                                zmlVersion=zmlVersion)
         #todo: optimize: don't fix up links if doctype is set
