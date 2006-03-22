@@ -7,7 +7,6 @@
 """
 import unittest, os, os.path, glob, tempfile
 from Ft.Xml import XPath, InputSource
-from Ft.Rdf import Util
 import cStringIO
 from Ft.Xml.Lib.Print import PrettyPrint
 from pprint import *
@@ -21,41 +20,45 @@ else:
 
 import difflib, time
 
-from rx.RxPathUtils import _parseTriples as parseTriples
-from Ft.Rdf.Statement import Statement as FtStatement
-from Ft.Rdf.Model import Model as Model4Suite
-#this function is no longer used by RxPath
-def DeserializeFromN3File(n3filepath, driver=Memory, dbName='', create=0, defaultScope='',
-                        modelName='default', model=None):
-    if not model:
-        if create:
-            db = driver.CreateDb(dbName, modelName)
+try:
+    from Ft.Rdf import Util
+    from rx.RxPathUtils import _parseTriples as parseTriples
+    from Ft.Rdf.Statement import Statement as FtStatement
+    from Ft.Rdf.Model import Model as Model4Suite
+    #this function is no longer used by RxPath
+    def DeserializeFromN3File(n3filepath, driver=Memory, dbName='', create=0, defaultScope='',
+                            modelName='default', model=None):
+        if not model:
+            if create:
+                db = driver.CreateDb(dbName, modelName)
+            else:
+                db = driver.GetDb(dbName, modelName)
+            db.begin()
+            model = Model4Suite(db)
         else:
-            db = driver.GetDb(dbName, modelName)
-        db.begin()
-        model = Model4Suite(db)
-    else:
-        db = model._driver
-        
-    if isinstance(n3filepath, ( type(''), type(u'') )):
-        stream = file(n3filepath, 'r+')
-    else:
-        stream = n3filepath
-        
-    #bNodeMap = {}
-    #makebNode = lambda bNode: bNodeMap.setdefault(bNode, generateBnode(bNode))
-    makebNode = lambda bNode: BNODE_BASE + bNode
-    for stmt in parseTriples(stream,  makebNode):
-        if stmt[0] is Removed:            
-            stmt = stmt[1]
-            scope = stmt[4] or defaultScope
-            model.remove( FtStatement(stmt[0], stmt[1], stmt[2], '', scope, stmt[3]) )
+            db = model._driver
+            
+        if isinstance(n3filepath, ( type(''), type(u'') )):
+            stream = file(n3filepath, 'r+')
         else:
-            scope = stmt[4] or defaultScope
-            model.add( FtStatement(stmt[0], stmt[1], stmt[2], '', scope, stmt[3]) )                
-    #db.commit()
-    return model, db
-
+            stream = n3filepath
+            
+        #bNodeMap = {}
+        #makebNode = lambda bNode: bNodeMap.setdefault(bNode, generateBnode(bNode))
+        makebNode = lambda bNode: BNODE_BASE + bNode
+        for stmt in parseTriples(stream,  makebNode):
+            if stmt[0] is Removed:            
+                stmt = stmt[1]
+                scope = stmt[4] or defaultScope
+                model.remove( FtStatement(stmt[0], stmt[1], stmt[2], '', scope, stmt[3]) )
+            else:
+                scope = stmt[4] or defaultScope
+                model.add( FtStatement(stmt[0], stmt[1], stmt[2], '', scope, stmt[3]) )                
+        #db.commit()
+        return model, db
+except ImportError:
+    print 'package Ft.Rdf not available, some tests will be disabled'
+    
 class RDFDomTestCase(unittest.TestCase):
     ''' tests rdfdom, rxpath, rxslt, and xupdate on a rdfdom
         tests models with:
@@ -89,7 +92,7 @@ class RDFDomTestCase(unittest.TestCase):
 <urn:sha:jERppQrIlaay2cQJsz36xVNyQUs=> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#Contents> .
 <urn:sha:jERppQrIlaay2cQJsz36xVNyQUs=> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "jERppQrIlaay2cQJsz36xVNyQUs=" .
 <urn:sha:jERppQrIlaay2cQJsz36xVNyQUs=> <http://rx4rdf.sf.net/ns/archive#hasContent> "        kkkk    &nbsp;" .
-<urn:sha:jERppQrIlaay2cQJsz36xVNyQUs=> <http://rx4rdf.sf.net/ns/archive#content-length> "13" .
+<urn:sha:jERppQrIlaay2cQJsz36xVNyQUs=> <http://rx4rdf.sf.net/ns/archive#content-length> "20" .
 '''
 
     model2 = r'''<urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#Contents> .
@@ -124,6 +127,8 @@ class RDFDomTestCase(unittest.TestCase):
             self.loadModel = self.loadMemModel
         else:
             raise "unrecognized driver: " + DRIVER
+        #from rx import RxPath
+        #RxPath.useQueryEngine = True
 
     def loadFtModel(self, source, type='nt'):
         if type == 'rdf':
@@ -158,9 +163,9 @@ class RDFDomTestCase(unittest.TestCase):
         elif type == 'rdf':
             type = 'rdfxml'        
         if isinstance(source, (str, unicode)):
-            return MemModel(parseRDFFromURI('file:'+source,type))
+            return TransactionMemModel(parseRDFFromURI('file:'+source,type))
         else:
-            return MemModel(parseRDFFromString(source.read(),'test:', type))
+            return TransactionMemModel(parseRDFFromString(source.read(),'test:', type))
         
     def getModel(self, source, type='nt'):
         model = self.loadModel(source, type)
@@ -189,6 +194,12 @@ class RDFDomTestCase(unittest.TestCase):
         [(subject, predicate, object, objectType, scope)] = [x for x in parseTriples([n3])]
         self.failUnless(object=="1" and objectType == 'http://www.w3.org/2001/XMLSchema#int')
 
+        sio = cStringIO.StringIO()
+        writeTriples( [Statement('test:s', 'test:p', u'\x10\x0a\\\u56be',
+                                 OBJECT_TYPE_LITERAL)], sio, 'ascii')
+        self.failUnless(sio.getvalue() == r'<test:s> <test:p> "\u0010\n\\\u56BE" .'
+                        '\n')                      
+
     def testDom(self):
         self.rdfDom = self.getModel(cStringIO.StringIO(self.model1) )
 
@@ -199,7 +210,7 @@ class RDFDomTestCase(unittest.TestCase):
         xpath = '/*[not(starts-with(., "http://www.w3.org/"))]'
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         #pprint( ( len(res1), res1 ) )
-        self.failUnless(len(res1)==14) #6 resource + 8 properties
+        self.failUnless(len(res1)== 14) #6 resource + 8 properties
         
         #test predicate stringvalue         
         xpath = "string(/*[wiki:name/text()='HomePage']/a:has-expression)"
@@ -207,6 +218,7 @@ class RDFDomTestCase(unittest.TestCase):
 
         xpath = "string(/*[wiki:name='HomePage']/a:has-expression/node())"
         res3 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        #( (res2, res3) )
         self.failUnless(res2 and res2 == res3)
 
         #test recursive elements        
@@ -295,6 +307,8 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#contents> "".
                 
         xpath = "/*/*[is-subproperty-of(@uri,'http://www.w3.org/1999/02/22-rdf-syntax-ns#type')]"        
         res2 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
+        #print len(res1), [n.parentNode for n in res1]
+        #print len(res2), [n.parentNode for n in res2]
         self.failUnless(res1 == res2)
         
         
@@ -329,7 +343,7 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         res = self.rdfDom.evalXPath( xpath,  self.model1NsMap, node=res1[0])
         self.failUnless(len(res) == 1)
         
-        xpath = "is-subproperty-of(/*/a:A/@uri, uri('a:B'))" 
+        xpath = "is-subproperty-of(/*/a:A/@uri, uri('a:B'))"
         res4 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless(res4 )
 
@@ -367,17 +381,37 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         
         res10 = self.rdfDom.evalXPath(xpath3,  self.model1NsMap)
         self.failUnless(res10 == res3)                
+
+    def printPlan(self, xpath):
+        from rx import RxPathQuery
+        from Ft.Xml.XPath.Context import Context 
+
+        compExpr = XPath.Compile(xpath)
+        print compExpr.pprint()
+        context = Context(self.rdfDom,
+                    extFunctionMap = BuiltInExtFunctions,
+                    processorNss = self.model1NsMap)            
+        newExpVisitor = RxPathQuery.ReplaceRxPathSubExpr(context, compExpr)
+        print xpath
+        #print repr(newExpVisitor.resultExpr)
+        newExpVisitor.resultExpr.pprint()
         
-    def timeXPath(self):        
+        newExpVisitor.explain = True
+        res = newExpVisitor.resultExpr.evaluate(context)
+        if isinstance(res, Tupleset):            
+            res.explain(sys.stdout)
+        newExpVisitor.explain = False                        
+    
+    def testTimeXPath(self):        
         self.rdfDom = self.getModel(cStringIO.StringIO(self.model1) )
-        return self._timeXPath(self.rdfDom, 1)
+        return self._timeXPath(self.rdfDom, 1, 0)
 
     def timeXPathBig(self):        
         source = cStringIO.StringIO(self.model1)
         model = MemModel()
         count = 0
         for stmt in parseRDFFromString(source.read(),'test:', 'ntriples'):            
-            for i in xrange(200):
+            for i in xrange(2000):
                 modStmt = MutableStatement(*stmt)
                 if i > 0:
                     modStmt[0] += str(i)
@@ -391,34 +425,50 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
                }
         rdfDom = RDFDoc(model, self.nsMap)
         
-        return self._timeXPath(rdfDom, 1)
+        return self._timeXPath(rdfDom, 1, 1)
 
-    def _timeXPath(self, rdfDom, count):
+    def _timeXPath(self, rdfDom, count, printLevel=2):
         from rx import RxPathQuery
         from Ft.Xml.XPath.Context import Context 
 
         queries = [
-        ("/*[wiki:name='HomePage']", 12),
+        ("/*/*", 0.12),
+        ("/*[a:content-length > 15]", 0),
+        ("/*/*", 0.12),
+        ("/*[wiki:name='ZMLSandbox']/*[uri(.)='http://purl.org/dctitle']",0),        
+        #('/*[.=$subjects]', 0),
+        ('/*[.=$test]', 0),
+        ('/*[not(starts-with(., "http://www.w3.org/"))]', 0),        
+        ("/*/a:D/@uri", 0),
         ("/*[wiki:name='HomePage']/a:has-expression/*/a:hasContent/text()", 79),
+        ("/*/a:has-expression", 7.6),
+        ("/*[wiki:name='HomePage']/a:has-expression/*", 77.5),
+        ("/*[wiki:name='HomePage']", 12),
         ("/*/*", 0.12),
         ("/*/baz", 966),                
-        ("/*[wiki:name='HomePage']/a:has-expression/*", 77.5),
         ("/*/*[node()]", 0.5),
         ("/a:NamedContent", 1.25),
         ("/a:NamedContent[wiki:name='HomePage']", 0.35),
-        ("/*/a:has-expression", 7.6),
         ("/*[.='http://nonexistent']", 1),
-        ("/*[.='http://4suite.org/rdf/banonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6']", 1),        
+        ("/*[.='http://4suite.org/rdf/banonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6']", 1),
+        ("/a:NamedContent[.='http://4suite.org/rdf/banonymous/5e3bc305-0fbb-4b67-b56f-b7d3f775dde6']", 1),
         ]
 
+        timer = time.clock #some platform time() has precision than clock()
+        
         for xpath, expectRatio in queries:
             compExpr = XPath.Compile(xpath)
             context = Context(rdfDom,
                     extFunctionMap = BuiltInExtFunctions,
+                    varBindings = { 
+                    (None, 'test') : [rdfDom.firstChild],
+                    (None, 'subjects') : rdfDom.childNodes,
+                     },
                     processorNss = self.model1NsMap)            
             newExpVisitor = RxPathQuery.ReplaceRxPathSubExpr(context, compExpr)
-            print xpath
-            print repr(newExpVisitor.resultExpr)
+            if printLevel > 1:
+                print xpath
+                print repr(newExpVisitor.resultExpr)
 
             #if profile:
             #    for i in xrange(2): 
@@ -428,44 +478,54 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
             compExpr0 = XPath.Compile(xpath)
 
             res = compExpr0.evaluate(context)        
-            start = time.clock()
+            start = timer()
             for i in xrange(count):
                 #print 'orig', self.rdfDom.evalXPath( xpath,  self.model1NsMap)
                 res = compExpr0.evaluate(context)
                             
-            xpathClock = time.clock() - start
-            print xpathClock, len(res), res and res[0] or []
+            xpathClock = timer() - start
+            if printLevel > 1: print xpathClock, len(res), res and res[0] or []
 
-            newExpVisitor.describe = True
-            res = newExpVisitor.resultExpr.evaluate(context)            
-            res.describe(sys.stdout)
-            newExpVisitor.describe = False                        
+            newExpVisitor.explain = True
+            res2 = newExpVisitor.resultExpr.evaluate(context)            
+            if printLevel > 1: res2.explain(sys.stdout)
+            newExpVisitor.explain = False                        
 
-            start = time.clock()                
+            start = timer()                
             for i in xrange(count):                            
                 #print 'orig', self.rdfDom.evalXPath( xpath,  self.model1NsMap)            
                 def tst():
                     return newExpVisitor.resultExpr.evaluate(context)
                 if profile:
-                    res = prof.runcall(tst)
+                    res2 = prof.runcall(tst)
                     break
                 else:
-                    res = tst()
+                    res2 = tst()
                 
-            rxpathClock = time.clock() - start
-            print rxpathClock, len(res), res and res[0] or []
-            print 'RATIO', xpathClock / rxpathClock
-            print '\n'
-            
-            #self.failUnless((not res and not res2) or res[0] == res2[0])
+            rxpathClock = timer() - start
+            if printLevel > 0:
+                if printLevel < 2: print xpath
+                print rxpathClock, len(res2),
+                if printLevel > 1: print res2 and res2[0] or []
+                print 'RATIO', xpathClock / rxpathClock
+                print '\n'
+            self.failUnless((not res and not res2) or res[0] == res2[0])
+
+            #skip next test as the non-query engine run sometime has duplicate
+            #resource nodes somehow e.g. urn:sha:jERppQrIlaay2cQJsz36xVNyQUs=            
+            #self.failUnless(len(res) == len(res2))
+
+            #skip the next test since varies too much from config to config 
             #self.failUnless( rxpathClock / xpathClock < expectRatio)
             
-
     def testLoop(self):
         loopNsMap = {'loop': 'http://loop.com#'}
         loopNsMap.update(self.model1NsMap)
         self.rdfDom = self.getModel(cStringIO.StringIO(self.loopModel) )
-        
+        from rx import RxPath
+        RxPath.useQueryEngine = 1
+        context = RxPath.XPath.Context.Context(self.rdfDom,processorNss = loopNsMap)
+                
         xpath = '/*[starts-with(.,"http://loop.com#r")]'
         res1 = self.rdfDom.evalXPath( xpath,  loopNsMap)
         #print len(res1), res1
@@ -473,12 +533,16 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
                 
         xpath = "/*/loop:*/*"        
         res2 = self.rdfDom.evalXPath( xpath,  loopNsMap)
-        #print len(res2), [ x.parentNode for x in res2]
+        #print len(res1), len(res2), [ x.parentNode for x in res2]
         self.failUnless(len(res2)==len(res1))
         
         #circularity checking only on with descendant axes
-        xpath = "/*/loop:*/*/*/*"        
+        xpath = "/*/loop:*/*/loop:*/*"        
         res3 = self.rdfDom.evalXPath( xpath,  loopNsMap)
+
+        #xpath = "$r1/*/*[.=uri('loop:r1')]/*/*/*/*"
+        #node = self.rdfDom.findSubject('http://loop.com#r1')
+        #print self.rdfDom.evalXPath( xpath,  loopNsMap, vars = { (None,'r1'): [node]})
         
         c1 = [x.stringValue for x in res2]
         c1.sort()
@@ -497,10 +561,12 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         #results should be r1; r3, r2; r2, r3
         self.failUnless(len(res5)==5) 
 
-        xpath = "/*[.=uri('loop:r1')]//loop:*/*"         
+        xpath = "/*[.=uri('loop:r1')]//loop:*/*"
+        #RxPath._compileXPath(xpath,context).pprint()
         res4 = self.rdfDom.evalXPath( xpath,  loopNsMap)
         #print len(res4), res4
-        self.failUnless(len(res4)==2) 
+        #results should be r1, r1
+        self.failUnless(len([n for n in res4 if RxPath.isResource(context, [n])])==2)
 
         xpath = "/*[.=uri('loop:r2')]//loop:*/*"         
         res4 = self.rdfDom.evalXPath( xpath,  loopNsMap)
@@ -554,7 +620,7 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         xpath = "*[wiki:name='about']/wiki:revisions/*"
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless(res1 and res1[0].isCompound() )
-        
+
     def testContainers(self):
         self.rdfDom = self.getModel("about.containertest.nt")
         xpath = "*/wiki:revisions/*/rdfs:member/@listID='http://www.w3.org/1999/02/22-rdf-syntax-ns#_1'"
@@ -582,14 +648,18 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         self.failUnless( res1 )
 
     def testId(self):
-        #use this one because all resources appear as an object at least once
+        #use this model because all resources appear as an object at least once]
         self.rdfDom = self.getModel(cStringIO.StringIO(self.loopModel) )
+        
+        loopNsMap = {'loop': 'http://loop.com#'}
+        loopNsMap.update(self.model1NsMap)
+        
         #we need to add the predicate filter to force the nodeset in doc order so we can compare it
-        xpath = "(id(/*/*/*))[true()]"
-        res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-        #the property resources don't appear as the objects of any statements so exclude them
-        res2 = self.rdfDom.evalXPath( '/*[not(is-instance-of(.,uri("rdf:Property")))]',  self.model1NsMap)
-        pprint(( len(res1), len(res2), res1, '2', res2 ))
+        xpath = "(id(/*/*/loop:*))[true()]"
+        res1 = self.rdfDom.evalXPath( xpath, loopNsMap)
+        
+        res2 = self.rdfDom.evalXPath('/loop:*',  loopNsMap)
+        #pprint(( len(res1), len(res2), res1, '2', res2 ))
         self.failUnless(res1 == res2)
 
     def testrdfdocument(self):
@@ -629,10 +699,10 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         updateNode = updateDom.findSubject('http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2')
         self.failUnless( updateNode )
         added, removed, reordered = diffResources(self.rdfDom, [updateNode])
-        #print added, removed, reordered
-        #we've add and removed one non-list statement and changed the first list item (and so 1 add, 1 remove)
-        self.failUnless( len(added) == len(removed) == len(reordered) ==
-            len(reordered.values()[0][0]) == len(reordered.values()[0][1]) == 1)
+        #we've added one non-list statement and changed the first list item (and so 1 add, 1 remove)
+        self.failUnless( len(added) == len(reordered) ==
+            len(reordered.values()[0][0]) == len(reordered.values()[0][1]) == 1 
+            and not len(removed))
 
         updateDom = self.getModel("about.diff3.nt")
         updateNode = updateDom.findSubject('http://4suite.org/rdf/anonymous/xde614713-e364-4c6c-b37b-62571407221b_2')
@@ -657,7 +727,6 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         self.failUnless(Statement('s', 'o', 'p','L') == Statement('s', 'o', 'p'))        
         self.failUnless(Statement('s', 'o', 'p',scope='C1') == Statement('s', 'o', 'p', scope='C2'))
         self.failUnless(Statement('s', 'o', 'p','L','C') == Statement('s', 'o', 'p'))
-        #test rich comparison ops e.g. != 
         self.failUnless(not Statement('s', 'o', 'p','L','C') != Statement('s', 'o', 'p'))
         self.failUnless(Statement('s', 'p', 'a') < Statement('s', 'p', 'b'))
     
@@ -850,25 +919,26 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         result = applyXslt(self.rdfDom, xslStylesheet)
         #open('testXslt1new.xml', 'wb').write(result)
         #d = difflib.Differ()
-        #print list(d.compare(result,file('testXslt1.xml').read())) #list of characters, not lines!
+        #list(d.compare(result,file('testXslt1.xml').read())) #list of characters, not lines!
         self.failUnless( result == file('testXslt1.xml').read(),'xml output does not match')
 
     def testXPathRewrite(self):
         from rx import RxPathQuery
         from Ft.Xml.XPath.Context import Context 
 
-        tests = { '/*' : 'evalRxPath:SelectOp()',
-                  'foo(/*)' : 'foo(evalRxPath:SelectOp())',
-                  '/baz/foo[bar][1=2][0][foo]' : 'evalRxPath:SelectOp()',
-                  '/*/*[foo/bar]': 'evalRxPath:SelectOp()',                  
+        tests = { '/*' : 'evalRxPathQuery("select 0 from -1 where()")',
+                  'foo(/*)' : 'foo(evalRxPathQuery("select 0 from -1 where()"))',
+                  '/baz/foo[bar][1=2][0][foo]' : 
+                    '''evalRxPathQuery("select 0 from -1 where(select 2 from 0 where((select 1 from 1 where() = u'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'), select 2 from 2 where() in (u'baz')), select 1 from 1 where() in (u'foo'), select 1 from 1 where() with child::bar and (1.0 = 2.0)) with ./child::foo[child::bar][1 = 2][0][child::foo]")''',
+                  '/*/*[foo/bar]': 'evalRxPathQuery("select 1 from -1 where(select 1 from 1 where() with child::foo/child::bar)")',                  
                 }
 
         domNode = createDOM(MemModel() )        
         for exp, expected in tests.items():            
             visitor = RxPathQuery.ReplaceRxPathSubExpr(
                         Context(domNode),XPath.Compile(exp))
-            print exp, expected, repr(visitor.resultExpr)
-            #self.failUnless(repr(visitor.resultExpr) == expected)
+            #print 'xpw', exp, expected, repr(visitor.resultExpr)
+            self.failUnless(repr(visitor.resultExpr) == expected)
             
         
 DRIVER = 'Mem'#'4Suite'#'Mem'
@@ -877,7 +947,10 @@ def profilerRun(testname, testfunc):
     import hotshot, hotshot.stats
     global prof
     prof = hotshot.Profile(testname+".prof")
-    testfunc() #prof.runcall(testfunc)
+    try:
+        testfunc() #prof.runcall(testfunc)
+    except:
+        import traceback; traceback.print_exc()
     prof.close()
 
     stats = hotshot.stats.load(testname+".prof")
