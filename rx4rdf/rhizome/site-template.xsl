@@ -63,11 +63,13 @@ doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"
 <xsl:variable name='removeMessage' select="wf:remove-metadata('session:message')" /> 
 
 <xsl:template match="/">
+<xsl:variable name='expires' select="wf:assign-metadata('response-header:expires', '-1')" />	
+<xsl:variable name='nocache' select="wf:assign-metadata('response-header:cache-control', 'no-cache')" />
+<!-- don't cache a page with a message alert 
 <xsl:if test='$message'>
- <!-- don't cache a page with a message alert -->
-    <xsl:variable name='expires' select="wf:assign-metadata('response-header:expires', '-1')" />	
+  <xsl:variable name='expires' select="wf:assign-metadata('response-header:expires', '-1')" />	
 </xsl:if>
-
+-->
 <html>
 <head>
 <title><xsl:value-of select="$title" /></title>
