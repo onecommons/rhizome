@@ -132,7 +132,7 @@
     <xsl:template match="text()|@*">
     </xsl:template>
    
- <xsl:template match='a | area'>
+ <xsl:template match='a | area | html:a | html:area'>
     <xsl:if test='@href'>
        <xsl:call-template name='add-urlref'>
         <xsl:with-param name='url' select='@href' />
