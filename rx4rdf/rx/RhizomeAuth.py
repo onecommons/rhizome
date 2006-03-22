@@ -341,7 +341,7 @@ class RhizomeAuth(RhizomeBase):
         args.extend(['__account', values[0], '__accountTokens', values[1]])
         return [], args
 
-    def getValidateXPathFuncArgsCacheKey(self, cacheFunc):
+    def getValidateXPathFuncArgsCacheKey(self, cacheFuncName, cacheFunc):
         if not cacheFunc: #not cacheable
             return cacheFunc        
         def validateXPathFuncArgsCacheKey(field, context, notCacheableXPathFunctions):
@@ -356,6 +356,9 @@ class RhizomeAuth(RhizomeBase):
         return validateXPathFuncArgsCacheKey
         
     def authorizeXPathFunc(self, name,func, authFunc,context,args):
+        '''
+        Authorize the XPath function call using authFunc.        
+        '''
         account = context.varBindings.get( (None, '__account'))
         if not account:
             raise raccoon.NotAuthorized(
@@ -398,6 +401,14 @@ class RhizomeAuth(RhizomeBase):
         return func(context, *args)
 
     def authorizeXPathFuncs(self, extFuncDict, extFuncCacheDict):
+        '''
+        Where necessary, update extFuncDict and extFuncCacheDict with
+        functions that do an authorization before invoking the XPath
+        function. The updated versions of these dictionary will be
+        used in contexts where XPath function calls need to be
+        authorized (e.g. the XSLT or XUpdate content processors).
+        '''
+        
         for name, (authFunc, cacheFunc) in self.authorizedExtFunctions.items():
             func = extFuncDict.get(name)
             if func:
@@ -409,9 +420,9 @@ class RhizomeAuth(RhizomeBase):
                 extFuncDict[name] = curryFunc(name, func, authFunc)
                 if cacheFunc:
                     #pass -1 if not in the notcachable dict
-                    cacheFunc = cacheFunc(extFuncCacheDict.get(name,-1))
+                    cacheFunc = cacheFunc(name, extFuncCacheDict.get(name,-1))
                 #-1 means it shouldn't be in notcacheable dict
-                if cacheFunc != -1: 
+                if cacheFunc != -1: #if either 0 or a function
                     extFuncCacheDict[name] = cacheFunc
                 elif extFuncCacheDict.has_key(name):
                     del extFuncCacheDict[name] #rare case, for correctness
