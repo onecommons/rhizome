@@ -906,9 +906,9 @@ the Action is run (default is False).
                             return locals()
 
                         kw['_errorInfo'] = getErrorKWs()
-                        self.log.warning("invoking error handler on exception",
-                                         exc_info=1)
-                        #todo provide a protocol for mapping exceptions to
+                        self.log.warning("invoking error handler on exception:\n"+
+                                         kw['_errorInfo']['details'])
+                        #todo: provide a protocol for mapping exceptions attributes to
                         #XPath variables, e.g. line # for parsing errors
                         #kw['errorInfo'].update(self.extractXPathVars(
                         #                  kw['errorInfo']['value']) )
@@ -1188,7 +1188,7 @@ the Action is run (default is False).
                                 uri=baseUri, msgOutput=output)
             msg = output.getvalue()
             if msg:
-                self.log.debug('XUpdate messages: ' + msg)
+                self.log.info('XUpdate messages: ' + msg)
             return output.getvalue()            
                                                     
         def updateDom(self, addStmts, removedNodes=None):
@@ -1488,7 +1488,13 @@ the Action is run (default is False).
                         if etags and resultHash in [x.strip() for x in etags.split(',')]:
                             kw['_response'].headerMap['status'] = "304 Not Modified"
                             return ''
-                        
+
+                    #todo: we don't support if-modified-since header but we set this so
+                    #pages can check if they've load from the browser cache
+                    #or not using document.lastModified javascript
+                    #if self.setLastModified:
+                    #   kw['_response'].headerMap['last-modified'] = time.strftime(
+                    #        "%a, %d %b %Y %H:%M:%S GMT", time.gmtime(time.time()))
                     return result
             finally:
                 self.requestContext.pop()
