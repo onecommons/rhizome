@@ -343,7 +343,7 @@ def serializeRDF(statements, type, uri2prefixMap=None,
                 if uri2prefixMap:
                     for uri,prefix in uri2prefixMap.items():
                         if prefix != 'rdf': #avoid duplicate ns attribute bug
-                            serializer.set_namespace(prefix, uri)
+                            serializer.set_namespace(prefix.encode('utf8'), uri)
                 return serializer.serialize_model_to_string(model)
             except ImportError:
                 try:
