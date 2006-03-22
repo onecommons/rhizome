@@ -16,12 +16,10 @@
 <xsl:template name="process-assert">
    <xsl:param name="role" />
    <xsl:param name="pattern" />
-   <xsl:variable name='message'>
-     <xsl:apply-templates mode="text"/>
-   </xsl:variable>
 
-   <axsl:variable name='dummy'
-     select="wf:error('Validation Error: {$message}')" />          
+   <axsl:message terminate='yes'>
+     RxSchematron Validation Error: <xsl:copy-of select='./node()' />
+   </axsl:message>   
 </xsl:template>
 
 <!-- override default -->

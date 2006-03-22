@@ -525,17 +525,21 @@ aschange
 
 <!-- ============================================================== -->
     <xsl:template match="sch:let | let" />  <!-- already handled, suppress warning -->
-	<xsl:template match="*">
+	<xsl:template match="*"> <!-- aschange -->
+	   <xsl:if test="namespace-uri(.)!='http://www.w3.org/1999/XSL/Transform'" >
 		<xsl:message>
 			<xsl:text>Warning: unrecognized element </xsl:text>
 			<xsl:value-of select="name(.)"/>
 		</xsl:message>
+	   </xsl:if>
 	</xsl:template>
 	<xsl:template match="*" mode="text">
+      <xsl:if test="namespace-uri(.)!='http://www.w3.org/1999/XSL/Transform'" >
 		<xsl:message>
 			<xsl:text>Warning: unrecognized element </xsl:text>
 			<xsl:value-of select="name(.)"/>
 		</xsl:message>
+	  </xsl:if>
 	</xsl:template>
 <!-- ============================================================== -->
 	<!-- Default named templates -->
