@@ -192,7 +192,7 @@ class RhizomeTestCase(unittest.TestCase):
 
     def _fineGrainedCheck(self, root, account, contents, expectNotAuthorized,
                 resourcesExp=None, kw=None, exceptionType=raccoon.NotAuthorized,
-                xpath=None, xpathValidate=None):
+                xpath=None, xpathValidate=None, more=0):
         kw = kw or {}
         kw['contents'] = contents
         kw['__account'] = account        
@@ -215,6 +215,10 @@ class RhizomeTestCase(unittest.TestCase):
             root.evalXPath(xpath, vars, extFunMap)
             root.txnSvc._prepareToVote() #we don't want to actually commit
             if xpathValidate:
+                if more:
+                    for xp in more:
+                        print xp
+                        print root.evalXPath(xp, vars, extFunMap)
                 self.failUnless( root.evalXPath(xpathValidate, vars, extFunMap) )
         except exceptionType:            
             if not expectNotAuthorized:                
@@ -388,23 +392,41 @@ class RhizomeTestCase(unittest.TestCase):
 
     def testValidation(self):
         root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
-                            model_uri = 'test:', appVars = { 'useIndex':0,} )
+                            model_uri = 'test:', appVars = { 'useIndex':0, })
 
-        #print root.evalXPath('/*/auth:requires-authorization-for[.= "bnode:diffrevisions1Content"]')
-        #return
         guestAccount = root.evalXPath("/*[foaf:accountName = 'guest']")
         self.failUnless(guestAccount)
 
-        #trigger validation error -- wiki:name must be unique, and 'index' is already used
+        import Ft.Xml.Xslt
+        #trigger validation error -- wiki:name must be unique for a:NamedContent, and 'index' is already used
         contents = '''
         prefixes:
             wiki: `http://rx4rdf.sf.net/ns/wiki#
+            a: `http://rx4rdf.sf.net/ns/archive#
             base: `test:
 
         base:newresource:
+            a: a:NamedContent
             wiki:name: 'index'
-        '''        
-        self._fineGrainedCheck(root, guestAccount, contents, True,exceptionType=raccoon.XPathUserError)
+        '''
+        self._fineGrainedCheck(root, guestAccount, contents, True,exceptionType=
+                               Ft.Xml.Xslt.XsltRuntimeException)
+
+        #trigger validation error -- wiki:name must be unique (except a:NamedContent can shadow it)
+        contents = '''
+        prefixes:
+            wiki: `http://rx4rdf.sf.net/ns/wiki#
+            a: `http://rx4rdf.sf.net/ns/archive#
+            base: `test:
+
+        base:newresource2:
+            wiki:name: 'non-unique'
+
+        base:newresource3:
+            wiki:name: 'non-unique'
+        '''
+        self._fineGrainedCheck(root, guestAccount, contents, True,exceptionType=
+                               Ft.Xml.Xslt.XsltRuntimeException)
         
     def testLocalLinks(self):
         #the main point of this test is to test virtual hosts
@@ -429,10 +451,11 @@ class RhizomeTestCase(unittest.TestCase):
 
         self.doHTTPRequest(root, {}, 'http://www.foo.com:8000')
         
-    def _testRootConfigLocalLinks(self, config):
+    def _testRootConfigLocalLinks(self, config, configArgs=None):
         #the main point of this test is to test virtual hosts
         
-        argsForConfig = ['--rhizomedir', os.path.abspath(RHIZOMEDIR)]
+        argsForConfig = ['--rhizomedir', os.path.abspath(RHIZOMEDIR)
+                         ] + (configArgs or [])
         root = raccoon.HTTPRequestProcessor(a=config,
                                 argsForConfig=argsForConfig)
 
@@ -486,7 +509,8 @@ class RhizomeTestCase(unittest.TestCase):
         self._testRootConfigLocalLinks('test-root-config.py')
 
     def testLocalLinksXMLRootConfig(self):
-        self._testRootConfigLocalLinks('test-xml-root-config.py')
+        self._testRootConfigLocalLinks('test-root-config.py', 
+            ['-s', 'test-server.xml'])
     
     def _testCaches(self, live):
         argsForConfig = ['--rhizomedir', os.path.abspath(RHIZOMEDIR)]
@@ -516,7 +540,7 @@ class RhizomeTestCase(unittest.TestCase):
 
         #yes, this is quite a fragile test:
         #print cacheSizes[-1]
-        self.failUnless(cacheSizes[-1][:-1] == (7, 5, 135, 57))#, 16724L)) 
+        self.failUnless(cacheSizes[-1][:-1] == (7, 5, 138, 59))#, 17090L)) 
 
         cacheSizes = self._testCaches(True)
         #make sure the cache isn't erroneously growing
@@ -524,7 +548,7 @@ class RhizomeTestCase(unittest.TestCase):
 
         #yes, this is quite a fragile test:
         #print cacheSizes[-1]
-        self.failUnless(cacheSizes[-1][:-1] == (6, 3, 123, 57))#, 16724L))
+        self.failUnless(cacheSizes[-1][:-1] == (6, 3, 127, 59))#, 16724L))
 
     def testShredding(self):
         appVars = { 'useIndex':0,
@@ -535,21 +559,30 @@ class RhizomeTestCase(unittest.TestCase):
         self.failUnless(guestAccount)
         
         xpath = '''wf:shred(/*[wiki:name='ZMLSandbox'],
-         'http://rx4rdf.sf.net/ns/wiki#item-format-xml', "<testshredder />")'''
+         'http://rx4rdf.sf.net/ns/wiki#item-format-xml',
+            "<testshredder ><a href='foo'/><a href='ZMLSandbox'/></testshredder >")'''
 
-        xpathValidate = "/*[wiki:name='ZMLSandbox']/wiki:testprop = 'test success!'"  
+        xpathValidate = '''/*[wiki:name='ZMLSandbox']/wiki:testprop = 'test success!'
+        and /*[wiki:name='ZMLSandbox']/wiki:links-to = 'site:///foo'
+        and count(/wiki:MissingPage) = 1 and /wiki:MissingPage/wiki:name = 'foo' '''
+        m = []#["/*[wiki:name='ZMLSandbox']/wiki:testprop",
+            #"f:resolve-url('site:///zmlsandbox', 'foo')",
+            # "/*[wiki:name='ZMLSandbox']/wiki:links-to",
+            # '/wiki:MissingPage/wiki:name/text()']
         #xml-shred.xsl has a test pattern for matching <testshredder>
         self._fineGrainedCheck(root, guestAccount, '', False, xpath=xpath,
-                               xpathValidate=xpathValidate)
+                               xpathValidate=xpathValidate, more=m)
 
         xpath = '''wf:shred(/*[wiki:name='ZMLSandbox'],
          'http://rx4rdf.sf.net/ns/wiki#item-format-xml', "<faq />")'''
 
-        xpathValidate = '''(/*[wiki:name='ZMLSandbox']//wiki:revisions/*/rdf:first)[last()]/*/wiki:doctype
-           = uri('wiki:doctype-faq') and count((/*[wiki:name='ZMLSandbox']//wiki:revisions/*/rdf:first)[last()]/*/wiki:doctype) = 1'''
+        xpathValidate = '''(/*[wiki:name='ZMLSandbox']/wiki:revisions/*/rdf:first)[last()]/*/wiki:doctype
+           = uri('wiki:doctype-faq') and count((/*[wiki:name='ZMLSandbox']/wiki:revisions/*/rdf:first)[last()]/*/wiki:doctype) = 1'''
         #xml-shred.xsl should deduce the proper doctype
+        m = []#["(/*[wiki:name='ZMLSandbox']/wiki:revisions/*/rdf:first)[last()]/*/wiki:doctype",
+              #  "count((/*[wiki:name='ZMLSandbox']/wiki:revisions/*/rdf:first)[last()]/*/wiki:doctype)"]
         self._fineGrainedCheck(root, guestAccount, '', False, xpath=xpath,
-                               xpathValidate=xpathValidate)
+                               xpathValidate=xpathValidate, more=m)
         
         xpath = '''wf:shred(/*[wiki:name='ZMLSandbox'],
          'http://rx4rdf.sf.net/ns/wiki#item-format-xml', $contents)'''
@@ -560,7 +593,7 @@ class RhizomeTestCase(unittest.TestCase):
         self._fineGrainedCheck(root, guestAccount, contents, False, xpath=xpath,
                                xpathValidate=xpathValidate)
 
-    def testShredding2(self):
+    def _testGRDDL(self):
         appVars = { 'useIndex':0,
                     'DEFAULT_URI_SCHEMES':['http','data','file'],}
         root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
