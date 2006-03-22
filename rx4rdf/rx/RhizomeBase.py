@@ -224,7 +224,7 @@ class RhizomeBase(object):
         if hasattr(result, 'read'): #if result is a stream
             result = result.read()
         if not isinstance(result, unicode):
-            item = unicode(str(result), 'utf8')
+            result = unicode(str(result), 'utf8')
         return result
 
     def nameFromURL(self, context, resultset):
