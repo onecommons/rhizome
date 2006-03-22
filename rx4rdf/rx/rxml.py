@@ -455,16 +455,21 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
     elif not fixUp: #if fixUp we assume we're outputing xml/html not zml
         root += '#?zml0.7 markup' + NL
 
-    if not isinstance(resourceNodes, (type([]), type(()) )):
+    if not isinstance(resourceNodes, (list, tuple)):
         resourceNodes = [ resourceNodes ]
-    #print resourceNodes
+    
     for resourceNode in resourceNodes:
-        #print resourceNode
+        if RxPath.isPredicate(None, [resourceNode]):
+            predicateNodes = [ resourceNode ]
+            resourceNode = resourceNode.parentNode
+        else:
+            predicateNodes = resourceNode.childNodes
+            
         line += indent + getResourceNameFromURI(resourceNode) + ':'
         if rescomment:
             line += ' #'+ rescomment
         line += NL
-        for p in resourceNode.childNodes:
+        for p in predicateNodes:
             line += outputPredicate(p, indent + INDENT)
         line += NL
 
