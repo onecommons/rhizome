@@ -89,7 +89,7 @@ class MRUCacheTestCase(unittest.TestCase):
         self.failUnless( len(self.cache.invalidateDict) == 1)
 
         self.cache.removeNode( self.cache.mru )
-        self.failUnless(self.cache.countNodes() == 0)
+        self.failUnless(self.cache._countNodes() == 0)
         import gc
         gc.collect()
         self.failUnless( len(self.cache.invalidateDict) == 0)
@@ -98,17 +98,17 @@ class MRUCacheTestCase(unittest.TestCase):
         v1 = self.cache.getValue('b'*7)
         v1 = self.cache.getValue('c'*5)
         self.failUnless(self.cache.nodeSize == 12)
-        self.failUnless(self.cache.countNodes() == 2)
+        self.failUnless(self.cache._countNodes() == 2)
 
         self.cache.removeNode( self.cache.mru ) #remove the last node ('c')
         self.failUnless(self.cache.nodeSize == 7)
-        self.failUnless(self.cache.countNodes() == 1)
+        self.failUnless(self.cache._countNodes() == 1)
 
     def testClear(self):
         #test clear on empty cache
         self.cache.clear()
         self.failUnless(self.cache.nodeSize == 0)
-        self.failUnless(self.cache.countNodes() == 0)
+        self.failUnless(self.cache._countNodes() == 0)
         
         v1 = self.cache.getValue('a'*7)
         self.failUnless(self.cache.nodeSize == 7)
@@ -124,7 +124,7 @@ class MRUCacheTestCase(unittest.TestCase):
 
         self.cache.clear()
         self.failUnless(self.cache.nodeSize == 0)
-        self.failUnless(self.cache.countNodes() == 0)
+        self.failUnless(self.cache._countNodes() == 0)
     
 if __name__ == '__main__':
     import sys    
