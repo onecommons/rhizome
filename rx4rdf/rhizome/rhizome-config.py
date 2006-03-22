@@ -556,7 +556,8 @@ templateList = [rhizome._addItemTuple('_not_found',loc='path:_not_found.xsl', fo
 rhizome._addItemTuple('search', format='rxslt', disposition='entry', loc='path:search.xsl'),
 rhizome._addItemTuple('login', format='zml', disposition='complete', loc='path:login.zml'),
 rhizome._addItemTuple('logout', format='rxslt', disposition='complete', loc='path:logout.xsl'),
-rhizome._addItemTuple('signup', format='zml', disposition='entry', loc='path:signup.zml',
+#rhizome._addItemTuple('signup', format='zml', disposition='entry', loc='path:signup.zml',
+rhizome._addItemTuple('signup', format='rxslt', disposition='entry', loc='path:edit-user.xsl',
                       handlesAction=['edit', 'new'], actionType='http://xmlns.com/foaf/0.1/OnlineAccount'),
 rhizome._addItemTuple('save-user', format='rxupdate', disposition='handler', loc='path:signup-handler.xml',
                       handlesAction=['save', 'creation'], actionType='http://xmlns.com/foaf/0.1/OnlineAccount'),
@@ -602,6 +603,8 @@ rhizome._addItemTuple('save-bookmark', format='rxupdate', disposition='handler',
 rhizome._addItemTuple('replacetags.xml', loc='path:replacetags.xml', disposition='complete', format='xml'),
 rhizome._addItemTuple('edit-tags.xsl', loc='path:edit-tags.xsl', disposition='complete', format='xml'),
 rhizome._addItemTuple('update-triggers',loc='path:update-triggers.xml', format='rxupdate', disposition='complete'),
+rhizome._addItemTuple('bookmarksetup',loc='path:help/bookmarksetup.xsl', 
+     format='rxslt', disposition='entry', keywords=['help'], title="Bookmark setup"),
 #rhizome._addItemTuple('todo2document.xsl', loc='path:changes2document.xsl', format='http://www.w3.org/1999/XSL/Transform', 
 #                disposition='template', doctype='document', handlesDoctype='todo'),
 #rhizome._addItemTuple('s5-template',loc='path:s5-template.xsl', format='rxslt', 
@@ -836,6 +839,7 @@ authStructure =\
  auth:role-guest:
   rdf:type: auth:Role
   rdfs:label: `Guest
+  rdfs:comment: `this role is used when the user is not logged-in
  
  auth:role-superuser:
   rdfs:comment: `the superuser role is a special case that always has permission to do anything
@@ -845,12 +849,15 @@ authStructure =\
   # we add these here so they shows up in the Sharing dropdown on the edit page
   auth:can-assign-guard: base:write-structure-token 
   auth:can-assign-guard: base:save-only-token
+  auth:can-assign-role:  auth:role-guest
+  auth:can-assign-role:  auth:role-default
+  auth:can-assign-role:  auth:role-superuser
   #if you want to use release labels it is convenient to add this next property
   #which is user by edit.xsl
   #wiki:default-edit-label: wiki:label-released  
     
  auth:role-default:
-  rdfs:comment: `this role automatically assigned to new users (see signup-handler.xml)
+  rdfs:comment: `this role is automatically assigned to new users
   rdf:type: auth:Role
   rdfs:label: `Default User Role
   #remove this property if you don't want this 
@@ -861,6 +868,9 @@ authStructure =\
  #access tokens 
  #######################################
    
+ auth:GroupAccessToken rdfs:subClassOf: auth:AccessToken
+ auth:AccountGroup rdfs:subClassOf: auth:Role
+ 
  #access token to protect structural resources from modification
  #(assign (auth:has-rights-to) to adminstrator users or roles to give access)
  base:write-structure-token:
@@ -947,7 +957,7 @@ Note that if you create more labels with the wiki:is-released property you'll wa
 
  base:create-nospam-token:
   rdfs:comment: '''If the content creator has this token, she is trusted not 
-  to be a spammer and rhizome.processMarkup() will not add rel='nofollow' to 
+  to be a spammer and Rhizome will not check if the content is spam or add rel='nofollow' to 
   links.'''
   rdf:type: auth:AccessToken  
   auth:priority: 10

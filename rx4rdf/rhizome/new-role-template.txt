@@ -22,4 +22,9 @@ rx:
   # this also shows up in the Sharing dropdown on the edit page
   # when edited by a user with this role
   #auth:has-rights-to: base:role-access-token1
+
+ #specifies which users or user roles can assign this role 
+ #(at the least the administrator role should be able to)
+ auth:role-superuser:   
+   auth:can-assign-role: bnode:newRole
  

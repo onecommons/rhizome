@@ -55,8 +55,8 @@ version="1.0">
       </auth:AccessToken>
       <!-- adding group access-tokens enables us to easily allow access to only those that are 
             a member of one of the groups the user is a member of: -->
-      <!-- when the user joins a group, add her group access tokens to the group's corresponding role  -->
-      <auth:AccessToken rdf:about="{$BASE_MODEL_URI}accounts/{$loginname}/group-rw">
+      
+      <auth:GroupAccessToken rdf:about="{$BASE_MODEL_URI}accounts/{$loginname}/group-rw">
         <rdfs:label>Group</rdfs:label>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-view"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-view-metadata"/>
@@ -71,8 +71,8 @@ version="1.0">
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/auth#permission-remove-statement"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/auth#permission-add-statement"/>
         <auth:priority>1</auth:priority>
-      </auth:AccessToken>
-      <auth:AccessToken rdf:about="{$BASE_MODEL_URI}accounts/{$loginname}/group-w">
+      </auth:GroupAccessToken>
+      <auth:GroupAccessToken rdf:about="{$BASE_MODEL_URI}accounts/{$loginname}/group-w">
         <rdfs:label>Group Write/Public Read</rdfs:label>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-confirm-delete"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-delete"/>
@@ -82,7 +82,7 @@ version="1.0">
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/auth#permission-remove-statement"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/auth#permission-add-statement"/>
         <auth:priority>1</auth:priority>
-      </auth:AccessToken>
+      </auth:GroupAccessToken>
       
       <foaf:OnlineAccount rdf:about="{$BASE_MODEL_URI}accounts/{$loginname}">
         <foaf:accountName>
@@ -142,6 +142,7 @@ version="1.0">
       <wiki:has-child rdf:resource="{$BASE_MODEL_URI}users/{$loginname}"/>
     </xu:append>
 
+    <xu:variable name="account" select="/*[.=concat($BASE_MODEL_URI,'accounts/', $loginname)]"/>
   </xu:if>
   
   <xu:if test="not($action='creation')">
@@ -176,6 +177,45 @@ version="1.0">
      </xu:if>
   </xu:if>
 
+  <xu:if test="wf:get-metadata('setroles')"> 
+  
+      <xu:if test="wf:get-metadata('assigned')" >
+        <xu:variable name='roles' select="/*[.=wf:get-metadata('assigned')]" />
+        <xu:if test='not($roles)'><xu:message terminate='yes' 
+           text="error: roles not found for {wf:get-metadata('assigned')}" /></xu:if>
+
+        <xu:variable name='newroles' select= "$roles[.!= $account/auth:has-role]" />
+        <xu:variable name='rolesToRemove' select="$account/auth:has-role[not(* = $roles)]" />        
+
+        <xu:append select='$account'>
+            <xu:for-each select="$newroles" >
+               <auth:has-role rdf:resource='{$current}' />     
+            </xu:for-each>
+        </xu:append>
+
+        <xu:if test='$newroles/self::auth:AccountGroup'>
+            <xu:append select='$newroles/self::auth:AccountGroup'>
+            <!-- when the user joins a group, add her group access tokens 
+                 to the group's corresponding role  -->
+            <xu:for-each select="$account/auth:can-assign-guard/auth:GroupAccessToken">
+                <auth:has-rights-to rdf:resource='{$current}' />
+            </xu:for-each>        
+            </xu:append>        
+        </xu:if>            
+      </xu:if>
+
+      <xu:if test="not(wf:get-metadata('assigned'))" >
+        <xu:variable name='rolesToRemove' select="$account/auth:has-role" />
+      </xu:if>
+                       
+      <!-- when removing an account from a AccountGroup, remove the account's 
+           GroupAccessTokens from the AccountGroup -->
+      <xu:remove select="$rolesToRemove/auth:AccountGroup/auth:has-rights-to
+                  [. = $account/auth:can-assign-guard/auth:GroupAccessToken]" />
+      <xu:remove select='$rolesToRemove' />
+  
+  </xu:if>
+  
   <xu:if test="wf:get-metadata('loginnow')">
     <xu:variable name='dummy' select="wf:assign-metadata('session:login', $loginname)"  />
   </xu:if>
