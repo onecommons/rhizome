@@ -20,11 +20,16 @@
 <xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />
 <xsl:variable name='_robots' select="wf:assign-metadata('_robots', 'nofollow,noindex')" />
 
+<xsl:variable name='shreddedContext' select="/*[a:from-source = ($__resource/wiki:revisions/*/rdf:first/*)[last()]/a:contents/*]/a:entails" />
+
 <!-- note: the same template is used in search.xsl for the rxml output -->
 <a href="site:///{$_name}?action=edit-metadata&amp;about={f:escape-url($__resource)}">Edit Metadata</a>
 &#xa0;<a href='site:///search?search=%2F*%2F*%5B.%3D%27{f:escape-url($__resource)}%27%5D&amp;searchType=RxPath&amp;view=html'>Used By</a>
 &#xa0;<a href='site:///search?search=%2F*%5B.%3D%27{f:escape-url($__resource)}%27%5D&amp;searchType=RxPath&amp;view=rdf'>RDF/XML</a>
 &#xa0;<a href='site:///search?search=%2F*%5B.%3D%27{f:escape-url($__resource)}%27%5D&amp;searchType=RxPath&amp;view=ntriples'>NTriples</a>
+<xsl:if test='$shreddedContext'>
+&#xa0;<a href='site:///search?search=get-graph-predicates%28%2F*%5B.%3D%27{f:escape-url($shreddedContext)}%27%5D%29&amp;searchType=RxPath&amp;view=rxml'>Extracted Metadata</a>
+</xsl:if>
 <hr />
 <xsl:if test='$__resource/wiki:about'>
  Keywords:&#xa0; 
