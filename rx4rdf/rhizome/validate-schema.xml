@@ -4,13 +4,21 @@ defaultPhase='revalidate' >
 <ns prefix="wf" uri="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#" />
 <ns prefix="wiki" uri="http://rx4rdf.sf.net/ns/wiki#" />
 <ns prefix="auth" uri="http://rx4rdf.sf.net/ns/auth#" />
+<ns prefix='a' uri="http://rx4rdf.sf.net/ns/archive#" />
 <ns prefix="foaf" uri="http://xmlns.com/foaf/0.1/" />
 <ns prefix="previous" uri='http://rx4rdf.sf.net/ns/raccoon/previous#' />
+<ns prefix='xsl' uri="http://www.w3.org/1999/XSL/Transform" />
 
-<!-- _added and _removed are not defined, set them to be every predicate 
-    and an empty nodeset, respectively -->
+<!-- if _added and _removed are not defined, set them to be every predicate 
+    and an empty nodeset, respectively.
+    Note that if $_removed *is* defined, it will contain predicate nodes that have already been removed 
+    so they will have no parent (subject) nodes.
+ -->
 <let name='previous:_added' value='/*/*'   />
 <let name='previous:_removed' value='/..' />
+<!-- hide the ugliness of the previous: namespace -->
+<let name='_added' value='$previous:_added'   />
+<let name='_removed' value='$previous:_removed' />
 
 <title>Validate Model</title>
 
@@ -23,19 +31,21 @@ defaultPhase='revalidate' >
 </phase>
 
  <pattern name='Uniqueness Tests' id='uniqueness'> 
-    <rule context='$previous:_added/self::wiki:name'>
+    <rule context='$_added/self::wiki:name'>
       <!-- iso schematron -->
-       <let name='wikiName' value='.' />
-       <assert test='count(/*[wiki:name = $wikiName]) = count($wikiName)' >   
-          <!-- 1.5: too slow 
-           <key name='wikiName' match='/*/wiki:name' path='.' />
-           <assert test="count(key('wikiName', .)) = 1" >
-          -->      
+      <let name='wikiName' value='.' />
+
+<!-- 
+wiki:names must be unique except there can be one a:NamedContent that "overrides" the name.
+-->
+      <assert test='count(/a:NamedContent[wiki:name = $wikiName]) &lt;= 1 and
+                     count(/*[not(self::a:NamedContent)][wiki:name = $wikiName]) &lt;= 1'>
+      The resource name (<xsl:value-of xmlns:xsl='http://www.w3.org/1999/XSL/Transform' select='$wikiName'/>) is used more than once.
       Resource names must be unique.
-      </assert>
+      </assert>     
     </rule>
     
-    <rule context='$previous:_added/self::foaf:holdsAccount'>
+    <rule context='$_added/self::foaf:holdsAccount'>
       <let name='foafName' value='.' />
       <assert test='count(/*[foaf:holdsAccount = $foafName]) = 1' >   
       Account names must be unique.
