@@ -1,0 +1,16 @@
+<server xmlns='http://rx4rdf.sf.net/ns/raccoon/config#' >
+  <host model-uri='http://www.foo.com/'
+     config-path="test-links.py"
+     path="." >
+   <hostname>foo.com</hostname>
+   <hostname>foo.org</hostname>
+   <hostname>foo.bar.org</hostname>
+ </host>
+ 
+  <host model-uri='http://bar.org/bar/'
+     config-path="test-links.py"
+     path="." 
+     appBase="/bar"
+     appName="bar"
+  />
+</server>
