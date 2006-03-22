@@ -420,7 +420,18 @@ def findGraphURIs(context, nodeset):
     return scopes.values()
 
 def rdfDocument(context, object,type='unknown', nodeset=None):
-    #note: XSLT only
+    '''Equivalent to XSLT's document() function except it parses RDF
+    and returns RxPath Document nodes instead of XML Document nodes.
+    The first and third arguments are equivalent to document()'s first
+    and second arguments, respectively, and the second argument is
+    converted to a string that names the format of the RDF being
+    parsed. The format names recognized are the same as the ones used
+    by parseRDFFromString(). ParseException will be raised if the RDF
+    can not be parsed.
+
+    Note: this is only available in the context of an XSLT processor.
+    '''
+    
     type = StringValue(type)
     oldDocReader = context.processor._docReader
     class RDFDocReader:
