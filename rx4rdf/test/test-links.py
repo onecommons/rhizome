@@ -29,7 +29,7 @@ xmlns:wf="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#" xmlns:f="http://xmlns.4sui
 <x:param name='_APP_BASE' />
 <x:template match='a[@undefined]'>
     <x:variable name='page' select='f:if(starts-with(@href,$_APP_BASE), substring-after(@href, $_APP_BASE), @href )' />
-    <x:if test='not(wf:has-page($page))'>
+    <x:if test='not(wf:has-page(wf:name-from-url($page)))'>
       <x:message terminate='yes'><x:value-of select='@href'/> not found! with <x:value-of select='$page'/>,<x:value-of select='$_APP_BASE'/></x:message>
     </x:if>
     <a href='{@href}'><x:value-of select='@href'/></a>
