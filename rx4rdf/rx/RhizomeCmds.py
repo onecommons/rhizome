@@ -39,7 +39,8 @@ Options:
 Can be used for schema migration, for example.
 Default: "path:import.xml". This disgards previous revisions and
          points the content to the new import location.
--noindex Don't add the content to the index
+-noindex Don't add the content to the index.
+-noshred Don't shred content on import.
 
 The following options only apply when no metarx file is present: 
 -folder path (prepended to name and creates folder resource if necessary)
@@ -329,12 +330,9 @@ Options:
                     #todo: what about adding user context
                     #(default to administrator?)
                     content = self._invokeRequest(name, rc)                     
-
-                    #todo: handle aliases better (only generate if referenced)
-                    #todo: what about external files (e.g. images)
+                    
+                    #todo: copy embedded external links (e.g. images)
                     #todo: change extension based on output mime type                     
-                    #      (use invokeEx but move default mimetype handling out of handleRequest())
-                    #      but adding an extension means fixing up links
                 except:
                     #traceback.print_exc()
                     #note: only works with static pages (ones with no required parameters)
@@ -368,6 +366,7 @@ Options:
 
             if static:
                  if not noalias:
+                    #todo: handle aliases better (only generate if referenced)
                     aliases = self.server.evalXPath('wiki:alias/text()',
                                                     node = item)
                     for alias in aliases:
