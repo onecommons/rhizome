@@ -268,8 +268,6 @@ class MRUCache:
         return value
 
     def invalidate(self, key):
-        idk = self.invalidateDict.keys()
-        idv = self.invalidateDict.values()
         currentNodes = self.invalidateDict.get(key)        
         if currentNodes is not None:
             #import pprint; pprint.pprint([x.hkey for x in currentNodes.keys()])
@@ -293,9 +291,9 @@ class MRUCache:
         self.nodeSize -= node.size
         del self.nodeDict[node.hkey]                
 
-    def countNodes(self):
-        #much slower than len(self.nodeDict)
-        #exists for diagnostic use
+    def _countNodes(self):
+        '''much slower than len(self.nodeDict) -- exists for diagnostic use
+        '''
         prev = self.mru
         if not prev:
             return 0
