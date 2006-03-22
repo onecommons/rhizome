@@ -1,4 +1,4 @@
-#?zml0.9 markup
+#?zml0.7 markup
 #?raccoon-format http://rx4rdf.sf.net/ns/wiki#item-format-rxslt
  x:stylesheet (version="1.0" xmlns:x="http://www.w3.org/1999/XSL/Transform",
      xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#',
@@ -7,20 +7,22 @@
      xmlns:a="http://rx4rdf.sf.net/ns/archive#",
      xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#",
      xmlns:response-header='http://rx4rdf.sf.net/ns/raccoon/http-response-header#',
+     xmlns:response-cookie='http://rx4rdf.sf.net/ns/raccoon/http-response-cookie#',
      xmlns:session = 'http://rx4rdf.sf.net/ns/raccoon/session#',    
      xmlns:foaf="http://xmlns.com/foaf/0.1/"
-     exclude-result-prefixes = "f wf a wiki rdf"
+     exclude-result-prefixes = "f wf a wiki rdf response-header response-cookie session"
      ) 
   x:param name="redirect"
   x:param name="password"
   x:param name="loginname"
+  x:param name="response-cookie:invalidate"
   x:param name="__passwordHashProperty"
    
   x:template match='/':  	    
     x:variable name=dummy select='''wf:if(wf:secure-hash($password) = /*[foaf:accountName = $loginname]/*[uri(.)=$__passwordHashProperty], 
 "wf:assign-metadata('session:login', $loginname) and wf:assign-metadata('session:message', '')", 
 "wf:assign-metadata('session:message', 'login attempt failed!')")'''
-    x:variable name=dummy2 select="wf:assign-metadata('response-header:status', 302)"
+    x:variable name=dummy2 select="wf:assign-metadata('response-header:status', 303)"
     x:variable name=dummy3 select="wf:assign-metadata('response-header:Location', $redirect)"
     r'''<html><body>You should be redirected shortly...</body></html>'''
 
