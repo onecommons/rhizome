@@ -112,14 +112,11 @@ class RaccoonTestCase(unittest.TestCase):
             
     def testXPathExtFuncs(self):
         root = raccoon.RequestProcessor(a='testAuthAction.py',model_uri='test:')
-        
+
         self.failUnless( root.evalXPath("""/* = wf:map(/*, ".")""") )
         self.failUnless( root.evalXPath("""count(/*) = count(wf:map(/*, "."))""") )
 
     def testResolvers(self):
-        '''
-        test an action pipeline whose retVal is a file-like object
-        '''
         from Ft.Xml import InputSource
         from Ft.Lib import UriException
         root = raccoon.RequestProcessor(a='testMinimalApp.py',model_uri='test:')
@@ -139,6 +136,39 @@ class RaccoonTestCase(unittest.TestCase):
 
         self.failUnless(InputSource.DefaultFactory.fromUri('http://www.google.com'))
 
+    def testCaching(self):
+        root = raccoon.RequestProcessor(a='testMinimalApp.py',model_uri='test:')
+        from rx import RxPath
+        from Ft.Xml import XPath
+        node = root.domStore.dom
+        kw = { 'url': 'foo:', '__server__': root}
+        vars, extFunMap = root.mapToXPathVars(kw)        
+        context = XPath.Context.Context(node, varBindings=vars,
+                                        extFunctionMap = extFunMap,
+                                        processorNss = raccoon.DefaultNsMap) 
+        xpath = "wf:get-metadata('url')"        
+        compExpr = RxPath._compileXPath(xpath, context)
+        key = raccoon.getKeyFromXPathExp(compExpr, context, root.NOT_CACHEABLE_FUNCTIONS)        
+        self.failUnless(key == ('wf:get-metadata("url")', (None, u'url'),
+                                'foo:', node.getKey()) )
+
+        styleSheetContents = '''
+        <x:stylesheet version="1.0" xmlns:x="http://www.w3.org/1999/XSL/Transform"
+                 xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'>
+        <x:template match='/'>
+        <x:variable name='url' select='wf:get-metadata("url")' />
+        </x:template></x:stylesheet>
+        '''
+        
+        styleSheetKey = raccoon.getXsltCacheKeyPredicate(
+                        root.styleSheetCache,
+                        root.NOT_CACHEABLE_FUNCTIONS,
+                        styleSheetContents,
+                        '<root />', kw, node,
+                        styleSheetUri='test:')
+
+        self.failUnless(styleSheetKey == (styleSheetContents,
+                'test:', '<root />', node.getKey(),((None, u'url'),False), ((None, u'url'),'foo:')) )
         
 
 if __name__ == '__main__':
