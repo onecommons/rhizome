@@ -1167,7 +1167,7 @@ class BasePredicate(Element):
         if self.listID: #we're a list so compare based on the order in the DOM
             return super(BasePredicate, self).cmpSiblingOrder(other)
         else:
-            return cmp(self.stmt, other.stmt)
+            return cmp(self.stmt[1:4], other.stmt[1:4])
 
     def __eq__(self, other):        
         if self is other:
@@ -1175,8 +1175,8 @@ class BasePredicate(Element):
         if not isinstance(other, BasePredicate):
             return False
         else:
-            return self.parentNode == other.parentNode and\
-                self.stmt == other.stmt and self.listID == other.listID
+            return (self.parentNode == other.parentNode and
+                self.stmt[1:4] == other.stmt[1:4] and self.listID == other.listID)
 
     def getAttributeNS(self, namespaceURI, localName):
         toEval = self.builtInAttr.get( (namespaceURI, localName) )
@@ -1513,7 +1513,15 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         else:
             getKey = getattr(other.ownerDocument or other, 'getKey', lambda: -1)
             return cmp(self.getKey(), getKey())
-    
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+        elif not isinstance(other, Document):
+            return False
+        else:
+            return self.getKey() == other.getKey()
+        
     def _get_childNodes(self):
         if self._childNodes is None:
             self._toSubjectNodes()
@@ -1815,7 +1823,10 @@ class ContextDoc(Document):
         self.basedoc = basedoc
         super(ContextDoc, self).__init__(basedoc.model, basedoc.nsRevMap,
                                          basedoc.modelURI, basedoc.schemaClass)        
-                             
+
+    def getKey(self):
+        return (self.basedoc.getKey(), self.contexturis)
+                
     def filterScope(self,stmts):
         return [s for s in stmts if not s.scope or s.scope in self.contexturis]
 
