@@ -1,3 +1,14 @@
+!Upgrading to Rhizome version 0.6.0
+
+To upgrade an existing Rhizome store to this version you will need to make these modifications to the store:
+* Add the pages found in ^^rhizome-config.py^^ after the comment "#added in 0.6.0:"
+* Replace the [signup] page with the new one
+* Update any RxPath expressions that used the ^^rdf:ID^^ to use ^^get-statement-uris()^^ instead.
+* Replace any usages of ^^save-metadata^^ and ^^get-rdf-as-xml^^ XPath functions with ^^save-rdf^^ and ^^serialize-rdf^^, respectively.
+* Add these statements:
+** ^^auth:GroupAccessToken rdfs:subClassOf: auth:AccessToken^^
+** ^^auth:AccountGroup rdfs:subClassOf: auth:Role^^
+
 !Upgrading to Rhizome version 0.5.1
 * Add the skin CSS pages found in ^^rhizome-config.py^^ (after the comment "#css skins")
 * Add the statement ^^base:site-template: wiki:uses-skin:  base:skin-lightblue.css^^

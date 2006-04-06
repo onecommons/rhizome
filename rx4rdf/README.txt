@@ -1,8 +1,8 @@
                             README
 
                          Rx4RDF and Rhizome
-                         Version 0.5.1
-                         Oct 21, 2005
+                         Version 0.6.0
+                         Mar 31, 2006
  
   Introduction
   ------------
@@ -21,27 +21,31 @@
   
   What's new in this release?
   ---------------------------    
-  Major changes since last announced release (0.4.3):
+  Major changes since last announced release (0.5.1):
+  
+  Rhizome: 
+  * major performance enhancements: several times faster
+  * supports GRDDL and "shredding", a framework for extracting
+    RDF from content and maintaining the relationship over time.
+  * better support for viewing and editing RDF directly with most RDF formats (RDF/XML, NTriples, Turtle).
+  * new UI for editing users and roles
+  * more Wiki features (including tracking missing pages)
+  * page and comment spam detection via Akismet service    
 
-  Major changes to the Raccoon application server:
-  * enable URL namespace to be mapped to multiple applications
-  * allow applications to use XML (instead of RDF) data stores
-  * added SQL-like triggers
-  * added two-phase commit transaction coordinator
-  Major changes to Rhizome:
-  * Added a new, more polished and usable default theme.
-  * Made fine-grained authentication of changes to the model ubiquitous, 
-    made authorization schema much more flexible and expressive.
-  * Now uses Schematron (via RxPath) to validate the RDF model.  
-  Refactored and cleaned-up code base.
-  Plus many other enhancements.
+  Rx4RDF:
+  * much faster: now uses a simple but optimizing query engine
+  * support for RDF named graphs (RDF contexts)    
+  * better support for using RxPath in XML contexts (e.g. an XSLT page)
+  * better support 3rd party RDF libraries and RDF stores
+
+  Plus many other enhancements and bug fixes.
       
   For a detailed list of all major changes see docs/changelog.txt.
           
   Requirements
   ------------
     
-  Rx4RDF requires Python 2.2 or later (2.3 recommended) and the 4Suite 
+  Rx4RDF requires Python 2.2 or later (2.4 recommended) and the 4Suite 
   XML and RDF libraries (at [http://4Suite.org], version 1.0a1 or later).
    
   Rx4RDF and Rhizome are known to run on Linux and Windows 2000/XP 
@@ -111,9 +115,6 @@
   * On Windows and Cygwin, lock files are not deleted with the process ends.
 
   Rhizome
-  * Dynamic pages might not behave as expected since Rhizome doesn't set headers
-    such as Pragma NoCache or Expires -- if you need that you'll have set them 
-    yourself (for example, by modifying site-template.xsl).
   * You should not import files directly into the directory specified in the 
     ALTSAVE_DIR setting (the default is "content") -- if you do the first 
     revision of a file will overwrite the initial version. Instead import 
@@ -122,8 +123,6 @@
   * Deleting a page doesn't delete its file or remove its contents from the index.
     Note that this can be a security concern, because those files will be still 
     accessible.
-  * When searching, the RxML and Edit views only support queries that evaluate 
-    to a resource list (as opposed to a list of statement predicates, for example). 
   
   Feedback
   --------

@@ -58,7 +58,7 @@ uriResolveWhitelist = ['(file:|data:|site:|path:).*', 'http://localhost.*']
 
 #uriResolveBlacklist is a list of regex strings where if any match the URL, resolution is denied.
 #default: uriResolveBlacklist = [] 
-uriResolveBlacklist = ['http://(www\.)?evilsite.com/.*' ]
+uriResolveBlacklist = ['http://(.*@)?localhost(?!:8000)', 'http://(.*@)?10\.*.'] #blacklist access to the local subnet
 
 #authorizationDigests is a dictionary used by RequestProcessor.authorizeByDigest
 #to create a whitelist of content that processed. By default it is used for the Python content processor
@@ -132,9 +132,7 @@ DEFAULT_MIME_TYPE='text/plain'
 #default is the value of BASE_MODEL_URI
 MODEL_RESOURCE_URI = 'http://example.org/rhizomeapp/2/20/2004'
 
-: never expires 31536000, already expired: -1, don't expires: 0 or None, default 3600 (1 hour)
-
-#defaultExpiresIn specifis what to do about Expires HTTP response header if it 
+#defaultExpiresIn specifies what to do about Expires HTTP response header if it 
 #hasn't already set by the application. If it's value is 0 or None the header 
 #will not be sent, otherwise the value is the number of seconds in the future 
 #that responses should expire. To indicate that they already expired set it to -1;
@@ -466,7 +464,19 @@ validateExternalRequest=rhizome.validateExternalRequest
 #where extFunctions is a copy of the dictionary of XPath functions
 #and notCacheableDict is a copy of NOT_CACHEABLE_FUNCTIONS
 #default is lambda *args: None
-authorizeXPathFuncs=rhizome.authorizeXPathFuncs
+authorizeXPathFuncs=rhizome.authorizeXPathFuncs #rhizome-config.py sets this
+
+#authorizedExtFunctions is dictionary used by rhizome.authorizeXPathFunc 
+#where the key is the name of the XPath function and the value is 
+#(authFunc, 0 or cachFunc) with the following signatures:
+# def authFunc(funcName, context, args)
+#  returns (list of access token URIs, args) or raises NotAuthorized
+# def cachFunc(funcName, func) 
+#  returns either 0 (never cache), -1 (OK to cache), or a caching func
+authorizedExtFunctions = {('http://example.com/extfuncs','delete-everything') :
+  (lambda name, context, args: 
+      (['http://example.com/delete-everything-token'], args), 
+    0) }
 
 #shredders is a list of ContentProcessors that are invoked during the shredding process
 #default: see rhizome-config.py

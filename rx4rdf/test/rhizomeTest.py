@@ -233,14 +233,36 @@ class RhizomeTestCase(unittest.TestCase):
             root.txnSvc.abort()    #we don't want to actually commit this  
         
     def testFineGrainedAuthorization(self):
+        def beforeConfigLoad(kw):
+            addTestUser = '''                     
+        {test:testUser}:
+          rdf:type: foaf:OnlineAccount
+          foaf:accountName: `test
+          auth:has-role: auth:role-default
+          auth:can-assign-guard: base:testUserToken
+          auth:has-rights-to: base:testUserToken
+
+        base:testUserToken
+          rdf:type: auth:AccessToken   
+          auth:priority: `1            
+
+        base:anotherToken
+          rdf:type: auth:AccessToken   
+          auth:priority: `1            
+        '''
+            kw['__addRxML__'](addTestUser)
+        
         root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
-                            model_uri = 'test:', appVars = { 'useIndex':0,} )
+                            model_uri = 'test:', appVars = { 'useIndex':0,
+                                        'beforeConfigHook': beforeConfigLoad })
 
         guestAccount = root.evalXPath("/*[foaf:accountName = 'guest']")
         self.failUnless(guestAccount)
         adminAccount = root.evalXPath("/*[foaf:accountName = 'admin']")
         self.failUnless(adminAccount)
-        
+        testAccount = root.evalXPath("/*[foaf:accountName = 'test']")
+        self.failUnless(testAccount)
+
         #test add -- the guest shouldn't have permission to add a role
         contents = '''
         prefixes:        
@@ -351,7 +373,7 @@ class RhizomeTestCase(unittest.TestCase):
         '''
         self._fineGrainedCheck(root, guestAccount, contents % '1', False)
         self._fineGrainedCheck(root, guestAccount, contents % '100', True)
-
+    
         #test extraPrivileges 
         #saveRes auth:grants-rights-to save-only-override-token
         saveRes = root.evalXPath("/*[wiki:name = 'save']")
@@ -359,16 +381,19 @@ class RhizomeTestCase(unittest.TestCase):
         kw = { '__handlerResource' : saveRes }        
         self._fineGrainedCheck(root, guestAccount, saveOnlyProtectedcontents, False, "''", kw)
 
-        #test auth:with-guard-that-user-can-assign
+        #test auth:with-value-account-has-via-this-property
         contents = '''
         prefixes:
             auth: `http://rx4rdf.sf.net/ns/auth#
             base: `test:
 
-        base:diffrevisions:
-            auth:guarded-by: {test:testUser/private-rw}
+        base:ZMLSandbox:
+            auth:guarded-by: %s
         '''
-        #self._fineGrainedCheck(root, testAccount, contents, False)
+        #should fail because of base:guard-guard:
+        self._fineGrainedCheck(root, testAccount, contents % 'base:anotherToken', True)
+        #should succeed because of base:change-accesstoken-guard:
+        self._fineGrainedCheck(root, testAccount, contents % 'base:testUserToken', False)
         
     def testXPathFuncAuthorization(self):
         root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',

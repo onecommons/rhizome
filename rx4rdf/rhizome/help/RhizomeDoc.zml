@@ -73,7 +73,7 @@ If Lupy is installed (http://www.divmod.org/Home/Projects/Lupy), Rhizome will
 perform full-text indexing of content (requires Python 2.3). 
 
 Redland RDF or RDFLib data stores can be used if Redland ([http://www.redland.opensource.ac.uk])
-or RDFLib ([http://rdflib.net]) are installed. See the [Raccoon manual|RaccoonDoc] for more info.
+or RDFLib ([http://rdflib.net]) are installed. See the [Raccoon manual|RaccoonDoc] for more information.
 
 !Installation
 This is a standard Python source distribution. To install:
@@ -129,7 +129,7 @@ For information on configuring the Raccoon application server, for example, to r
 !Using Rhizome
 
 !!Creating and Editing Resources
-You can create and edit any type of resource in Rhizome, but it is primarily focused on content item resources, which are internally called ^^NamedContent^^. If you click on the "New" or (most of the time) the "Edit" link on the default template you will see the edit page specific to this type of resource. To edit or create other types of resources, go to the [administration] page (the "Admin" link on the default template). There you will be able to view or manage any type of resource in the system. 
+You can create and edit any type of resource in Rhizome, but it is primarily focused on content item resources (aka plain ol' pages), which are internally called ^^NamedContent^^. If you click on the "New" or (most of the time) the "Edit" link on the default template you will see the edit page specific to this type of resource. To edit or create other types of resources, go to the [administration] page (the "Admin" link on the default template). There you will be able to view or manage any type of resource in the system. 
 
 __Editing Content Items__
 
@@ -137,11 +137,12 @@ Below is a guide to the form controls found on the edit and new pages:
 
 +Name=When creating content for the first time the Name edit box will be shown. Enter the name of the content here -- it should be a name unique to the site. If the name contains slashes (e.g. 'foo/bar') the content will placed in the folder based on name, creating the folder structure if necessary (e.g. content will be put in the folder named 'foo' and the content given the name 'bar'). If the "Anonymous" option is selected you do not need to give the content a name (internally it will be given a name based on the current time and date). If the "Anonymous"  is selected //and// there is a name entered in the "Name" edit box, then the name will be treated as the folder path in which to place the anonymous content (creating the folder structure if necessary).
 
-+Title=Enter the title for the content (optional). Unlike the name it can be changed anytime and contain any characters. 
++Title=Enter the title for the content (optional). Unlike the name it can be changed anytime and contain any type of characters. 
 
 +Content=You create the item's content either by entering it in the editbox or by uploading a file.
 
 +Source Format=This dropdrown specifies the format of the content you are entering and drives how Rhizome will process the content. The following list describes how Rhizome will handle the different choices:
+++ZML=[ZML] (the default choice) is a text format similar to the ones found in Wikis except that you can use it author arbitrary HTML or XML.
 ++Binary=Binary content is content such as an image or multimedia file. It is never tranformed or manipulated by Rhizome. Generally you'll want to set the Item Type (see below) to "Page".
 ++HTML/XML=HTML and XML text will have any link that starts with 'site:' replaced with a live URL depending on the request context. Using 'site:' links allows links on a page to be work even if the page moves to another directory or transformed in other contexts (such as statically exported). The 'site:' URL scheme is similar to the 'file' scheme: URLs that start with 'site:/\//' will be relative to the root of where the Rhizome site is running from, while URLs that start only with 'site:' will be relative to the current location of the page.
 ++Python=The contents is treated as [Python|http://www.python.org] code that is executed when the page is requested. Anything the code writes to ^^stdout^^ is captured and sent as the response. By default, the administrator must explicitly authorize each page of Python code or an Unauthorized error will occur when attempted to view the page.
@@ -149,9 +150,12 @@ Below is a guide to the form controls found on the edit and new pages:
 ++RxUpdate=[rx4rdf:RxUpdate] is an (enhanced) [XUpdate|http://xmldb.org/xupdate/] document that is used to update the site's model. RxUpdate pages are typically used as form handlers (for example, 'save' page) and generally you'll want to set its Item Type to 'Handler'.
 ++Text=Plain text. When included in HTML (for example, by the "Entry" template), it will be escaped.
 ++XSLT=A [XSLT|http://w3.org/TR/xslt] stylesheet. It uses the current content of the request as the document source, so you'll need to set this page up as a template by adding a "wiki:handles-doctype" property. You'll also probably want to set the Item Type to "Template".
-++ZML=[ZML] is a text format similar to the ones found in Wikis except that you can use it author arbitrary HTML or XML.
+++NTriples=[NTriples|http://www.w3.org/TR/rdf-testcases/#ntriples] is a plain text (as opposed to XML) based format for RDF. 
+++Turtle=[Turtle|http://www.dajobe.org/2004/01/turtle] (Terse RDF Triple Language) (only if the Redland package is installed) is another plain text format for RDF.
 
-+Output Document Type=This specifies the type of XML document that will be outputed after processing the source. It is used to select the stylesheet that will transform the output to HTML for rendering in your browser. By default Rhizome supports HTML, DocBook, and several Apache Forest schemas.
++Minor Edit=When you check this option you mark this revision of the content as being a minor edit. If you also edited the last revision of this item, then the current revision will replace the previous one. (This prevents cluttering the site up with revisions to just to fix typos, etc.)
+
++Keywords=A comma or space-separated list of keywords. Keywords provide simple way to associate arbitrary metadata with the content item. Each keyword will be asociated with the content item via the ^^wiki:about^^ property. You can browse pages in the system grouped by keywords by choosing [Browse|keyword-browser] in the page footer.
 
 +Item Type=The Item Type (internally called the //Item Disposition//) specifies how this content item should be used. It is used to select a template stylesheet that will be applied to the content. The following are included by default:
 ++Page=This means that content is a stand-alone page and no template should be applied to it. For example, you probably want to set this for images.
@@ -160,21 +164,23 @@ Below is a guide to the form controls found on the edit and new pages:
 ++RxML Template=Indicates the content is text containing RxML that when invoked will bring up an edit metadata page containing the RxML. When saved, Rhizome will treate all the properties as new and replace any anonymous (aka //blank//) resources (those whose name starts with 'bnode:') with new anonymous resources. Using RxML templates provides a quick and dirty way of adding new types of resources to the sytem without having to build a form UI for creating and editing them.
 ++Template=The content will be used as template (typically for XSLT content). Currently, this just has the effect of stopping any more templates from being applied to the content.
 
+Advanced Options. Pressing the "More" button will reveal the following options:
+
 +Sharing=This dropdown lets you choose how the content can be accessed. Choices depend on rights the user has. The Guest user (the default if you are not logged in) only has one choice: "Public", which means anyone can view, edit, or delete the content. If you sign in as a user, you'll see choices that allow you to make content only readable and writable by you (and administrators), or public readable but only privately modifiable. You can also set the content to be readable and/or writable only to members of the user group you belong to.
 
 +Label=This dropdown shows all the labels in the system that you can choose to apply to this revision of the content. The default configuration of Rhizome has two labels, "Draft" and "Released". To have no label associated, choose the blank option. When viewing content, the last revisions with the "Released" label will be shown. If there is no revision labeled "Released" the last revision not labeled "Draft" is chosen. This behavior can be overridden by adding a ^^label^^ or ^^revision^^ parameter to the URL. By default, only administrators can set the "Released" label on a revision. Setting this enables a review process since all future revisions will need to be marked "Released" by an administrator before they can be viewed. Non-administrators can prevent content they are working on from being displayed by marking it "Draft".
 
-+Minor Edit=When you check this option you mark this revision of the content as being a minor edit. If you also edited the last revision of this item, then the current revision will replace the previous one. (This prevents cluttering the site up with revisions to just to fix typos, etc.)
++Shred=This checkbox (default: on) indicates whether or not Rhizome should try to extract metadata from the content when saving it.
 
 +Change Comment=An optional comment to be associated with your revision.
-
-+Keywords=A comma or space-separated list of keywords. Keywords provide simple way to associate arbitrary metadata with the content item. Each keyword will be asociated with the content item via the ^^wiki:about^^ property. You can browse pages in the system grouped by keywords by choosing [Browse|keyword-browser] in the page footer.
 
 __Assigning metadata and properties to the content__
 
 After you save your changes, you can add or modify arbitary properties and metadata for the content item and its latest revision. To do so, after saving choose the metadata link, which will display the metadata view of the content. Then choose the "Edit Metadata" at the top of the metadata view page.
 
-The edit metadata page presents the content's resources as editable [RxML]. In addition to adding arbitrary metadata there are a few properties that affect Rhizomes behavior that are not managed by the edit page. 
+The edit metadata page presents the content's resources as editable [RxML]. You will also see links that let you edit the metadata in two other RDF formats, RDF/XML and Ntriples. For an example, click [here| .?action=edit-metadata] to edit the metadata of this page.
+
+In addition to adding arbitrary metadata there are a few properties that affect Rhizome's behavior that are not managed by the edit page. Some of these include: 
 
 +wiki:alias=This property can be assigned to any resource that uses the ^^wiki:name^^ property and lets you give a resource an alternative name. Its value is identical to the value of a ^^wiki:name^^: it may be a hierarchical path that corresponds to its folder structure and the name should be unique across the site.
 
@@ -188,11 +194,11 @@ The edit metadata page presents the content's resources as editable [RxML]. In a
 
 __Creating and Editing Other Resources__
 
-You can browse and edit all the types of resources in the system from the [administration] page (click on the "Admin" link). Unless a resource type has an edit handler associated with it the default edit handler will be used, which lets you directly edit the resource as [RxML]. You can designate a resource as an edit handler for a given type of resource by assigning it the ^^wiki:handles-action^^ and ^^wiki:action-for-type^^ properties, as described above. 
+You can browse and edit all the types of resources in the system from the [administration] page (click on the "Admin" link). Unless a resource type has an edit handler associated with it the default edit handler will be used, which lets you directly edit the resource as [RxML] (and other RDF formats). You can designate a resource as an edit handler for a given type of resource by assigning it the ^^wiki:handles-action^^ and ^^wiki:action-for-type^^ properties, as described above. 
 
 There are a few useful properties that can be assigned to any resource:
 
-+wiki:name=Any resource that has this property can be addressed with an URL, just like the item content name described above. Names should unique across the site, with the exception that you can also have a content item with the same name (and will be invoked instead). If the name is hierarchical, you should add a ^^wiki:has-child^^ property to the parent Folder. 
++wiki:name=Any resource that has this property can be addressed with an URL, just like the item content name described above. Names should unique across the site, with the exception that you can also have a content item with the same name (and will be invoked instead). 
 
 +wiki:alias=See above.
 
@@ -215,7 +221,7 @@ URLs are mapped to resources through a series of steps:
 1. Look for a resource that can handle the action associated with this URL when applied to the selected resource.
 11. If the action is 'view' and resource is of type 'NamedContent', choose the same resource.
 11. Search for a resource with a ^^wiki:handles-action^^ property equal to the action and a ^^wiki:action-for-type^^ property equal to the type of the current resource or 'rdfs:Resource'.
-11. Look for a resource that has a ^^wiki:name^^ property named 'default-resource-viewer'. The default view displays the resource as [RxML].
+11. Look for a resource that has a ^^wiki:name^^ property named 'default-resource-viewer'. The default view displays the resource as RDF (in [RxML] or other RDF formats).
 1. At this point the current resource should alway be of type NamedContent. Now find a revision associated with that resource (through the ^^wiki:revisions^^ property) that contains the resource's content:
 11. If the URL had a revision parameter, choose the revision that matches that number
 11. If the URL had a label parameter, choose the last revision that has a matching label
@@ -227,14 +233,23 @@ URLs are mapped to resources through a series of steps:
 11. Search for a resource with a ^^wiki:handles-disposition^^ property equal to the URL's '_disposition' parameter, if present, or the revision's ^^wiki:item-disposition^^ property. Item disposition's corresponds to the "Item type" drop-down on the Edit page and allow for template stylesheets to control how content is rendered.
 :If we do find a template resource, we stuff the content of the current request into a XPath variable called '$_contents' and then, starting with the fourth step, invoke the above steps again using template resource. Note that this means that another template can be invoked on the results of this template resource and so on and so on.
 
-# todo !!Folders
+!!Folders
+Hierarchical folder structures can be created in Rhizome simply using names that contain "/"s to deliminate the path. When a resource with such a name is saved the resource will be associated with the parent folder resource using the ^^wiki:has-child^^ property, and if the folder resource doesn't exist it will be created. The default view handler for a folder resource lists all the child resources of that folder.
 
 !!RSS feeds
 You can create a RSS feed (currenly only RSS 2.0) on nearly anything in the system by doing a search with the RSS view option. The URL for the search results can be used as the RSS URL. For example, for a RSS feed of the most recently changed pages, click on the "Recent" link, change the view to RSS, and then press the search button. Identical results need not be repeatedly sent as Raccoon always generates an etag for tools that support If-None-Match http headers.
 
+!!Extracting metadata (shredding and GRDDL)
+When you save content Rhizome analyzes the content for RDF metadata and saves it in its store. This is referred to as "shredding" the content. Rhizome includes the shredders discussed below, and more shredders can be added by setting the ^^shredders^^ config variable to associate new shredding ^^ContentProcessors^^ with different content types. Rhizome keeps track of the relationship between shredded metadata and its content source -- and when content is deleted or changed, the old extracted metadata is removed from the store. The default shredders behave as follows:  
+* If the content is RDF (supported formats include RDF/XML, RxML, Turtle, and NTriples) the RDF is parsed and added to the store.
+* Otherwise, if the content is ZML, XML or XHTML Rhizome tries to shred the content based on the XML elements it encounters using the [xml-shred.xsl| xml-shred.xsl?action=view-source] stylesheet. It currently does the following:
+** Supports [GRDDL|http://www.w3.org/TeamSubmission/grddl/] (Gleaning Resource Descriptions from Dialects of Languages): If XML contains ^^dataview:transformation^^ attributes or XHTML contains a GRDDL profile in its ^^head^^ element, those GRDDL stylesheets will be invoked and their results added to the store. In addition, Rhizome will search the store for any GRDDL stylesheets associated with a document namespace via the ^^dataview:namespaceTransformation^^ property, and invoke that stylesheet.
+** For XML that doesn't use namespaces, it will try to figure out which XML vocabulary is used and associate the content with a ^^wiki:DocType^^ resource. DocTypes specifies what type of XML the document is. It is used to select a stylesheet for transforming the XML to HTML. By default, Rhizome supports DocBook and several [Apache Forrest|http://forrest.apache.org/] schemas. If a ^^DocType^^ is found, the shredder will also check if there is a GRDDL stylesheet associated the ^^DocType^^ via the (non-standard) ^^dataview:doctypeTransformation^^ property. (Currently Rhizome only provides a shredder for the Apache Forrest FAQ DocType.)
+** Searches for ^^html:a^^ (and similar) elements to enable Rhizome to keep track of a page's outgoing links (including whether or not the target of a internal link exists or not).
+
 !Access Control
 
-Access control (or //authorization//) provides control over which users can access or modify particular resources and functionality. This is particularly important with Rhizome because most of its structure and behavior is editable by users; indeed if the Python content processor is enabled (is disabled by default) the user can execute arbitrary [Python|http://www.python.org] code. However, in many applications you don't want to have to think about access control, so Rhizome provides an access control model that protects the core structure by default but doesn't require extra work if you're not interested in extra control.
+Access control (or //authorization//) provides control over which users can access or modify particular resources and functionality. This is particularly important with Rhizome because most of its structure and behavior is editable by users; indeed, the user can write pages in [Python|http://www.python.org] and execute arbitrary code. However, in many applications you don't want to have to think about access control, so Rhizome provides an access control model that protects the core structure by default but doesn't require extra work if you're not interested in extra control.
 
 !!Access Tokens and Permissions
 
@@ -244,23 +259,46 @@ One benefit with this approach is how scalable it is in terms of the complexity 
 
 With Rhizome's default authorization expression, user have rights to a token either directly via the ^^auth:has-rights-to^^ property or as a member of a Role (via ^^auth:has-role^^) which in turn has rights to tokens via ^^auth:has-rights-to^^.  Similarly, resources are guarded by access tokens either directly via the ^^auth:guarded-by^^ property or indirectly by the access-tokens that guard their class resources.
 
-!!Users and Roles
+!!Users, Accounts, and Roles
 
-Rhizome has two preconfigured users and roles. The 'admin' user is assigned the 'super-user' role, which is a special role that has full access to the system regardless of the access tokens. The 'guest' user is a member of the 'guest' role and this is the identify the user is assumed to be until she logs in. The 'guest' user can only perform actions that don't require any access token. 
+The basic subject (or principle) of access control in Rhizome is represented by the  ^^foaf:OnlineAccount^^ class; accounts can be members of a Role, which give the account rights to all the AccessTokens that the role has rights to. Accounts are almost always associated with a user (via the ^^foaf:holdsAccount^^ property); and users are represented by the ^^foaf:Person^^ class. However, Rhizome has two built-in accounts that are not associated with any particular user: The 'admin' account is assigned the 'super-user' role, which is a special role that has full access to the system regardless of access tokens. The 'guest' account is a member of the 'guest' role; anyone not logged-in treated as a 'guest'. By default, the 'guest' account can only perform actions that don't require any access token. 
 
-Users are assigned roles with the ^^auth:has-role^^ property -- there's currently no UI for this, so just edit the user's metadata. (With the default schema, only users with the "user-guard" access token can add or remove roles and access tokens from users.)
+The [Create/Edit User|http://testrz.liminalzone.org/accounts/?about=http%3A//xmlns.com/foaf/0.1/OnlineAccount&action=new] page allows you to choose which roles the user belongs, but the UI for this is only displayed when the current user (the one viewing the page) has the right to assign roles (this is determined by the ^^auth:can-assign-role^^ property), and only those roles that user can assign will be displayed.
 
 !!Privacy and User Groups
 
-When a new user is created, several new access tokens are created for the user, allowing the user to set different levels of privacy for the content she edits (to learn more, take a look at [signup-handler.xml|save-user?action=edit]). When you create or edit a page you'll notice a dropdown box labeled "Sharing". This drop-down contains all the access tokens the user has rights to (if you're not logged-in, you'll see just see the default "Public Read/Write" token because the guest user doesn't have rights to any access tokens).  When you save the page it will now require your chosen access token.
+When a new user is created, several new access tokens are created for the user, allowing the user to set different levels of privacy for the content she edits (to learn more, take a look at [signup-handler.xml|save-user?action=edit]). When you create or edit a page you'll notice a dropdown box labeled "Sharing". This drop-down contains all the access tokens the user has rights to (if you're not logged-in, you'll see just see the default "Public Read/Write" option because the guest user doesn't have rights to any access tokens).  When you save the page it will now require your chosen access token.
 
-Notice that two of the "Sharing" options are labeled "Group" and "Group Write/Public Read" -- choosing these access tokens limit access to only those users who share membership in any of the User Groups you are a member of. A User group is simply a role that has the user's group access tokens added to the role when the user joins. That way, any other user that has that user group role can access resources associated with that user's group tokens. Thus, to have a user "join" a user group, add the user to the user group role and then edit the user group role and add a ^^auth:has-rights-to^^ property for each of the user's two group access tokens. To remove her, delete those properties.
+Notice that two of the "Sharing" options are labeled "Group" and "Group Write/Public Read" -- choosing these access tokens limit access to only those users who share membership in any of the User Groups you are a member of. A user group is a subclass of role which has the user's group access tokens added to the role when the user joins. This way any other user that shares membership with that user's user groups can access resources that are guarded by one of that user's group access tokens.
 
 !!Fine-grained Authorization
-In addition to permissions that correspond to the type of action associated with a request ("view", "edit", "save", etc.), access tokens can have permissions that exactly specify which properties can be added or removed from a given resource. The permissions ^^auth:permission-add-statement^^ and ^^auth:permission-remove-statement^^ control whether a resource can have properties added or removed. If they are modified by the presence of an ^^auth:with-property^^ property then they only apply to the properties that are the value of the ^^auth:with-property^^ property. You can further refine this with the addition of the ^^auth:with-value^^ property, which limits the access control to only those properties with that specific value. For example, the default authorization schema (found in the rhizome config variable ^^authStructure^^) creates an access token to control adding an ^^item format^^ with the Python source format.
+In addition to permissions that correspond to the type of action associated with a request ("view", "edit", "save", etc.), access tokens can have permissions that exactly specify which properties can be added or removed from a given resource. The permissions ^^auth:permission-add-statement^^ and ^^auth:permission-remove-statement^^ control whether a resource can have properties added or removed. If they are modified by the presence of an ^^auth:with-property^^ property then they only apply to the properties that are the value of the ^^auth:with-property^^ property. You can further refine this with the addition of the ^^auth:with-value^^ property, which limits the access control to only those properties with that specific value. For example, the default authorization schema (found in the rhizome config variable ^^authStructure^^) creates an access token to control who can add an ^^item format^^ with the Python source format.
 
 In addition, Rhizome provides a simple access control scheme for modifying a request metadata via the ^^assign-metadata^^ and ^^remove-metadata^^ XPath extension functions: Any variable whose name that starts with two leading underscores ("\__") is considered read-only and can not be assigned or removed.
 Similarly, external requests (e.g. form variables) cannot contain variables that start with two underscores (this is to prevent external variables from overriding the protected variables).
+
+!Security
+Besides the access control functionality described above, Rhizome has the following security features:
+
+!!Spam control
+If a user hasn't been granted access to the ^^create-nospam-token^^ access token, Rhizome will subject the user to following two spam control checks:
+* Before saving content (e.g. pages or comments) Rhizome will check the [Akismet | akismet.com] service to see if the content is spam. This functionality is enabled when you set the ^^akismetKey^^ and ^^akismetUrl^^ config variables (where ^^akismetKey^^ can be a free WordPress API key). 
+* When generating HTML from content created by users without the ^^create-nospam-token^^ access token, Rhizome will add the attribute "rel=nofollow" to all links (see [http://microformats.org/wiki/rel-nofollow]).
+
+^^create-nospam-token^^ is granted to the default user role, so only the Guest user will be subjected to these spam checks. For more stringent spam control, remove this token from the default user role.
+
+!!Markup sanitization
+Rhizome will sanitize HTML and XML generated by content created by any user that hasn't been granted access to the ^^create-unsanitary-content-token^^ Access Token. By default, only the administrator role is 
+granted this token. Rhizome sanitizes markup using a black list as opposed to a white list -- this approach is necessary given its goal to allow users to create arbitrary markup. The default black list is designed to strip out any potentially unsafe markup for all mainstream browsers but the list can be modified through the ^^blacklistedElements^^, ^^blacklistedAttributes^^, and ^^blacklistedContent^^ config variables.
+
+!!Other Security features
+
+Rhizome also provides following security features that may require configuration. For more information on the settings mentioned below, see the [config file|RaccoonConfig] documentation.
+
+* Python pages will only be executed if the SHA1 digest of the page is listed in the ^^authorizationDigests^^ config variable.
+* By default, URL resolution is limited to only access local file system paths specified by the ^^PATH^^ config variable. These limitations can be relaxed in various ways through the following config variables: ^^SECURE_FILE_ACCESS^^, ^^DEFAULT_URI_SCHEMES^^, ^^uriResolveWhitelist^^, ^^uriResolveBlacklist^^.
+* The authorization and validation of XPath extension functions calls can be controlled by the  ^^authorizedExtFunctions^^ config variable.
+* Rhizome utilizes other security features provided by Raccoon which can customized by overriding various configuration settings (for example, the authorization of Content Processors and request metadata). See ^^rhizome-config.py^^ and the [Raccoon manual|RaccoonDoc] for more information.
 
 !Rhizome Customization
 
@@ -314,6 +352,9 @@ __addRxML__(replace = '@sitevars', contents = '''
   wiki:uses-skin:  base:light-blue.css
 ''')
 """
+
+!!Validation and update triggers
+When customizing Rhizome's behavior or adding new resource types, it may be useful to modify two scripts, [update-triggers | update-triggers?action=view-source], a RxUpdate script, and [validate-schema | validate-schema?action=view-source], a Schematron stylesheet. Rhizome invokes these scripts (in this order) each time a transaction is about to be committed. Both pages expose two XPath variables, ^^$_added^^ and ^^$_removed^^, which contain the Predicate elements that reference the all RDF statements are to be added or removed when the transaction is committed. [Update-triggers | update-triggers?action=view-source] invokes rules that can do such tasks as removing resources that are no longer in use, while [validate-schema | validate-schema?action=view-source] is used to validate that the consistency of the store will be maintained, and contains rules for testing referential integrity and uniqueness guarantees.
 
 !!Slightly Involved Customization Example
 In this example we'll add a template for displaying a print-friendly version of a page. (Note: in going through the trouble writing and testing this example, I've decided to leave it in the core product -- see ^^print-template.xsl^^.)
@@ -391,8 +432,8 @@ The import command adds content to the site by adding all the files that match t
 
 The command has these options:
 p'''--import path [--recurse] [--filenameonly] [--dest path] 
-        [--xupdate url] [--folder path] [--noindex]
-        [--format format]  [--doctype doctype] 
+        [--xupdate url] [--folder path] [--noindex] 
+        [--noshred] [--format format]  [--doctype doctype] 
         [--disposition disposition] [--token accesstoken] 
         [--label label] [--keyword keyword]'''
 where
@@ -402,7 +443,7 @@ where
 ~~^^--dest dir^^ If dest is present files will be copied to this directory, otherwise the site will directly reference the imported files.
 ~~^^--xupdate URL^^ URL to an RxUpdate file which is applied to each metarx file if present.
 ~~^^--noindex^^ Don't add imported content to the full-text index
-
+~~^^--noshred^^ Don't shred content on import.
 The following are applied to a file if no metarx file is present:
 ~~^^--folder path^^ Prepends path to name and creates folder resource if necessary
 ~~^^--keepext^^ Don't drop the file extension when naming the page.

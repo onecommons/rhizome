@@ -111,7 +111,6 @@ class Node(xml.dom.Node, object):
         try:
             return cmp(self.docIndex, other.docIndex)
         except:
-            print self, other
             raise
 
     def __ne__(self, other): #so __eq__ is called instead of __cmp__

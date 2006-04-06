@@ -1,5 +1,28 @@
 !Latest News
 
+\[31 Mar 2006]
+Version 0.6.0 of Rx4RDF and Rhizome released. 
+
+Major changes include:
+
+Rhizome: 
+* major performance enhancements: several times faster
+* supports GRDDL and "shredding", a framework for extracting RDF from content and maintaining the relationship over time.
+* better support for viewing and editing RDF directly with most RDF formats (RDF/XML, NTriples, Turtle).
+* new UI for editing users and roles
+* more Wiki features (including tracking missing pages)
+* page and comment spam detection via Akismet service    
+
+Rx4RDF:
+* much faster: now uses a simple but optimizing query engine
+* support for RDF named graphs (RDF contexts)    
+* better support for using RxPath in XML contexts (e.g. an XSLT page)
+* better support 3rd party RDF libraries and RDF stores
+
+Plus many other enhancements and bug fixes.
+
+[Download] it or view the [changelog|changelog.txt]
+
 \[21 Oct 2005]
 Version 0.5.1 of Rx4RDF and Rhizome released. 
 

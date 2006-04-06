@@ -798,7 +798,7 @@ authStructure =\
  auth:with-value-instance-of: rdfs:subPropertyOf: auth:with-value
  auth:with-value-subclass-of: rdfs:subPropertyOf: auth:with-value
  auth:with-value-subproperty-of: rdfs:subPropertyOf: auth:with-value
- auth:with-guard-that-user-can-assign: rdfs:subPropertyOf: auth:with-value
+ auth:with-value-account-has-via-this-property: rdfs:subPropertyOf: auth:with-value
  
  #######################################
  # pre-defined users and roles
@@ -863,6 +863,7 @@ authStructure =\
   #remove this property if you don't want this 
   auth:has-rights-to: base:create-nospam-token 
   auth:has-rights-to: base:change-accesstoken-guard
+  auth:has-rights-to: base:change-role-guard
  
  #######################################
  #access tokens 
@@ -980,6 +981,7 @@ Note that if you create more labels with the wiki:is-released property you'll wa
    auth:guarded-by: base:user-guard
    auth:guarded-by: base:account-guard
    auth:guarded-by: base:change-accesstoken-guard
+   auth:guarded-by: base:change-role-guard
    auth:guarded-by: base:limit-priority-guard
    
  base:execute-python-token:
@@ -995,6 +997,7 @@ Note that if you create more labels with the wiki:is-released property you'll wa
    rdfs:comment: `protects all Roles from being modified
    auth:has-permission: auth:permission-add-statement
    auth:has-permission: auth:permission-remove-statement  
+   auth:has-permission: auth:permission-new-resource-statement
    auth:priority: 100
 
  auth:Role:
@@ -1017,6 +1020,7 @@ Note that if you create more labels with the wiki:is-released property you'll wa
    auth:with-property:  auth:has-rights-to
    auth:with-property:  auth:has-role
    auth:with-property:  auth:can-assign-guard
+   auth:with-property:  auth:can-assign-role   
    auth:priority: 100
         
  base:access-token-guard:
@@ -1054,12 +1058,21 @@ Note that if you create more labels with the wiki:is-released property you'll wa
 
  base:change-accesstoken-guard:
    rdf:type: auth:AccessToken   
-   rdfs:comment: "users with this token can add or remove guards tokens that we have can-assign-guard rights to"
+   rdfs:comment: "users with this token can add or remove guards tokens that they have can-assign-guard rights to"
    auth:has-permission: auth:permission-add-statement
    auth:has-permission: auth:permission-remove-statement
    auth:with-property:  auth:guarded-by
    auth:with-property:  auth:type-guarded-by
-   auth:with-guard-that-user-can-assign: 1
+   auth:with-value-account-has-via-this-property: auth:can-assign-guard
+   auth:priority: 100  
+
+ base:change-role-guard:
+   rdf:type: auth:AccessToken   
+   rdfs:comment: "users with this token can add or remove roles that they have can-assign-role rights to"
+   auth:has-permission: auth:permission-add-statement
+   auth:has-permission: auth:permission-remove-statement
+   auth:with-property:  auth:has-role
+   auth:with-value-account-has-via-this-property: auth:can-assign-role
    auth:priority: 100  
 
  base:limit-priority-guard:
@@ -1375,12 +1388,20 @@ itemFormats = [
 ]
 
 _rfb = 'http://rx4rdf.sf.net/ns/wiki#rdfformat-'
-rdfFormats = [(_rfb+'rdfxml', 'RDF/XML', 1, 1),(_rfb+'rxml_zml', 'RxML',1,1),
-                                           (_rfb+'ntriples', 'NTriples',1,1)]
+rdfFormats = [(_rfb+'rxml_zml', 'RxML',1,1), (_rfb+'ntriples', 'NTriples',1,1)]
 try:
-   import RDF
-   rdfFormats += [(_rfb+'turtle', 'Turtle',0,1)]
-except ImportError: pass
+   import RDF #redland
+   rdfFormats += [(_rfb+'rdfxml', 'RDF/XML', 1, 1),(_rfb+'turtle', 'Turtle',0,1)]
+except ImportError: 
+   try:      
+     import rdflib #RDFLib
+     rdfFormats += [(_rfb+'rdfxml', 'RDF/XML', 1, 1)]
+   except ImportError: 
+     try:
+        import Ft.Rdf #4Suite RDF
+        rdfFormats += [(_rfb+'rdfxml', 'RDF/XML', 1, 1)]
+     except ImportError: 
+        pass
    
 #define the APPLICATION_MODEL (static, read-only statements in the 'context:application' scope)
 APPLICATION_MODEL= (

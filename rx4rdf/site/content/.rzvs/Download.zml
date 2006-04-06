@@ -1,31 +1,30 @@
-Rx4RDF requires Python 2.2 or later (2.4 recommended) and the 4Suite XML and RDF 
-libraries (at [http://4Suite.org], version 1.0a1 or later).
-
-Rx4RDF and Rhizome are tested on Linux and Windows 2000/XP  
-and should work on any platform that supports Python and 4Suite.
-It has been also known to work on Windows 98, Cygwin and OS X. 
-For OS X you should have 4Suite 1.0a4 or later installed -- see
-[http://uche.ogbuji.net/tech/akara/nodes/2003-01-01/osx] for more details.
-
 [Source (zip)|http://sourceforge.net/project/showfiles.php?group_id=85676]
 
 [Source (tar.gz)|http://sourceforge.net/project/showfiles.php?group_id=85676]
 
+Rx4RDF requires Python 2.2 or later (2.4 recommended) and the 4Suite XML library  (at [http://4Suite.org], version 1.0a1 or later). 
+
+Rx4RDF and Rhizome are tested on Linux, Windows XP, and OS X 10.4  
+and should work on any platform that supports Python and 4Suite.
+It has been also known to work on Windows 98, Windows 2000, Cygwin and BSD.
+ 
 If you're just interested in ZML you just need this one Python [file|http://cvs.sourceforge.net/viewcvs.py/rx4rdf/rx4rdf/rx/zml.py].
 
-Optional Packages:
+Optional RDF Libraries
+
+If the following RDF libraries are installed, Rx4RDF will utilize the datastores and RDF parsers that they support -- see the Raccoon manual for more info. If none are installed, Rx4RDF only supports a text file-based datastore and the NTriples and RxML RDF formats. 
+ 
+Redland ([http://librdf.org/]). Enables support for the RDF/XML and Turtle RDF formats. Note that the required Python bindings need to be installed separately.
+
+RDFLib ([http://www.rdflib.net]) Enables support for the RDF/XML format.
+
+4Suite RDF -- the latest version of 4Suite (1.0b3) does not include their RDF library. However, prior versions of 4Suite do and they can be used with RxRDF. Note that 4Suite's RDF/XML parser doesn't support recent changes to the syntax and will only be used if none of the other RDF libraries are installed.   
+
+Other optional packages:
 
 If Lupy is installed ([http://www.divmod.org/Home/Projects/Lupy]), Rhizome will
-perform full-text indexing of content (requires Python 2.3). 
+perform full-text indexing of content (requires Python 2.3 or later). 
 See the Rhizome manual for more info.
-
-RDFLib data stores can be used if RDFLib ([http://www.rdflib.net])
-is installed. See the Raccoon manual for more info. In addition, if RDFLib is 
-installed, its RDF/XML parser will be used by default (since the 4Suite's parser doesn't  
-support the new RDF/XML syntax). 
-
-Redland RDF data stores can be used if Redland ([http://www.redland.opensource.ac.uk])
-is installed. See the Raccoon manual for more info.
 
 !Install
 This is a standard Python source distribution. To install:

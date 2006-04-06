@@ -352,7 +352,9 @@ def serializeRDF(statements, type, uri2prefixMap=None,
                     db = Memory.CreateDb('', 'default')
                     import Ft.Rdf.Model
                     model = Ft.Rdf.Model.Model(db)
-                    model.add(statements)                
+                    from rx import RxPath
+                    for stmt in statements:
+                        model.add(RxPath.statement2Ft(stmt) )  
                     from Ft.Rdf.Serializers.Dom import Serializer as DomSerializer
                     serializer = DomSerializer()
                     outdoc = serializer.serialize(model, nsMap = uri2prefixMap)

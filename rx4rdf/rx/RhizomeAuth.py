@@ -57,17 +57,17 @@ def authorizationValueMatch(context, predicates, value):
         elif predicate == 'http://rx4rdf.sf.net/ns/auth#auth:with-value-subproperty-of':
             if RxPath.isProperty(context, value, object):
                 return raccoon.XTrue
-        elif predicate == 'http://rx4rdf.sf.net/ns/auth#with-guard-that-user-can-assign':
-            #assumes value is a resource, matches if the user in the context
-            #can assign the resource
+        elif predicate == 'http://rx4rdf.sf.net/ns/auth#with-value-account-has-via-this-property':            
+            #assumes value is a resource, matches if the account in the context
+            #can reach that same resource via the property which is the object of the token
             vars = kw2vars(
                 __account=context.varBindings.get((None, '__account'),[]),
                 __context = value)
             cnxt = raccoon.XPath.Context.Context(context.node,
                     varBindings = vars,
                     processorNss = {'auth': "http://rx4rdf.sf.net/ns/auth#"})                                
-            exp = '''($__account/auth:can-assign-guard |
-$__account/auth:has-role/*/auth:can-assign-guard) = $__context'''
+            exp = '''($__account | $__account/auth:has-role/*)/*[@uri='%s']
+                        = $__context''' % object
             compExpr = raccoon.RequestProcessor.expCache.getValue(exp)
             queryCache=getattr(context.node.ownerDocument, 'queryCache', None)
             if queryCache:
@@ -163,7 +163,7 @@ class RhizomeAuth(RhizomeBase):
             assert getattr(node, 'stmt') #assert it's a predicate node
             authorizingResources = self.getAuthorizingResources(
                 node.parentNode )
-            self._authorizeUpdate(accountTokens,authorizingResources, op,
+            self._authorizeUpdate(account, accountTokens,authorizingResources, op,
                 node.stmt.subject, node.stmt.predicate,node.stmt.object,
                 newResources=newResources,extraPrivileges=extraPrivileges)
         return raccoon.XTrue
@@ -250,14 +250,14 @@ class RhizomeAuth(RhizomeBase):
         for resNode, authorizingResources in recheckResources.items():
             authorizingResources = RxPath.Set.Unique(authorizingResources)
             for pred in resNode.childNodes:                    
-                self._authorizeUpdate(kw['__accountTokens'],
+                self._authorizeUpdate(kw['__account'], kw['__accountTokens'],
                     authorizingResources,
                     'http://rx4rdf.sf.net/ns/auth#permission-add-statement',
                     pred.stmt.subject, pred.stmt.predicate,pred.stmt.object,
                     newResources=kw.get('_newResources'),
                     extraPrivileges=kw.get('__extraPrivilegeResources'))
         
-    def _authorizeUpdate(self, accountTokens, authorizingResources,
+    def _authorizeUpdate(self, account, accountTokens, authorizingResources,
             action, subject, predicate=0, object=0,
             noraise=False, newResources=None,extraPrivileges=None):
         
@@ -286,7 +286,8 @@ class RhizomeAuth(RhizomeBase):
 
         def kw2dict(**kw): return kw #for python 2.2 compatibility
         
-        authkw = kw2dict(__authAction=action,__accountTokens=accountTokens,
+        authkw = kw2dict(__authAction=action, __account=account,
+            __accountTokens=accountTokens,            
             __authResources = authorizingResources,
             __authProperty=predicate, __authValue=object,
             _newResources=newResources or [],
@@ -294,22 +295,23 @@ class RhizomeAuth(RhizomeBase):
             __extraPrivilegeResources=extraPrivileges or [],
             __server__ = self.server)
         vars, extFunMap = self.server.mapToXPathVars(authkw)
-        
-        result = self.server.evalXPath(self.authorizationQueryTemplate %
-         {'minpriority': self.minPriority, 'required':required},
-                                       vars, extFunMap)
+
+        authQuery = self.authorizationQueryTemplate % { 'minpriority':
+                                    self.minPriority, 'required':required}
+        result = self.server.evalXPath(authQuery ,vars, extFunMap)
 
         if result:
             requires = []
             has = []
-            for node in authorizingResources:
+            for node in authorizingResources+forAllResources:
                 requires.extend( self.server.evalXPath(
                     required,vars, extFunMap,node=node) )
                 has.extend( self.server.evalXPath(
                     required+'[.=$__accountTokens]',
-                    vars, extFunMap, node=node) )            
+                    vars, extFunMap, node=node) )
             self.log.info('authentication failed, need tokens: %s'
-                                    % RxPath.Set.Not(requires, has))            
+                % RxPath.Set.Not(RxPath.Set.Unique(requires),
+                                 RxPath.Set.Unique(has)))
             
         #if any of the authresources requires an auth token that the
         #user doesn't have access to, the nodeset will not be empty

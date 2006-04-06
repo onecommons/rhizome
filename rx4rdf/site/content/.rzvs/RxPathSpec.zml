@@ -242,6 +242,8 @@ should these functions be in an extension namespace?
 
 +//nodeset// get-statement-resources(//nodeset//?)=  For each node in the argument nodeset that is a Predicate element, find any Subject elements whose URI reference is a ^^rdf:Statement^^ resource that reifies the Predicate element. Note that while the RDF/XML syntax only can express one reified statement resource per statement (through the ^^rdf:ID^^ attribute) it is possible and valid for a statement to have any number of reified statement resources.
 
++//nodeset// rdfdocument(//object//, //string//?, //nodeset//?)= This function is equivalent to XSLT's ^^document()^^ function except it parses RDF and returns RxPath Document nodes instead of XML Document nodes. The first and third arguments are equivalent to ^^document()^^'s first and second arguments, respectively, and the second argument is converted to a string that names the format of the RDF being parsed. The format names are implementation dependent but SHOULD include "rdfxml", "ntriples", and "unknown". If this argument is ommitted or "unknown", the implementation SHOULD try to figure out the format or raise an error if it can not. This function MAY only be available in the context of an XSLT or RXSLT processor.
+
 <  s1 title="RxSLT":
 RxSLT is a language for transforming RDF to XML. It is syntactically identical to [XSLT 1.0||http://www.w3.org/TR/xslt] and behaves as very similarly. A RxSLT processor behaves indentically to a XSLT 1.0 processor transforming a document whose data model conformed to the Data Model mapping described above; with the following exceptions:
 <   s2 title="Patterns":

@@ -8,9 +8,10 @@ undefinedPageIndicator=False
 
 #import all zml pages into the model template
 #(this makes development easier -- we can always recreated the site on load)
-templateMap.update(rhizome.doImport('content/.rzvs/*.zml', 
+importedPages = rhizome.doImport('content/.rzvs/*.zml', 
    label='wiki:label-released', fixedBaseURI='path:.rzvs/', 
-   token='base:save-only-token', save=False))
+   token='base:save-only-token', save=False)
+templateMap.update(importedPages)
 
 #override default template by adding or replacing pages
 __addItem__('RxPathSpec',loc='path:.rzvs/RxPathSpec.zml', format='zml', 

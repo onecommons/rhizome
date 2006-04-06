@@ -1154,6 +1154,8 @@ class ParseState(object):
                     linkinfo = nameAndLink[-1].strip() #the right side of the |
                     
                     words = linkinfo.split()
+                    if not words:
+                        raise ZMLParseError('link missing URL: ['+linkToken+']')
 
                     #last character is the annotation delineator,
                     #so there's no link

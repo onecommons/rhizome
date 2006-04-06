@@ -399,6 +399,9 @@ the Action is run (default is False).
             if appVars:
                 kw.update(appVars)
 
+            if kw.get('beforeConfigHook'):
+                kw['beforeConfigHook'](kw)
+
             def initConstants(varlist, default):
                 return assignVars(self, kw, varlist, default)
                             

@@ -9,7 +9,7 @@ include site/*
 exclude site/test-config*.py
 include blank/*
 include docs/*
-global-exclude .cvsignore
+global-exclude .cvsignore .DS_Store
 global-exclude *.bak *.bk? *.nt *.metarx *.pyc *.log *.lock *.tmp *.bpl *.prof *.db
 include test/*.nt
 recursive-include rhizome *.nt

@@ -1,9 +1,9 @@
 Rx4RDF and Rhizome Changelog
 ============================
-Changes in Version 0.x.x (xxx xx, 200x)
+Changes in Version 0.6.0 (March 31, 2006)
 ----------------------------------------
 * RxPath: Replaced rdf:ID attribute with get-statement-uris() function
-* RxPath: add rdfDocument() XPath function (invoke from XSLT/RxSLT only)
+* RxPath: add rdfdocument() XPath function (invoke from XSLT/RxSLT only)
 * RxPath: get Redland adapter working again
 * raccoon: add $__store global request variable
 * RxPath: preliminary support for named graphs/contexts: 
@@ -14,45 +14,55 @@ Changes in Version 0.x.x (xxx xx, 200x)
 ** added get-graph-predicates(graphuri) XPath function
 * XUpdate: add "to-graph" attribute to XUpdate elements to specify the subgraph for additions.
 * utils: move RDF-related functions to new module RxPathUtils, cleaned up RDF parsing APIs
-* raccoon: replace save-metadata XPath function with save-rdf: can now handle multiple RDF formats
-* raccoon: replace XPath function get-rdf-as-xml with serialize-rdf, now supports multiple formats
 * raccoon: add uriResolveBlacklist, uriResolveWhitelist and DEFAULT_URI_SCHEMES config settings
-     restrict URL resolution with URL scheme and by URL regular expression whitelists or blacklists 
+   (restrict URL resolution with URL scheme and by URL regular expression white/blacklists)
 * utils: change threadlocalattribute to rely on threading.local 
         (and implement threading.local for Python 2.3)
-* Rhizome: except for new resources, move class-based authentication actions back to fine-grained check
+* Rhizome: except for new resources, move class-based authentication to fine-grained check
 * raccoon: DomStore now invalidates affected cache nodes on transaction rollback
+* raccoon: add support for multiple RDF formats (RDF/XML, NTriples, RxML, Turtle)
+** replace save-metadata XPath function with save-rdf
+** replace get-rdf-as-xml XPath function with serialize-rdf
 * Rhizome: better support for RDF formats
 ** add a NTriples item format (and Turtle if redland is installed)
-** enable viewing and editing of RDF in all supported formats (RDF/XML, NTriples, RxML, Turtle)
+** enable viewing and editing of RDF in all supported formats 
    on these pages: edit-metadata, default-resource-viewer, view-metadata and search
 * raccoon: fix bug where uncacheable XSLT stylesheets where being cached
 * raccoon: fix bug where has- and get-metadata calls weren't being added to XSLT cache keys
 * RxPath: add MemModel, an efficient in-memory Model; clean up Model constructors
-* RxPath: remove dependencies on 4Suite Rdf package; now optional
+* RxPath: remove dependencies on 4Suite Ft.Rdf package; now optional
+** enables support for 4Suite 1.0b3 (which has no RDF package)
+** add Statement and MutableStatement classes
 * Rhizome: add shredding support:
 ** add shred() and shred-with-xslt() XPath functions
-** add shredders config variable (DOC), shredders include:
-** shredders for RDF (any supported format)
-** GRDDL XSLT stylesheets
+** add shredders config variable, default shredders include:
+*** RDF (any supported format)
+*** GRDDL 
+*** XHTML: extract hyperlinks, add wiki:links-to statements
+*** Forrest FAQ XML: extract FAQ resources
+*** extract doctype out of XML, removed Doctype dropdown from edit.xsl
 ** save.xml invokes shred() when saving content
 ** have import command shred unless new --noshred option is used
-** extract hyper-links out of XHTML, add wiki:links-to statements
-** extract FAQ resources out of Forrest FAQ XML
-** extract doctype out of XML, removed Doctype dropdown from edit.xsl
-* Add support for keeping track of links to missing pages.
+** add a "Extracted metadata" link on the view-metadata page to view the shredded RDF
+* Rhizome: Add support for keeping track of links to missing pages.
 * raccoon: path: URI resolver nows escapes URLs properly
 * Rhizome: search.xsl - fix property links
-* RxPath: revamped RDFS schema support, now includes type inference based on rdfs:range or rdfs:domain.
-* Rhizome: fix the "Save (keep editing)" option the Edit page.
+* RxPath: completed RDFS schema support, including type inference based on rdfs:range or rdfs:domain.
+* Rhizome: fix the "Save (keep editing)" option on the Edit page.
 * Rhizome: save current default zml version when creating content and use it later if necessary
-* Rhizome: inital support for collaborative bookmarks
-* Rhizome: support for the Akismet anti-spam service (to activate, set the akismetKey and akismetUrl config vars)
+* Rhizome: inital support for collaborative bookmarks (see the bookmarksetup page)
+* Rhizome: support for the Akismet anti-spam service 
+           (to activate, set the akismetKey and akismetUrl config vars)
 * XUpdate: get xupdate:include element working
 * Rhizome: add update-triggers.xml, moved folder creation and cleanup code there.
 * Rhizome: factored out keyword editing and saving into new edit-tags.xsl and replacetags.xml files
-* RxPath: add simple optimizing query engine 
-* Raccoon: add defaultExpiresIn config setting for setting expires header if its not already set (default: 1 hour)
+* Raccoon: add defaultExpiresIn config setting for setting expires header 
+           if its not already set (default: 1 hour)
+* Raccoon: add -s server.xml command line option to root-config.py
+* utils: monkey patch Python's HTMLParser to fix bug with comments in script tags 
+* Rhizome: revamped create/edit/view user page, including new UI for joining roles and user groups.
+* Rhizome: changed auth:with-guard-that-user-can-assign to auth:with-value-account-has-via-this-property
+* RxPath: add simple but optimizing query engine (queries can run 10x - 1000x faster!)
 
 Changes in Version 0.5.1 (Oct 21, 2005)
 ----------------------------------------

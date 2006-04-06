@@ -1,3 +1,4 @@
+#?zml0.7
 <document:
 < header:
 <  title: `Raccoon Manual
@@ -46,25 +47,29 @@ Raccoon is an application server that runs a given application and is always in 
 ^^<python scrips dir>/run-raccoon -x -a your-app-config.py  --app-specific-arg^^
 
 !!Running multiple applications 
-A single instance of Raccoon can be used to run multiple applications with different base URLs or different hostnames. The functionality is provided by a simple Raccoon application (called ^^root-config^^) that dispatches incoming HTTP requests to the appropriate application. ^^root-config^^'s data store contains the configuration settings describing how the request should be delegates and Raccoon is launched with ^^root-config^^.  A typical root-config looks like:
+A single instance of Raccoon can be used to run multiple applications with different base URLs or different hostnames. The functionality is provided by a simple Raccoon application (called ^^root-config^^) that dispatches incoming HTTP requests to the appropriate application. To use Raccoon is launched with the ^^root-config^^ application which in turn can take a XML configuration file as an command line argument. A typical invocation would look like:
+
+^^run-raccoon -a root-config.py -s server.xml^^
+
+Below is an example of a ^^server.xml^^ configuration file:
 
 p"""
-__include__('/usr/share/rx4rdf/rhizome/root-config.py')
-
-APPLICATION_MODEL = rxml.zml2nt(nsMap = nsMap, contents='''
- {http://www.foo.com/}:
-   config:hostname: "foo.com"
-   config:hostname: "foo.org"
-   config:config-path: "foo/foo-config.py"
-   config:path: "foo"
-   config:appName: "foo"
-
- {http://bar.org/bar/}:
-   config:appBase: "/bar"   
-   config:config-path: "bar/bar-config.py"
-   config:path: "bar"
-   config:appName: "bar"
-''')
+<server xmlns='http://rx4rdf.sf.net/ns/raccoon/config#' >
+  <host model-uri='http://www.foo.com/'
+     config-path=""foo/foo-config.py""
+     path="." >
+   <hostname>foo.com</hostname>
+   <hostname>foo.org</hostname>
+   <hostname>foo.bar.org</hostname>
+ </host>
+ 
+  <host model-uri='http://bar.org/bar/'
+     config-path="bar/bar-config.py"
+     path="." 
+     appBase="/bar"
+     appName="bar"
+  />
+</server>
 """
 
 For more information, see the comments in ^^root-config.py^^ found in the rhizome directory.
@@ -165,10 +170,11 @@ In addition, when a request dictionary is mapped to XPath variables, the followi
 +STOP=When an action's match expression evaluates to this variable, the RequestProcessor will stop evaluating the rest of the action's match expressions.
 +_APP_BASE=The value of the ^^appBase^^ config setting
 +BASE_MODEL_URI=The value of the ^^BASE_MODEL_URI^^ config setting
++__store=A reference to the application store's root Document node. Using this variable allows RxPath expressions to be executed when the store isn't part of XPath context, for example when executing a regular XSLT stylesheet. 
 
 __Request Triggers__
 
-Raccoon invokes the following request triggers (or request types). The application can invoke its own triggers using the ^^runActions^^ method -- the application just needs to add the trigger name as a key in its ^^actions^^ dictionary. Requestor objects and the "site:" URL resolvers default to invoking the 'http-request' trigger but this can be globally changed by setting ^^DEFAULT_TRIGGER^^ (for an application not designed to respond to HTTP requests, for example) or in a specific context by assigning the (thread-local) ^^RequestProcessor.currentRequestTrigger^^ property.
+Raccoon invokes the following request triggers (or request types). In addition, an application can invoke its own triggers using the ^^runActions^^ method -- the application just needs to add the trigger name as a key in its ^^actions^^ dictionary. Requestor objects and the "site:" URL resolvers default to invoking the 'http-request' trigger but this can be globally changed by setting ^^DEFAULT_TRIGGER^^ (for an application not designed to respond to HTTP requests, for example) or in a specific context by assigning the (thread-local) ^^RequestProcessor.currentRequestTrigger^^ property.
 
 +^^load-model^^=The load-model request is invoked when a model is first loaded, usually when the Raccoon application is initialized. No specific request metadata is set.
 
@@ -316,7 +322,7 @@ After the model is loaded, any statements in the ^^APPLICATION_MODEL^^ config va
 
 Raccoon loads the model using the class or factory function specified by the ^^domStoreFactory^^ config variable. The function must return an object that conforms to the ^^DomStore^^ interface. Raccoon provides two ^^DomStore^^ implementations: ^^XMLDomStore^^ for using an XML file as the datastore and ^^RxPathDomStore^^ (the default), which exposes an RDF model as a RxPath DOM. Once the DOMStore is created, its ^^loadDom^^ method is called, passing both the value of the ^^-m^^ argument or ^^STORAGE_PATH^^ and (as the default model) a stream containing the NTriples stored in STORAGE_TEMPLATE. 
 
-^^RxPathDomStore^^ can rely different RDF libraries for its underlying RDF store, depending on a factory function passed to its constructor. The default is ^^RxPath.initFileModel^^, which can load RDF, NTriples, and Metakit files created by 4Suite, but always saves the model as a special NTriples file that acts as a transaction log. This allowing the model to be incrementally updated with appends. Also available is ^^RxPath.initRedlandHashBdbModel^^, which loads and saves to Berkeley DB files created by Redland (requires [Redland|http://www.redland.opensource.ac.uk/] to be installed); and ^^RxPath.initRDFLibModel^^, which loads and saves to the specified RDF/XML file (requires [RDFLib|http://rdflib.net]). Below is an example from of an application config file demonstrating how to use one of these alternative RDF libraries: 
+^^RxPathDomStore^^ can rely different RDF libraries for its underlying RDF store, depending on the class or factory function passed to its constructor. The default is ^^RxPath.IncrementalNTriplesFileModel^^, which can load RDF file in any of the supported RDF formats, but always saves the model as a special NTriples file that acts as a transaction log. This allowing the model to be incrementally updated with appends. Also available is ^^RxPath.RedlandHashBdbModel^^, which loads and saves to Berkeley DB files created by Redland (requires [Redland|http://www.redland.opensource.ac.uk/] to be installed); and ^^RxPath.RDFLibFileModel^^, which loads and saves to the specified RDF/XML file (requires [RDFLib|http://rdflib.net]). Below is an example from of an application config file demonstrating how to use one of these alternative RDF libraries: 
 
 p"""
 def createRedlandDomStore():
@@ -325,7 +331,7 @@ def createRedlandDomStore():
 domStoreFactory = createRedlandDomStore
 """
 
-4Suite, Redland, and RDFLib, each, in turn, support several other RDF stores (including various SQL databases) and alternative ^^initModel^^ functions can be written to use these fairly easily, however until the underlying RxPath implementation is improved there's not much benefit in using these other data sources.
+4Suite, Redland, and RDFLib, each, in turn, support several other RDF stores (including various SQL databases) and alternative ^^domStoreFactory^^ functions can be written to use these fairly easily.
 
 !!Transactions
 
@@ -333,7 +339,7 @@ Each top-level request (that is, a request not invoked within another request, i
 
 After the actions associated with a request are run, the transaction is committed if any of the transaction's participants have been modified. Application code can mark a transaction as read-only by adding a variable named ^^__readOnly^^ to the request metadata; if it is present and evaluates to a non-zero value, the transaction will be aborted if any modification occured. During the commit process three trigger will be invoked: one before the commit process begins (^^before-prepare^^), another after all the transaction participants have voted to commit (^^before-commit^^) and a third one after the commit succeeded (^^after-commit^^). See the above section on request triggers for more details. During the first trigger modifications can still be made to the transaction and this trigger could be used to, for example, transactionally update a full text index based on changes to the data store. By the time the second trigger is invoked the changes to the transaction is finalized but the transaction can still be aborted, at this point schema validation could occur. With the third trigger, the transaction has completed successfully; this could be used to implement notifications about changes to the application. 
 
-Besides allowing an application to modified the data store's DOM directly, Raccoon provides a few methods for updating the data store. At the lowest level is ^^updateDOM^^ which takes a list of statements to add and remove. Also available is ^^processRxML^^ which parses RxML and updates the model either by adding new statements or, if a list of resources to replace is specified, by merging in the difference between the RxML and the resource list. Finally, there is the ^^xupdateRDFDom^^ method which processes an [rx4rdf:RxUpdate] document and is used by the RxUpdate content processor.
+Besides allowing an application to modified the data store's DOM directly, Raccoon provides a few methods for updating the data store. At the lowest level is ^^updateDOM^^ which takes a list of statements to add and remove. Also available is ^^updateStoreWithRDF^^ which parses RDF and updates the model either by adding new statements or, if a list of resources to replace is specified, by merging in the difference between the specified RDF and the resource list. Finally, there is the ^^xupdateRDFDom^^ method which processes an [rx4rdf:RxUpdate] document and is used by the RxUpdate content processor.
 
 #todo: describe global process lock, update statement
 

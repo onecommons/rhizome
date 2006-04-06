@@ -510,6 +510,11 @@ class RhizomeBase(object):
         except akismet.AkismetError, e:            
             self.log.warning('error invoking akismet API: %s %s' % (e.response, e.statuscode))
             return raccoon.XFalse
+        except:
+            #akismet module doesn't handle, for example, socket errors
+            self.log.exception('unexpected error invoking akismet')
+            return raccoon.XFalse
+
 
     ###text indexing ###
     #todo:
