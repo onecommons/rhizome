@@ -225,6 +225,7 @@ for functionName in ['date','time', 'year', 'leap-year', 'month-in-year',
 #chance the local files they depend on might change while the cache is being used
 EnvironmentDependentFunctions = dict([(x, None) for x in [
     (None, 'document'),
+    (None, 'rdfdocument'),
     (RXWIKI_XPATH_EXT_NS, 'openurl'),
     (RXWIKI_XPATH_EXT_NS, 'file-exists') ]])
 
