@@ -577,6 +577,12 @@ class Processor:
                     href = node.getAttributeNS(EMPTY_NAMESPACE, u'href')
                     if not href:
                         raise XUpdateException(XUpdateException.NO_HREF)
+                    if href:
+                        href = self.parseAVT(href)
+                        oldNss = context.processorNss
+                        context.processorNss = Domlette.GetAllNs(node)
+                        href = href.evaluate(context)
+                        context.processorNss = oldNss
                     
                     reader = Domlette.NonvalidatingReader
                     xupdate = reader.parseUri(href)
