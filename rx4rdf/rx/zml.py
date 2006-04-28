@@ -812,12 +812,13 @@ class MarkupMapFactoryHandler(Handler):
         #    self.defaultNSDeclaration = value
         super(MarkupMapFactoryHandler, self).attrib(name, value)
 
-    #def endAttribs(self):
-    #    if self.elementCount < 2 and not self.defaultNSDeclaration:
-    #        defaultNS = self.st.mm.wantDefaultNSDeclaration()
-    #        if defaultNS:
-    #            self.nextHandler.attrib('xmlns', defaultNS)
-    #    super(MarkupMapFactoryHandler, self).endAttribs()
+    def text(self, string):
+        #note: <!DOCTYPE will should up as text
+        if not self.markupfactory.done and self.elementCount < 2:
+            mm = self.markupfactory.text(string)
+            if mm:
+                self.st.mm = mm
+        super(MarkupMapFactoryHandler, self).text(string)
                             
     def comment(self, string): 
         if not self.markupfactory.done and self.elementCount < 2:
@@ -857,22 +858,21 @@ def stripQuotes(strQuoted, checkEscapeXML=True):
         
     #python 2.2 and below won't eval unicode strings while in unicode,
     #so temporarily encode as UTF-8
-    #NOTE: may cause some problems, but good enough for now
-    strUTF8 = strQuoted.encode("utf-8")
+    if sys.version_info < (2, 3) and isinstance(strUnquoted, unicode):
+        strQuoted = strQuoted.encode("utf8")
+
     #remove p prefix from string
-    if strUTF8[0] in 'pP':
-        strUTF8 = 'u' + strUTF8[1:]
-    elif strUTF8[0] in 'rR' and strUTF8[1] in 'pP':
-        strUTF8 = 'ur' + strUTF8[2:]
+    if strQuoted[0] in 'pP':
+        strQuoted = 'u' + strQuoted[1:]
+    elif strQuoted[0] in 'rR' and strQuoted[1] in 'pP':
+        strQuoted = 'ur' + strQuoted[2:]
     if escapeXML:
         #we need to do this before eval() because eval("'\&'") == eval("'\\&'")
-        strUTF8 = xmlescape(strUTF8)
-    strUnquoted = eval(strUTF8)
+        strQuoted = xmlescape(strQuoted)
+    strUnquoted = eval(strQuoted)
     #now handle and \U and \u: replace with character reference
     strUnquoted = re.sub(r'\\U(.{8})', r'&#x\1;', strUnquoted)
     strUnquoted = re.sub(r'\\u(.{4})', r'&#x\1;', strUnquoted)        
-    if type(strUnquoted) != type(u''):
-        strUnquoted = unicode(strUnquoted, "utf-8")
     return strUnquoted
 
 def xmlquote(quote, escape=True):
@@ -917,7 +917,7 @@ def xmlescape(s):
     return s
         
 def zmlString2xml(strText, markupMapFactory=None, **kw):
-    if type(strText) == type(u''):
+    if isinstance(strText, unicode):
         strText = strText.encode("utf8")
     fd = StringIO.StringIO(strText)
     contents = zml2xml(fd, mmf=markupMapFactory, **kw)   
@@ -1815,7 +1815,6 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
     outputHandler = handler or OutputHandler(output)
     st.handler = handler = MarkupMapFactoryHandler(st, outputHandler)
     del st
-        
     try:                    
         tokenize(fd.readline, parser)
     except ZMLParseError, e:        
@@ -1842,7 +1841,7 @@ def zml2xml(fd, mmf=None, debug = 0, handler=None, prettyprint=False,
             import Ft.Xml.InputSource, Ft.Xml.Domlette, Ft.Xml.Lib.Print
             xmlInputSrc = Ft.Xml.InputSource.DefaultFactory.fromString(xml)
             prettyOutput = StringIO.StringIO()
-            reader = Ft.Xml.Domlette.NonvalidatingReader
+            reader = Ft.Xml.Domlette.NoExtDtdReader
             xmlDom = reader.parse(xmlInputSrc)        
             Ft.Xml.Lib.Print.PrettyPrint(xmlDom, stream=prettyOutput)
             return prettyOutput.getvalue()
@@ -2016,7 +2015,7 @@ def xml2zml(input, out, NL = os.linesep):
     zml.feed( input )
     zml.close()
 
-if __name__ == '__main__':
+def main():
     if len(sys.argv) < 2 or (sys.argv[-1][0] == '-' and sys.argv[-1] != '-'):        
         cmd_usage = '''usage: %s [options] (file | -)
 
@@ -2096,7 +2095,14 @@ ZML to XML options:
             file = sys.stdin
         else:
             file = open(sys.argv[-1])
-        
+            
+        enc = getattr(file, 'encoding', None) 
+        if enc or sys.platform == 'win32':
+            import codecs
+            #use the OS codepage
+            file = codecs.EncodedFile(file, 'utf8',enc or 'mbcs') 
         print zml2xml(file, mmf, debug, prettyprint=prettyprint,
                 rootElement = rootElement, mixed=not markupOnly)    
 
+if __name__ == '__main__':
+    main()
