@@ -500,10 +500,11 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
             
         
     def commit(self, **kw):
-        if self.autocommit:
+        if self.autocommit:            
             return
     
         super(RDFSSchema, self).commit(**kw)
+        self.entailments.commit(**kw)
         
         self.subproperties = self.currentSubProperties        
         self.subtypes = self.currentSubTypes
@@ -515,6 +516,7 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
     
     def rollback(self):
         super(RDFSSchema, self).rollback()
+        self.entailments.rollback()
         
         self.currentSubProperties = self.subproperties
         self.currentSubTypes = self.subtypes
@@ -541,5 +543,6 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
         '''        
         self.removeFromSchema( (stmt,) )
         self.model.removeStatement(stmt)
+        self.entailments.removeStatement(stmt)
 
 defaultSchemaClass = RDFSSchema        
