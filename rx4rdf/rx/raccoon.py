@@ -408,9 +408,7 @@ the Action is run (default is False).
             initConstants( [ 'nsMap', 'extFunctions', 'actions',
                              'authorizationDigests',
                              'NOT_CACHEABLE_FUNCTIONS', ], {} )
-            initConstants( [ 'STORAGE_PATH', 'STORAGE_TEMPLATE',
-                             'APPLICATION_MODEL',
-                             'DEFAULT_MIME_TYPE', 'transactionLog'], '')
+            initConstants( ['DEFAULT_MIME_TYPE'], '')
 
             initConstants( ['appBase'], self.appBase)
             assert self.appBase[0] == '/', "appBase must start with a '/'"
@@ -432,7 +430,7 @@ the Action is run (default is False).
 
             self.txnSvc = transactions.RaccoonTransactionService(self)
             domStoreFactory = kw.get('domStoreFactory', DomStore.RxPathDomStore)
-            self.domStore = domStoreFactory()                        
+            self.domStore = domStoreFactory(**kw)                        
             self.domStore.addTrigger = self.txnSvc.addHook
             self.domStore.removeTrigger = self.txnSvc.removeHook
             self.domStore.newResourceTrigger = self.txnSvc.newResourceHook
@@ -562,21 +560,9 @@ the Action is run (default is False).
             assert self.lock
             return glock.LockGetter(self.lock)
 
-        def loadModel(self):        
-            if self.source:
-                source = self.source
-            else:
-                source = self.STORAGE_PATH
-            if not source:
-                self.log.warning('no model path given and STORAGE_PATH'
-                                 ' is not set -- model is read-only.')
-            elif not os.path.isabs(source):
-                #todo its possible for source to not be file path
-                #     -- this will break that
-                source = os.path.join( self.baseDir, source)
-
+        def loadModel(self):
             if not self.lock:            
-                lockName = 'r' + `hash(repr(source))` + '.lock'
+                lockName = 'r' + str(hash(self.MODEL_RESOURCE_URI)) + '.lock'
                 self.lock = self.LockFile(lockName)
                 
             lock = self.getLock()
@@ -590,8 +576,7 @@ the Action is run (default is False).
                 self.actionCache = MRUCache.MRUCache(self.ACTION_CACHE_SIZE,
                                                      digestKey=True)
                 
-                self.domStore.loadDom(self, source,
-                                StringIO.StringIO(self.STORAGE_TEMPLATE))
+                self.domStore.loadDom(self)
             finally:
                 lock.release()
     ##        outputfile = file('debug.xml', "w+", -1)
@@ -815,8 +800,8 @@ the Action is run (default is False).
                 raise exc
             return result, contextNode, retVal
 
-        def _doActionsTxn(self, sequence, kw, contextNode, retVal):
-            self.txnSvc.begin(source=self.getPrincipleFunc(kw))
+        def _doActionsTxn(self, sequence, kw, contextNode, retVal):            
+            self.txnSvc.begin()
             self.txnSvc.state.kw = kw
             self.txnSvc.state.contextNode = contextNode
             self.txnSvc.state.retVal = retVal
@@ -828,7 +813,9 @@ the Action is run (default is False).
                     self.txnSvc.abort()
                 raise
             else:
-                if self.txnSvc.isActive(): #could have already been aborted                
+                if self.txnSvc.isActive(): #could have already been aborted                    
+                    self.txnSvc.addInfo(source=self.getPrincipleFunc(kw))
+
                     self.txnSvc.state.result = result
                     self.txnSvc.state.contextNode = contextNode
                     self.txnSvc.state.retVal = retVal
@@ -1626,7 +1613,7 @@ Please check the URL to ensure that the path is correct.</p>
                 raise CmdArgError('')
             try:
                 root = HTTPRequestProcessor(appName='root', **kw)
-            except (TypeError), e:
+            except (TypeError), e:                
                 index = str(e).find('argument') #bad keyword arguement
                 if index > -1:                    
                     raise CmdArgError('invalid ' +str(e)[index:])
