@@ -22,14 +22,18 @@ class DomStore(transactions.TransactionParticipant):
     addTrigger = None
     removeTrigger = None
     newResourceTrigger = None
-        
+
+    def __init__(**kw):
+        pass
+    
     def loadDom(self,requestProcessor, location, defaultDOM):
         ''' Load the DOM located at location (a filepath).
         If location doesn't exist create a new DOM that is a copy of 
         defaultDOM, a file-like of appropriate type
         (e.g. an XML or RDF NTriples file).
         '''
-        
+        self.log = logging.getLogger("domstore." + requestProcessor.appName)
+                
     def evalXPath(self, xpath, context, expCache=None, queryCache = None):
         pass
 
@@ -50,19 +54,40 @@ class DomStore(transactions.TransactionParticipant):
         If this is not implemented, it should raise KeyError (the default implementation).
         '''
         raise KeyError
-        
+
+    def _normalizeSource(self, requestProcessor, path):
+        #if source was set on command line, override config source
+        if requestProcessor.source:            
+            source = requestProcessor.source
+        else:
+            source = path
+
+        if not source:
+            self.log.warning('no model path given and STORAGE_PATH'
+                             ' is not set -- model is read-only.')            
+        elif not os.path.isabs(source):
+            #todo its possible for source to not be file path
+            #     -- this will break that
+            source = os.path.join( requestProcessor.baseDir, source)
+        return source
+    
 class XMLDomStore(DomStore):
     _defaultModel = None
     _location = None
     prettyPrint = False
+
+    def __init__(self, STORAGE_PATH ='', STORAGE_TEMPLATE='', **kw):
+        self.STORAGE_PATH = STORAGE_PATH
+        self._defaultModel = StringIO.StringIO(STORAGE_TEMPLATE)
     
-    def loadDom(self, requestProcessor, source, defaultModel):
-        self.log = logging.getLogger("domstore." + requestProcessor.appName)        
+    def loadDom(self, requestProcessor):        
+        self.log = logging.getLogger("domstore." + requestProcessor.appName)
+        source = self._normalizeSource(requestProcessor, self.STORAGE_PATH)
+
         if os.path.exists(source):
             inputSource = InputSource.DefaultFactory.fromUri(Uri.OsPathToUri(source))
         else:
-            inputSource = InputSource.DefaultFactory.fromStream(defaultModel)
-            self._defaultModel = defaultModel
+            inputSource = InputSource.DefaultFactory.fromStream(self._defaultModel)
             
         self._location = source
         self.dom = Domlette.NonvalidatingReader.parse(inputSource)
@@ -115,9 +140,17 @@ class XMLDomStore(DomStore):
     def abortTransaction(self, txnService):
         #reload the file
         self.loadDom(None, self._location, self._defaultModel)
+            
+class RxPathDomStore(DomStore):
 
-class RxPathDomStore(DomStore):        
-    def __init__(self, modelFactory=RxPath.IncrementalNTriplesFileModel, schemaFactory=RxPath.defaultSchemaClass):
+    def __init__(self, modelFactory=RxPath.IncrementalNTriplesFileModel,
+                 schemaFactory=RxPath.defaultSchemaClass,                 
+                 STORAGE_PATH ='',
+                 STORAGE_TEMPLATE='',
+                 APPLICATION_MODEL='',
+                 transactionLog = '',
+                 VERSION_STORAGE_PATH='',
+                 versionModelFactory=None, **kw):
         '''
         modelFactory is a RxPath.Model class or factory function that takes
         two parameters:
@@ -127,28 +160,67 @@ class RxPathDomStore(DomStore):
         schemaClass 
         '''
         self.modelFactory = modelFactory
+        self.versionModelFactory = versionModelFactory or modelFactory
         self.schemaFactory = schemaFactory
-                                        
-    def loadDom(self, requestProcessor, source, defaultTripleStream):        
+        self.APPLICATION_MODEL = APPLICATION_MODEL
+        self.STORAGE_PATH = STORAGE_PATH
+        self.VERSION_STORAGE_PATH = VERSION_STORAGE_PATH
+        self.defaultTripleStream = StringIO.StringIO(STORAGE_TEMPLATE)
+        self.transactionLog = transactionLog
+            
+    def loadDom(self, requestProcessor):        
         self.log = logging.getLogger("domstore." + requestProcessor.appName)
-        model = self.modelFactory(source,
-                        RxPath.NTriples2Statements(defaultTripleStream))
+
+        normalizeSource = getattr(self.modelFactory, 'normalizeSource',
+                                  DomStore._normalizeSource)
+        source = normalizeSource(self, requestProcessor,self.STORAGE_PATH)
+
+        modelUri=requestProcessor.MODEL_RESOURCE_URI        
+        from rx import RxPathGraph
+        initCtxUri = RxPathGraph.getTxnContextUri(modelUri, 0)
+        defaultStmts = RxPath.NTriples2Statements(self.defaultTripleStream, initCtxUri)
+
+        if self.VERSION_STORAGE_PATH:
+            normalizeSource = getattr(self.versionModelFactory, 'normalizeSource',
+                                  DomStore._normalizeSource)
+            versionStoreSource = normalizeSource(self, requestProcessor,
+                                                 self.VERSION_STORAGE_PATH)
+            delmodel = self.versionModelFactory(source=versionStoreSource,
+                                                defaultStatements=[])
+        else:
+            delmodel = None
+
+        #note: to override loadNtriplesIncrementally, set this attribute
+        #on your custom modelFactory function
+        if getattr(self.modelFactory, 'loadNtriplesIncrementally', False):
+            if not delmodel:
+                delmodel = RxPath.MemModel()
+            dmc = RxPathGraph.DeletionModelCreator(delmodel)            
+            model = self.modelFactory(source=source, defaultStatements=defaultStmts,
+                                              incrementHook=dmc)        
+            lastScope = dmc.lastScope
+        else:
+            model = self.modelFactory(source=source, defaultStatements=defaultStmts)
+            lastScope = None
                 
-        if requestProcessor.APPLICATION_MODEL:
-            appTriples = StringIO.StringIO(requestProcessor.APPLICATION_MODEL)
-            stmtGen = RxPath.NTriples2Statements(appTriples, 'context:application')
+        if self.APPLICATION_MODEL:
+            appTriples = StringIO.StringIO(self.APPLICATION_MODEL)
+            stmtGen = RxPath.NTriples2Statements(appTriples, RxPathGraph.APPCTX)
             appmodel = RxPath.MemModel(stmtGen)
             model = RxPath.MultiModel(model, appmodel)
             
-        if requestProcessor.transactionLog:
+        if self.transactionLog:
             model = RxPath.MirrorModel(model, RxPath.IncrementalNTriplesFileModel(
-                requestProcessor.transactionLog, []) )
-            
+                self.transactionLog, []) )
+
+        graphManager = RxPathGraph.NamedGraphManager(model, delmodel,lastScope)
+        
         #reverse namespace map #todo: bug! revNsMap doesn't work with 2 prefixes one ns            
         revNsMap = dict(map(lambda x: (x[1], x[0]), requestProcessor.nsMap.items()) )
         self.dom = RxPath.createDOM(model, revNsMap,
-                                modelUri=requestProcessor.MODEL_RESOURCE_URI,
-                                    schemaClass = self.schemaFactory)
+                                modelUri=modelUri,
+                                schemaClass = self.schemaFactory,
+                                graphManager = graphManager)
         self.dom.addTrigger = self.addTrigger
         self.dom.removeTrigger = self.removeTrigger
         self.dom.newResourceTrigger = self.newResourceTrigger              
