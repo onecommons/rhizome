@@ -12,7 +12,7 @@ __all__ = ["raccoon", "RxPathDom", "RxPath", "utils", 'htmlfilter',
            "Server", "XUpdate", 'MRUCache', "DomTree", 
            "glock", "metakitdriver", "htmldiff" ]
 
-__version__ = '0.6.0'
+__version__ = '0.6.1'
 
 try:
     import Ft
@@ -25,3 +25,12 @@ if sys.version_info < (2, 3):
 else:
     import logging
 #for python 2.2 compatibility use 'from rx import logging' instead of import logging
+
+try:
+    set = set
+    frozenset = frozenset
+except NameError:
+    import sets
+    set = sets.Set
+    frozenset = sets.ImmutableSet
+#for python 2.3 compatibility use "from rx import set"

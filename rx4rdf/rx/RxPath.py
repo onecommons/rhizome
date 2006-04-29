@@ -27,9 +27,11 @@ log = logging.getLogger("RxPath")
 
 useQueryEngine = 1
 
-def createDOM(model, nsRevMap = None, modelUri=None, schemaClass = defaultSchemaClass):
+def createDOM(model, nsRevMap = None, modelUri=None,
+        schemaClass = defaultSchemaClass, graphManager=None):
     from rx import RxPathDom
-    return RxPathDom.Document(model, nsRevMap,modelUri,schemaClass)
+    return RxPathDom.Document(model, nsRevMap,modelUri,schemaClass,
+                              graphManager=graphManager)
 
 
 
@@ -400,10 +402,14 @@ def getGraphPredicates(context, uri):
     uri = StringValue(uri)
     predicates = []
     doc = context.node.ownerDocument
-    statements = doc.model.getStatements(context=uri)
-    for stmt in statements:
+    if doc.graphManager:
+        statements = doc.graphManager.getStatementsInGraph(uri)
+    else:
+        statements = doc.model.getStatements(context=uri)
+    for stmt in statements:        
         assert stmt.scope == uri
         subjectNode = doc.findSubject(stmt.subject)
+        assert subjectNode
         predNode = subjectNode.findPredicate(stmt)
         assert predNode
         predicates.append(predNode)
@@ -468,28 +474,28 @@ def getContextDoc(context, nodeset):
         return []
     return [ RxPathDom.ContextDoc(nodeset[0].rootNode,contexturis) ]        
             
-RFDOM_XPATH_EXT_NS = None #todo: put these in an extension namespace?
+RXPATH_EXT_NS = None #todo: put these in an extension namespace?
 BuiltInExtFunctions = {
-(RFDOM_XPATH_EXT_NS, 'is-predicate'): isPredicate,
-(RFDOM_XPATH_EXT_NS, 'is-resource'): isResource,
-(RFDOM_XPATH_EXT_NS, 'resource'): getResource,
+(RXPATH_EXT_NS, 'is-predicate'): isPredicate,
+(RXPATH_EXT_NS, 'is-resource'): isResource,
+(RXPATH_EXT_NS, 'resource'): getResource,
 
-(RFDOM_XPATH_EXT_NS, 'is-instance-of'): isInstanceOf,
-(RFDOM_XPATH_EXT_NS, 'is-subproperty-of'): isProperty,
-(RFDOM_XPATH_EXT_NS, 'is-subclass-of'): isType,
+(RXPATH_EXT_NS, 'is-instance-of'): isInstanceOf,
+(RXPATH_EXT_NS, 'is-subproperty-of'): isProperty,
+(RXPATH_EXT_NS, 'is-subclass-of'): isType,
 
-(RFDOM_XPATH_EXT_NS, 'name-from-uri'): getQNameFromURI,
-(RFDOM_XPATH_EXT_NS, 'prefix-from-uri'): getPrefixFromURI,
-(RFDOM_XPATH_EXT_NS, 'local-name-from-uri'): getLocalNameFromURI,
-(RFDOM_XPATH_EXT_NS, 'namespace-uri-from-uri'): getNamespaceURIFromURI,
-(RFDOM_XPATH_EXT_NS, 'uri'): getURIFromElement,
+(RXPATH_EXT_NS, 'name-from-uri'): getQNameFromURI,
+(RXPATH_EXT_NS, 'prefix-from-uri'): getPrefixFromURI,
+(RXPATH_EXT_NS, 'local-name-from-uri'): getLocalNameFromURI,
+(RXPATH_EXT_NS, 'namespace-uri-from-uri'): getNamespaceURIFromURI,
+(RXPATH_EXT_NS, 'uri'): getURIFromElement,
 
-(RFDOM_XPATH_EXT_NS, 'get-statement-uris'): getReified,
-(RFDOM_XPATH_EXT_NS, 'get-graph-predicates'): getGraphPredicates,
-(RFDOM_XPATH_EXT_NS, 'rdfdocument'): rdfDocument,
+(RXPATH_EXT_NS, 'get-statement-uris'): getReified,
+(RXPATH_EXT_NS, 'get-graph-predicates'): getGraphPredicates,
+(RXPATH_EXT_NS, 'rdfdocument'): rdfDocument,
 }
 from Ft.Xml.Xslt import XsltContext
-XsltContext.XsltContext.functions[(RFDOM_XPATH_EXT_NS, 'rdfdocument')] = rdfDocument
+XsltContext.XsltContext.functions[(RXPATH_EXT_NS, 'rdfdocument')] = rdfDocument
 ##########################################################################
 ## "monkey patches" to Ft.XPath
 ##########################################################################

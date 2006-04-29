@@ -639,16 +639,7 @@ class Subject(Resource):
         
     def addStatement(self, stmt, listID = '', refChild = None):  
         try:
-            assert stmt.subject == self.uri
-            stmt = RxPath.MutableStatement(*stmt)
-            if not stmt.scope: #don't change if already set
-                scope = self.ownerDocument.currentContexts[-1]
-                #work-around 4Suite bug in Statement.toTuple():
-                if scope is None: scope = ''
-                stmt.scope = scope
-            else:
-                scope = stmt.scope
-            
+            assert stmt.subject == self.uri            
             if stmt.predicate == RDF_MS_BASE+'first':
                 #we're a list so we need to follow the insert order
                 #set defaults as if we're the first item in the list                 
@@ -692,8 +683,11 @@ class Subject(Resource):
                     #append the new list node to the end of list
                     previousRestListStmt = RxPath.Statement(previousListId,
                         RDF_MS_BASE+'rest', listID,
-                        objectType=OBJECT_TYPE_RESOURCE, scope=scope)
-                    self.ownerDocument.model.addStatement( previousRestListStmt)
+                        objectType=OBJECT_TYPE_RESOURCE)
+                    if self.ownerDocument.graphManager:
+                        self.ownerDocument.graphManager.add(previousRestListStmt)
+                    else:
+                        self.ownerDocument.model.addStatement(previousRestListStmt)
                 else: #this statement is the first item in the list, so our subject will be head list resource
                     assert not listID or listID == self.uri, `listID` + '==' + `self.uri`
                     listID  = self.uri
@@ -710,8 +704,12 @@ class Subject(Resource):
                         oldPreviousRestStmts = self.ownerDocument.model.getStatements(
                                                 previousListId, RDF_MS_BASE+'rest',RDF_MS_BASE+'nil')
                         assert len(oldPreviousRestStmts) == 1
-                        for oldNilStmt in oldPreviousRestStmts:
-                            self.ownerDocument.model.removeStatement( oldNilStmt )
+                        for oldNilStmt in oldPreviousRestStmts:                            
+                            if self.ownerDocument.graphManager:
+                                self.ownerDocument.graphManager.remove(oldNilStmt)
+                            else:
+                                self.ownerDocument.model.removeStatement( oldNilStmt )
+                            
                     predicateNode = Predicate(stmt, self, None, self.lastChild,
                                                                   listID=listID)
                     if self.ownerDocument.addTrigger:
@@ -721,13 +719,18 @@ class Subject(Resource):
                     self._lastChild = self._childNodes[-1]
                     #terminate the list
                     restListStmt = RxPath.Statement(listID, RDF_MS_BASE+'rest',
-                        RDF_MS_BASE+'nil', objectType=OBJECT_TYPE_RESOURCE,
-                                                                scope=scope)
-                    self.ownerDocument.model.addStatement( restListStmt)                
-                #update statement with the real subject, the listID
-                stmt.subject = listID
-                stmt = RxPath.Statement(*stmt) #must be read-only 
-                self.ownerDocument.model.addStatement( stmt )
+                        RDF_MS_BASE+'nil', objectType=OBJECT_TYPE_RESOURCE)
+
+                    if self.ownerDocument.graphManager:
+                        self.ownerDocument.graphManager.add(restListStmt)
+                    else:
+                        self.ownerDocument.model.addStatement(restListStmt)             
+                #update statement with the real subject, the listID                
+                stmt = RxPath.Statement(listID,*stmt[1:])
+                if self.ownerDocument.graphManager:
+                    self.ownerDocument.graphManager.add(stmt)
+                else:
+                    self.ownerDocument.model.addStatement(stmt)
             elif stmt.predicate == RDF_SCHEMA_BASE+'member': 
                 if refChild:
                     raise NotSupportedErr("inserting items into lists not yet supported") #todo
@@ -758,7 +761,7 @@ class Subject(Resource):
                         raise HierarchyRequestErr("model error: container "
             "statement %s already exists but in different order" % str(listID))
 
-                predicateNode = Predicate(RxPath.Statement(*stmt), self,
+                predicateNode = Predicate(stmt, self,
                                           None, self.lastChild, listID=listID)
                 if self.ownerDocument.addTrigger:
                     self.ownerDocument.addTrigger(predicateNode)
@@ -767,8 +770,11 @@ class Subject(Resource):
                 self._lastChild = self._childNodes[-1]
                                 
                 #update statement with the real predicate, the listID
-                stmt.predicate = listID                
-                self.ownerDocument.model.addStatement(RxPath.Statement(*stmt))
+                stmt = RxPath.Statement(stmt[0], listID, *stmt[2:])
+                if self.ownerDocument.graphManager:                    
+                    self.ownerDocument.graphManager.add(stmt)
+                else:
+                    self.ownerDocument.model.addStatement(stmt)                
             else: #regular statement
                 if self.childNodes and self.childNodes[-1].stmt.predicate in [
                    RDF_MS_BASE + 'first', RDF_SCHEMA_BASE + 'member' ]:
@@ -783,11 +789,13 @@ class Subject(Resource):
                 else:
                     hi = None
                     
-                stmt = RxPath.Statement(*stmt) #must be read-only 
                 predicateNode = self._orderedInsert(stmt, Predicate,
                     lambda x, y: cmp(x.stmt, y), hi = hi,
                                 notify=self.ownerDocument.addTrigger)
-                self.ownerDocument.model.addStatement( stmt )
+                if self.ownerDocument.graphManager:
+                    self.ownerDocument.graphManager.add(stmt)
+                else:
+                    self.ownerDocument.model.addStatement(stmt)
             self.revision += 1        
             self.ownerDocument.revision += 1
             return predicateNode 
@@ -828,20 +836,29 @@ class Subject(Resource):
                 #first, remove the statement that asserts this item follows it
                 previousRestListStmt = RxPath.Statement(
                         previousListItem.listID, RDF_MS_BASE+'rest',
-                        oldChild.listID, objectType=OBJECT_TYPE_RESOURCE)
-                self.ownerDocument.model.removeStatement( previousRestListStmt )
+                        oldChild.listID, objectType=OBJECT_TYPE_RESOURCE)                
+                if self.ownerDocument.graphManager:
+                    self.ownerDocument.graphManager.remove(previousRestListStmt)
+                else:
+                    self.ownerDocument.model.removeStatement( previousRestListStmt )
                     
             #remove the rdf:rest triple for this item
             oldRestListStmt = RxPath.Statement(oldChild.listID,
-                RDF_MS_BASE+'rest', restObject, objectType=OBJECT_TYPE_RESOURCE)
-            self.ownerDocument.model.removeStatement( oldRestListStmt )
+                RDF_MS_BASE+'rest', restObject, objectType=OBJECT_TYPE_RESOURCE)            
+            if self.ownerDocument.graphManager:
+                self.ownerDocument.graphManager.remove(oldRestListStmt)
+            else:
+                self.ownerDocument.model.removeStatement( oldRestListStmt )
             
             if previousListItem:                
                 #add a statement that linking the previous item
                 #with the following item or with rdf:nill
                 newRestListStmt = RxPath.Statement(previousListItem.listID,
                     RDF_MS_BASE+'rest', restObject, objectType=OBJECT_TYPE_RESOURCE)
-                self.ownerDocument.model.addStatement( newRestListStmt)
+                if self.ownerDocument.graphManager:
+                    self.ownerDocument.graphManager.add(newRestListStmt)
+                else:
+                    self.ownerDocument.model.addStatement(newRestListStmt)
             #else: no previous item.
             #      it looks like according to the rdf syntax spec sect. 7.2.19
             #      that we should remove this resource and replace it with
@@ -863,7 +880,11 @@ class Subject(Resource):
             oldStmt = oldChild.stmt
             
         oldStmt = RxPath.Statement(*oldStmt) #must be read-only 
-        self.ownerDocument.model.removeStatement(oldStmt) #handle exception here?
+        if self.ownerDocument.graphManager:
+            self.ownerDocument.graphManager.remove(oldStmt)
+        else:
+            self.ownerDocument.model.removeStatement(oldStmt) #handle exception here?
+
         self._doRemoveChild(self._childNodes, oldChild)        
         self.revision += 1
         self.ownerDocument.revision += 1
@@ -1466,7 +1487,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     defaultNsRevMap = { RDF_MS_BASE : 'rdf', RDF_SCHEMA_BASE : 'rdfs' }
     
     def __init__(self, model, nsRevMap = None, modelUri=None,
-                        schemaClass = RxPath.defaultSchemaClass,useContexts=True):
+                        schemaClass = RxPath.defaultSchemaClass,graphManager=None):
         self.rootNode = self
         self.ownerDocument = self #todo: this violates the W3C DOM spec i think but fixes some bugs
         self.model = model
@@ -1483,26 +1504,20 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
             self.stringValue =self.modelUri=RxPath.generateBnode()
 
         self.revision = 0
-        if useContexts:
-            self.initContext = self.modelUri
-            self.currentContexts = [self._newContextURI(self.modelUri)]
+        if graphManager:
+            graphManager.setDoc(self)
         else:
-            self.initContext = None
-            self.currentContexts = [None]
+            self.graphManager = None
                     
         self.schemaClass = schemaClass
         #we need to set the schema up now so that the schema from the model isn't
         #added as part of a transaction that may get rolled by
-        self.schema = schemaClass(model)
+        self.schema = schemaClass(self.model)
         if isinstance(self.schema, RxPath.Model):
             self.model = self.schema
 
     def filterScope(self, stmts):
         return stmts
-
-    def _newContextURI(self, uri):
-        from Ft.Lib import Time 
-        return 'context:'+uri+'_'+str(Time.FromPythonTime()).replace(':','_')
         
     def __cmp__(self, other):
         if self is other:
@@ -1701,15 +1716,15 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
             typeName = RxPath.getURIFromElementName(newChild)
             log.debug('attempting to adding type statement %s for %s'
                       % (typeName, uri))
-            scope = self.ownerDocument.currentContexts[-1]
-            #work-around 4Suite bug in Statement.toTuple():
-            if scope is None: scope = ''            
             typeStmt = RxPath.Statement(uri, RDF_MS_BASE+'type', typeName,
-                objectType=OBJECT_TYPE_RESOURCE, scope=scope)
+                objectType=OBJECT_TYPE_RESOURCE)
             try:
                 predicateNode = subjectNode._orderedInsert(typeStmt, Predicate,
                             lambda x, y: cmp(x.stmt, y), notify=self.addTrigger)
-                self.model.addStatement( typeStmt )
+                if self.graphManager:
+                    self.graphManager.add(typeStmt)
+                else:
+                    self.model.addStatement(typeStmt)
                 self.revision += 1
             except IndexError:
                 #thrown by _orderedInsert: statement already exists in the model
@@ -1763,30 +1778,24 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         represents this node and current state of the DOM
         '''
         from rx import MRUCache
-        if self.initContext is not None:
+        if self.graphManager:
             #the DOM store uses InvalidationKey to invalidate the cache
             #during rollback
-            return MRUCache.InvalidationKey((self.currentContexts[0],))
+            return MRUCache.InvalidationKey((self.graphManager.getTxnContext(),))
         else:    
             return (id(self),  self.revision)
 
     def commit(self, **kw):
-        #scope = self.currentContexts[-1]
-        #if scope and kw.get('source') and notallremoves:    
-        #   self.model.addStatement(Statement(scope, 'created_by',
-        #       RxPath.StringValue(kw['source']),OBJECT_TYPE_RESOURCE, scope))
-               
+        if self.graphManager:
+            self.graphManager.commit(kw)
+
         self.model.commit(**kw)
 
-        if self.initContext is not None:
-            self.currentContexts = [self._newContextURI(self.initContext)]
-        else:
-            self.currentContexts = [None]
-
-    def rollback(self):
-        self.currentContexts = self.currentContexts[:1]
-        
+    def rollback(self):        
         self.model.rollback()
+        if self.graphManager:
+            self.graphManager.rollback()        
+            
         #to remove the changes we need to rollback we just force the
         #DOM's nodes to be regenerated from the model by null-ing out
         #childNodes and then incrementing revision.
@@ -1803,13 +1812,12 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         self.revision += 1 #note that revision is also used as part of cache keys
 
     def pushContext(self,uri):
-        self.currentContexts.append(uri)
-        #todo update context dependency metadata
+        if self.graphManager:
+            self.graphManager.pushContext(uri)
 
     def popContext(self):
-        assert len(self.currentContexts) > 1
-        self.currentContexts.pop()
-        
+        if self.graphManager:
+            self.graphManager.popContext()        
 
 class ContextDoc(Document):
     '''
@@ -1828,7 +1836,7 @@ class ContextDoc(Document):
                 
     def filterScope(self,stmts):
         return [s for s in stmts if not s.scope or s.scope in self.contexturis]
-
+    
 import traceback, sys, re
 
 def invokeRxSLT(RDFPath, stylesheetPath):

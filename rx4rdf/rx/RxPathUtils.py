@@ -91,7 +91,6 @@ class Statement(tuple, BaseStatement):
             return cmp(self[:4],other[:4])
         else:
             return False
-
         
 class MutableStatement(list, BaseStatement):
     __slots__ = ()
@@ -132,8 +131,6 @@ class MutableStatement(list, BaseStatement):
     def extend(self, o): raise TypeError("extend() not allowed")
     def pop(self): raise TypeError("pop() not allowed")    
 
-#MutableStatement = Statement #todo: make Statement unmutable and derive from tuple
-
 class ParseException(utils.NestedException):
     def __init__(self, msg = ''):                
         utils.NestedException.__init__(self, msg,useNested = True)
@@ -146,23 +143,30 @@ def generateBnode(name=None):
     _bNodeCounter += 1
     name = name or `_bNodeCounter`    
     return BNODE_BASE + _sessionBNodeUUID +  name
-
-def NTriples2Statements(stream, defaultScope=''):
+        
+def NTriples2Statements(stream, defaultScope='', incrementHook=None):
     makebNode = lambda bNode: BNODE_BASE + bNode
     stmtset = {}
-    for stmt in _parseTriples(stream,  makebNode):
-        if stmt[0] is Removed:            
+    for stmt in _parseTriples(stream,  makebNode, yieldcomments=incrementHook):        
+        if stmt[0] is Removed:
+            if incrementHook:
+                stmt = incrementHook.remove(stmt[1], stmt[2])
             stmt = stmt[1][:4] #don't include scope in key
             if stmt in stmtset:
                 del stmtset[stmt]
+        elif stmt[0] is Comment:
+            incrementHook.comment(stmt[1])
         else:
+            if incrementHook:
+                stmt = incrementHook.add(stmt)
             #don't include scope in key
-            stmtset[stmt[:4]] = stmt[4] 
+            stmtset[stmt[:4]] = stmt[4]                
     for stmt, scope in stmtset.iteritems():
         yield Statement(stmt[0], stmt[1], stmt[2],stmt[3],
                                  scope or defaultScope)
     
-def parseRDFFromString(contents, baseuri, type='unknown', scope=None):
+def parseRDFFromString(contents, baseuri, type='unknown', scope=None,
+                       incrementHook=None):
     '''
     returns an iterator of Statements
     
@@ -201,7 +205,8 @@ def parseRDFFromString(contents, baseuri, type='unknown', scope=None):
                 try:
                     #convert generator to list to force parsing now 
                     return list(NTriples2Statements(
-                                StringIO.StringIO(contents), scope))
+                                StringIO.StringIO(contents), scope,
+                                incrementHook=incrementHook))
                 except:
                     #maybe its n3 or turtle, but we can't detect that
                     #but we'll try rxml_zml
@@ -209,7 +214,8 @@ def parseRDFFromString(contents, baseuri, type='unknown', scope=None):
                     
         if type == 'ntriples':
             #use our parser
-            return NTriples2Statements(StringIO.StringIO(contents), scope)    
+            return NTriples2Statements(StringIO.StringIO(contents), scope,
+                                       incrementHook=incrementHook)    
         elif type == 'rxml_xml' or type == 'rxml_zml':
             if type == 'rxml_zml':
                 from rx import zml
@@ -265,7 +271,8 @@ def parseRDFFromString(contents, baseuri, type='unknown', scope=None):
     except:
         raise ParseException()
 
-def parseRDFFromURI(uri, type='unknown', modelbaseuri=None, scope=None):
+def parseRDFFromURI(uri, type='unknown', modelbaseuri=None, scope=None,
+                    incrementHook=None):
     'returns an iterator of Statements'
     if not modelbaseuri:
         modelbaseuri = uri
@@ -285,7 +292,7 @@ def parseRDFFromURI(uri, type='unknown', modelbaseuri=None, scope=None):
     inputSource = InputSource.DefaultFactory.fromUri(uri)
     contents = inputSource.stream.read()
     inputSource.stream.close()
-    return parseRDFFromString(contents, modelbaseuri, type, scope)
+    return parseRDFFromString(contents, modelbaseuri, type, scope, incrementHook=incrementHook)
      
 def RxPathDOMFromStatements(statements, uri2prefixMap, uri=None,schemaClass=None):    
     from rx import RxPath, RxPathSchema
@@ -373,7 +380,8 @@ def serializeRDF(statements, type, uri2prefixMap=None,
 #todo: assumes utf8 encoding and not string escapes for unicode 
 Removed = object()
 Comment = object()
-def _parseTriples(lines, bNodeToURI = lambda x: x, charencoding='utf8'):
+def _parseTriples(lines, bNodeToURI = lambda x: x, charencoding='utf8',
+                  yieldcomments=False):
     remove = False
     graph = None
     for line in lines:
@@ -385,6 +393,11 @@ def _parseTriples(lines, bNodeToURI = lambda x: x, charencoding='utf8'):
         if line.startswith('#!remove'):
             #this extension to NTriples allows us to incrementally update
             #a model using NTriples
+            tokens = line.split(None)
+            if len(tokens) > 1:
+                removeForContext = tokens[1]
+            else:
+                removeForContext = ''
             remove = True
             continue
         if line.startswith('#!graph'):
@@ -395,9 +408,11 @@ def _parseTriples(lines, bNodeToURI = lambda x: x, charencoding='utf8'):
             else:
                 graph = None
             continue
-        elif line[0] == '#': #comment
+        elif line[0] == '#': #comment            
             remove = False
             graph = None
+            if yieldcomments:
+                yield (Comment, line[1:])
             continue        
         subject, predicate, object = line.split(None,2)
         if subject.startswith('_:'):
@@ -436,10 +451,10 @@ def _parseTriples(lines, bNodeToURI = lambda x: x, charencoding='utf8'):
             else:    
                 objectType = OBJECT_TYPE_LITERAL
             object = literal
-        #print "parsed: ", subject, predicate, object
+
         if remove:
             remove = False
-            yield (Removed, (subject, predicate, object, objectType, graph))
+            yield (Removed, (subject, predicate, object, objectType, graph), removeForContext)
         else:
             if objectType != OBJECT_TYPE_RESOURCE or object:
                 #hack to handle malformed NTriples docs
@@ -461,29 +476,32 @@ def writeTriples(stmts, stream, enc='utf8'):
     scope = 4
     
     for stmt in stmts:       
-       if stmt[0] is Comment:
-           stream.write("#" + stmt[1].encode(enc, 'backslashreplace') + "\n")
-           continue
-       if stmt[0] is Removed:
-           stream.write("#!remove\n")
-           stmt = stmt[1]
-           
-       if stmt[scope]:
-           stream.write("#!graph "+stmt[scope].encode(enc)+"\n")
-       if stmt[subject].startswith(BNODE_BASE):
+        if stmt[0] is Comment:
+            stream.write("#" + stmt[1].encode(enc, 'backslashreplace') + "\n")
+            continue
+        if stmt[0] is Removed:
+            stmt = stmt[1]
+            if getattr(stmt, 'removeForContext', False): #hack
+                stream.write("#!remove "+stmt[scope].encode(enc)+"\n")
+            else:
+                stream.write("#!remove\n")
+                      
+        if stmt[scope]:
+            stream.write("#!graph "+stmt[scope].encode(enc)+"\n")
+        if stmt[subject].startswith(BNODE_BASE):
             stream.write('_:' + stmt[subject][BNODE_BASE_LEN:].encode(enc) ) 
-       else:
+        else:
             stream.write("<" + stmt[subject].encode(enc) + ">")
-       if stmt[predicate].startswith(BNODE_BASE):
+        if stmt[predicate].startswith(BNODE_BASE):
             stream.write( '_:' + stmt[predicate][BNODE_BASE_LEN:].encode(enc) ) 
-       else:            
-           stream.write(" <" + stmt[predicate].encode(enc) + ">")
-       if stmt[objectType] == OBJECT_TYPE_RESOURCE:
+        else:            
+            stream.write(" <" + stmt[predicate].encode(enc) + ">")
+        if stmt[objectType] == OBJECT_TYPE_RESOURCE:
             if stmt[object].startswith(BNODE_BASE):
                 stream.write(' _:' + stmt[object][BNODE_BASE_LEN:].encode(enc)  + " .\n") 
             else:
                 stream.write(" <" + stmt[object].encode(enc)  + "> .\n")
-       else:           
+        else:           
             escaped = (stmt[object].replace('\\', r'\\').encode(enc, 'backslashreplace'))
             #fix differences between python and ntriples escaping:
             #* ascii range is escaped as \xXX instead of \u00XX,
