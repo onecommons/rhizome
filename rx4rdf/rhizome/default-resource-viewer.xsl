@@ -14,15 +14,19 @@
 <xsl:param name="__resource" />
 <xsl:param name="_name" />
 <xsl:param name="BASE_MODEL_URI" />
+<xsl:param name="revnum" />
+
+<xsl:variable name='resource' select="f:if($revnum, get-revision($__resource, $revnum), $__resource)" />
 
 <xsl:template match="/" >
 <!-- this page is always html, not the content's mimetype -->
 <xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />
 <xsl:variable name='_robots' select="wf:assign-metadata('_robots', 'nofollow,noindex')" />
 
-<xsl:variable name='shreddedContext' select="/*[a:from-source = ($__resource/wiki:revisions/*/rdf:first/*)[last()]/a:contents/*]/a:entails" />
+<xsl:variable name='shreddedContext' select="/*[a:from-source = ($resource/wiki:revisions/*/rdf:first/*)[last()]/a:contents/*]/a:entails" />
 
 <!-- note: the same template is used in search.xsl for the rxml output -->
+<xsl:if test='not($revnum)'> <!-- can't edit previous revisions -->
 <a href="site:///{$_name}?action=edit-metadata&amp;about={f:escape-url($__resource)}">Edit Metadata</a>
 &#xa0;<a href='site:///search?search=%2F*%2F*%5B.%3D%27{f:escape-url($__resource)}%27%5D&amp;searchType=RxPath&amp;view=html'>Used By</a>
 &#xa0;<a href='site:///search?search=%2F*%5B.%3D%27{f:escape-url($__resource)}%27%5D&amp;searchType=RxPath&amp;view=rdf'>RDF/XML</a>
@@ -31,9 +35,11 @@
 &#xa0;<a href='site:///search?search=get-graph-predicates%28%2F*%5B.%3D%27{f:escape-url($shreddedContext)}%27%5D%29&amp;searchType=RxPath&amp;view=rxml'>Extracted Metadata</a>
 </xsl:if>
 <hr />
-<xsl:if test='$__resource/wiki:about'>
+</xsl:if>
+
+<xsl:if test='$resource/wiki:about'>
  Keywords:&#xa0; 
- <xsl:for-each select='$__resource/wiki:about'>
+ <xsl:for-each select='$resource/wiki:about'>
    <a href='site:///keywords/{local-name-from-uri(.)}?about={f:escape-url(.)}' >
    <xsl:value-of select='f:if(namespace-uri-from-uri(.)=concat($BASE_MODEL_URI,"kw#"),local-name-from-uri(.), name-from-uri(.))'/>
    </a>&#xa0;
@@ -49,7 +55,7 @@
     <xsl:variable name='fixupPredicate' select=
     "&quot;&lt;a href='site:///search?search=%%2F*%%2F*%%5Bis-subproperty-of%%28%%40uri%%2C%%27%(encodeduri)s%%27%%29%%5D&amp;amp;searchType=RxPath&amp;amp;view=html&amp;amp;title=Property%%20Usage'>%(predicate)s&lt;/a>&quot;" />
                
-    <xsl:value-of disable-output-escaping='yes' select="wf:serialize-rdf($__resource, 'rxml_zml', $fixup, $fixupPredicate)" />
+    <xsl:value-of disable-output-escaping='yes' select="wf:serialize-rdf($resource, 'rxml_zml', $fixup, $fixupPredicate)" />
 </pre>
 
 </xsl:template>

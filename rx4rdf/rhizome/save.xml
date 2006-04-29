@@ -135,7 +135,7 @@
     <xu:if test='$lastContents'>
         <xu:variable name='graphSource' select="/*[a:from-source = ($resource/wiki:revisions/*/rdf:first/*)[last()]/a:contents/*]" />        
         <xu:if test='$graphSource'>
-            <xu:remove select='get-graph-predicates($graphSource/a:entails)' />                
+            <xu:remove to-graph='{$graphSource/a:entails}' select='get-graph-predicates($graphSource/a:entails)' />                
         </xu:if>
     </xu:if>
     
@@ -314,7 +314,7 @@
        </rdf:first>
     </xu:append>
 
-    <xu:variable name='contextURI' select="concat('context:', $formatTransformURI)" />
+    <xu:variable name='contextURI' select="concat('context:extracted:', $formatTransformURI)" />
 
     <xu:if test='wf:get-metadata("shred")'>
     <xu:append select='/' to-graph='{$contextURI}'>

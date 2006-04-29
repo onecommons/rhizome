@@ -11,12 +11,11 @@ import cStringIO
 from Ft.Xml.Lib.Print import PrettyPrint
 from pprint import *
    
-newRDFDom = 1
-if not newRDFDom:
-    from rx.RDFDom import *
-else:
-    from rx.RxPath import *
-    RDFDoc = lambda model, nsMap: createDOM(model, nsMap)
+from rx.RxPath import *
+def RDFDoc(model, nsMap):
+    from rx import RxPathGraph
+    graphManager = RxPathGraph.NamedGraphManager(model, None,None)
+    return createDOM(model, nsMap, graphManager=graphManager)
 
 import difflib, time
 
@@ -116,7 +115,7 @@ class RDFDomTestCase(unittest.TestCase):
                     'wiki' : "http://rx4rdf.sf.net/ns/wiki#",
                     'a' : "http://rx4rdf.sf.net/ns/archive#" }
 
-    def setUp(self):
+    def setUp(self):        
         if DRIVER == '4Suite':
             self.loadModel = self.loadFtModel
         elif DRIVER == 'RDFLib':
@@ -136,9 +135,16 @@ class RDFDomTestCase(unittest.TestCase):
             model, self.db = Util.DeserializeFromUri('file:'+source, scope='')
         else:
             model, self.db = DeserializeFromN3File( source )
-        return FtModel(model)
+        #use TransactionFtModel because we're using 4Suite's Memory
+        #driver, which doesn't support transactions
+        return TransactionFtModel(model)
 
     def loadRedlandModel(self, source, type='nt'):
+        #ugh can't figure out how to close an open store!
+        #if hasattr(self,'rdfDom'):
+        #    del self.rdfDom.model.model._storage
+        #    import gc; gc.collect()             
+
         if type == 'rdf':
             assert False, 'Not Supported'
         else:            
@@ -148,8 +154,10 @@ class RDFDomTestCase(unittest.TestCase):
             if isinstance(source, (str, unicode)):
                 stream = file(source, 'r+')
             else:
-                stream = source                    
-            return initRedlandHashBdbModel("RDFDomTest", stream)
+                stream = source
+            stmts = NTriples2Statements(stream)
+            return RedlandHashMemModel("RDFDomTest", stmts)
+            #return RedlandHashBdbModel("RDFDomTest", stmts)
 
     def loadRdflibModel(self, source, type='nt'):
         dest = tempfile.mktemp()
@@ -218,7 +226,7 @@ class RDFDomTestCase(unittest.TestCase):
 
         xpath = "string(/*[wiki:name='HomePage']/a:has-expression/node())"
         res3 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
-        #( (res2, res3) )
+        #print ( (res2, res3) )
         self.failUnless(res2 and res2 == res3)
 
         #test recursive elements        
@@ -509,7 +517,7 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
                 if printLevel > 1: print res2 and res2[0] or []
                 print 'RATIO', xpathClock / rxpathClock
                 print '\n'
-            self.failUnless((not res and not res2) or res[0] == res2[0])
+            self.failUnless((not res and not res2) or res[0:] == res2[0:])
 
             #skip next test as the non-query engine run sometime has duplicate
             #resource nodes somehow e.g. urn:sha:jERppQrIlaay2cQJsz36xVNyQUs=            
@@ -793,6 +801,7 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         </xupdate:modifications>
         '''               
         applyXUpdate(self.rdfDom,xupdate)
+        self.rdfDom.commit()
         self.failUnless(len(adds) == 3) #2 statements plus the type statement
 
         res1 = self.rdfDom.evalXPath( "get-graph-predicates('context:1')")
@@ -810,12 +819,13 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
                                   (u'urn:sha:2jmj7l5rSw0yVb/vlWAYkK/YBwk=', u'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', u'http://rx4rdf.sf.net/ns/archive#Contents', u'', u'context:1', u'R'),
                                   (u'urn:sha:2jmj7l5rSw0yVb/vlWAYkK/YBwk=', u'http://rx4rdf.sf.net/ns/archive#content-length', u'0', u'', u'context:1', u'L'),
                                   (u'urn:sha:2jmj7l5rSw0yVb/vlWAYkK/YBwk=', u'http://rx4rdf.sf.net/ns/archive#hasContent', u'', u'', u'context:1', u'L')]}
-        currentStmts = db._statements['default']
+        currentStmts = [s for s in db._statements['default']
+            if not s[4].startswith('context:add') and not s[4].startswith('context:txn')]
         currentStmts.sort()
         #print 'XUPDATE ', pprint( currentStmts) 
         expectedStmts = statements['default']
         expectedStmts.sort()
-        d = difflib.SequenceMatcher(None,currentStmts, expectedStmts )         
+        d = difflib.SequenceMatcher(None,currentStmts, expectedStmts )        
         self.failUnless( currentStmts == expectedStmts , 'statements differ: '+`d.get_opcodes()` )
 
         removes = []    
@@ -827,12 +837,20 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         self.rdfDom.removeTrigger = removeTrigger
         xupdate=r'''<?xml version="1.0" ?> 
         <xupdate:modifications version="1.0" xmlns:xupdate="http://www.xmldb.org/xupdate">    
-            <xupdate:remove select="get-graph-predicates('context:1')" />
+            <xupdate:remove to-graph='context:1' select="get-graph-predicates('context:1')" />
         </xupdate:modifications>
         '''               
         applyXUpdate(self.rdfDom,xupdate)
+        self.rdfDom.commit()
+
+        #print [p.stmt for p in removes]
         self.failUnless(len(removes) == 3)
-        self.failUnless(len(db._statements['default']) == len(currentStmts) - 3)
+
+        changedStmts = [s for s in db._statements['default']
+                        if not s[4].startswith('context:') or s[4].startswith('context:1')]        
+        #pprint(changedStmts)
+        #print len(changedStmts), len(currentStmts)
+        self.failUnless(len(changedStmts) == len(currentStmts) - 3)
 
     def testXslt2(self):
         self.rdfDom = self.getModel(cStringIO.StringIO(self.model2) )
@@ -920,7 +938,7 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         #open('testXslt1new.xml', 'wb').write(result)
         #d = difflib.Differ()
         #list(d.compare(result,file('testXslt1.xml').read())) #list of characters, not lines!
-        self.failUnless( result == file('testXslt1.xml').read(),'xml output does not match')
+        self.failUnless( result == file('testXslt1.xml').read(),'xml output does not match')        
 
     def testXPathRewrite(self):
         from rx import RxPathQuery
@@ -941,7 +959,7 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
             self.failUnless(repr(visitor.resultExpr) == expected)
             
         
-DRIVER = 'Mem'#'4Suite'#'Mem'
+DRIVER = 'Mem'
 
 def profilerRun(testname, testfunc):
     import hotshot, hotshot.stats

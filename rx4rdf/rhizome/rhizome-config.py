@@ -544,7 +544,7 @@ templateList = [rhizome._addItemTuple('_not_found',loc='path:_not_found.xsl', fo
  rhizome._addItemTuple('basestyles.css',format='text', loc='path:basestyles.css'),
  rhizome._addItemTuple('edit-icon.png',format='binary',loc='path:edit.png'),
  #rhizome._addItemTuple('list',loc='path:list-pages.xsl', format='rxslt', disposition='entry'),
- rhizome._addItemTuple('showrevisions',loc='path:showrevisions.xsl', format='rxslt', disposition='entry',handlesAction=['showrevisions']),
+ rhizome._addItemTuple('showrevisions',loc='path:showrevisions.xsl', format='rxslt', disposition='entry',handlesAction=['showrevisions'], actionType='a:NamedContent'), 
  rhizome._addItemTuple('item-disposition-handler-template',loc='path:item-disposition-handler.xsl', format='rxslt', 
                         disposition='entry', handlesDisposition='handler'),
  rhizome._addItemTuple('save-metadata',loc='path:save-metadata.xml', format='rxupdate', 
@@ -609,7 +609,8 @@ rhizome._addItemTuple('bookmarksetup',loc='path:help/bookmarksetup.xsl',
 #                disposition='template', doctype='document', handlesDoctype='todo'),
 #rhizome._addItemTuple('s5-template',loc='path:s5-template.xsl', format='rxslt', 
 #                        disposition='complete', handlesDisposition='s5-template'), 
-    
+#added in 0.6.1:
+rhizome._addItemTuple('show-revision-contexts',loc='path:show-revision-contexts.xsl', format='rxslt', disposition='entry',handlesAction=['showrevisions'],actionType='rdfs:Resource'), #added actionType also
 #administration pages
 rhizome._addItemTuple('administration', loc='path:administer.xsl', disposition='entry', format='rxslt', title="Administration"), 
 rhizome._addItemTuple('new-role-template', loc='path:new-role-template.txt', handlesAction=['new'], actionType='auth:Role',
