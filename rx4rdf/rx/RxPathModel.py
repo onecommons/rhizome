@@ -108,22 +108,26 @@ class Model(Tupleset):
     ### Operations ###
                        
     def getStatements(self, subject = None, predicate = None, object=None,
-                      objecttype=None,context=None):
+                      objecttype=None,context=None, asQuad=False):
         ''' Return all the statements in the model that match the given arguments.
         Any combination of subject, predicate or object can be None, and any None slot is
         treated as a wildcard that matches any value in the model.
         If objectype is specified, it should be one of:
         OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL, an ISO language code or an URL representing the datatype.
+        If asQuad is True, will return duplicate statements if their context differs.
         '''
         assert object is not None or objecttype
+        raise NotImplementedError 
         
     def addStatement(self, statement ):
         '''add the specified statement to the model'''
+        raise NotImplementedError 
         
     def removeStatement(self, statement ):
         '''Removes the statement. If 'scope' isn't specified, the statement
            will be removed from all contexts it appears in.
         '''
+        raise NotImplementedError 
 
     reifiedIDs = None
     def findStatementIDs(self, stmt):        
@@ -152,16 +156,13 @@ def getReifiedStatements(stmts):
         #else: log.warning('incomplete reified statement')
     return reifiedDict
 
-def removeDupStatementsFromSortedList(aList, pred=None):
+def removeDupStatementsFromSortedList(aList, asQuad=False, pred=None):
     def removeDups(x, y):
         if pred and not pred(y):
             return x
-        if not x or x[-1] != y:            
+        if (not x or (asQuad and x[-1][:] != y[:]) #include scope in comparison
+            or (not asQuad and x[-1] != y)): 
             x.append(y)
-        #else: #x[-1] == y but Statement.__cmp__ doesn't consider the reified URI
-        #    #its a duplicate statement but second one has a reified URI
-        #    if x and y.uri: #the reified statement URI
-        #        x[-1].uri = y.uri #note: we only support one reification per statement
         return x
     return reduce(removeDups, aList, [])
     
@@ -169,20 +170,20 @@ class MemModel(Model):
     '''
     simple in-memory module
     '''
-    def __init__(self,statements=None):
+    def __init__(self,defaultStatements=None, **kw):
         self.by_s = {}
         self.by_p = {}
         self.by_o = {}
         self.by_c = {}
-        if statements:
-            for stmt in statements:
+        if defaultStatements:
+            for stmt in defaultStatements:
                 self.addStatement(stmt)                                
 
     def size(self):
         return len(self.by_s)
             
     def getStatements(self, subject = None, predicate = None, object = None,
-                      objecttype=None,context=None):
+                      objecttype=None,context=None, asQuad=False):
         ''' 
         Return all the statements in the model that match the given arguments.
         Any combination of subject and predicate can be None, and any None slot is
@@ -193,7 +194,7 @@ class MemModel(Model):
         fo = object is not None
         fot = objecttype is not None
         fc = context is not None
-        
+
         if not fc:
             if fs:                
                 stmts = self.by_s.get(subject,[])            
@@ -204,13 +205,12 @@ class MemModel(Model):
             else:
                 #get all
                 stmts = utils.flattenSeq(self.by_s.itervalues(), 1)
-                #stmts = reduce(lambda l, i: l.extend(i) or l, self.by_s.values(), [])
                 if fot:
                     stmts = [s for s in stmts if s.objectType == objecttype]
                 else:
                     stmts = list(stmts)
                 stmts.sort()
-                return stmts
+                return removeDupStatementsFromSortedList(stmts,asQuad)
         else:            
             by_cAnds = self.by_c.get(context)
             if not by_cAnds:
@@ -218,21 +218,20 @@ class MemModel(Model):
             if fs:                
                 stmts = by_cAnds.get(subject,[])
             else:
-                #stmts = reduce(lambda l, i: l.extend(i) or l, by_cAnds.values(), [])
                 stmts = utils.flattenSeq(by_cAnds.itervalues(), 1)
                 
         stmts = [s for s in stmts 
-                    if not fs or s.subject == subject
-                    and not fp or s.predicate == predicate
-                    and not fo or s.object == object
-                    and not fot or s.objectType == objecttype
-                    and not fc or s.scope == context]
+                    if (not fs or s.subject == subject)
+                    and (not fp or s.predicate == predicate)
+                    and (not fo or s.object == object)
+                    and (not fot or s.objectType == objecttype)
+                    and (not fc or s.scope == context)]
         stmts.sort()
-        return stmts   
+        return removeDupStatementsFromSortedList(stmts, asQuad)
                      
     def addStatement(self, stmt ):
         '''add the specified statement to the model'''
-        if stmt in self.by_s.get(stmt[0], []):
+        if stmt in self.by_c.get(stmt[4], {}).get(stmt[0], []):
             return #statement already in
         self.by_s.setdefault(stmt[0], []).append(stmt)
         self.by_p.setdefault(stmt[1], []).append(stmt)
@@ -283,7 +282,7 @@ class MultiModel(Model):
         self.models[0].rollback()        
                     
     def getStatements(self, subject = None, predicate = None, object = None,
-                      objecttype=None,context=None):
+                      objecttype=None,context=None, asQuad=False):
         ''' Return all the statements in the model that match the given arguments.
         Any combination of subject and predicate can be None, and any None slot is
         treated as a wildcard that matches any value in the model.'''
@@ -291,13 +290,13 @@ class MultiModel(Model):
         changed = 0
         for model in self.models:
             moreStatements = model.getStatements(subject, predicate,object,
-                                              objecttype,context)
+                                              objecttype,context, asQuad)
             if moreStatements:
                 changed += 1
                 statements.extend(moreStatements)
         if changed > 1:        
             statements.sort()
-            return removeDupStatementsFromSortedList(statements)
+            return removeDupStatementsFromSortedList(statements, asQuad)
         else:
             return statements            
                      
@@ -330,9 +329,9 @@ class MirrorModel(Model):
             model.rollback()
                             
     def getStatements(self, subject = None, predicate = None, object = None,
-                      objecttype=None,context=None):
+                      objecttype=None,context=None, asQuad=False):
         return self.models[0].getStatements(subject, predicate, object,
-                                            objecttype,context)
+                                            objecttype,context, asQuad)
                      
     def addStatement(self, statement ):
         for model in self.models:
@@ -391,12 +390,12 @@ class TransactionModel(object):
         return True
         
     def getStatements(self, subject = None, predicate = None, object = None,
-                      objecttype=None,context=None):
+                      objecttype=None,context=None, asQuad=False):
         ''' Return all the statements in the model that match the given arguments.
         Any combination of subject and predicate can be None, and any None slot is
         treated asj a wildcard that matches any value in the model.'''
         statements = super(TransactionModel, self).getStatements(subject, predicate, object,
-                                                                 objecttype,context)
+                                                                 objecttype,context, asQuad)
         if not self.queue: 
             return statements
 
@@ -422,7 +421,7 @@ class TransactionModel(object):
 
         if changed:        
             statements.sort()
-            return removeDupStatementsFromSortedList(statements)
+            return removeDupStatementsFromSortedList(statements, asQuad)
         else:
             return statements
 
@@ -445,13 +444,15 @@ class TransactionModel(object):
 class TransactionMemModel(TransactionModel, MemModel): pass
 
 class NTriplesFileModel(MemModel):
-    def __init__(self, path, defaultStatements, context=''):
-        self.path, stmts, format = _loadRDFFile(path, defaultStatements,context)
+    def __init__(self, source='', defaultStatements=(), context='',
+                                             incrementHook=None, **kw):
+        self.path, stmts, format = _loadRDFFile(source, defaultStatements,
+                                        context, incrementHook=incrementHook)
         MemModel.__init__(self, stmts)    
 
     def commit(self, **kw):
         outputfile = file(self.path, "w+", -1)
-        stmts = self.getStatements()
+        stmts = self.getStatements(asQuad=True)
         writeTriples(stmts, outputfile)
         outputfile.close()
         
@@ -460,8 +461,9 @@ class _IncrementalNTriplesFileModelBase(object):
     Incremental save changes to an NTriples "transaction log"
     Use in a class hierarchy for Model where self has a path attribute
     and TransactionModel is preceeds this in the MRO.
-    '''
-    
+    '''    
+    loadNtriplesIncrementally = True
+        
     def commit(self, **kw):                
         import os.path, time
         if os.path.exists(self.path):
@@ -488,14 +490,14 @@ class _IncrementalNTriplesFileModelBase(object):
 
 class IncrementalNTriplesFileModel(TransactionModel, _IncrementalNTriplesFileModelBase, NTriplesFileModel): pass
 
-def _loadRDFFile(path, defaultStatements,context=''):
+def _loadRDFFile(path, defaultStatements,context='', incrementHook=None):
     '''
     If location doesn't exist create a new model and initialize it
     with the statements specified in defaultModel
     '''
     if os.path.exists(path):
         uri = Uri.OsPathToUri(path)
-        stmts = parseRDFFromURI(uri, scope=context)
+        stmts = parseRDFFromURI(uri, scope=context,incrementHook=incrementHook)
     else:
         stmts = defaultStatements
 
@@ -562,7 +564,7 @@ try:
             self.model._driver.rollback()        
                     
         def getStatements(self, subject = None, predicate = None, object = None,
-                          objecttype=None,context=None):
+                          objecttype=None,context=None, asQuad=False):
             ''' Return all the statements in the model that match the given arguments.
             Any combination of subject and predicate can be None, and any None slot is
             treated as a wildcard that matches any value in the model.'''
@@ -575,7 +577,7 @@ try:
                 pred = lambda stmt: stmt.objectType == objecttype
             else:
                 pred = None
-            return removeDupStatementsFromSortedList(statements, pred)
+            return removeDupStatementsFromSortedList(statements, asQuad, pred)
                          
         def addStatement(self, statement ):
             '''add the specified statement to the model'''
@@ -587,9 +589,16 @@ try:
             self._beginIfNecessary()
             self.model.remove( statement2Ft(statement) )
 
+    class TransactionFtModel(TransactionModel, FtModel):
+        '''
+        Use this class when creating a 4Suite Model using a driver that is not transactional
+        (in particular, the Memory driver).
+        '''
+        
     class NTriplesFtModel(FtModel):
-        def __init__(self, path, defaultStatements, context=''):
-            self.path, stmts, format = _loadRDFFile(path, defaultStatements,context)
+        def __init__(self, source='', defaultStatements=(), context='', **kw):
+            self.path, stmts, format = _loadRDFFile(source,
+                                                    defaultStatements,context)
             db = Memory.GetDb('', 'default')
             model = Ft.Rdf.Model.Model(db)
             stmts = [statement2Ft(stmt) for stmt in stmts]
@@ -618,9 +627,12 @@ except ImportError:
 
 try:
     import RDF #import Redland RDF
+    #import RDF.RDF; RDF.RDF._debug = 1
     
     def node2String(node):
-        if node.is_blank():
+        if node is None:
+            return ''
+        elif node.is_blank():
             return BNODE_BASE + node.blank_identifier
         elif node.is_literal():
             literal = node.literal_value['string']
@@ -635,12 +647,13 @@ try:
         if isinstance(uri, unicode):
             uri = uri.encode('utf8')
         if uri.startswith(BNODE_BASE):
-            return RDF.Node(blank=uri[BNODE_BASE_LEN:])
+            label = uri[BNODE_BASE_LEN:]
+            return RDF.Node(blank=label)
         else:
             return RDF.Node(uri_string=uri)
 
     def object2node(object, objectType):
-        if objectType == OBJECT_TYPE_RESOURCE:            
+        if objectType == OBJECT_TYPE_RESOURCE:
             return URI2node(object)
         else:
             if isinstance(object, unicode):
@@ -648,11 +661,13 @@ try:
             if isinstance(objectType, unicode):
                 objectType = objectType.encode('utf8')
                 
-            kwargs = { 'literal':object}
-            if objectType.find(':') > -1:
-                kwargs['datatype'] = objectType
-            elif len(objectType) > 1: #must be a language id
-                kwargs['language'] = objectType
+            kwargs = { 'literal':object }
+            if objectType and objectType != OBJECT_TYPE_LITERAL:
+                if objectType.find(':') > -1:
+                    kwargs['datatype'] = RDF.Uri(objectType)
+                    kwargs['language'] = None
+                elif len(objectType) > 1: #must be a language id
+                    kwargs['language'] = objectType                    
             return RDF.Node(**kwargs)            
         
     def statement2Redland(statement):
@@ -661,16 +676,29 @@ try:
                              URI2node(statement.predicate), object)
 
     def redland2Statements(redlandStatements, defaultScope=''):
-        '''RDF.Statement to Statement'''
-        for stmt in redlandStatements:
-            if stmt.object.is_literal():                
-                objectType = stmt.object.literal_value.get('language') or \
-                             stmt.object.literal_value.get('datatype') or OBJECT_TYPE_LITERAL
+        '''convert result of find_statements or find_statements_context to Statements'''
+        for result in redlandStatements:
+            if isinstance(result, tuple):
+                stmt, context = result
+            else:
+                stmt = result
+                context = None
+
+            if stmt.object.is_literal():
+                language = stmt.object.literal_value.get('language')
+                if language:
+                    objectType = language
+                else:
+                    datatype = stmt.object.literal_value.get('datatype')
+                    if datatype:
+                        objectType = str(datatype)
+                    else:
+                        objectType = OBJECT_TYPE_LITERAL
             else:
                 objectType = OBJECT_TYPE_RESOURCE
             yield Statement(node2String(stmt.subject), node2String(stmt.predicate),                            
                             node2String(stmt.object), objectType=objectType,
-                            scope=redlandStatements.context() or defaultScope)
+                            scope=node2String(context) or defaultScope)
         
     class RedlandModel(Model):
         '''
@@ -686,46 +714,101 @@ try:
             pass
                     
         def getStatements(self, subject=None, predicate=None, object=None,
-                          objecttype=None,context=None):
+                          objecttype=None,context=None, asQuad=False):
             ''' Return all the statements in the model that match the given arguments.
             Any combination of subject and predicate can be None, and any None slot is
             treated as a wildcard that matches any value in the model.'''
             if subject:
-                subject = URI2node(subject)
+                subject = URI2node(subject)            
             if predicate:
                 predicate = URI2node(predicate)
             if object is not None:
-                object = object2node(object, objectType)
-            redlandStmts = self.model.find_statements(
-                                RDF.Statement(subject, predicate, object),
-                                context=context or None)
-            statements = list( redland2Statements( redlandStmts ) )
-            statements.sort()
-            return removeDupStatementsFromSortedList(statements)
-                         
-        def addStatement(self, statement ):
-            '''add the specified statement to the model'''
-            self.model.add_statement(statement2Redland(statement),
-                                      context=statement.scope or None)
+                if objecttype is None:
+                    #ugh... we need to do two separate queries
+                    objecttypes = (OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL)
+                else:
+                    objecttypes = (objecttype,)
+            else:
+                objecttypes = (None,)
 
-        def removeStatement(self, statement ):
+            redlandStmts = []
+            for objecttype in objecttypes:
+                if object is not None:
+                    redlandObject = object2node(object, objecttype)
+                else:
+                    redlandObject = None
+            
+                if context or not asQuad:
+                    if context:
+                        redlandContext = URI2node(context)
+                    else:
+                        redlandContext = None
+                
+                    redlandStmts.append(self.model.find_statements(
+                                    RDF.Statement(subject, predicate, redlandObject),
+                                        context=redlandContext) )
+                    defaultContext = context
+                else:
+                    #search across all contexts                
+                    redlandStmts.append(self.model.find_statements_context(
+                                RDF.Statement(subject, predicate, redlandObject)) )
+                    defaultContext = ''
+
+            statements = list( utils.flattenSeq([redland2Statements(rstmts, defaultContext)
+                                         for rstmts in redlandStmts]) )
+            #statements = list( redland2Statements(redlandStmts, defaultContext))
+            statements.sort()
+            return removeDupStatementsFromSortedList(statements, asQuad)
+                         
+        def addStatement(self, statement):
+            '''add the specified statement to the model'''
+            if statement.scope:
+                context = URI2node(statement.scope)
+            else:
+                context = None            
+            self.model.add_statement(statement2Redland(statement),
+                                      context=context)
+
+        def removeStatement(self, statement):
             '''removes the statement'''
+            if statement.scope:
+                context = URI2node(statement.scope)
+            else:
+                context = None            
             self.model.remove_statement(statement2Redland(statement),
-                                        context=statement.scope or None)
+                                        context=context)
 
     class RedlandHashBdbModel(TransactionModel, RedlandModel):
-        def __init__(self,location, defaultStatements=()):
-            if os.path.exists(location + '-sp2o.db'):
-                storage = RDF.HashStorage(location, options="hash-type='bdb'")
+        def __init__(self, source='', defaultStatements=(),**kw):
+            if os.path.exists(source + '-sp2o.db'):
+                storage = RDF.HashStorage(source,
+                                    options="hash-type='bdb',contexts='yes'")
                 model = RDF.Model(storage)
             else:
                 # Create a new BDB store
-                storage = RDF.HashStorage(location, options="new='yes',hash-type='bdb'")
+                storage = RDF.HashStorage(source,
+                        options="new='yes',hash-type='bdb',contexts='yes'")
                 model = RDF.Model(storage)                
                 for stmt in defaultStatements:
-                    model.add_statement( statement2Redland(stmt), context=stmt.scope)
+                    if stmt.scope:
+                        context = URI2node(stmt.scope)
+                    else:
+                        context = None
+                    model.add_statement( statement2Redland(stmt),context=context)
                 model.sync()
             super(RedlandHashBdbModel, self).__init__(model)
+
+    class RedlandHashMemModel(TransactionModel, RedlandModel):
+        def __init__(self, source='dummy', defaultStatements=(),**kw):
+            # Create a new hash memory store
+            storage = RDF.HashStorage(source,
+                    options="new='yes',hash-type='memory',contexts='yes'")
+            model = RDF.Model(storage)
+            super(RedlandHashMemModel, self).__init__(model)
+            for stmt in defaultStatements:
+                self.addStatement(stmt)
+            model.sync()
+            
 
 except ImportError:
     log.debug("Redland not installed")
@@ -801,7 +884,8 @@ try:
         def rollback(self):
             pass
                     
-        def getStatements(self, subject = None, predicate = None, object = None, objecttype=None):
+        def getStatements(self, subject = None, predicate = None, object=None,
+                          objecttype=None, asQuad=False):
             ''' Return all the statements in the model that match the given arguments.
             Any combination of subject and predicate can be None, and any None slot is
             treated as a wildcard that matches any value in the model.'''
@@ -813,7 +897,7 @@ try:
                 object = object2node(object, objectType)
             statements = list( rdflib2Statements( self.model.triples((subject, predicate, object)) ) )
             statements.sort()
-            return removeDupStatementsFromSortedList(statements)
+            return removeDupStatementsFromSortedList(statements, asQuad)
                          
         def addStatement(self, statement ):
             '''add the specified statement to the model'''            
@@ -824,8 +908,8 @@ try:
             self.model.remove( statement2rdflib(statement))
 
     class RDFLibFileModel(RDFLibModel):
-        def __init__(self,path, defaultStatements=(), context=''):
-            ntpath, stmts, format = _loadRDFFile(path, defaultStatements,context)
+        def __init__(self,source='', defaultStatements=(), context='', **kw):
+            ntpath, stmts, format = _loadRDFFile(source, defaultStatements,context)
             if format == 'unsupported':                
                 self.format = 'nt'
                 self.path = ntpath
@@ -833,7 +917,7 @@ try:
                 self.format = (format == 'ntriples' and 'nt') or (
                                format == 'rdfxml' and 'xml') or 'error'
                 assert self.format != 'error', 'unexpected format'
-                self.path = path
+                self.path = source
                 
             from rdflib.TripleStore import TripleStore                                    
             RDFLibModel.__init__(self, TripleStore())
