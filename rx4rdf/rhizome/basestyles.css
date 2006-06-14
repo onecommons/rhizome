@@ -1,6 +1,9 @@
 /*-------------------------------------------------------
 / The following are used by system files
 ------------------------------------------------------*/
+
+.zmlannotation { display: none; }
+
 /*-------------------------
 / used by diff-revisions.py (when comparing revisions)
 -------------------------*/

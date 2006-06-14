@@ -1,21 +1,9 @@
 from zml import *
 
-def makeReallyOldParser():
-    '''
-    Globally sets the ZML parser compatible with the ZML syntax prior to Rhizome 0.3.1    
-    '''
-    global OLCHAR, COMMENTCHAR, NEWSTMTCHAR, pseudoprog, endprogs
-    OLCHAR = '#'
-    COMMENTCHAR = ';'
-    NEWSTMTCHAR = ''
-    pseudoprog, endprogs = makeTokenizer()
-
-def copyZML(stream, markupOnly = False, upgrade = False):
-    if upgrade:
-        makeReallyOldParser()
+def copyZML(stream, markupOnly = False):
     tokens = []
     
-    class CopyParseState:
+    class CopyParseState(ParseState):
         in_xml = None
         MARKUPSTARTCHAR = '<'
         
@@ -23,12 +11,19 @@ def copyZML(stream, markupOnly = False, upgrade = False):
             self.lines = []
             self.useFreestr = useFreestr
             self.want_freestr = 0
+            self.pseudoprog,self.endprogs,self.nameOrUriProg = self.makeTokenizer()
 
         def setMarkupMode(self, mode):
             self.useFreestr = not mode
 
         def handlesVersion(self, version):
             return True
+
+        def parseXML(self, line):
+            return line
+
+        def processOpenWikiElements(self, parent, popAndStop=False):
+            pass
             
         def __setattr__(self, name, value):
             if name == 'currentLine':
@@ -56,15 +51,6 @@ def copyZML(stream, markupOnly = False, upgrade = False):
                     tokens.append(token)
                 else:
                     lines = self.getLines( (srow-1, scol), (erow-1, ecol) )
-                    if upgrade and type == FREESTR:
-                        if lines[0][0]=='#':
-                            line = lines[0]
-                            count = len(line)
-                            line = line.lstrip('#')
-                            count = count - len(line)
-                            lines[0] = '1'*count + '.' + line
-                        elif lines[0][0]==';':
-                            lines[0] = '#' + lines[0][1:]
                     tokens.extend(lines )
             elif type == NL:
                 if not line[:scol] or line[:scol].strip('<'): #todo: stop sending this extra NL if the whitespace is all <<<
@@ -77,8 +63,6 @@ def copyZML(stream, markupOnly = False, upgrade = False):
                         tokens.append(line)                    
                 else:
                     pass#print 'skipped NL', repr(token), line[:scol]
-            elif upgrade and type == COMMENT:
-                tokens.append('#' + token[1:])
             elif type not in [INDENT, DEDENT]:
                 #print tok_name[type], repr(token)
                 tokens.append(token)
@@ -89,20 +73,33 @@ def copyZML(stream, markupOnly = False, upgrade = False):
     counter = Parser(not markupOnly, parseStateFactory=CopyParseState)
     tokenize(stream.readline, counter)
     return ''.join(tokens)
-
-def upgrade(path, markupOnly = False):
-    import glob, os.path
-    for f in glob.glob(path):
-        resultpath = os.path.splitext(f)[0]+'.new.zml'
-        results = copyZML(open(f,'rb'), markupOnly, upgrade = True)
-        print 'upgrading to ', resultpath
-        open(resultpath, 'wb').write(results)        
-
+        
 class OldParseState(ParseState):
     forVersion = [0.7, 0.9]
+
+    escapeXML = True    
     
+    defexp =  r'\='
+    tableexp= r'\|' 
+    bold= r'__'
+    italics= r'(?<!:)//' #ignore cases like http://
+    monospace= r'\^\^'
+    brexp= r'\~\~'
+    #todo linkexp doesn't handle ] in annotation strings or IP6 hostnames in URIs
+    linkexp = r'\[.*?\]' 
+    #match any of the above unless proceeded by an odd number of \
+    inlineprog = re.compile(r'(((?<!\\)(\\\\)+)|[^\\]|^)'+
+                group(defexp,tableexp,bold,monospace,italics,linkexp,brexp))
+
+    COMMENTCHAR = '#'
+    NEWSTMTCHAR = ';'
+
+    Name = r'[a-zA-Z_][\w:.-]*' #added _:.-   
+    URIRef =  r"\{[a-zA-Z_][\w:.\-\]\[;/?@&=+$,!~*'()%#]*\}"
+
     def __init__(self, mixedMode=True, mmf=None):
         ParseState.__init__(self, mixedMode, mmf)
+        del self.mm.wikiStructure['!']
         self.useFreestr = mixedMode
         #the stack of elements created by wiki markup that has yet to be closed
         #should maintain this order:
@@ -114,15 +111,20 @@ class OldParseState(ParseState):
         self.toClose = 0 #how many inline elements need to be closed at the end of the wikimarkup line
 
         self.MARKUPSTARTCHAR = '<'
+
         
-
-
     #this is always 0
     want_freestr = property(lambda self: 0, lambda self, v: None)
     
     def setMarkupMode(self, mode):
         self.useFreestr = not mode
 
+    def processOpenWikiElements(self, parent, popAndStop=False):
+        pass
+
+    def parseXML(self, line):
+        return line
+    
     def processInlineToken(st, elem, inlineTokens):
         if st.wikiStack.count(elem): #if the elem is open 
             while st.wikiStack[-1] != elem: #close it
@@ -154,14 +156,14 @@ class OldParseState(ParseState):
 
     def handleWikiML(st, string):
         handler = st.handler
-        wikiStructureStack = st.wikiStructureStack
+        wikiStructureStack = st.wikiStructureStack        
         
         lead = string[0]
         if lead == '`': #treat just like STRLINE token
             handler.text( stripQuotes(string) ) 
             return
 
-        if lead == COMMENTCHAR: #treat just like COMMENT token
+        if lead == st.COMMENTCHAR: #treat just like COMMENT token
             handler.comment( string[1:] )
             return
         
