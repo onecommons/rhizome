@@ -80,6 +80,8 @@ doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"
   <link href="site:///{$previous:_template/wiki:uses-skin/*/wiki:name}" rel="stylesheet" type="text/css" />
 </xsl:if>
 
+<link rel="alternate" type="application/rdf+xml" title="{$title}" href='site:///search?search=%2F*%5B.%3D%27{f:escape-url($previous:__resource)}%27%5D&amp;searchType=RxPath&amp;view=rdf' />
+
 <xsl:if test="wf:file-exists('favicon.ico')"> <!-- performance hack (assumes favicon.ico is external) -->
   <link rel="icon" href="site:///favicon.ico" />
 </xsl:if>
