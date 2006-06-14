@@ -10,6 +10,7 @@
         xmlns:foaf="http://xmlns.com/foaf/0.1/"
         exclude-result-prefixes = "a wiki foaf rdf rdfs f wf response-header" 
         >
+<xsl:output omit-xml-declaration='yes' indent='no' />
 <xsl:param name="_name" />
 <xsl:param name="__resource" />
 
@@ -20,14 +21,15 @@
     <xsl:variable name='_robots' select="wf:assign-metadata('_robots', 'nofollow,noindex')" />
     
     <xsl:variable name='resName' select="f:if($__resource/wiki:name, $__resource/wiki:name, 
-                                                f:if($__resource/rdfs:label, $__resource/rdfs:label, name-from-uri(.)))" />
+        f:if($__resource/rdfs:label, $__resource/rdfs:label, name-from-uri($__resource) ))" />
     
     <div class="title">All revisions for resource <b><xsl:value-of select='$resName'/></b></div>
     <br />
+    <form name="diff" METHOD="GET" ACTION="site:///diff-revisions" ENCTYPE="multipart/form-data">
     <table>
     <tr><th>Revision </th><th>Created On</th><th>By</th><th>Label</th><th>Minor Edit?</th><th>Comments</th></tr> 
     <xsl:for-each select="get-revision-contexts-for-subject($__resource)">
-        <tr><td> <!--<input TYPE="checkbox" NAME="rev" VALUE="{position()}" />-->
+        <tr><td> <input TYPE="checkbox" NAME="rev" VALUE="{position()}" />
                 <a href="site:///{$__resource/wiki:name}?action=view-metadata&amp;about={f:escape-url($__resource)}&amp;revnum={position()}" ><xsl:value-of select='position()'/></a></td>
             <td><xsl:value-of select='wf:format-pytime( a:created-on, "%a, %d %b %Y %H:%M")'/></td>
             <td>
@@ -46,5 +48,12 @@
         </tr>        
     </xsl:for-each>
     </table>
+    <input TYPE="HIDDEN" name="revres" value="{$__resource}" />
+    Diff:	
+    <input TYPE="SUBMIT" name="diff"  VALUE="Side By Side" />	
+    &#xa0;<input TYPE="SUBMIT" name="diff"  VALUE="Context" />	    
+    &#xa0;<label for="context">Number of context lines </label><input TYPE="text" NAME="context" VALUE="5" SIZE="1" MAXLENGTH="3" />	    
+    </form>
+
 </xsl:template>
 </xsl:stylesheet>

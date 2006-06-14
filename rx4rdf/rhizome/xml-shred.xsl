@@ -171,7 +171,7 @@
      <xsl:if test="starts-with($absurl, 'site:')" >
        <xsl:variable name="name" select="wf:name-from-url($absurl)" />
        <xsl:if test="not(wf:has-page($name))" >
-        <xupdate:append select='/'>
+        <xupdate:append to-graph='' select='/'>
             <wiki:MissingPage rdf:about='{wf:get-nameURI($name)}'>
               <wiki:name><xsl:value-of select="$name" /></wiki:name>
             </wiki:MissingPage>

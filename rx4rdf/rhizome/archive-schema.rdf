@@ -27,6 +27,44 @@
   <dc:identifier>http://rx4rdf.sf.net/ns/archive</dc:identifier>
 </owl:Ontology>
 
+<owl:Class rdf:ID="Context" />   
+
+<owl:Class rdf:ID="TransactionContext" >   
+<rdfs:subClassOf rdf:resource="#Context" />  
+</owl:Class>
+
+<owl:Class rdf:ID="CurrentTransactionContext" >   
+<rdfs:subClassOf rdf:resource="#TransactionContext" />  
+</owl:Class>
+
+<owl:ObjectProperty rdf:about="#includes" >  
+<rdfs:domain rdf:resource="#Context" />
+<rdfs:range rdf:resource="#Context" />
+</owl:ObjectProperty>  
+
+<owl:ObjectProperty rdf:about="#excludes" >  
+<rdfs:domain rdf:resource="#Context" />
+<rdfs:range rdf:resource="#Context" />
+</owl:ObjectProperty>  
+ 
+<owl:ObjectProperty rdf:about="#applies-to" >  
+<rdfs:domain rdf:resource="#Context" />
+<rdfs:range rdf:resource="#Context" />
+</owl:ObjectProperty>  
+
+<owl:ObjectProperty rdf:about="#applies-to-all-including" >  
+<rdfs:domain rdf:resource="#Context" />
+<rdfs:range rdf:resource="#Context" />
+</owl:ObjectProperty>  
+
+<owl:ObjectProperty rdf:about="#entails" >  
+<rdfs:range rdf:resource="#Context" />
+</owl:ObjectProperty>  
+
+<owl:DatatypeProperty rdf:about="#latest">  
+  <rdfs:domain rdf:resource="#CurrentTransactionContext" />
+</owl:DatatypeProperty>
+
 <owl:Class rdf:ID="ContentRep" />   
 
 <owl:Class rdf:ID="NamedContent" >   

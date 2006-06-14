@@ -1,7 +1,7 @@
 """
     Config file for Rhizome
 
-    Copyright (c) 2003-4 by Adam Souzis <asouzis@users.sf.net>
+    Copyright (c) 2003-6 by Adam Souzis <asouzis@users.sf.net>
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
@@ -360,14 +360,14 @@ actions = {
                 ],
     'load-model' : [ FunctorAction(rhizome.initIndex) ],
     
-    'before-add': [ Action(['''wf:authorize-statements($_added,
+    'before-add': [ Action(['$__skipAuth', '''wf:authorize-statements($_added,
       "http://rx4rdf.sf.net/ns/auth#permission-add-statement", 
       $_newResources, wf:get-metadata('previous:__handlerResource',/..))''',
       #authorize-statements should either return true or raise an exception
       "wf:error('Authorization check unexpectedly failed.')"]), 
                   ],
                      
-    'before-remove': [ Action(['''wf:authorize-statements($_removed,
+    'before-remove': [ Action(['$__skipAuth','''wf:authorize-statements($_removed,
       "http://rx4rdf.sf.net/ns/auth#permission-remove-statement", 
       $_newResources, wf:get-metadata('previous:__handlerResource',/..))''',
       #authorize-statements should either return true or raise an exception                         
@@ -384,8 +384,6 @@ actions = {
                 '_added', $_added, '_removed', $_removed)''']),
         recheckAuthorizations,
         classAuthenticateNewResourceAction,
-#        classAuthenticateAddsAction,
-#        classAuthenticateRemovesAction,                            
         #invoke the validatation schematron document on the changes
         Action(['''wf:request('validate-schema', '_noErrorHandling', 1,
          'phase', 'incremental', '_added', $_added, '_removed', $_removed)''']),
@@ -518,8 +516,6 @@ authorizedExtFunctions = {
 
 STORAGE_PATH = "./wikistore.nt"
 #STORAGE_PATH = "./wikistore.bdb"
-#from rx import RxPath
-#initModel = RxPath.initRedlandHashBdbModel
 
 MODEL_RESOURCE_URI = rhizome.BASE_MODEL_URI
 
@@ -607,10 +603,11 @@ rhizome._addItemTuple('bookmarksetup',loc='path:help/bookmarksetup.xsl',
      format='rxslt', disposition='entry', keywords=['help'], title="Bookmark setup"),
 #rhizome._addItemTuple('todo2document.xsl', loc='path:changes2document.xsl', format='http://www.w3.org/1999/XSL/Transform', 
 #                disposition='template', doctype='document', handlesDoctype='todo'),
-#rhizome._addItemTuple('s5-template',loc='path:s5-template.xsl', format='rxslt', 
-#                        disposition='complete', handlesDisposition='s5-template'), 
 #added in 0.6.1:
-rhizome._addItemTuple('show-revision-contexts',loc='path:show-revision-contexts.xsl', format='rxslt', disposition='entry',handlesAction=['showrevisions'],actionType='rdfs:Resource'), #added actionType also
+rhizome._addItemTuple('show-revision-contexts',loc='path:show-revision-contexts.xsl', format='rxslt', disposition='entry',handlesAction=['showrevisions'],actionType='rdfs:Resource'), 
+rhizome._addItemTuple('s5-template',loc='path:s5-template.xsl', format='rxslt', 
+                        disposition='complete', handlesDisposition='s5-template'), 
+
 #administration pages
 rhizome._addItemTuple('administration', loc='path:administer.xsl', disposition='entry', format='rxslt', title="Administration"), 
 rhizome._addItemTuple('new-role-template', loc='path:new-role-template.txt', handlesAction=['new'], actionType='auth:Role',
@@ -757,7 +754,7 @@ if not adminShaPassword:
     adminShaPassword = sha.sha( locals().get('ADMIN_PASSWORD',rhizome.defaultPassword)+ secureHashSeed ).hexdigest()    
 
 authorizationDigests = { 
-    'My4pn2M3AXwU9vro1UIoBnELsS0=' : 1, #for diff-revisions.py
+    'swGuTVkdKI8+vU7Xdj4SQObhivM=' : 1, #for diff-revisions.py
 }
 
 #rxml
@@ -841,7 +838,8 @@ authStructure =\
   rdf:type: auth:Role
   rdfs:label: `Guest
   rdfs:comment: `this role is used when the user is not logged-in
- 
+  auth:has-rights-to: base:current-transaction-override-token
+  
  auth:role-superuser:
   rdfs:comment: `the superuser role is a special case that always has permission to do anything
   rdf:type: auth:Role
@@ -865,6 +863,7 @@ authStructure =\
   auth:has-rights-to: base:create-nospam-token 
   auth:has-rights-to: base:change-accesstoken-guard
   auth:has-rights-to: base:change-role-guard
+  auth:has-rights-to: base:current-transaction-override-token
  
  #######################################
  #access tokens 
@@ -895,6 +894,26 @@ authStructure =\
   auth:with-property: wiki:has-child
   auth:priority: 90
 
+ #a:Context:
+ #  auth:type-guarded-by: base:write-structure-token
+
+ a:CurrentTransactionContext:
+   auth:type-guarded-by: base:current-transaction-override-token
+
+ base:current-transaction-override-token:
+  rdf:type: auth:AccessToken
+  auth:has-permission: auth:permission-add-statement
+  auth:has-permission: auth:permission-remove-statement 
+  #auth:with-property:  auth:has-transaction-metadata  
+  auth:with-property:  wiki:minor-edit
+  auth:with-property:  rdfs:comment
+  auth:with-property:  wiki:created-from
+  auth:with-property:  wiki:created-by
+  auth:with-property:  a:created-on
+  auth:priority: 90
+  rdfs:comment:  '''this token overrides the guard protecting 
+  Context resource, allowing users to modify the current context'''
+   
  wiki:ItemDisposition:
   auth:type-guarded-by: base:write-structure-token
   
@@ -1333,7 +1352,7 @@ itemDispositions = [
      ('http://rx4rdf.sf.net/ns/wiki#item-disposition-rxml-template', 'RxML Template'), 
      ('http://rx4rdf.sf.net/ns/wiki#item-disposition-print', 'Printable'),
      ('http://rx4rdf.sf.net/ns/wiki#item-disposition-short-display', 'Summary'),
-#     ('http://rx4rdf.sf.net/ns/wiki#item-disposition-s5-template', 'S5 Template'), 
+     ('http://rx4rdf.sf.net/ns/wiki#item-disposition-s5-template', 'S5 Template'), 
 ]
 
 docTypes = [ ('http://rx4rdf.sf.net/ns/wiki#doctype-faq', 'FAQ', 'text/xml'),
@@ -1416,13 +1435,13 @@ APPLICATION_MODEL= (
 
 #add the "archive" schema to APPLICATION_MODEL
 import os.path
-from rx import RxPathUtils
 #4Suite's RDF parser can't parse archive-schema.rdf 
 #so we have to load a NTriples file instead
-#schema = RxPathUtils.convertToNTriples(
-#  os.path.split(_rhizomeConfigPath)[0]+'/archive-schema.nt')
 schema = file(os.path.split(_rhizomeConfigPath)[0]+'/archive-schema.nt').read()
-#to regenerate: change above to end in .rdf and uncomment this line:
+#to regenerate: uncomment these lines:
+#from rx.RxPath import serializeRDF, parseRDFFromURI, Uri
+#schema = serializeRDF(parseRDFFromURI(Uri.OsPathToUri(
+#  os.path.split(_rhizomeConfigPath)[0]+'/archive-schema.rdf')) , 'ntriples')
 #file(os.path.split(_rhizomeConfigPath)[0]+'/archive-schema.nt', 'w').write(schema)
 APPLICATION_MODEL += schema
 

@@ -71,6 +71,10 @@ class Statement(tuple, BaseStatement):
     objectType = property(lambda self: self[3])
     scope =  property(lambda self: self[4])
 
+    def __hash__( self):
+        #for now don't include scope
+        return hash(self[:4])
+
     def __eq__(self, other):
         #for now don't compare scope        
         if isinstance(other, (tuple,list)):
@@ -715,6 +719,7 @@ def addStatements(rdfDom, stmts):
     listItems = {}
     tails = []
     containerItems = {}
+    newNodes = []
     for stmt in stmts:
         #print 'stmt', stmt
         if stmt.predicate == RDF_MS_BASE+'first':
@@ -732,7 +737,9 @@ def addStatements(rdfDom, stmts):
             if not subject:
                 subject = rdfDom.addResource(stmt.subject)
                 assert rdfDom.findSubject(stmt.subject)
-            subject.addStatement(stmt)
+            newNode = subject.addStatement(stmt)
+            if newNode:
+                newNodes.append(newNode)
 
     #for each list encountered
     for tail in tails:            
@@ -747,7 +754,9 @@ def addStatements(rdfDom, stmts):
             listid = stmt.subject
             stmt = Statement(head, *stmt[1:]) #set the subject to be the head of the list
             subject = rdfDom.findSubject(stmt.subject) or rdfDom.addResource(stmt.subject)
-            subject.addStatement(stmt, listid)
+            newNode = subject.addStatement(stmt, listid)
+            if newNode:
+                newNodes.append(newNode)
         
     #now add any container statements in the correct order
     containerKeys = containerItems.keys()
@@ -759,7 +768,12 @@ def addStatements(rdfDom, stmts):
         #change the predicate 
         stmt = Statement(stmt[0], RDF_SCHEMA_BASE+u'member', *stmt[2:]) 
         subject = rdfDom.findSubject(stmt.subject) or rdfDom.addResource(stmt.subject)
-        subject.addStatement(stmt, listid)
+        newNode = subject.addStatement(stmt, listid)
+        if newNode:
+            newNodes.append(newNodes)
+    return newNodes
+
+        
 
 def diffResources(sourceDom, resourceNodes):
     ''' Given a list of Subject nodes from another RxPath DOM, compare

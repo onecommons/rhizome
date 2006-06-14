@@ -2,7 +2,8 @@
 		    xmlns:a="http://rx4rdf.sf.net/ns/archive#" 
 		    xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#" 
 		    xmlns:f = 'http://xmlns.4suite.org/ext' 
-		    xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'		    
+		    xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'
+xmlns:request-header = 'http://rx4rdf.sf.net/ns/raccoon/http-request-header#'
 			xmlns:auth="http://rx4rdf.sf.net/ns/auth#"
 			xmlns:dc='http://purl.org/dc/elements/1.1/'
 			xmlns:foaf="http://xmlns.com/foaf/0.1/"
@@ -77,8 +78,6 @@
 </xu:for-each>
 
 <xu:for-each select='$_removed/self::wiki:links-to'>
-    <xu:message text="removing links-to {$current}, name: {wf:name-from-url($current)}" terminate="no" />
-
     <xu:variable name='name' select='wf:name-from-url($current)' />   
     <xu:if test='$name'>
         <xu:variable name='missingpage' select='/wiki:MissingPage[wiki:name = $name]' />          
@@ -89,5 +88,72 @@
         </xu:if>
     </xu:if>
 </xu:for-each>
+
+<xu:if test='not($__current-transaction)' >
+<xu:message text="error: $__current-transaction not set" terminate="yes" />
+</xu:if>
+
+<xu:append select='$__current-transaction'>
+            <xu:if test="wf:get-metadata('change_comment')">
+                <rdfs:comment><xu:value-of select="$change_comment"/></rdfs:comment>
+            </xu:if>
+            <a:created-on><xu:value-of select="wf:current-time()"/></a:created-on>
+            <wiki:created-from><xu:value-of select="wf:if(wf:has-metadata('request-header:remote-host'), 
+                '$request-header:remote-host','$request-header:remote-addr')"/>
+            </wiki:created-from>
+            <xu:if test='wf:get-metadata("minor_edit")'>
+                <wiki:minor-edit>1</wiki:minor-edit>
+            </xu:if>    
+
+            <wiki:created-by rdf:resource="{$__account}"/>
+            <xu:variable name='user' select='/foaf:Person[foaf:holdsAccount = $__account]'/>
+
+     <xu:if test='not($user)'>        
+     <!-- 
+     This change is made by the someone not logged in. If some identifying info was posted 
+     (this can happen on the comments page) find or create a foaf:Person and associate it with this revision
+     -->     
+        <xu:if test='wf:get-metadata("user-name") or wf:get-metadata("email")' >             
+             <xu:variable name='user' select="/foaf:Person[foaf:mbox=concat('mailto:',$email)]"/> 
+             <xu:if test='$user' >                       
+                <!-- update user properties -->                                                          
+                <xu:if test='wf:get-metadata("user-name")' >
+                   <xu:remove select="$user/foaf:name" />
+                   <xu:append select="$user">
+                      <foaf:name rdf:resource='{$user-name}' />
+                   </xu:append>
+                </xu:if>
+                <xu:if test='wf:get-metadata("user-url")' >             
+                   <xu:remove select="$user/foaf:homepage" />
+                   <xu:append select="$user">
+                        <foaf:homepage rdf:resource='{$user-url}' />                            
+                   </xu:append>
+                </xu:if>                                                                         
+             </xu:if> 
+             
+             <xu:if test='not($user)'> 
+                <xu:variable name="guestURI" select="wf:generate-bnode()"/>
+                <xu:append select='/'>
+                   <foaf:Person rdf:about='{$guestURI}'>
+                      <xu:if test='wf:get-metadata("email")' >             
+                        <foaf:mbox rdf:resource="mailto:{$email}" />
+                      </xu:if>                          
+                      <xu:if test='wf:get-metadata("user-name")' >             
+                        <foaf:name rdf:resource='{$user-name}' />                            
+                      </xu:if>
+                      <xu:if test='wf:get-metadata("user-url")' >             
+                        <foaf:homepage rdf:resource='{$user-url}' />                            
+                      </xu:if>                                                     
+                   </foaf:Person>                   
+                </xu:append>
+                <xu:variable name="user" select="/*[.=$guestURI]"/>
+             </xu:if>              
+        </xu:if> 
+     </xu:if> 
+            
+            <xu:if test='$user'>
+                <dc:creator rdf:resource="{$user}"/>
+            </xu:if>
+</xu:append>
 
 </xu:modifications>

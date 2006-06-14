@@ -60,6 +60,8 @@ class TransactionState(object):
     timestamp    = None
     safeToJoin   = True
     cantCommit   = False
+    inCommit     = False
+    inAbort      = False
     
     def __init__(self):
        self.participants = []
@@ -150,18 +152,21 @@ class TransactionService(object):
         self._vote()
         #bug? vote failed will raise the participant's error and _cleanup will never get called
         
-        for p in self.state.participants:
-            try:
-                p.commitTransaction(self)
-            except:
-                self.errorHandler.commitFailed(self,p)
-
+        try:
+            self.state.inCommit = True 
+            for p in self.state.participants:
+                try:
+                    p.commitTransaction(self)
+                except:
+                    self.errorHandler.commitFailed(self,p)
+        finally:
+            self.state.inCommit = False 
+            
         self._cleanup(True)
 
     def fail(self):
         if not self.isActive():
             raise OutsideTransaction
-
         self.state.cantCommit = True
         self.state.safeToJoin = False
 
@@ -175,11 +180,15 @@ class TransactionService(object):
 
         self.fail()
 
-        for p in self.state.participants[:]:
-            try:
-                p.abortTransaction(self)
-            except:
-                self.errorHandler.abortFailed(self,p)
+        try:
+            self.state.inAbort = True 
+            for p in self.state.participants[:]:
+                try:
+                    p.abortTransaction(self)
+                except:
+                    self.errorHandler.abortFailed(self,p)
+        finally:
+            self.state.inAbort = False 
 
         self._cleanup(False)
 
@@ -209,7 +218,6 @@ class TransactionService(object):
 
         self.state = self.stateFactory()
         
-
     def isActive(self):
         return self.state.timestamp is not None
 
@@ -264,7 +272,7 @@ class RaccoonTransactionService(TransactionService,utils.object_with_threadlocal
         '''
         This is intended to be set as the DOMStore's newResourceTrigger
         '''
-        if self.isActive():            
+        if self.isActive() and self.state.safeToJoin:
             self.state.newResources.append(node)
             self._runActions('before-new', {'_newResources' : [node]})
 
@@ -272,7 +280,7 @@ class RaccoonTransactionService(TransactionService,utils.object_with_threadlocal
         '''
         This is intended to be set as the DOMStore's addTrigger
         '''
-        if self.isActive():            
+        if self.isActive() and self.state.safeToJoin:            
             self.state.additions.append(node)
             isnew = node.parentNode in self.state.newResources
             kw = {'_added' : [node], '_isnew' : isnew,
@@ -284,7 +292,7 @@ class RaccoonTransactionService(TransactionService,utils.object_with_threadlocal
         This is intended to be set as the DOMStore's removeTrigger
         '''
         from rx import RxPathDom
-        if self.isActive():
+        if self.isActive() and self.state.safeToJoin:
             state = self.state
             if isinstance(node, RxPathDom.Resource):
                 state.removals.extend(node.childNodes)

@@ -32,7 +32,7 @@
 &#xa0;<a href='site:///search?search=%2F*%5B.%3D%27{f:escape-url($__resource)}%27%5D&amp;searchType=RxPath&amp;view=rdf'>RDF/XML</a>
 &#xa0;<a href='site:///search?search=%2F*%5B.%3D%27{f:escape-url($__resource)}%27%5D&amp;searchType=RxPath&amp;view=ntriples'>NTriples</a>
 <xsl:if test='$shreddedContext'>
-&#xa0;<a href='site:///search?search=get-graph-predicates%28%2F*%5B.%3D%27{f:escape-url($shreddedContext)}%27%5D%29&amp;searchType=RxPath&amp;view=rxml'>Extracted Metadata</a>
+&#xa0;<a href='site:///search?search=get-context%28%2F*%5B.%3D%27{f:escape-url($shreddedContext)}%27%5D%29%2F*%2F*&amp;searchType=RxPath&amp;view=rxml'>Extracted Metadata</a>
 </xsl:if>
 <hr />
 </xsl:if>

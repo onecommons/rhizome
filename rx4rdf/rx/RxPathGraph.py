@@ -35,7 +35,7 @@ and a secondary one which has the rest of the types of contexts supported here:
 The primary one represents the current state of the model, the secondary one for version history.  
 '''
 
-from rx import RxPath
+from rx import RxPath, utils
 from RxPath import Statement,OBJECT_TYPE_RESOURCE,OBJECT_TYPE_LITERAL,RDF_MS_BASE
 import time, re
 from rx import logging #for python 2.2 compatibility
@@ -90,52 +90,211 @@ def splitContext(ctx):
 class CurrentTxN:
     def __init__(self, txnCtxt):
         self.txnContext = txnCtxt
-
-        self.specificContext = None
-        self.includeCtxts = []
-        self.excludeCtxts = []
-        self.del3Ctxts = [] #list of contexts that have had statement remove from it during this txn
-        self.del4Ctxts = {} #associate a del4context with the list of add contexts removed in it
+        self.adds = {} #(stmt, stmt.scope) => [model, stmt)*]
+        self.removes = {} #(stmt, stmt.scope) => [(add/remove, model, stmt)*], visible, srcCtxt
+        self.specificContexts = [None]
+        # ctxt => [src stmts], [new stmts] #remove new when src is empty
+        self.includeCtxts = {}
+        self.excludeCtxts = {}
+        #list of contexts that have had statement remove from it during this txn
+        #addstmts, ctxstmts = currentTxn.del3Ctxts[]
+        self.del3Ctxts = {} #srcContext => [src stmts], [new stmts] 
+        #associate a del4context with the list of add contexts removed in it
+        self.del4Ctxts = {} # del4ctx => {addcontexts=> (src stmts, new stmts)}
 
     def rollback(self):
-        self.specificContext = None
-        self.includeCtxts = []
-        self.excludeCtxts = []
-        self.del3Ctxts = []
+        self.adds = {}
+        self.removes = {}
+        while self.specificContexts:
+            contextDoc = self.specificContexts.pop()
+            if contextDoc:
+                contextDoc.valid = False
+        self.specificContexts = [None]
+
+        self.includeCtxts = {}
+        self.excludeCtxts = {}
+        self.del3Ctxts = {}
         self.del4Ctxts = {}      
 
+    def recordAdd(self, stmt, model, newstmt):
+        self.adds.setdefault((stmt,stmt.scope),[]).append(
+                                (model, newstmt) )
+        model.addStatement(newstmt)        
+
+    def recordRemoves(self, stmt, model, add, newstmt):
+        newstmts,vis = self.removes.setdefault((stmt,stmt.scope),[[], False])
+        newstmts.append((add, model, newstmt) )
+        if add:
+            model.addStatement(newstmt)
+        else:
+            model.removeStatement(newstmt)            
+        
 class _StatementWithRemoveForContextMarker(Statement):
     removeForContext = True
 
 def getTxnContextUri(modelUri, versionnum):
     return TXNCTX + modelUri + ';' + str(versionnum)
+
+class _NamedGraphManagerBase(object):
+    dontPropagate=False
     
-class NamedGraphManager(object):
-    markLatest = True
+    def __init__(self, addmodel, delmodel):
+        self.delmodel = delmodel
+        self.managedModel = addmodel
+
+    def setDoc(self, doc):
+        self.doc = doc        
+        doc.graphManager = self
+        doc.model = self.managedModel
+      
+    def isRemoveNecessary(self, node):
+        return True
+
+    def propagateRemove(self, doc, stmt):
+        if stmt.predicate == RDF_MS_BASE+'rest':                
+            return #these aren't included in the DOM
+        try:
+            #remove the stmt to the ContextDoc
+            #we set dontPropagate because its already been removed from this doc
+            doc.graphManager.dontPropagate = True
+            subjectNode = doc.findSubject(stmt.subject)
+            if subjectNode:
+                predicateNode = subjectNode.findPredicate(stmt)
+                if predicateNode:
+                    subjectNode.removeChild(predicateNode)
+                    return True
+            return False
+        finally:
+            doc.graphManager.dontPropagate = False                          
+
+    def propagateAdd(self, doc, stmt):
+        return self._propagateAdds(doc, [stmt])
+        
+    def _propagateAdds(self, doc, stmts):
+        try:
+            #add the stmt to the doc
+            #we set dontPropagate because its already been added to this doc
+            doc.graphManager.dontPropagate = True                
+            try:
+                return RxPath.addStatements(doc, stmts)
+            except KeyError:
+                #this can happen with list statements that we don't want
+                #to add to the DOM anyways
+                return None
+        finally:
+            doc.graphManager.dontPropagate = False          
+        
+    def revertRemoveIfNecessary(self, stmt, currentTxn):
+        if (stmt,stmt.scope) in currentTxn.removes:
+            newstmts, visible = currentTxn.removes[(stmt,stmt.scope)]
+            for add, model, newstmt in newstmts:
+                if add: #remove add
+                    model.removeStatement(newstmt)
+                else: #revert remove
+                    model.addStatement(newstmt)
+
+                if newstmt.scope in currentTxn.excludeCtxts:
+                    addstmts, ctxstmts = currentTxn.excludeCtxts[newstmt.scope]
+                    addstmts.remove(stmt)
+                    if not addstmts:
+                        for ctxStmt in ctxstmts:
+                            self.doc.model.removeStatement(ctxStmt)
+                        del currentTxn.excludeCtxts[newstmt.scope]
+
+                parts = splitContext(newstmt.scope)
+                delctx,addctx = parts[DELCTX], parts[ADDCTX]
+                if delctx and addctx and delctx in currentTxn.del4Ctxts:
+                    delCtxStmtsDict = currentTxn.del4Ctxts[delctx]                    
+                    addstmts, ctxstmts = delCtxStmtsDict[addctx]
+                    addstmts.remove(stmt)
+                    if not addstmts:
+                        for ctxStmt in ctxstmts:
+                            self.delmodel.removeStatement(ctxStmt)
+                        del delCtxStmtsDict[addctx]
+
+                if addctx and delctx.startswith(DELCTX):
+                    srcContext = parts[EXTRACTCTX]
+                    addstmts, ctxstmts = currentTxn.del3Ctxts[srcContext]
+                    addstmts.remove(stmt)
+                    if not addstmts:
+                        for ctxStmt in ctxstmts:
+                            self.delmodel.removeStatement(ctxStmt)
+                        del currentTxn.del3Ctxts[srcContext]
+            del currentTxn.removes[(stmt,stmt.scope)]
+            return newstmts, visible
+        return ()
+
+    def revertAddIfNecessary(self, stmt, currentTxn):        
+        if (stmt,stmt.scope) in currentTxn.adds:
+            for model, newstmt in currentTxn.adds[(stmt,stmt.scope)]:
+                model.removeStatement(newstmt)
+                if newstmt.scope.startswith(ADDCTX):
+                    addstmts, ctxstmts = currentTxn.includeCtxts[newstmt.scope]
+                    addstmts.remove(stmt)
+                    if not addstmts:
+                        for ctxStmt in ctxstmts:
+                            self.doc.model.removeStatement(ctxStmt)
+                        del currentTxn.includeCtxts[newstmt.scope]
+            del currentTxn.adds[(stmt,stmt.scope)]
+            return True
+        return False
+
+    def _doRemove(self, model, stmt, currentDelContext, currentTxn):
+        txnContext = self.getTxnContext()
+        
+        if currentDelContext not in currentTxn.excludeCtxts:
+            #deleting stmts for the first time in this transaction
+            #add statement declaring the deletion context
+            removeCtxStmt = Statement(txnContext,
+                    'http://rx4rdf.sf.net/ns/archive#excludes',
+               currentDelContext,OBJECT_TYPE_RESOURCE, txnContext)
+
+            model.addStatement(removeCtxStmt)
+            currentTxn.excludeCtxts[currentDelContext] = ([stmt], [removeCtxStmt])
+        else:
+            currentTxn.excludeCtxts[currentDelContext][0].append(stmt)
+
+        currentTxn.recordRemoves(stmt, self.delmodel, True,
+            Statement(stmt[0],stmt[1],stmt[2],stmt[3], currentDelContext))
+
+    def addTrigger(self, node):
+        if node and self.doc.addTrigger:
+            self.doc.addTrigger(node)
+    
+class NamedGraphManager(_NamedGraphManagerBase):
+    markLatest = True    
     
     def __init__(self, addmodel, delmodel, lastScope):        
         if not delmodel:
             #if we don't use a separate store for version history
             #wrap the store so that DOM only sees the latest version of the model
-            self.delmodel = addmodel
-            self.managedModel = ExcludeDeletionsModel(addmodel)
+            delmodel = addmodel
+            managedModel = ExcludeDeletionsModel(addmodel)
         else:
-            self.delmodel = delmodel
-            self.managedModel = addmodel
+            delmodel = delmodel
+            managedModel = addmodel
+
+        super(NamedGraphManager, self).__init__(managedModel,delmodel)
 
         if not lastScope:
-            oldLatest = addmodel.getStatements(predicate='http://rx4rdf.sf.net/ns/archive#latest')
+            oldLatest = addmodel.getStatements(predicate=
+                        'http://rx4rdf.sf.net/ns/archive#latest')
             if oldLatest:
                 lastScope = oldLatest[0].subject
 
         if lastScope:
             parts = lastScope.split(';')
-            #context urls will always start with a txn context, with the version after the first ;
-            assert int(parts[1])
+            #context urls will always start with a txn context,
+            #with the version after the first ;
+            #assert int(parts[1])
             self.lastVersion = int(parts[1])   
         else:
             self.lastVersion = 0
 
+    def setDoc(self, doc):
+        super(NamedGraphManager, self).setDoc(doc)
+        self.initializeTxn()
+ 
     def getTxnContext(self):
         return self.currentTxn.txnContext
     
@@ -143,53 +302,120 @@ class NamedGraphManager(object):
         self.lastVersion += 1
         return getTxnContextUri(self.doc.modelUri, self.lastVersion)        
 
-    def setDoc(self, doc):
-        self.doc = doc        
-        doc.graphManager = self
-        doc.model = self.managedModel
-        
-        self.currentTxn = CurrentTxN(self.incrementTxnContext())    
-        
-    def add(self, stmt):
-        txnCtxt = self.getTxnContext()
-
-        if self.currentTxn.specificContext:
-            baseContext = self.currentTxn.specificContext
-            addContext = ADDCTX + txnCtxt + ';;' + baseContext
-
-            if addContext not in self.currentTxn.includeCtxts:
-                #add info about the included context
-                self.currentTxn.includeCtxts.append(addContext)
-
-                newCtxStmts = [
-                Statement(txnCtxt,'http://rx4rdf.sf.net/ns/archive#includes',
-                        addContext,OBJECT_TYPE_RESOURCE, txnCtxt),
-                #just infer this from a:includes rdfs:range a:Context
-                #Statement(addContext, RDF_MS_BASE+'type',
-                #    'http://rx4rdf.sf.net/ns/archive#Context',
-                #              OBJECT_TYPE_RESOURCE, addContext),
-                Statement(addContext, 'http://rx4rdf.sf.net/ns/archive#applies-to',
-                        baseContext, OBJECT_TYPE_RESOURCE, addContext),
-                ]
-                for ctxStmt in newCtxStmts:            
-                    self.doc.model.addStatement(ctxStmt)        
-
-            self.doc.model.addStatement(Statement(
-                    scope=addContext, *stmt[:4]) )
-            #save the statement again using the original scope
-            self.delmodel.addStatement(Statement(
-                    scope=baseContext, *stmt[:4]) )
+    def addTrigger(self, node):            
+        specificContext = self.currentTxn.specificContexts[-1]
+        if isinstance(node, tuple):
+            stmt = node
+            node = None
         else:
-            self.doc.model.addStatement(Statement(
-                    scope=txnCtxt, *stmt[:4]) )
+            stmt = node.stmt
+            
+        if specificContext:            
+            addToContextInstead = False
+            if node:
+                removed=self.currentTxn.removes.get(
+                          (stmt,specificContext.contexturi))
+                if removed and not removed[1]:#removed[1] == visibleGlobally
+                    #we'll be reverting a remove that wasn't visible to this doc
+                    #so don't add the node to this doc
+                    addToContextInstead = True
+            else:
+                #the node can't be inserted (it already exists)
+                #but we still want to try to add it to the context doc
+                addToContextInstead = True
 
-    def _removeGlobal(self, stmt, currentDelContext):
+            if addToContextInstead:
+                #try to add to contextdoc instead of this one
+                addedNodes = self.propagateAdd(specificContext, stmt)
+                if addedNodes:
+                    if self.doc.addTrigger:
+                      #we not adding new node to the base doc but still call 
+                      #the trigger (because contextdocs don't have the trigger)
+                      assert len(addedNodes) == 1
+                      self.doc.addTrigger(addedNodes[0])
+                #raise so the node isn't added to this doc:
+                raise IndexError('inserting node into current context instead') 
+        
+        if node and self.doc.addTrigger:
+               self.doc.addTrigger(node)                  
+        
+    def add(self, stmt, node=None):
+        if self.dontPropagate:
+            #already handled by the context graph manager
+            return
+
+        specificContext = self.currentTxn.specificContexts[-1]
+        if specificContext:
+            self.propagateAdd(specificContext, stmt)
+        else:
+            #make sure no scope is set
+            stmt = Statement(scope='', *stmt[:4])
+            if self.revertRemoveIfNecessary(stmt,self.currentTxn):
+                return
+            newstmt = Statement(scope=self.getTxnContext(), *stmt[:4])
+            self.currentTxn.recordAdd(stmt, self.doc.model, newstmt)
+
+    def isRemoveNecessary(self, node):
         '''
-        remove all statements that match
+        When need this check to handle the case where removing a
+        node from the base doc while in a specific context.
+        In this case, we want to leave the node in the base doc
+        if the statement appears in other contexts.
+                        
+        returns False if the node should remain in the DOM
         '''
-        stmts = self.doc.model.getStatements(asQuad=True, *stmt[:4])
+        #node is either a resource or predicate node
+        contextDoc = self.currentTxn.specificContexts[-1]
+        if not contextDoc:
+            return True
+        
+        noneAreVisible = True
+        if isinstance(node, RxPathDom.Resource):
+            predNodes = node.childNodes
+        else:
+            assert isinstance(node, RxPathDom.BasePredicate)
+            predNodes = [node]
+
+        for prednode in predNodes:
+            stmt = prednode.stmt
+            if not self.dontPropagate:
+                #do the remove now (else: it has already been done)
+                if not self.propagateRemove(contextDoc, stmt):
+                    raise RxPathDom.NotFoundErr("trying to remove a statement "
+                        "(%s)  that doesn't exist in the specified context (%s)"
+                                        % (str(stmt), contextDoc.contexturi))            
+            #see if the node is still visible
+            #stmt will not be in removes if the remove just reverted an add
+            #so set the default to True because in that case the node was
+            #added here also
+            newstmts, visible = self.currentTxn.removes.get(
+                      (stmt,contextDoc.contexturi), (1, True))
+            if visible:
+                noneAreVisible = False
+        if not noneAreVisible and self.doc.removeTrigger:
+            #we not gonna be removing this node, so invoke the trigger now
+            #(because contextdoc triggers don't fire)
+            self.doc.removeTrigger(node)
+        return noneAreVisible
+        
+    def remove(self, srcstmt):
+        if self.dontPropagate:
+            return #already handled by context graph manager
+
+        if self.currentTxn.specificContexts[-1]:
+            #we've already handled this in isRemoveNecessary()
+            return
+                  
+        srcstmt = Statement(scope='', *srcstmt[:4]) #make sure no scope is set
+        if self.revertAddIfNecessary(srcstmt,self.currentTxn):
+            return
+
+        currentDelContext = DELCTX + self.getTxnContext()
+        #remove all statements that match        
+        stmts = self.doc.model.getStatements(asQuad=True, *srcstmt[:4])
         if not len(stmts):
-            return False
+            log.debug('remove failed '+ str(srcstmt))
+            return
 
         #there should only be at most one stmt with a txncontext as scope
         #and any number of stmts with a addcontext as scope
@@ -203,184 +429,362 @@ class NamedGraphManager(object):
                 assert not txnctxEncountered
                 txnctxEncountered = 1
                 scope = stmt.scope or TXNCTX + self.doc.modelUri + ';0'
-                self.delmodel.addStatement(Statement(stmt[0],stmt[1],stmt[2],                                                     
-                 stmt[3],ORGCTX+ stmt.scope +';;'+currentDelContext))            
+                self.currentTxn.recordRemoves(stmt, self.delmodel, True,
+                  Statement(stmt[0],stmt[1],stmt[2],                                                     
+                  stmt[3],ORGCTX+ stmt.scope +';;'+currentDelContext))
             elif stmt.scope.startswith(ADDCTX):
-                self.delmodel.addStatement(Statement(stmt[0],stmt[1],stmt[2],                                                     
+                self.currentTxn.recordRemoves(stmt, self.delmodel, True,
+                    Statement(stmt[0],stmt[1],stmt[2],                                                     
                          stmt[3],ORGCTX+ stmt.scope +';;'+currentDelContext))
                 #record each context we're deleting from
                 srcContext = stmt.scope.split(';;')[1]
                 assert srcContext
-                if srcContext not in self.currentTxn.del3Ctxts:    
-                    self.delmodel.addStatement(Statement(currentDelContext,
+                if srcContext not in self.currentTxn.del3Ctxts:
+                    ctxStmt = Statement(currentDelContext,
                     'http://rx4rdf.sf.net/ns/archive#applies-to-all-including',
-                        srcContext,OBJECT_TYPE_RESOURCE, currentDelContext) )
+                        srcContext,OBJECT_TYPE_RESOURCE, currentDelContext)
                     
-                    self.currentTxn.del3Ctxts.append(srcContext)                                 
+                    self.delmodel.addStatement(ctxStmt)                    
+                    self.currentTxn.del3Ctxts[srcContext] = ([stmt],[ctxStmt])
+                else:
+                    self.currentTxn.del3Ctxts[srcContext][0].append(stmt)
             elif not stmt.scope:
                 scope = TXNCTX + self.doc.modelUri + ';0'
-                self.delmodel.addStatement(Statement(stmt[0],stmt[1],stmt[2],                                                     
-                 stmt[3],ORGCTX+ scope +';;'+currentDelContext))            
+                self.currentTxn.recordRemoves(stmt, self.delmodel, True,
+                    Statement(stmt[0],stmt[1],stmt[2],                                                     
+                    stmt[3],ORGCTX+ scope +';;'+currentDelContext))
             else:                
                 log.warn('skipping remove, unexpected context ' + stmt.scope)
                 continue
-            self.doc.model.removeStatement(stmt)
-            
-        return True
-        
-    def _removeFromContext(self, stmt, currentDelContext):
-        '''
-        Remove from the current specific context only:
-        * remove the statement 
-        * Add the stmt to the current del4 context    
-        '''
-        sourceContext = self.currentTxn.specificContext
-
-        stmts = self.doc.model.getStatements(asQuad=True,*stmt[:4])
-        for stmt in stmts:
-            if stmt.scope.startswith(ADDCTX) and stmt.scope.endswith(
-                                                    ';;'+sourceContext):
-                #a bit of a hack: we use _StatementWithRemoveForContextMarker
-                #to signal to the incremental NTriples file model that this
-                #remove is specific to this context, not global
-                self.doc.model.removeStatement(
-                    _StatementWithRemoveForContextMarker(*stmt) )
-                orginalAddContext = stmt.scope
-                break
-        else:
-            orginalAddContext = None            
-        
-        self.delmodel.removeStatement(Statement(
-                    scope=sourceContext, *stmt[:4]) )
-
-        if not orginalAddContext:            
-            #this must have been deleting by a global delete, so we'll have to figure out
-            #when this statement was added to the source context
-            delstmts = self.delmodel.getStatements(asQuad=True,*stmt[:4])
-            orgcontexts = [s.scope for s in delstmts
-                if (s.scope.startswith(ORGCTX+ADDCTX)
-                    and splitContext(s.scope)[EXTRACTCTX] == sourceContext)]
-            if not orgcontexts:
-                return False #not found!!                
-            orgcontexts.sort(lambda x,y: comparecontextversion(
-                  getTransactionContext(x),getTransactionContext(y)) )
-            orginalAddContext = splitContext(orgcontexts[-1])[ADDCTX]
-            assert orginalAddContext
-                                        
-        #we add the stmt to the org context to record which transaction the removed statement was added
-        #don't include the srcContext in ORGCTX since its already in the ADDCTX
-        currentDelContextWithoutSrc = DEL4CTX + self.getTxnContext() 
-        self.delmodel.addStatement(Statement(stmt[0],stmt[1],stmt[2],stmt[3],
-             ORGCTX+ orginalAddContext +';;'+currentDelContextWithoutSrc))
-
-        if orginalAddContext not in self.currentTxn.del4Ctxts.setdefault(currentDelContext,[]):
-            self.delmodel.addStatement(Statement(currentDelContext,
-                   'http://rx4rdf.sf.net/ns/archive#applies-to',
-                orginalAddContext,OBJECT_TYPE_RESOURCE, currentDelContext))
-            
-            self.currentTxn.del4Ctxts[currentDelContext].append(orginalAddContext)
-
-        return True        
-
-    def remove(self, stmt):
-        txnContext = self.getTxnContext()
-
-        specificContext = self.currentTxn.specificContext
-        if specificContext:            
-            currentDelContext = DEL4CTX + txnContext + ';;' + specificContext
-            if not self._removeFromContext(stmt, currentDelContext):
-                log.debug('remove failed '+ str(stmt) + ' for context ' + specificContext)
-                return            
-        else:
-            currentDelContext = DELCTX + txnContext
-            if not self._removeGlobal(stmt, currentDelContext):
-                log.debug('remove failed '+ str(stmt))
-                return
-        
-        if currentDelContext not in self.currentTxn.excludeCtxts:
-            #deleting stmts for the first time in this transaction
-            #add statement declaring the deletion context
-            removeCtxStmt = Statement(txnContext,
-                    'http://rx4rdf.sf.net/ns/archive#excludes',
-               currentDelContext,OBJECT_TYPE_RESOURCE, txnContext)
-
-            self.doc.model.addStatement(removeCtxStmt)
-            self.currentTxn.excludeCtxts.append(currentDelContext)
-        
-        self.delmodel.addStatement(Statement(stmt[0],stmt[1],stmt[2],stmt[3],
-             currentDelContext))
+            self.currentTxn.recordRemoves(stmt, self.doc.model, False, stmt)
+        #use managedmodel to skip schema and entailment triggers  
+        self._doRemove(self.managedModel, srcstmt, currentDelContext, self.currentTxn)
             
     def commit(self, kw):
+  #      scope = self.getTxnContext()
+  #      assert scope
+  #      if self.markLatest:
+  #          oldLatest = self.doc.model.getStatements(predicate='http://rx4rdf.sf.net/ns/archive#latest')
+  #          if oldLatest:
+  #              self.doc.model.removeStatement(oldLatest[0])
+
+  #      ctxStmts = [
+  #          Statement(scope, RDF_MS_BASE+'type',
+  #          'http://rx4rdf.sf.net/ns/archive#TransactionContext', OBJECT_TYPE_RESOURCE, scope),
+  #          Statement(scope,'http://rx4rdf.sf.net/ns/archive#created-on',
+  #           time.asctime(),OBJECT_TYPE_LITERAL, scope),
+  #      ]
+
+  #      if self.markLatest:
+  #          ctxStmts.append(Statement(scope, 'http://rx4rdf.sf.net/ns/archive#latest', 
+  #              unicode(self.lastVersion),OBJECT_TYPE_LITERAL, scope))
+                
+ #       if kw.get('source'):
+ #           ctxStmts.append( Statement(scope,
+ #               'http://rx4rdf.sf.net/ns/wiki#created-by',
+ #              RxPath.StringValue(kw['source'][0]),OBJECT_TYPE_RESOURCE, scope))
+ #       if kw.get('createdFrom'):
+ #           ctxStmts.append( Statement(scope,
+ #               'http://rx4rdf.sf.net/ns/wiki#created-from',
+ #              RxPath.StringValue(kw['createdFrom'][0]),OBJECT_TYPE_LITERAL, scope))
+ #       if kw.get('comment'):
+ #           ctxStmts.append( Statement(scope,
+ #               RxPath.RDF_SCHEMA_BASE + 'comment',
+ #              RxPath.StringValue(kw['comment'][0]),OBJECT_TYPE_LITERAL, scope))
+ #       if kw.get('minorEdit'):
+ #           ctxStmts.append(Statement(scope, 'http://rx4rdf.sf.net/ns/wiki#minor-edit', 
+ #               '1',OBJECT_TYPE_LITERAL, scope))
+
+ #      for stmt in ctxStmts:            
+ #           self.doc.model.addStatement(stmt)
+
+        if self.delmodel != self.managedModel:
+            self.delmodel.commit(**kw)
+        
+        while self.currentTxn.specificContexts:
+            contextDoc = self.currentTxn.specificContexts.pop()
+            if contextDoc:
+                #the context doc will no longer be synchronized
+                contextDoc.valid = False
+
+ #       #add the context stmts to the DOM
+ #       self._propagateAdds(self.doc, ctxStmts)
+ 
+        #commit the transaction
+        self.doc.model.commit(**kw)
+        self.initializeTxn()
+
+    def initializeTxn(self):
+        #increment version and set new transaction and context
+        self.currentTxn = CurrentTxN(self.incrementTxnContext())   
+
         scope = self.getTxnContext()
         assert scope
+            
+        #create a new context resource     
         if self.markLatest:
             oldLatest = self.doc.model.getStatements(predicate='http://rx4rdf.sf.net/ns/archive#latest')
             if oldLatest:
                 self.doc.model.removeStatement(oldLatest[0])
-
         ctxStmts = [
             Statement(scope, RDF_MS_BASE+'type',
             'http://rx4rdf.sf.net/ns/archive#TransactionContext',OBJECT_TYPE_RESOURCE, scope),
-            Statement(scope,'http://rx4rdf.sf.net/ns/archive#created-on',
-             time.asctime(),OBJECT_TYPE_LITERAL, scope),
         ]
 
         if self.markLatest:
             ctxStmts.append(Statement(scope, 'http://rx4rdf.sf.net/ns/archive#latest', 
                 unicode(self.lastVersion),OBJECT_TYPE_LITERAL, scope))
-                
-        if kw.get('source'):
-            ctxStmts.append( Statement(scope,
-                'http://rx4rdf.sf.net/ns/wiki#created-by',
-               RxPath.StringValue(kw['source'][0]),OBJECT_TYPE_RESOURCE, scope))
-        if kw.get('createdFrom'):
-            ctxStmts.append( Statement(scope,
-                'http://rx4rdf.sf.net/ns/wiki#created-from',
-               RxPath.StringValue(kw['createdFrom'][0]),OBJECT_TYPE_LITERAL, scope))
-        if kw.get('comment'):
-            ctxStmts.append( Statement(scope,
-                RxPath.RDF_SCHEMA_BASE + 'comment',
-               RxPath.StringValue(kw['comment'][0]),OBJECT_TYPE_LITERAL, scope))
-        if kw.get('minorEdit'):
-            ctxStmts.append(Statement(scope, 'http://rx4rdf.sf.net/ns/wiki#minor-edit', 
-                '1',OBJECT_TYPE_LITERAL, scope))
 
+        #first add the context stmts to the DOM tree if its been created 
+        if self.doc._childNodes is not None:
+            self._propagateAdds(self.doc, ctxStmts)
+        #then add the stmts (triggers entailments)
         for stmt in ctxStmts:            
             self.doc.model.addStatement(stmt)
-
-        if self.delmodel != self.managedModel:
-            self.delmodel.commit(**kw)
-        
-        #increment version and set new context
-        self.currentTxn = CurrentTxN(self.incrementTxnContext())        
 
     def rollback(self):
         if self.delmodel != self.managedModel:
             self.delmodel.rollback()
-        self.currentTxn.rollback() #reset context
-
+        #we want to increment the version # because we might still have cache 
+        #keys referencing this transaction id
+        self.initializeTxn()
+ 
     def pushContext(self,baseContext):
         '''
         Any future changes to the DOM will be specific to this context
         '''
-        assert not self.currentTxn.specificContext, ("pushContext() only allowed"
-        " inside a transaction context, not "+self.currentTxn.specificContext)
+        if not baseContext:
+            self.currentTxn.specificContexts.append(None)
+            return
         
-        self.currentTxn.specificContext = baseContext
+        assert not self.currentTxn.specificContexts[-1], ("pushContext() only"
+        " allowed inside a transaction context, not " +
+                              self.currentTxn.specificContexts[-1].contexturi)
 
         if baseContext.startswith(ORGCTX):
             #special case to allow history to be changed
             #this is used so we can efficiently store deltas
             assert 0 #todo!        
+        
+        self.currentTxn.specificContexts.append( ContextDoc(self.doc, baseContext) )
             
     def popContext(self):
-        self.currentTxn.specificContext = None
+        lastContext = self.currentTxn.specificContexts.pop()
+        if lastContext:
+            #we're done with this 
+            lastContext.valid = False
+        elif not self.currentTxn.specificContexts:
+            self.currentTxn.specificContexts.append(None)
 
     def getStatementsInGraph(self, contexturi):
         if contexturi.startswith(TXNCTX) or contexturi.startswith(ADDCTX):
             return self.doc.model.getStatements(context=contexturi)
         else:
             return self.delmodel.getStatements(context=contexturi)
+
+from rx import RxPathDom
+class ContextDoc(RxPathDom.Document):
+    '''
+    Once the transaction that created this has ended, this will become invalid:
+    Its representation maybe become out of date and attempting to modify it will raise a RuntimeException.
+    Check the "valid" property to find out if this document is still valid.
+    '''
+    
+    def __init__(self, basedoc, contexturi):
+        self.contexturi = contexturi
+        self.basedoc = basedoc
+        if contexturi.startswith(TXNCTX) or contexturi.startswith(ADDCTX):
+            basemodel = basedoc.model
+        else:
+            basemodel = basedoc.graphManager.delmodel            
+
+        stmts = basemodel.getStatements(context=contexturi)
+        model = RxPath.ViewModel(basemodel, stmts)
+        graphManager = ContextNamedGraphManager(model,basedoc.graphManager.delmodel)
+        schemaClass = RxPath.BaseSchema #basedoc.schemaClass
+        super(ContextDoc, self).__init__(model, basedoc.nsRevMap,
+                                         basedoc.modelUri, schemaClass,
+                                         graphManager=graphManager)
+        #note: triggers won't be set, but in general we don't want them to be
+        self.valid = True
+
+    def getKey(self):
+        return (self.basedoc.getKey(), self.contexturi)
+                
+    def commit(self, **kw):
+        raise RuntimeError("invalid operation for ContextDoc")
+
+    def rollback(self):
+        raise RuntimeError("invalid operation for ContextDoc")
+
+    def pushContext(self,uri):
+        raise RuntimeError("invalid operation for ContextDoc")
+
+    def popContext(self):
+        raise RuntimeError("invalid operation for ContextDoc")
+        
+class ContextNamedGraphManager(_NamedGraphManagerBase):        
+    def getTxnContext(self):
+        return self.doc.basedoc.graphManager.currentTxn.txnContext
+
+    def add(self, stmt, node=None):
+        if not self.doc.valid:
+            raise RuntimeError('trying to modify a invalid ContextDoc')
+          
+        currentTxn = self.doc.basedoc.graphManager.currentTxn
+        if not currentTxn.specificContexts[-1]:
+          assert not self.dontPropagate
+          #we're trying to add a node in a ContextDoc while in the global context
+          #so treat this as a global add and don't modify this ContextDoc
+          self.propagateAdd(self.doc.basedoc, stmt)
+          return
+
+        assert self.doc is currentTxn.specificContexts[-1]
+        baseContext = self.doc.contexturi
+        #stmt won't necessarily have the right scope set
+        #(e.g. when coming from the node of basedoc)
+        stmt = Statement(scope=baseContext, *stmt[:4])
+        
+        revert = self.revertRemoveIfNecessary(stmt,currentTxn)
+        if not revert:
+            txnCtxt = currentTxn.txnContext                    
+            addContext = ADDCTX + txnCtxt + ';;' + baseContext
+
+            if addContext not in currentTxn.includeCtxts:
+                #add info about the included context                
+                newCtxStmts = [
+                Statement(txnCtxt,'http://rx4rdf.sf.net/ns/archive#includes',
+                        addContext,OBJECT_TYPE_RESOURCE, txnCtxt),
+                #just infer this from a:includes rdfs:range a:Context
+                #Statement(addContext, RDF_MS_BASE+'type',
+                #    'http://rx4rdf.sf.net/ns/archive#Context',
+                #              OBJECT_TYPE_RESOURCE, addContext),
+                Statement(addContext, 'http://rx4rdf.sf.net/ns/archive#applies-to',
+                        baseContext, OBJECT_TYPE_RESOURCE, addContext),
+                ]                
+                for ctxStmt in newCtxStmts: 
+                    #use managedmodel to skip schema and entailment triggers           
+                    self.doc.basedoc.graphManager.managedModel.addStatement(ctxStmt)
+                currentTxn.includeCtxts[addContext] = ([stmt], newCtxStmts)
+            else:
+                currentTxn.includeCtxts[addContext][0].append(stmt)
+
+            currentTxn.recordAdd(stmt, self.doc.basedoc.model,
+                                  Statement(scope=addContext, *stmt[:4]) )
+            #save the statement again using the original scope
+            currentTxn.recordAdd(stmt, self.delmodel,stmt)
+        else:
+            #this node removed in this transaction, just revert that remove
+            #check if this node was also removed from the base doc too            
+            newstmts, visibleGlobally = revert
+            if not visibleGlobally:
+                #it wasn't, so don't propagate this add                
+                if not self.dontPropagate and node:
+                    #but we do want to invoke the tigger
+                    if self.doc.basedoc.addTrigger:
+                        self.doc.basedoc.addTrigger(node)
+                return 
+
+        if not self.dontPropagate:
+            self.propagateAdd(self.doc.basedoc, stmt)
+
+    def remove(self, stmt):      
+        '''
+        Remove from the current specific context only:
+        * remove the statement 
+        * Add the stmt to the current del4 context    
+        '''
+        if not self.doc.valid:
+            raise RuntimeError('trying to modify a invalid ContextDoc')
+
+
+        currentTxn = self.doc.basedoc.graphManager.currentTxn
+        if not currentTxn.specificContexts[-1]:
+          assert not self.dontPropagate
+          #try to remove a node in a ContextDoc while in the global context
+          #so treat this as a global remove and don't modify this ContextDoc
+          self.propagateRemove(self.doc.basedoc, stmt)
+          return
+          
+        assert self.doc is currentTxn.specificContexts[-1], (
+           'wrong context: %s not %s' % (currentTxn.specificContexts[-1], self.doc))
+
+        sourceContext = self.doc.contexturi
+        #stmt won't necessarily have the right scope set
+        #(e.g. when coming from the node of basedoc)
+        stmt = Statement(scope=sourceContext, *stmt[:4])
+
+        if self.revertAddIfNecessary(stmt,currentTxn):
+            if not self.dontPropagate:
+                #if dontPropagate isn't set, the removal occured on the contextdoc          
+                #so remove the node from the base doc too
+                self.propagateRemove(self.doc.basedoc, stmt)
+            return
+        
+        currentDelContext = DEL4CTX +  self.getTxnContext() + ';;' + sourceContext        
+        #we need to search the global model since we need the ADDCTX info        
+        stmts = self.doc.basedoc.model.getStatements(asQuad=True,*stmt[:4])
+        for matchstmt in stmts:
+            if matchstmt.scope.startswith(ADDCTX) and matchstmt.scope.endswith(
+                                                    ';;'+sourceContext):
+                #a bit of a hack: we use _StatementWithRemoveForContextMarker
+                #to signal to the incremental NTriples file model that this
+                #remove is specific to this context, not global
+                currentTxn.recordRemoves(stmt, self.doc.basedoc.model, False,
+                                   _StatementWithRemoveForContextMarker(*matchstmt) )
+                orginalAddContext = matchstmt.scope
+                break
+        else:
+            orginalAddContext = None            
+        
+        stillVisibleGlobally = len(stmts) - bool(orginalAddContext) > 0        
+        currentTxn.recordRemoves(stmt, self.delmodel, False, stmt)
+        currentTxn.removes[(stmt,stmt.scope)][1] = stillVisibleGlobally
+
+        if not self.dontPropagate:
+            #if dontPropagate isn't set, the removal occured on the contextdoc          
+            #so remove the node from the base doc too
+            #we do this even if stillVisibleGlobally is false
+            #to ensure the basedoc's trigger is called
+            self.propagateRemove(self.doc.basedoc, stmt)
+
+        if not orginalAddContext:            
+            #this stmt must have already been deleted by a global delete,
+            #so we'll have to figure out when this statement was added
+            #to the source context
+            delstmts = self.delmodel.getStatements(asQuad=True,*stmt[:4])
+            orgcontexts = [s.scope for s in delstmts
+                if (s.scope.startswith(ORGCTX+ADDCTX)
+                    and splitContext(s.scope)[EXTRACTCTX] == sourceContext)]
+            if not orgcontexts:
+                log.debug('remove failed '+ str(stmt) +
+                      ' for context ' + self.doc.contexturi)              
+                return False #not found!!                
+            orgcontexts.sort(lambda x,y: comparecontextversion(
+                  getTransactionContext(x),getTransactionContext(y)) )
+            orginalAddContext = splitContext(orgcontexts[-1])[ADDCTX]
+        assert orginalAddContext        
+
+        #we add the stmt to the org context to record which transaction the removed statement was added
+        #don't include the srcContext in ORGCTX since its already in the ADDCTX
+        currentDelContextWithoutSrc = DEL4CTX + self.getTxnContext()
+        currentTxn.recordRemoves(stmt, self.delmodel, True, 
+            Statement(stmt[0],stmt[1],stmt[2],stmt[3],
+            ORGCTX+ orginalAddContext +';;'+currentDelContextWithoutSrc))
+
+        delCtxStmtsDict = currentTxn.del4Ctxts.setdefault(currentDelContext,{})
+        if orginalAddContext not in delCtxStmtsDict:
+            ctxStmt = Statement(currentDelContext,
+                   'http://rx4rdf.sf.net/ns/archive#applies-to',
+                orginalAddContext,OBJECT_TYPE_RESOURCE, currentDelContext)
+            self.delmodel.addStatement(ctxStmt)            
+            delCtxStmtsDict[orginalAddContext] = ([stmt], [ctxStmt])
+        else:
+            delCtxStmtsDict[orginalAddContext][0].append(stmt)
+            
+        #use managedmodel to skip schema and entailment triggers            
+        self._doRemove(self.doc.basedoc.graphManager.managedModel, stmt,
+            currentDelContext, currentTxn)
         
 class DeletionModelCreator(object):
     '''
@@ -409,7 +813,7 @@ class DeletionModelCreator(object):
 ##        return scope
               
     def add(self, stmt):
-        scope = self.upgradeScope(stmt[4])
+        scope = self._upgradeScope(stmt[4])
         if stmt[4]:
             if stmt[4].startswith(ADDCTX):
                 #reconstruct user defined contexts
@@ -450,18 +854,18 @@ class DeletionModelCreator(object):
         if line.startswith('end'):
             #transaction ended
             #record removes that were specific to a context
-            for ctxt, stmts in self.currRemovesForContext.values():
+            for ctxt, stmts in self.currRemovesForContext.items():
                 assert ctxt.startswith(ADDCTX)
                 srcCtxt = ctxt.split(';;')[1]
 
                 #reconstruct user defined contexts
-                self.delmodel.removeStatement(
-                    Statement(stmt[0],stmt[1],stmt[2],stmt[3], srcCtxt))
-
                 currentDelContext = DEL4CTX + self.lastScope + ';;' + srcCtxt
                 for stmt in stmts:
                     assert stmt[4]==ctxt, "%s != %s" % (stmt[4], ctxt)
-                    
+
+                    self.delmodel.removeStatement(
+                        Statement(stmt[0],stmt[1],stmt[2],stmt[3], srcCtxt))
+                  
                     self.delmodel.addStatement(
                      Statement(stmt[0],stmt[1],stmt[2],stmt[3],currentDelContext))
                     
@@ -472,7 +876,7 @@ class DeletionModelCreator(object):
                 #re-create statements that would be added to the delmodel:
                 self.delmodel.addStatement(Statement(currentDelContext,
                 'http://rx4rdf.sf.net/ns/archive#applies-to',
-                srcCtx,OBJECT_TYPE_RESOURCE, currentDelContext))
+                srcCtxt,OBJECT_TYPE_RESOURCE, currentDelContext))
 
             #record global removes 
             currentDelContext = DELCTX + self.lastScope
@@ -503,12 +907,16 @@ class ExcludeDeletionsModel(RxPath.MultiModel):
         RxPath.MultiModel.__init__(self, model)
 
     def getStatements(self, subject = None, predicate = None, object = None,
-                      objecttype=None,context=None, asQuad=False):        
+                      objecttype=None,context=None, asQuad=False):      
         result = self.models[0].getStatements(subject, predicate, object,
-                                            objecttype,context,asQuad)
-        return filter(lambda s: not s.scope or s.scope == APPCTX or
+                                            objecttype,context,True)
+        statements = filter(lambda s: not s.scope or s.scope == APPCTX or
                           s.scope.startswith(TXNCTX)
                           or s.scope.startswith(ADDCTX), result)
+        if not asQuad:
+            return RxPath.removeDupStatementsFromSortedList(statements, asQuad)
+        else:
+            return statements
         
 def getTransactionContext(contexturi):
     txnpart = contexturi.split(';;')[0]
@@ -517,15 +925,17 @@ def getTransactionContext(contexturi):
         return '' #not a txn context (e.g. empty or context:application, etc.)
     return txnpart[index:]
 
-    #if index < 0: 
-    #while not contexturi.startswith(TXNCTX):
-    #    stmts = model.getStatements(object=contexturi,
-    #        predicate='http://rx4rdf.sf.net/ns/archive#includes')
-    #    assert len(stmts) == 1
-    #    contexturi = stmts[0].subject #find parent txncontxt
-    #
-    #return contexturi
-
+def getContext(context, uri):
+    uri = RxPath.StringValue(uri)
+    basedoc = context.node.rootNode
+    if not basedoc.graphManager:
+        return []
+    currentContext = basedoc.graphManager.currentTxn.specificContexts[-1]
+    if currentContext and currentContext.contexturi == uri:
+        return [currentContext]
+    else:
+        return [ContextDoc(context.node.rootNode, uri)]
+    
 def _getRevisions(resource):    
     stmts = resource.ownerDocument.model.getStatements(subject=resource.uri,
                                                                 asQuad=True)        
@@ -534,10 +944,12 @@ def _getRevisions(resource):
     #get a unique set of transaction context uris, sorted by revision order
     import itertools
     contexts = set([getTransactionContext(s.scope)
-                for s in itertools.chain(stmts, delstmts)]) #todo: 2.3 dep
+                for s in itertools.chain(stmts, delstmts)#todo: 2.3 dep
+                if getTransactionContext(s.scope)]) #todo: what about s.scope == ''?
     contexts = list(contexts)
+    #print contexts #, stmts, delstmts
     contexts.sort(comparecontextversion)
-    return contexts, stmts, delstmts
+    return contexts, [s for s in stmts if s.scope], delstmts
 
 def getRevisionContexts(context, resourcenode):    
     assert len(resourcenode) == 1 and hasattr(resourcenode[0], 'uri')
@@ -549,10 +961,12 @@ def getRevisionContexts(context, resourcenode):
     
 def _showRevision(contexts, addstmts, removestmts, revision):
     '''revision is 0 based'''
+    #print contexts, addstmts, removestmts, revision
     rev2Context = dict( [ (x[1],x[0]) for x in enumerate(contexts)] )
 
     #include every add stmt whose context <= revision    
-    stmts = [s for s in addstmts if rev2Context[s.scope] <= revision]    
+    stmts = [s for s in addstmts 
+                if rev2Context[getTransactionContext(s.scope)] <= revision]    
     
     #include every deleted stmt whose original context <= revision 
     #and whose deletion context > revision        
@@ -586,8 +1000,8 @@ def comparecontextversion(ctxUri1, ctxUri2):
                     ctxUri1 + " doesn't look like a txn context URI")
     assert (not ctxUri2 or ctxUri2.startswith(TXNCTX),
                     ctxUri2 + " doesn't look like a txn context URI")
-    assert len(ctxUri1.split(';'))>1, ctxUri1 + " doesn't look like a txn context URI"
-    assert len(ctxUri2.split(';'))>1, ctxUri2 + " doesn't look like a txn context URI"
+    assert not ctxUri2 or len(ctxUri1.split(';'))>1, ctxUri1 + " doesn't look like a txn context URI"
+    assert not ctxUri2 or len(ctxUri2.split(';'))>1, ctxUri2 + " doesn't look like a txn context URI"
 
     return cmp(ctxUri1 and int(ctxUri1.split(';')[1]) or 0,
                ctxUri2 and int(ctxUri2.split(';')[1]) or 0)
@@ -605,6 +1019,7 @@ def comparecontextversion(ctxUri1, ctxUri2):
 ##        if v1 != v2:
 ##            return False
 ##    return True
+
 
 def _getContextRevisions(model, delmodel, srcContext):
     #find the txn contexts with changes to the srcContext
@@ -630,7 +1045,7 @@ def _getContextRevisions(model, delmodel, srcContext):
         txns.setdefault(getTransactionContext(ctx), []).append(ctx)
     txncontexts = txns.keys()
     txncontexts.sort(comparecontextversion)
-
+    #print 'txncts', txncontexts
     return txncontexts, txns
 
 def _showContextRevision(model, delmodel, srcContext, revision):
@@ -700,4 +1115,23 @@ RxPath.BuiltInExtFunctions.update({
 (RxPath.RXPATH_EXT_NS, 'get-revision'): showRevision,
 (RxPath.RXPATH_EXT_NS, 'get-revision-contexts-for-context'): getRevisionContextsForContext,
 (RxPath.RXPATH_EXT_NS, 'get-context-revision'): showContextRevision,
+(RxPath.RXPATH_EXT_NS, 'get-context'): getContext,
 })
+
+#todo: expose this XPath func?
+def findGraphURIs(context, nodeset):
+    scopes = {}
+    for node in nodeset:
+        if hasattr(node,'stmt'):
+            if stmt.scope:
+                scopeRes = node.ownerDocument.findSubject(stmt.scope)
+                assert scopeRes
+                scopes[stmt.scope]= scopeRes
+    return scopes.values()
+
+#todo: expose this XPath func?
+def getContextDoc(context, nodeset):
+    contexturis = [n.uri for n in nodeset if isResource([n])]
+    if not contexturis:
+        return []
+    return [ RxPathDom.ContextDoc(nodeset[0].rootNode,contexturis) ]        

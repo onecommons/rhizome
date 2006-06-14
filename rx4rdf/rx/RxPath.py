@@ -76,8 +76,8 @@ def elementNamesFromURI(uri, nsMap):
     return prefix+':'+predLocal, predNs, prefix, predLocal
 
 def getURIFromElementName(elem):
-    u = elem.namespaceURI
-    local = elem.localName 
+    u = elem.namespaceURI or ''
+    local = elem.localName
     return u + getURIFragmentFromLocal(local)
 
 def getURIFragmentFromLocal(local):
@@ -398,33 +398,6 @@ def getReified(context, nodeset):
                                  for uri in reifiedURIs])
     return reifications
 
-def getGraphPredicates(context, uri):
-    uri = StringValue(uri)
-    predicates = []
-    doc = context.node.ownerDocument
-    if doc.graphManager:
-        statements = doc.graphManager.getStatementsInGraph(uri)
-    else:
-        statements = doc.model.getStatements(context=uri)
-    for stmt in statements:        
-        assert stmt.scope == uri
-        subjectNode = doc.findSubject(stmt.subject)
-        assert subjectNode
-        predNode = subjectNode.findPredicate(stmt)
-        assert predNode
-        predicates.append(predNode)
-    return predicates
-
-def findGraphURIs(context, nodeset):
-    scopes = {}
-    for node in nodeset:
-        if hasattr(node,'stmt'):
-            if stmt.scope:
-                scopeRes = node.ownerDocument.findSubject(stmt.scope)
-                assert scopeRes
-                scopes[stmt.scope]= scopeRes
-    return scopes.values()
-
 def rdfDocument(context, object,type='unknown', nodeset=None):
     '''Equivalent to XSLT's document() function except it parses RDF
     and returns RxPath Document nodes instead of XML Document nodes.
@@ -467,12 +440,6 @@ def rdfDocument(context, object,type='unknown', nodeset=None):
 #    assert len(nodeset) == 1, 'only one root node in nodeset supported'
 #    nsRevMap = getattr(context.node.ownerDocument, 'nsRevMap', None)
 #    return RxPathDOMFromStatements(parseRDFFromDOM(nodeset[0]), nsRevMap, uri)
-
-def getContextDoc(context, nodeset):
-    contexturis = [n.uri for n in nodeset if isResource([n])]
-    if not contexturis:
-        return []
-    return [ RxPathDom.ContextDoc(nodeset[0].rootNode,contexturis) ]        
             
 RXPATH_EXT_NS = None #todo: put these in an extension namespace?
 BuiltInExtFunctions = {
@@ -491,7 +458,6 @@ BuiltInExtFunctions = {
 (RXPATH_EXT_NS, 'uri'): getURIFromElement,
 
 (RXPATH_EXT_NS, 'get-statement-uris'): getReified,
-(RXPATH_EXT_NS, 'get-graph-predicates'): getGraphPredicates,
 (RXPATH_EXT_NS, 'rdfdocument'): rdfDocument,
 }
 from Ft.Xml.Xslt import XsltContext

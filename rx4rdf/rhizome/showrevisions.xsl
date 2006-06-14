@@ -10,6 +10,7 @@
         xmlns:foaf="http://xmlns.com/foaf/0.1/"
         exclude-result-prefixes = "a wiki foaf rdf rdfs f wf response-header" 
         >
+<xsl:output omit-xml-declaration='yes' indent='no' />
 <xsl:param name="_name" />
 <xsl:param name="__resource" />
 

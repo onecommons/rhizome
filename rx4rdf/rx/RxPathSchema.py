@@ -15,6 +15,8 @@ class BaseSchema(object):
     A "null" schema that does nothing. Illustrates the minimum
     interfaces that must be implemented.
     '''
+    isInstanceOf = None
+    
     def __init__(self, model = None, autocommit=False):
         pass
     
@@ -40,6 +42,11 @@ class BaseSchema(object):
         else:
             return testProp == wantProp
 
+    def setEntailmentTriggers(self, addCallBack, removeCallBack):
+        '''
+        Callbacks when entailments happen.
+        '''
+
 class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
     
     #for a given context, deduce all additional statements and place them in another context.
@@ -49,6 +56,9 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
     SUBCLASSOF = u'http://www.w3.org/2000/01/rdf-schema#subClassOf'
 
     inTransaction = False
+    
+    addEntailmentCallBack = None
+    removeEntailmentCallBack = None
 
     #from http://www.w3.org/TR/2004/rdf-mt/ -- axiomatic statements for RDF and RDFS 
 #skip rdf:type rdf:Property -- we'll do this automatically as encountered
@@ -126,7 +136,7 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
 
         autocommit = model.autocommit
         self.autocommit = True #disable _beginTxn() during init
-        self.addToSchema(self.rdfsSchema)        
+        self.addToSchema(self.rdfsSchema)    
         self.addToSchema( model.getStatements() )
         self.autocommit = autocommit
 
@@ -178,13 +188,15 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
             close(closure, key, value)
         return dict([(x, y.keys()) for x, y in closure.items()])
 
-    def _addTypeStatement(self, stmt):        
+    def _addTypeStatement(self, stmt, addStmt=True):    
+        if addStmt:
+            self._addEntailment(stmt)    
         self.currentSubTypes.setdefault(stmt.object, [stmt.object])
         self.currentSuperTypes.setdefault(stmt.object, [stmt.object])
         key = (stmt.object, RDF_SCHEMA_BASE+u'Class')
         if key not in self.inferences:
             typeStmt = Statement(stmt.object, RDF_MS_BASE+u'type', RDF_SCHEMA_BASE+u'Class', OBJECT_TYPE_RESOURCE)
-            self.entailments.addStatement(typeStmt)
+            self._addEntailment(typeStmt)
             self.inferences[key] = 1
         else:
             self.inferences[key] += 1
@@ -195,7 +207,30 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
         elif self.isCompatibleType(stmt.object, RDF_MS_BASE+u'Property'):
             self.currentSubProperties.setdefault(stmt.subject, [stmt.subject])
             self.currentSuperProperties.setdefault(stmt.subject, [stmt.subject])
-    
+
+    def isInstanceOf(self, resourceUri, typeUri):
+        for superTypeUri in self.currentSuperTypes.get(typeUri, () ):
+            if (resourceUri, superTypeUri) in self.inferences:
+                return True
+        return False
+ 
+    def setEntailmentTriggers(self, addCallBack, removeCallBack):
+        '''
+        Callbacks when entailments happen.
+        '''
+        self.addEntailmentCallBack = addCallBack
+        self.removeEntailmentCallBack = removeCallBack
+
+    def _addEntailment(self,stmt):
+        self.entailments.addStatement(stmt)
+        if self.addEntailmentCallBack:
+            self.addEntailmentCallBack(stmt)
+
+    def _removeEntailment(self,stmt):
+        self.entailments.removeStatement(stmt)
+        if self.removeEntailmentCallBack:
+            self.removeEntailmentCallBack(stmt)
+           
     def addToSchema(self, stmts):
         self._beginTxn()
         
@@ -208,14 +243,15 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
         #thus they should be declared in the initial schemas
         for stmt in stmts:
             #handle "rdf1" entailment rule in the RDF Semantics spec
-            self.entailments.addStatement(Statement(stmt.predicate, RDF_MS_BASE+u'type', 
-                                                RDF_MS_BASE+u'Property',OBJECT_TYPE_RESOURCE))
+            self._addEntailment(Statement(stmt.predicate, RDF_MS_BASE+u'type', 
+                                RDF_MS_BASE+u'Property',OBJECT_TYPE_RESOURCE))
     
             #"rdfs4b" entailment rule (rdfs4a isn't necessary to make explicit, we just make this 
             #one explicit to guarantee that the object is the subject of at least one statement)
             if stmt.objectType == OBJECT_TYPE_RESOURCE:
-                self.entailments.addStatement( Statement(stmt.object, RDF_MS_BASE+u'type', 
-                                                RDF_SCHEMA_BASE+u'Resource',OBJECT_TYPE_RESOURCE))
+                self.entailments.addStatement( Statement(stmt.object, 
+                RDF_MS_BASE+u'type', 
+                RDF_SCHEMA_BASE+u'Resource',OBJECT_TYPE_RESOURCE))
             
             #"rdfs2" and "rdfs3" entailment rules: infer types from domain and range of predicate  
             for predicate in self.currentSuperProperties.get(stmt.predicate,[stmt.predicate]):
@@ -223,8 +259,8 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
                 for domain in domains:
                     key = (stmt.subject, domain)
                     if key not in self.inferences:
-                        typeStmt = Statement(stmt.subject, RDF_MS_BASE+u'type', domain, OBJECT_TYPE_RESOURCE)
-                        self.entailments.addStatement(typeStmt)
+                        typeStmt = Statement(stmt.subject, RDF_MS_BASE+u'type', 
+                        domain, OBJECT_TYPE_RESOURCE)
                         self._addTypeStatement(typeStmt)
                         self.inferences[key] = 1
                     else:
@@ -237,7 +273,6 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
                     key = (stmt.object, range)
                     if key not in self.inferences:
                         typeStmt = Statement(stmt.object, RDF_MS_BASE+u'type', range, OBJECT_TYPE_RESOURCE)
-                        self.entailments.addStatement(typeStmt)
                         self._addTypeStatement(typeStmt)
                         self.inferences[key] = 1
                     else:
@@ -271,7 +306,6 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
                                     typeStmt = Statement(targetStmt.subject,
                                             RDF_MS_BASE+u'type', type,
                                                          OBJECT_TYPE_RESOURCE)
-                                    self.entailments.addStatement(typeStmt)
                                     self._addTypeStatement(typeStmt)
                                     self.inferences[key ] = 1
                                 else:
@@ -286,7 +320,6 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
                                     typeStmt = Statement(targetStmt.object,
                                             RDF_MS_BASE+u'type', type,
                                                     OBJECT_TYPE_RESOURCE)
-                                    self.entailments.addStatement(typeStmt)
                                     self._addTypeStatement(typeStmt)
                                     self.inferences[key ] = 1
                                 else:
@@ -305,7 +338,7 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
                 
                 typesChanged = True
             elif stmt.predicate in self.typePreds:
-                self._addTypeStatement(stmt)                                       
+                self._addTypeStatement(stmt, addStmt=False)                                       
             else:
                 self.currentSubProperties.setdefault(stmt.predicate, [stmt.predicate])
                 self.currentSuperProperties.setdefault(stmt.predicate, [stmt.predicate])
@@ -322,7 +355,6 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
                                 typeStmt = Statement(targetStmt.subject,
                                     RDF_MS_BASE+u'type', stmt.object,
                                     OBJECT_TYPE_RESOURCE)
-                                self.entailments.addStatement(typeStmt)
                                 self._addTypeStatement(typeStmt)
                                 self.inferences[key ] = 1
                             else:
@@ -339,7 +371,6 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
                                 typeStmt = Statement(targetStmt.object,
                                     RDF_MS_BASE+u'type', stmt.object,
                                     OBJECT_TYPE_RESOURCE)
-                                self.entailments.addStatement(typeStmt)
                                 self._addTypeStatement(typeStmt)
                                 self.inferences[key] = 1
                             else:
@@ -389,7 +420,7 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
                     #its possible that multiple domain and range rules
                     #entail the same type for a given resource
                     if refCount == 0:             
-                        self.entailments.removeStatement( stmt)
+                        self._removeEntailment(stmt)
                         del self.inferences[(stmt.subject, stmt.object)]
                     else:
                         self.inferences[(stmt.subject, stmt.object)] = refCount
@@ -402,8 +433,9 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
                     try:
                         refCount = self.inferences[key] - 1
                         if refCount == 0:             
-                            self.entailments.removeStatement(Statement(stmt.subject,
-                                RDF_MS_BASE+u'type', domain, OBJECT_TYPE_RESOURCE))
+                            self._removeEntailment(Statement(stmt.subject,
+                                RDF_MS_BASE+u'type', domain, 
+                                OBJECT_TYPE_RESOURCE))
                             del self.inferences[key]
                         else:
                             self.inferences[key] = refCount
@@ -416,8 +448,9 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
                     try:
                         refCount = self.inferences[key] - 1
                         if refCount == 0:
-                            self.entailments.removeStatement(Statement(stmt.object,
-                                 RDF_MS_BASE+u'type', range, OBJECT_TYPE_RESOURCE))
+                            self._removeEntailment(Statement(stmt.object,
+                                 RDF_MS_BASE+u'type', range, 
+                                 OBJECT_TYPE_RESOURCE))
                             del self.inferences[key]
                         else:
                             self.inferences[key] = refCount
@@ -448,7 +481,7 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
                                 #its possible that multiple domain and range rules entail the
                                 #same type for a given resource
                                 if refCount == 0:             
-                                    self.entailments.removeStatement( stmt)
+                                    self._removeEntailment(stmt)
                                     del self.inferences[(stmt.subject, stmt.object)]
                                 else:
                                     self.inferences[(stmt.subject, stmt.object)] = refCount                            
@@ -497,8 +530,7 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
             self.currentSuperTypes = copy.deepcopy(self.supertypes)
 
             self.inTransaction = True
-            
-        
+
     def commit(self, **kw):
         if self.autocommit:            
             return
@@ -512,7 +544,6 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
         self.supertypes = self.currentSuperTypes 
         
         self.inTransaction = False
-        
     
     def rollback(self):
         super(RDFSSchema, self).rollback()
@@ -530,8 +561,7 @@ class RDFSSchema(BaseSchema, RxPathModel.MultiModel):
 
         self.inTransaction = False
 
-    ### Operations ###
-                        
+    ### Operations ###                   
     def addStatement(self, stmt ):
         '''add the specified statement to the model'''
         self.addToSchema( (stmt,) )

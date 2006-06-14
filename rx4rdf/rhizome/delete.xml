@@ -13,7 +13,7 @@
     <!-- remove any shredded statements from this resource-->
     <xu:variable name='graphSource' select="/*[a:from-source = ($__resource/wiki:revisions/*/rdf:first/*)[last()]/a:contents/*]" />
     <xu:if test='$graphSource'>
-         <xu:remove select='get-graph-predicates($graphSource/a:entails)' />
+         <xu:remove select='get-context($graphSource/a:entails)/*/*' />
     </xu:if>
 
     <!-- delete external contents if necessary 

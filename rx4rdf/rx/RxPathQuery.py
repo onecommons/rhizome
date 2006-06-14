@@ -856,6 +856,12 @@ class Path2AST(utils.XPathExprVisitor):
             eq1.appendArg(ConstantOp('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'))
             op.finalPosition = PRED_POS
             op.appendArg(eq1)
+
+            #eq3 = EqOp()                
+            #eq3.appendArg(SelectOp(OBJTYPE_POS))
+            #eq3.appendArg(ConstantOp(RxPath.OBJECT_TYPE_RESOURCE))
+            #op.finalPosition = OBJTYPE_POS
+            #op.appendArg(eq3)
             
             eq2 = InOp()
             eq2.appendArg(SelectOp(OBJ_POS))            

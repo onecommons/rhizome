@@ -438,7 +438,7 @@ the Action is run (default is False).
             self.defaultRequestTrigger = kw.get('DEFAULT_TRIGGER','http-request')
             initConstants( ['globalRequestVars'], [])
             self.globalRequestVars.extend( ['_name', '_noErrorHandling',
-                                    '__store', '_APP_BASE', '__readOnly'] )
+                '__current-transaction','__store', '_APP_BASE', '__readOnly'] )
             self.defaultPageName = kw.get('defaultPageName', 'index')
             #cache settings:                
             initConstants( ['LIVE_ENVIRONMENT', 'useEtags'], 1)
@@ -706,7 +706,6 @@ the Action is run (default is False).
                         raise
             finally:
                 Uri.BASIC_RESOLVER = oldResolver
-            
 
         def __assign(self, actionvars, kw, contextNode, debug=False):
             context = XPath.Context.Context(None, processorNss = self.nsMap)
@@ -803,6 +802,9 @@ the Action is run (default is False).
         def _doActionsTxn(self, sequence, kw, contextNode, retVal):            
             self.txnSvc.begin()
             self.txnSvc.state.kw = kw
+            txnCtxtResult = self.domStore.getTransactionContext()
+            self.txnSvc.state.kw['__current-transaction'] = txnCtxtResult or []
+
             self.txnSvc.state.contextNode = contextNode
             self.txnSvc.state.retVal = retVal
             try:
@@ -847,6 +849,9 @@ the Action is run (default is False).
                     retVal = self._doActionsTxn(sequence, kw,
                                                 contextNode, retVal)
                 else:
+                    if '__current-transaction' not in kw:
+                        txnCtxtResult = self.domStore.getTransactionContext()
+                        kw['__current-transaction'] = txnCtxtResult or []
                     result, contextNode, retVal = self._doActionsBare(
                                     sequence, kw, contextNode, retVal)
             except:
@@ -1187,7 +1192,7 @@ the Action is run (default is False).
             addStmts is a list of Statements to add
             removedNodes is a list of RxPath nodes
                (either subject or predicate nodes) to remove
-            '''            
+            '''
             removedNodes = removedNodes or []
             #log.debug('removing %s' % removeResources)
             self.txnSvc.join(self.domStore)
@@ -1222,8 +1227,13 @@ the Action is run (default is False).
             revNsMap = dict(map(lambda x: (x[1], x[0]), self.nsMap.items()) )    
             srcDom = RxPath.RxPathDOMFromStatements(
                     RxPath.parseRDFFromString(contents,uri,type), revNsMap, uri)
+            
+            storeDom = self.domStore.dom
+            if (storeDom.graphManager
+                and storeDom.graphManager.currentTxn.specificContexts[-1]):
+                #compare against the current ContextDoc
+                storeDom = storeDom.graphManager.currentTxn.specificContexts[-1]
 
-            storeDom = self.domStore.dom        
             if resources is None:
                 #no resources specified -- just add all the statements
                 newStatements, removedNodes = RxPath.addDOM(
@@ -1613,7 +1623,7 @@ Please check the URL to ensure that the path is correct.</p>
                 raise CmdArgError('')
             try:
                 root = HTTPRequestProcessor(appName='root', **kw)
-            except (TypeError), e:                
+            except (TypeError), e:               
                 index = str(e).find('argument') #bad keyword arguement
                 if index > -1:                    
                     raise CmdArgError('invalid ' +str(e)[index:])

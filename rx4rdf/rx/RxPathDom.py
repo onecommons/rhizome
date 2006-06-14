@@ -181,6 +181,8 @@ class Node(xml.dom.Node, object):
                 previousSibling = nextSibling.previousSibling 
                 #check for duplicate                                
                 if cmpPredicate(nextSibling, key) == 0:
+                    if notify: 
+                        notify(key)
                     raise IndexError("can't insert duplicate keys")                    
             
             newNode = ctor(key, self, nextSibling, previousSibling)
@@ -408,14 +410,19 @@ class Resource(Element):
         return (self.uri, parentKey)
                             
     def matchName(self, namespaceURI, local):
+        schema = self.ownerDocument.schema
+        wantUri = namespaceURI + RxPath.getURIFragmentFromLocal(local)
+        
+        if schema.isInstanceOf and schema.isInstanceOf(self.uri, wantUri):
+            return True
+            
         #support for multiple rdf:types:        
         #note: doesn't support subproperties of rdf:type
         for n in self.childNodes:
             if (n.nodeType == Node.ELEMENT_NODE and n.localName == 'type'
                     and n.namespaceURI == RDF_MS_BASE):
                 type = n.childNodes[0].uri                
-                if self.ownerDocument.schema.isCompatibleType(type, 
-                    namespaceURI + RxPath.getURIFragmentFromLocal(local)):
+                if schema.isCompatibleType(type, wantUri):
                         return True
                 
         return False
@@ -517,8 +524,7 @@ class Subject(Resource):
             return self.ownerDocument == other.ownerDocument and self.uri == other.uri 
     
     def _addListItem(self, children, listID):
-        stmts = self.ownerDocument.filterScope(
-            self.ownerDocument.model.getStatements(listID))
+        stmts = self.ownerDocument.model.getStatements(listID)
         
         nextList = None
         for stmt in stmts:                      
@@ -542,7 +548,6 @@ class Subject(Resource):
         If the RDF list or container has non-membership statements (usually just rdf:type) those will appear first.
         '''
         stmts = self.ownerDocument.model.getStatements(self.uri) #we assume list will be sorted
-        stmts = self.ownerDocument.filterScope(stmts)
         children = []
         containerItems = {}
         
@@ -712,8 +717,7 @@ class Subject(Resource):
                             
                     predicateNode = Predicate(stmt, self, None, self.lastChild,
                                                                   listID=listID)
-                    if self.ownerDocument.addTrigger:
-                        self.ownerDocument.addTrigger(predicateNode)
+                    self.ownerDocument._invokeAddTrigger(predicateNode)
                     self._doAppendChild(self.childNodes, predicateNode)
                     self._firstChild = self._childNodes[0]
                     self._lastChild = self._childNodes[-1]
@@ -728,7 +732,7 @@ class Subject(Resource):
                 #update statement with the real subject, the listID                
                 stmt = RxPath.Statement(listID,*stmt[1:])
                 if self.ownerDocument.graphManager:
-                    self.ownerDocument.graphManager.add(stmt)
+                    self.ownerDocument.graphManager.add(stmt,predicateNode)
                 else:
                     self.ownerDocument.model.addStatement(stmt)
             elif stmt.predicate == RDF_SCHEMA_BASE+'member': 
@@ -763,8 +767,7 @@ class Subject(Resource):
 
                 predicateNode = Predicate(stmt, self,
                                           None, self.lastChild, listID=listID)
-                if self.ownerDocument.addTrigger:
-                    self.ownerDocument.addTrigger(predicateNode)
+                self.ownerDocument._invokeAddTrigger(predicateNode)
                 self._doAppendChild(self.childNodes, predicateNode)
                 self._firstChild = self._childNodes[0]
                 self._lastChild = self._childNodes[-1]
@@ -772,7 +775,7 @@ class Subject(Resource):
                 #update statement with the real predicate, the listID
                 stmt = RxPath.Statement(stmt[0], listID, *stmt[2:])
                 if self.ownerDocument.graphManager:                    
-                    self.ownerDocument.graphManager.add(stmt)
+                    self.ownerDocument.graphManager.add(stmt,predicateNode)
                 else:
                     self.ownerDocument.model.addStatement(stmt)                
             else: #regular statement
@@ -788,20 +791,25 @@ class Subject(Resource):
                             break
                 else:
                     hi = None
-                    
+
                 predicateNode = self._orderedInsert(stmt, Predicate,
-                    lambda x, y: cmp(x.stmt, y), hi = hi,
-                                notify=self.ownerDocument.addTrigger)
+                                lambda x, y: cmp(x.stmt, y), hi = hi,
+                                notify=self.ownerDocument._invokeAddTrigger)
                 if self.ownerDocument.graphManager:
-                    self.ownerDocument.graphManager.add(stmt)
+                    self.ownerDocument.graphManager.add(stmt,predicateNode)
                 else:
                     self.ownerDocument.model.addStatement(stmt)
+
             self.revision += 1        
             self.ownerDocument.revision += 1
             return predicateNode 
+
         except IndexError:
             #thrown by _orderedInsert: statement already exists in the model
-            log.debug('add statement failed: statement already exists: '+str(stmt))
+            #(but note that this can happen when the stmt exists globally
+            #   but we are trying to add it to specific context)            
+            log.debug('add statement failed: statement already exists: '
+                                                                    +str(stmt))
             return None 
 
     def removeChild(self, oldChild, removingResource=False):
@@ -810,6 +818,12 @@ class Subject(Resource):
             If the predicate is rdf:first then previous and next list item statements are adjusted.
             (Note: In the case of rdfs:member, sibling rdf:_n statements are not adjusted.)            
         '''
+        #if we are trying to remove this node in a specific context
+        #it might only be necessary to remove it from the ContextDoc not this doc
+        if (self.ownerDocument.graphManager and
+            not self.ownerDocument.graphManager.isRemoveNecessary(oldChild)):
+            return
+
         if not removingResource and self.ownerDocument.removeTrigger:
            self.ownerDocument.removeTrigger(oldChild)
         
@@ -1482,14 +1496,14 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     addTrigger = None
     removeTrigger = None
     newResourceTrigger = None
-    
+        
     nextIndex = 0 #never used
     defaultNsRevMap = { RDF_MS_BASE : 'rdf', RDF_SCHEMA_BASE : 'rdfs' }
     
     def __init__(self, model, nsRevMap = None, modelUri=None,
                         schemaClass = RxPath.defaultSchemaClass,graphManager=None):
         self.rootNode = self
-        self.ownerDocument = self #todo: this violates the W3C DOM spec i think but fixes some bugs
+        self.ownerDocument = self #todo: this violates the W3C DOM spec but fixes some 4suite bugs 
         self.model = model
         self.subjectDict = {}
         self.nsRevMap = nsRevMap or self.defaultNsRevMap.copy()
@@ -1513,11 +1527,9 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         #we need to set the schema up now so that the schema from the model isn't
         #added as part of a transaction that may get rolled by
         self.schema = schemaClass(self.model)
+        self.schema.setEntailmentTriggers(self._entailmentAdd, self._entailmentRemove)
         if isinstance(self.schema, RxPath.Model):
             self.model = self.schema
-
-    def filterScope(self, stmts):
-        return stmts
         
     def __cmp__(self, other):
         if self is other:
@@ -1556,6 +1568,12 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     
     lastChild = property(_get_lastChild)
 
+    def _invokeAddTrigger(self, node):
+        if self.graphManager:
+            self.graphManager.addTrigger(node)
+        elif self.addTrigger and isinstance(node, Node):
+            self.addTrigger(node)
+
     def _toSubjectNodes(self):                
         children = []
         objects = {}
@@ -1564,7 +1582,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         islist = False
         
         #don't include rdf:List resources as a Subject node
-        for stmt in self.filterScope(self.model.getStatements()):
+        for stmt in self.model.getStatements():
             #assumes statements are sorted properly            
             if stmt.subject != lastSubject:                
                 if lastSubject and not islist:
@@ -1655,14 +1673,17 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         If the optional removeListObjects parameter is True then objects that are lists will be removed also.
         (Don't use this option if more than one statement refer to the list.)
         '''
-        #todo: what if the resource is reference by an object? -- model should throw an exception?
+        #todo: what if the resource is reference by an object? -- model should throw an exception?        
+        if self.graphManager and not self.graphManager.isRemoveNecessary(oldChild):
+            return
+
         if self.removeTrigger:
            self.removeTrigger(oldChild)
 
         del self.subjectDict[oldChild.uri]
         
         for predicate in tuple(oldChild.childNodes):
-            log.debug("removing statement " + str(predicate.stmt))
+            #log.debug("removing statement " + str(predicate.stmt))
             list = None
             if removeListObjects:
                 #if the object is a list 
@@ -1701,7 +1722,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         if not uri: #generate a bNode if the element has no URI reference
             uri = RxPath.generateBnode()
             
-        log.debug('attempting to adding resource %s' % uri)
+        #log.debug('attempting to add resource %s' % uri)
         subjectNode = self.findSubject(uri)
         if not subjectNode:
             #todo: catch this exception?
@@ -1714,15 +1735,15 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
                 and newChild.localName == 'Description'):
             #add class assertion            
             typeName = RxPath.getURIFromElementName(newChild)
-            log.debug('attempting to adding type statement %s for %s'
-                      % (typeName, uri))
+            #log.debug('attempting to adding type statement %s for %s'
+            #          % (typeName, uri))
             typeStmt = RxPath.Statement(uri, RDF_MS_BASE+'type', typeName,
                 objectType=OBJECT_TYPE_RESOURCE)
             try:
                 predicateNode = subjectNode._orderedInsert(typeStmt, Predicate,
-                            lambda x, y: cmp(x.stmt, y), notify=self.addTrigger)
+                    lambda x, y: cmp(x.stmt, y), notify=self._invokeAddTrigger)
                 if self.graphManager:
-                    self.graphManager.add(typeStmt)
+                    self.graphManager.add(typeStmt,predicateNode)
                 else:
                     self.model.addStatement(typeStmt)
                 self.revision += 1
@@ -1788,8 +1809,8 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     def commit(self, **kw):
         if self.graphManager:
             self.graphManager.commit(kw)
-
-        self.model.commit(**kw)
+        else:
+            self.model.commit(**kw)
 
     def rollback(self):        
         self.model.rollback()
@@ -1819,24 +1840,27 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         if self.graphManager:
             self.graphManager.popContext()        
 
-class ContextDoc(Document):
-    '''
-    ContextDocs are currently read-only.
-    '''
-    #todo: enforce readonly-ness
-    
-    def __init__(self, basedoc, contexturis):
-        self.contexturis = contexturis[:]
-        self.basedoc = basedoc
-        super(ContextDoc, self).__init__(basedoc.model, basedoc.nsRevMap,
-                                         basedoc.modelURI, basedoc.schemaClass)        
+    def _entailmentAdd(self, stmt):
+        self._entailmentChange(stmt, True)
 
-    def getKey(self):
-        return (self.basedoc.getKey(), self.contexturis)
-                
-    def filterScope(self,stmts):
-        return [s for s in stmts if not s.scope or s.scope in self.contexturis]
-    
+    def _entailmentRemove(self, stmt):
+        self._entailmentChange(stmt, False)
+        
+    def _entailmentChange(self, stmt, add):
+        if self._childNodes is not None: #already created them
+            if self.graphManager:
+                subjectNode = self.findSubject(stmt.subject)
+                if not subjectNode or subjectNode._childNodes is not None:
+                    if add:               
+                        self.graphManager.propagateAdd(self, stmt) 
+                    else:
+                        self.graphManager.propagateRemove(self, stmt) 
+            else:
+                self._childNodes = None
+                self.subjectDict = {}  
+                #todo: handle this case more efficiently
+
+        
 import traceback, sys, re
 
 def invokeRxSLT(RDFPath, stylesheetPath):

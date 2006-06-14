@@ -55,6 +55,9 @@ class DomStore(transactions.TransactionParticipant):
         '''
         raise KeyError
 
+    def getTransactionContext(self):
+        return None
+        
     def _normalizeSource(self, requestProcessor, path):
         #if source was set on command line, override config source
         if requestProcessor.source:            
@@ -149,6 +152,7 @@ class RxPathDomStore(DomStore):
                  STORAGE_TEMPLATE='',
                  APPLICATION_MODEL='',
                  transactionLog = '',
+                 saveHistory = True,
                  VERSION_STORAGE_PATH='',
                  versionModelFactory=None, **kw):
         '''
@@ -162,11 +166,12 @@ class RxPathDomStore(DomStore):
         self.modelFactory = modelFactory
         self.versionModelFactory = versionModelFactory or modelFactory
         self.schemaFactory = schemaFactory
-        self.APPLICATION_MODEL = APPLICATION_MODEL
-        self.STORAGE_PATH = STORAGE_PATH
+        self.APPLICATION_MODEL = APPLICATION_MODEL        
+        self.STORAGE_PATH = STORAGE_PATH        
         self.VERSION_STORAGE_PATH = VERSION_STORAGE_PATH
         self.defaultTripleStream = StringIO.StringIO(STORAGE_TEMPLATE)
         self.transactionLog = transactionLog
+        self.saveHistory = saveHistory
             
     def loadDom(self, requestProcessor):        
         self.log = logging.getLogger("domstore." + requestProcessor.appName)
@@ -175,9 +180,12 @@ class RxPathDomStore(DomStore):
                                   DomStore._normalizeSource)
         source = normalizeSource(self, requestProcessor,self.STORAGE_PATH)
 
-        modelUri=requestProcessor.MODEL_RESOURCE_URI        
-        from rx import RxPathGraph
-        initCtxUri = RxPathGraph.getTxnContextUri(modelUri, 0)
+        modelUri=requestProcessor.MODEL_RESOURCE_URI
+        if self.saveHistory:
+            from rx import RxPathGraph
+            initCtxUri = RxPathGraph.getTxnContextUri(modelUri, 0)
+        else:
+            initCtxUri = ''
         defaultStmts = RxPath.NTriples2Statements(self.defaultTripleStream, initCtxUri)
 
         if self.VERSION_STORAGE_PATH:
@@ -192,12 +200,13 @@ class RxPathDomStore(DomStore):
 
         #note: to override loadNtriplesIncrementally, set this attribute
         #on your custom modelFactory function
-        if getattr(self.modelFactory, 'loadNtriplesIncrementally', False):
+        if self.saveHistory and getattr(
+                self.modelFactory, 'loadNtriplesIncrementally', False):
             if not delmodel:
                 delmodel = RxPath.MemModel()
             dmc = RxPathGraph.DeletionModelCreator(delmodel)            
-            model = self.modelFactory(source=source, defaultStatements=defaultStmts,
-                                              incrementHook=dmc)        
+            model = self.modelFactory(source=source,
+                    defaultStatements=defaultStmts, incrementHook=dmc)
             lastScope = dmc.lastScope
         else:
             model = self.modelFactory(source=source, defaultStatements=defaultStmts)
@@ -213,7 +222,10 @@ class RxPathDomStore(DomStore):
             model = RxPath.MirrorModel(model, RxPath.IncrementalNTriplesFileModel(
                 self.transactionLog, []) )
 
-        graphManager = RxPathGraph.NamedGraphManager(model, delmodel,lastScope)
+        if self.saveHistory:
+            graphManager = RxPathGraph.NamedGraphManager(model, delmodel,lastScope)
+        else:
+            graphManager = None
         
         #reverse namespace map #todo: bug! revNsMap doesn't work with 2 prefixes one ns            
         revNsMap = dict(map(lambda x: (x[1], x[0]), requestProcessor.nsMap.items()) )
@@ -263,3 +275,11 @@ class RxPathDomStore(DomStore):
             return self.dom.getKey()
         else:
             return None
+
+    def getTransactionContext(self):
+        if self.dom._childNodes is not None:
+            contextUri = self.dom.graphManager.getTxnContext()
+            contextNode = self.dom.findSubject(contextUri)
+            if contextNode:
+                return [contextNode]
+        return None

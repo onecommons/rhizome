@@ -318,7 +318,10 @@ class MirrorModel(Model):
         self.models = models
 
     #autocommit is false if any model has autocommit == false
-    autocommit = property(lambda self: reduce(lambda x,y: x and y, [m.autocommit for m in self.models]))
+    autocommit = property(
+        lambda self: reduce(lambda x,y: x and y, [m.autocommit for m in self.models]),
+        lambda self, set: [setattr(m, 'autocommit', set) for m in self.models] and None
+        )
     
     def commit(self, **kw):
         for model in self.models:
@@ -340,6 +343,32 @@ class MirrorModel(Model):
     def removeStatement(self, statement ):
         for model in self.models:
             model.removeStatement( statement )
+
+class ViewModel(MirrorModel):
+    '''
+    View a subset of the underlying model.
+    Modifications are propagated to the underlying model.
+    Doesn't support a separate transaction from the underlying model:
+    calling commit or rollback will raise a RuntimeError.
+    '''    
+
+    def __init__(self, model, stmts):
+        '''
+        Assumes stmts are part of model.
+        '''
+        subset = MemModel(stmts)
+        MirrorModel.__init__(self, subset, model)
+
+    def getStatements(self, subject = None, predicate = None, object = None,
+                      objecttype=None,context=None, asQuad=False):        
+        return self.models[0].getStatements(subject, predicate, object,
+                                            objecttype,context,asQuad)
+
+    def commit(self, **kw):
+        raise RuntimeError("invalid operation for ViewModel")
+
+    def rollback(self):
+        raise RuntimeError("invalid operation for ViewModel")
                 
 class TransactionModel(object):
     '''
@@ -394,8 +423,8 @@ class TransactionModel(object):
         ''' Return all the statements in the model that match the given arguments.
         Any combination of subject and predicate can be None, and any None slot is
         treated asj a wildcard that matches any value in the model.'''
-        statements = super(TransactionModel, self).getStatements(subject, predicate, object,
-                                                                 objecttype,context, asQuad)
+        statements = super(TransactionModel, self).getStatements(subject,
+                                predicate, object,objecttype,context, asQuad)
         if not self.queue: 
             return statements
 
@@ -403,16 +432,19 @@ class TransactionModel(object):
         changed = False
         for stmt in self.queue:
             if stmt[0] is Removed:
-                if self._match(stmt[1], subject, predicate, object,
+                stmt = stmt[1] 
+                if self._match(stmt, subject, predicate, object,
                                                objecttype,context):
-                    try:
-                        statements.remove( stmt[1] )
+                    try:                        
+                        i = 0
+                        while 1:
+                            i = statements.index(stmt, i)
+                            if not asQuad or stmt.scope == statements[i].scope:
+                                del statements[i]
+                                changed = True
+                            i+=1
                     except ValueError:
-                        #its possible removeStatement was called with a
-                        #statement that doesn't exist in the underlying model
                         pass
-                    else:
-                        changed = True
             else:
                 if self._match(stmt[0], subject, predicate, object,
                                                objecttype,context):
@@ -429,17 +461,37 @@ class TransactionModel(object):
         '''add the specified statement to the model'''
         if self.autocommit:
             return super(TransactionModel, self).addStatement(statement)        
+        #print 'addStmt', statement
         if self.queue is None: 
-            self.queue = []    
-        self.queue.append( (statement,) )
+            self.queue = []        
+        try:
+            i = 0
+            while 1:
+                i = self.queue.index( (Removed, statement), i)
+                if self.queue[i][1].scope == statement.scope:
+                    del self.queue[i]
+                    return
+                i+=1
+        except ValueError:
+            #print 'addingtoqueue'
+            self.queue.append( (statement,) )            
         
     def removeStatement(self, statement ):
         '''removes the statement'''
         if self.autocommit:
             return super(TransactionModel, self).removeStatement(statement)
         if self.queue is None: 
-            self.queue = []    
-        self.queue.append( (Removed, statement) )
+            self.queue = []
+        try:
+            i = 0
+            while 1:
+                i = self.queue.index((statement,), i)
+                if self.queue[i][0].scope == statement.scope:
+                    del self.queue[i]
+                    return
+                i+=1
+        except ValueError:
+            self.queue.append( (Removed, statement) )
 
 class TransactionMemModel(TransactionModel, MemModel): pass
 
