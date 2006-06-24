@@ -26,22 +26,52 @@ __include__('../rhizome/rhizome-config.py')
 #default: 'http://' + socket.getfqdn() + '/'
 BASE_MODEL_URI='http://example.com/'
 
-#STORAGE_PATH the location of the RDF model. Usually a file path but the appropriate value depends on 'domStoreFactory'
-STORAGE_PATH = 'mywebsite.nt'
-
 #domStoreFactory is the class or factory function the Raccoon will call to instantiate application's DOM store
+#It is passed as keyword arguments the dictionary of the variables contained in the config file
 #note that this is a callable object which may need to be imported into the config file
 #default is DomStore.RxPathDomStore
-def createRedlandDomStore():
-  from rx import RxPath,DomStore
-  return DomStore.RxPathDomStore(RxPath.RedlandHashBdbModel)
-domStoreFactory = createRedlandDomStore
+from rx import DomStore 
+domStoreFactory = DomStore.XMLDomStore #the application uses an XML document instead of RDF
+
+#the following config variables are passed to domStoreFactory as keyword arguments:
+
+#STORAGE_PATH the location of the RDF model. Usually a file path but the appropriate value depends on 'modelFactory'
+#default is '' 
+STORAGE_PATH = 'mywebsite.nt'
 
 #transactionLog is the path of the transactionLog. The transactionLog records in NTriples format a log 
 #of the statements added and removed from the model along with comments on when and by whom.
 #Note: the default file store uses this format so there is not much reason to use this if you are using the default
 #default is '' (no transactionLog)
 transactionLog=/logs/auditTrail.nt
+
+#STORAGE_TEMPLATE is a string containing NTriples that is used when 
+#the file specified by STORAGE_PATH is not found
+STORAGE_TEMPLATE='''
+_:itemdispositionhandlertemplate <http://rx4rdf.sf.net/ns/wiki#name> "item-disposition-handler-template" .
+_:itemdispositionhandlertemplate <http://rx4rdf.sf.net/ns/wiki#revisions> _:itemdispositionhandlertemplate1List .
+_:itemdispositionhandlertemplate <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
+'''
+##APPLICATION_MODEL is a string containing NTriples that are added to the RDF model
+#but are read-only and not saved to disc. Use for structural components such as the schema.
+APPLICATION_MODEL='''<http://rx4rdf.sf.net/ns/wiki#item-format-zml'> <http://www.w3.org/2000/01/rdf-schema#label> "ZML" .'''
+
+#modelFactory is the class or factory function used by RxPathDomStore to load or create a new RDF document or database
+#note that this is a callable object which may need to be imported into the config file
+#default is RxPath.IncrementalNTriplesFileModel
+modelFactory=RxPath.RedlandHashBdbModel
+
+#VERSION_STORAGE_PATH the location of a separate RDF model for storing the history of changes to the database.
+#Usually a file path but the appropriate value depends on 'versionModelFactory'
+#default is '' (history not stored separately)
+VERSION_STORAGE_PATH = 'mywebsite.history.nt'
+
+#versionModelFactory is the class or factory function used by RxPathDomStore to load or create the version history RDF database
+#note that this is a callable object which may need to be imported into the config file
+#default is whatever 'modelFactory' is set to
+versionModelFactory=RxPath.RedlandHashBdbModel
+
+#the following are security specific configuration settings:
 
 #SECURE_FILE_ACCESS limits 'file:' URLs access only the directories reachable through the PATH  
 #default is True
@@ -75,6 +105,8 @@ authorizationDigests = { 'rosyIeJ7Kk+FZRkYPSjcteQi59w=' : 1} #for myPythonPage.p
 #To enable all content processors set this to an empty list.
 #default is [] (all contentProcessors enabled)
 disabledContentProcessors = ['http://rx4rdf.sf.net/ns/wiki#item-format-python']
+
+#Other config variables
 
 #nsMap is dictionary of namespace prefixes that may appear in RxPath expressions
 #default is {} but Raccoon will always add 'rdf', 'rdfs', 'owl', 'bnode', 'wf' (for Raccoon XPath Extension functions),
@@ -335,18 +367,6 @@ __addRxML__(replace = '@sitevars', contents = '''
 ## advanced configuration variables 
 ## these variables are only necessary when developing a new Raccoon application
 #################################################
-
-#STORAGE_TEMPLATE is a string containing NTriples that is used when 
-#the file specified by STORAGE_PATH is not found
-STORAGE_TEMPLATE='''
-_:itemdispositionhandlertemplate <http://rx4rdf.sf.net/ns/wiki#name> "item-disposition-handler-template" .
-_:itemdispositionhandlertemplate <http://rx4rdf.sf.net/ns/wiki#revisions> _:itemdispositionhandlertemplate1List .
-_:itemdispositionhandlertemplate <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#NamedContent> .
-'''
-
-##APPLICATION_MODEL is a string containing NTriples that are added to the RDF model
-#but are read-only and not saved to disc. Use for structural components such as the schema.
-APPLICATION_MODEL='''<http://rx4rdf.sf.net/ns/wiki#item-format-zml'> <http://www.w3.org/2000/01/rdf-schema#label> "ZML" .'''
 
 #cmd_usage is string used to display the command-line usage help
 cmd_usage = '''--import [dir] [--recurse] [--format format] [--disposition disposition]
