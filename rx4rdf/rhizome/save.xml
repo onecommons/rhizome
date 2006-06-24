@@ -135,7 +135,7 @@
     <xu:if test='$lastContents'>
         <xu:variable name='graphSource' select="/*[a:from-source = ($resource/wiki:revisions/*/rdf:first/*)[last()]/a:contents/*]" />        
         <xu:if test='$graphSource'>
-            <xu:remove to-graph='{$graphSource/a:entails}' select='get-graph-predicates($graphSource/a:entails)' />                
+            <xu:remove to-graph='{$graphSource/a:entails}' select='get-context($graphSource/a:entails)/*/*' /> 
         </xu:if>
     </xu:if>
     
