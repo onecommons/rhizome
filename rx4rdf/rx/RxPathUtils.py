@@ -148,10 +148,13 @@ def generateBnode(name=None):
     name = name or `_bNodeCounter`    
     return BNODE_BASE + _sessionBNodeUUID +  name
         
-def NTriples2Statements(stream, defaultScope='', incrementHook=None):
+def NTriples2Statements(stream, defaultScope='', baseuri=None,
+    charencoding='utf8', incrementHook=None):
     makebNode = lambda bNode: BNODE_BASE + bNode
     stmtset = {}
-    for stmt in _parseTriples(stream,  makebNode, yieldcomments=incrementHook):        
+    for stmt in _parseTriples(
+        stream,  makebNode, charencoding=charencoding, baseuri=baseuri,
+        yieldcomments=incrementHook):        
         if stmt[0] is Removed:
             if incrementHook:
                 stmt = incrementHook.remove(stmt[1], stmt[2])
@@ -210,7 +213,7 @@ def parseRDFFromString(contents, baseuri, type='unknown', scope=None,
                     #convert generator to list to force parsing now 
                     return list(NTriples2Statements(
                                 StringIO.StringIO(contents), scope,
-                                incrementHook=incrementHook))
+                                baseuri, incrementHook=incrementHook))
                 except:
                     #maybe its n3 or turtle, but we can't detect that
                     #but we'll try rxml_zml
@@ -219,7 +222,7 @@ def parseRDFFromString(contents, baseuri, type='unknown', scope=None,
         if type == 'ntriples':
             #use our parser
             return NTriples2Statements(StringIO.StringIO(contents), scope,
-                                       incrementHook=incrementHook)    
+                                       baseuri, incrementHook=incrementHook)    
         elif type == 'rxml_xml' or type == 'rxml_zml':
             if type == 'rxml_zml':
                 from rx import zml
@@ -385,10 +388,12 @@ def serializeRDF(statements, type, uri2prefixMap=None,
 Removed = object()
 Comment = object()
 def _parseTriples(lines, bNodeToURI = lambda x: x, charencoding='utf8',
-                  yieldcomments=False):
+                  baseuri=None, yieldcomments=False):
     remove = False
     graph = None
+    lineCounter = 0
     for line in lines:
+        lineCounter += 1
         line = line.strip()
         if not line: #trailing whitespace
             break;
@@ -424,6 +429,11 @@ def _parseTriples(lines, bNodeToURI = lambda x: x, charencoding='utf8',
             subject = bNodeToURI(subject)
         else:
             subject = subject[1:-1] #uri
+            if not subject: #<> refers to the baseuri
+                if baseuri is None:
+                    raise RuntimeError("Unable to parse NTriples on line %i:" 
+            "it contains a '<>' but no baseuri was specified." % lineCounter)
+                subject = baseuri
             
         if predicate.startswith('_:'):
             predicate = predicate[2:] #bNode
@@ -436,6 +446,11 @@ def _parseTriples(lines, bNodeToURI = lambda x: x, charencoding='utf8',
         if object[0] == '<': #if uri
             object = object[1:object.find('>')]
             objectType = OBJECT_TYPE_RESOURCE
+            if not object: #<> refers to the baseuri
+                if baseuri is None:
+                    raise RuntimeError("Unable to parse NTriples on line %i:" 
+            "it contains a '<>' but no baseuri was specified." % lineCounter)
+                object = baseuri
         elif object.startswith('_:'):
             object = object[2:object.rfind('.')].strip()
             object = bNodeToURI(object)
@@ -460,10 +475,7 @@ def _parseTriples(lines, bNodeToURI = lambda x: x, charencoding='utf8',
             remove = False
             yield (Removed, (subject, predicate, object, objectType, graph), removeForContext)
         else:
-            if objectType != OBJECT_TYPE_RESOURCE or object:
-                #hack to handle malformed NTriples docs
-                #-- skip statements that have <> as the object
-                yield (subject, predicate, object, objectType, graph)
+            yield (subject, predicate, object, objectType, graph)
         graph = None
                    
 def writeTriples(stmts, stream, enc='utf8'):
