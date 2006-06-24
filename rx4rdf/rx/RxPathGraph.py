@@ -598,7 +598,11 @@ class ContextDoc(RxPathDom.Document):
         else:
             basemodel = basedoc.graphManager.delmodel            
 
-        stmts = basemodel.getStatements(context=contexturi)
+        if isinstance(basemodel, RxPath.BaseSchema):
+            #don't include entailments
+            stmts = basemodel.model.getStatements(context=contexturi)
+        else:
+            stmts = basemodel.getStatements(context=contexturi)
         model = RxPath.ViewModel(basemodel, stmts)
         graphManager = ContextNamedGraphManager(model,basedoc.graphManager.delmodel)
         schemaClass = RxPath.BaseSchema #basedoc.schemaClass
