@@ -326,6 +326,7 @@ if not globals().has_key('hotReload'):
     mimetypes.types_map['.dwg']='image/x-dwg'
     #modified for rhizome:
     mimetypes.types_map['.ico']='image/x-icon'
+    mimetypes.types_map['.htc']='text/x-component' 
 
     def _parseFirstLine(data):
         data = str(data) # Get rid of unicode
