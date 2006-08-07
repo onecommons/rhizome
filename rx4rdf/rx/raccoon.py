@@ -854,6 +854,8 @@ the Action is run (default is False).
                         kw['__current-transaction'] = txnCtxtResult or []
                     result, contextNode, retVal = self._doActionsBare(
                                     sequence, kw, contextNode, retVal)
+            except (KeyboardInterrupt, SystemExit):
+                raise
             except:
                 #print newTransaction, self.txnSvc.state.timestamp
                 exc_info = sys.exc_info()
@@ -907,11 +909,14 @@ the Action is run (default is False).
                         #XPath variables, e.g. line # for parsing errors
                         #kw['errorInfo'].update(self.extractXPathVars(
                         #                  kw['errorInfo']['value']) )
-                        return self.callActions(errorSequence, result, kw,
-                                contextNode, retVal, self.globalRequestVars,
-                        #if we're creating a new transaction,
-                        #it has been aborted by now, so start a new one:
-                                            newTransaction=newTransaction) 
+                        try:
+                            return self.callActions(errorSequence, result, kw,
+                                    contextNode, retVal, self.globalRequestVars,
+                            #if we're creating a new transaction,
+                            #it has been aborted by now, so start a new one:
+                                                newTransaction=newTransaction)
+                        finally:
+                            del kw['_errorInfo']
                     else:
                         #traceback.print_exception(*exc_info)
                         raise exc_info[1] or exc_info[0], None, exc_info[2]

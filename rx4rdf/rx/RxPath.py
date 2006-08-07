@@ -749,32 +749,34 @@ if preNodeSorting4Suite: #if prior to 4suite b1
 #access to the underlying exception
 from Ft.Xml.Xslt import XsltRuntimeException, Error,XsltFunctions,AttributeInfo
 def ExpressionWrapper_evaluate(self,context):
- try:
-     return self.expression.evaluate(context)
- except XPath.RuntimeException, e:
-     from Ft.Xml.Xslt import MessageSource
-     e.message = MessageSource.EXPRESSION_POSITION_INFO % (
-         self.element.baseUri, self.element.lineNumber,
-         self.element.columnNumber, self.original, str(e))
-     # By modifying the exception value directly, we do not need
-     # to raise with that value, thus leaving the frame stack
-     # intact (original traceback is displayed).
-     raise
- except XsltRuntimeException, e:
-     from Ft.Xml.Xslt import MessageSource
-     e.message = MessageSource.XSLT_EXPRESSION_POSITION_INFO % (
-         str(e), self.original)
-     # By modifying the exception value directly, we do not need
-     # to raise with that value, thus leaving the frame stack
-     # intact (original traceback is displayed).
-     raise
- except Exception, e:
-     from Ft.Xml.Xslt import MessageSource     
-     tb = StringIO.StringIO()
-     tb.write("Lower-level traceback:\n")
-     traceback.print_exc(1000, tb)
-     raise utils.NestedException(MessageSource.EXPRESSION_POSITION_INFO % (
-         self.element.baseUri, self.element.lineNumber,
-         self.element.columnNumber, self.original, tb.getvalue()),
-                       useNested = False)
+    try:
+         return self.expression.evaluate(context)
+    except XPath.RuntimeException, e:
+         from Ft.Xml.Xslt import MessageSource
+         e.message = MessageSource.EXPRESSION_POSITION_INFO % (
+             self.element.baseUri, self.element.lineNumber,
+             self.element.columnNumber, self.original, str(e))
+         # By modifying the exception value directly, we do not need
+         # to raise with that value, thus leaving the frame stack
+         # intact (original traceback is displayed).
+         raise
+    except XsltRuntimeException, e:
+         from Ft.Xml.Xslt import MessageSource
+         e.message = MessageSource.XSLT_EXPRESSION_POSITION_INFO % (
+             str(e), self.original)
+         # By modifying the exception value directly, we do not need
+         # to raise with that value, thus leaving the frame stack
+         # intact (original traceback is displayed).
+         raise
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except Exception, e:
+         from Ft.Xml.Xslt import MessageSource     
+         tb = StringIO.StringIO()
+         tb.write("Lower-level traceback:\n")
+         traceback.print_exc(1000, tb)
+         raise utils.NestedException(MessageSource.EXPRESSION_POSITION_INFO % (
+             self.element.baseUri, self.element.lineNumber,
+             self.element.columnNumber, self.original, tb.getvalue()),
+                           useNested = False)
 AttributeInfo.ExpressionWrapper.evaluate = ExpressionWrapper_evaluate
