@@ -42,6 +42,8 @@ from rx import logging #for python 2.2 compatibility
 log = logging.getLogger("RxPath")
 from rx import set
 
+CTX_NS = u'http://rx4rdf.sf.net/ns/archive#'
+
 TXNCTX = 'context:txn:'  #+ modeluri:starttimestamp;version
 DELCTX = 'context:del3:' #+ tnxctx (the tnxctx that excludes this)
 DEL4CTX = 'context:del4:'#+ tnxctx;;sourcectx (the tnxctx that excludes this)
@@ -155,7 +157,8 @@ class _NamedGraphManagerBase(object):
             return #these aren't included in the DOM
         try:
             #remove the stmt to the ContextDoc
-            #we set dontPropagate because its already been removed from this doc
+            #we set dontPropagate because its already been removed from
+            #this doc
             doc.graphManager.dontPropagate = True
             subjectNode = doc.findSubject(stmt.subject)
             if subjectNode:
@@ -194,11 +197,12 @@ class _NamedGraphManagerBase(object):
                     model.addStatement(newstmt)
 
                 if newstmt.scope in currentTxn.excludeCtxts:
-                    addstmts, ctxstmts = currentTxn.excludeCtxts[newstmt.scope]
+                    addstmts, excludeModel, ctxstmts = currentTxn.excludeCtxts[
+                      newstmt.scope]
                     addstmts.remove(stmt)
                     if not addstmts:
                         for ctxStmt in ctxstmts:
-                            self.doc.model.removeStatement(ctxStmt)
+                            excludeModel.removeStatement(ctxStmt)
                         del currentTxn.excludeCtxts[newstmt.scope]
 
                 parts = splitContext(newstmt.scope)
@@ -245,12 +249,14 @@ class _NamedGraphManagerBase(object):
         if currentDelContext not in currentTxn.excludeCtxts:
             #deleting stmts for the first time in this transaction
             #add statement declaring the deletion context
-            removeCtxStmt = Statement(txnContext,
-                    'http://rx4rdf.sf.net/ns/archive#excludes',
-               currentDelContext,OBJECT_TYPE_RESOURCE, txnContext)
-
-            model.addStatement(removeCtxStmt)
-            currentTxn.excludeCtxts[currentDelContext] = ([stmt], [removeCtxStmt])
+            if self.createCtxResource:
+                removeCtxStmt = Statement(txnContext, CTX_NS+'excludes',
+                   currentDelContext,OBJECT_TYPE_RESOURCE, txnContext)
+                model.addStatement(removeCtxStmt)
+                ctxStmts = [removeCtxStmt]
+            else:
+                ctxStmts = []
+            currentTxn.excludeCtxts[currentDelContext] = ([stmt], model, ctxStmts)
         else:
             currentTxn.excludeCtxts[currentDelContext][0].append(stmt)
 
@@ -262,6 +268,7 @@ class _NamedGraphManagerBase(object):
             self.doc.addTrigger(node)
     
 class NamedGraphManager(_NamedGraphManagerBase):
+    createCtxResource = True
     markLatest = True    
     
     def __init__(self, addmodel, delmodel, lastScope):        
@@ -277,8 +284,7 @@ class NamedGraphManager(_NamedGraphManagerBase):
         super(NamedGraphManager, self).__init__(managedModel,delmodel)
 
         if not lastScope:
-            oldLatest = addmodel.getStatements(predicate=
-                        'http://rx4rdf.sf.net/ns/archive#latest')
+            oldLatest = addmodel.getStatements(predicate=CTX_NS+'latest')
             if oldLatest:
                 lastScope = oldLatest[0].subject
 
@@ -441,7 +447,7 @@ class NamedGraphManager(_NamedGraphManagerBase):
                 assert srcContext
                 if srcContext not in self.currentTxn.del3Ctxts:
                     ctxStmt = Statement(currentDelContext,
-                    'http://rx4rdf.sf.net/ns/archive#applies-to-all-including',
+                    u'http://rx4rdf.sf.net/ns/archive#applies-to-all-including',
                         srcContext,OBJECT_TYPE_RESOURCE, currentDelContext)
                     
                     self.delmodel.addStatement(ctxStmt)                    
@@ -458,46 +464,10 @@ class NamedGraphManager(_NamedGraphManagerBase):
                 continue
             self.currentTxn.recordRemoves(stmt, self.doc.model, False, stmt)
         #use managedmodel to skip schema and entailment triggers  
-        self._doRemove(self.managedModel, srcstmt, currentDelContext, self.currentTxn)
+        self._doRemove(self.managedModel, srcstmt, currentDelContext,
+                       self.currentTxn)
             
     def commit(self, kw):
-  #      scope = self.getTxnContext()
-  #      assert scope
-  #      if self.markLatest:
-  #          oldLatest = self.doc.model.getStatements(predicate='http://rx4rdf.sf.net/ns/archive#latest')
-  #          if oldLatest:
-  #              self.doc.model.removeStatement(oldLatest[0])
-
-  #      ctxStmts = [
-  #          Statement(scope, RDF_MS_BASE+'type',
-  #          'http://rx4rdf.sf.net/ns/archive#TransactionContext', OBJECT_TYPE_RESOURCE, scope),
-  #          Statement(scope,'http://rx4rdf.sf.net/ns/archive#created-on',
-  #           time.asctime(),OBJECT_TYPE_LITERAL, scope),
-  #      ]
-
-  #      if self.markLatest:
-  #          ctxStmts.append(Statement(scope, 'http://rx4rdf.sf.net/ns/archive#latest', 
-  #              unicode(self.lastVersion),OBJECT_TYPE_LITERAL, scope))
-                
- #       if kw.get('source'):
- #           ctxStmts.append( Statement(scope,
- #               'http://rx4rdf.sf.net/ns/wiki#created-by',
- #              RxPath.StringValue(kw['source'][0]),OBJECT_TYPE_RESOURCE, scope))
- #       if kw.get('createdFrom'):
- #           ctxStmts.append( Statement(scope,
- #               'http://rx4rdf.sf.net/ns/wiki#created-from',
- #              RxPath.StringValue(kw['createdFrom'][0]),OBJECT_TYPE_LITERAL, scope))
- #       if kw.get('comment'):
- #           ctxStmts.append( Statement(scope,
- #               RxPath.RDF_SCHEMA_BASE + 'comment',
- #              RxPath.StringValue(kw['comment'][0]),OBJECT_TYPE_LITERAL, scope))
- #       if kw.get('minorEdit'):
- #           ctxStmts.append(Statement(scope, 'http://rx4rdf.sf.net/ns/wiki#minor-edit', 
- #               '1',OBJECT_TYPE_LITERAL, scope))
-
- #      for stmt in ctxStmts:            
- #           self.doc.model.addStatement(stmt)
-
         if self.delmodel != self.managedModel:
             self.delmodel.commit(**kw)
         
@@ -506,9 +476,6 @@ class NamedGraphManager(_NamedGraphManagerBase):
             if contextDoc:
                 #the context doc will no longer be synchronized
                 contextDoc.valid = False
-
- #       #add the context stmts to the DOM
- #       self._propagateAdds(self.doc, ctxStmts)
  
         #commit the transaction
         self.doc.model.commit(**kw)
@@ -520,19 +487,20 @@ class NamedGraphManager(_NamedGraphManagerBase):
 
         scope = self.getTxnContext()
         assert scope
-            
+
+        if not self.createCtxResource:
+            return
         #create a new context resource     
-        if self.markLatest:
-            oldLatest = self.doc.model.getStatements(predicate='http://rx4rdf.sf.net/ns/archive#latest')
-            if oldLatest:
-                self.doc.model.removeStatement(oldLatest[0])
         ctxStmts = [
-            Statement(scope, RDF_MS_BASE+'type',
-            'http://rx4rdf.sf.net/ns/archive#TransactionContext',OBJECT_TYPE_RESOURCE, scope),
+            Statement(scope, RDF_MS_BASE+'type',CTX_NS+'TransactionContext',
+                      OBJECT_TYPE_RESOURCE, scope),
         ]
 
         if self.markLatest:
-            ctxStmts.append(Statement(scope, 'http://rx4rdf.sf.net/ns/archive#latest', 
+            oldLatest = self.doc.model.getStatements(predicate=CTX_NS+'latest')
+            if oldLatest:
+                self.doc.model.removeStatement(oldLatest[0])
+            ctxStmts.append(Statement(scope, CTX_NS+'latest', 
                 unicode(self.lastVersion),OBJECT_TYPE_LITERAL, scope))
 
         #first add the context stmts to the DOM tree if its been created 
@@ -566,7 +534,8 @@ class NamedGraphManager(_NamedGraphManagerBase):
             #this is used so we can efficiently store deltas
             assert 0 #todo!        
         
-        self.currentTxn.specificContexts.append( ContextDoc(self.doc, baseContext) )
+        self.currentTxn.specificContexts.append(
+                ContextDoc(self.doc, baseContext) )
             
     def popContext(self):
         lastContext = self.currentTxn.specificContexts.pop()
@@ -628,6 +597,9 @@ class ContextDoc(RxPathDom.Document):
         raise RuntimeError("invalid operation for ContextDoc")
         
 class ContextNamedGraphManager(_NamedGraphManagerBase):        
+    createCtxResource = property(
+        lambda self: self.doc.basedoc.graphManager.createCtxResource)
+    
     def getTxnContext(self):
         return self.doc.basedoc.graphManager.currentTxn.txnContext
 
@@ -655,20 +627,24 @@ class ContextNamedGraphManager(_NamedGraphManagerBase):
             addContext = ADDCTX + txnCtxt + ';;' + baseContext
 
             if addContext not in currentTxn.includeCtxts:
-                #add info about the included context                
-                newCtxStmts = [
-                Statement(txnCtxt,'http://rx4rdf.sf.net/ns/archive#includes',
-                        addContext,OBJECT_TYPE_RESOURCE, txnCtxt),
-                #just infer this from a:includes rdfs:range a:Context
-                #Statement(addContext, RDF_MS_BASE+'type',
-                #    'http://rx4rdf.sf.net/ns/archive#Context',
-                #              OBJECT_TYPE_RESOURCE, addContext),
-                Statement(addContext, 'http://rx4rdf.sf.net/ns/archive#applies-to',
-                        baseContext, OBJECT_TYPE_RESOURCE, addContext),
-                ]                
-                for ctxStmt in newCtxStmts: 
-                    #use managedmodel to skip schema and entailment triggers           
-                    self.doc.basedoc.graphManager.managedModel.addStatement(ctxStmt)
+                if self.createCtxResource:                
+                    #add info about the included context                
+                    newCtxStmts = [
+                    Statement(txnCtxt, CTX_NS+'includes',
+                            addContext,OBJECT_TYPE_RESOURCE, txnCtxt),
+                    #just infer this from a:includes rdfs:range a:Context
+                    #Statement(addContext, RDF_MS_BASE+'type',
+                    #    'http://rx4rdf.sf.net/ns/archive#Context',
+                    #              OBJECT_TYPE_RESOURCE, addContext),
+                    Statement(addContext, CTX_NS+'applies-to',
+                            baseContext, OBJECT_TYPE_RESOURCE, addContext),
+                    ]                
+                    for ctxStmt in newCtxStmts: 
+                        #use managedmodel to skip schema and entailment triggers           
+                        self.doc.basedoc.graphManager.managedModel.addStatement(
+                                                                        ctxStmt)
+                else:
+                    newCtxStmts = []
                 currentTxn.includeCtxts[addContext] = ([stmt], newCtxStmts)
             else:
                 currentTxn.includeCtxts[addContext][0].append(stmt)
@@ -735,7 +711,7 @@ class ContextNamedGraphManager(_NamedGraphManagerBase):
                 #to signal to the incremental NTriples file model that this
                 #remove is specific to this context, not global
                 currentTxn.recordRemoves(stmt, self.doc.basedoc.model, False,
-                                   _StatementWithRemoveForContextMarker(*matchstmt) )
+                              _StatementWithRemoveForContextMarker(*matchstmt) )
                 orginalAddContext = matchstmt.scope
                 break
         else:
@@ -769,7 +745,8 @@ class ContextNamedGraphManager(_NamedGraphManagerBase):
             orginalAddContext = splitContext(orgcontexts[-1])[ADDCTX]
         assert orginalAddContext        
 
-        #we add the stmt to the org context to record which transaction the removed statement was added
+        #we add the stmt to the org context to record which transaction
+        #the removed statement was added
         #don't include the srcContext in ORGCTX since its already in the ADDCTX
         currentDelContextWithoutSrc = DEL4CTX + self.getTxnContext()
         currentTxn.recordRemoves(stmt, self.delmodel, True, 
@@ -778,8 +755,7 @@ class ContextNamedGraphManager(_NamedGraphManagerBase):
 
         delCtxStmtsDict = currentTxn.del4Ctxts.setdefault(currentDelContext,{})
         if orginalAddContext not in delCtxStmtsDict:
-            ctxStmt = Statement(currentDelContext,
-                   'http://rx4rdf.sf.net/ns/archive#applies-to',
+            ctxStmt = Statement(currentDelContext, CTX_NS+'applies-to',
                 orginalAddContext,OBJECT_TYPE_RESOURCE, currentDelContext)
             self.delmodel.addStatement(ctxStmt)            
             delCtxStmtsDict[orginalAddContext] = ([stmt], [ctxStmt])
@@ -879,7 +855,7 @@ class DeletionModelCreator(object):
 
                 #re-create statements that would be added to the delmodel:
                 self.delmodel.addStatement(Statement(currentDelContext,
-                'http://rx4rdf.sf.net/ns/archive#applies-to',
+                u'http://rx4rdf.sf.net/ns/archive#applies-to',
                 srcCtxt,OBJECT_TYPE_RESOURCE, currentDelContext))
 
             #record global removes 
@@ -900,7 +876,7 @@ class DeletionModelCreator(object):
             for srcCtx in set([s[4].split(';;')[1] for s in self.currRemoves
                                if s[4].startswith(ADDCTX)]):           
                 self.delmodel.addStatement(Statement(currentDelContext,
-                'http://rx4rdf.sf.net/ns/archive#applies-to-all-including',
+                u'http://rx4rdf.sf.net/ns/archive#applies-to-all-including',
                 srcCtx,OBJECT_TYPE_RESOURCE, currentDelContext))
 
             self.currRemovesForContext = {}                
