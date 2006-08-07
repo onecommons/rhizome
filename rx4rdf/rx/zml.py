@@ -121,8 +121,8 @@ tok_name[URIREF] = 'URIREF'
 N_TOKENS += 1
 
 def group(*choices): return '(' + '|'.join(choices) + ')'
-def any(*choices): return apply(group, choices) + '*'
-def maybe(*choices): return apply(group, choices) + '?'
+def any(*choices): return group(*choices) + '*'
+def maybe(*choices): return group(*choices) + '?'
 
 tabsize = 8
 
@@ -592,7 +592,6 @@ class Annotation(object):
             else:
                 handler.text(child)                    
 
-
 class _WikiElemName(str):
     '''
     This marker class indicates that the element named here was
@@ -633,6 +632,9 @@ class MarkupMap(object):
     INLINE_IMG_EXTS = ['.png', '.jpg', '.gif']
 
     docType = ''
+    
+    nameClass = 'rhizomename'
+    annotationClass = 'zmlannotation'
         
     def __init__(self):
         #wikistructure maps syntax that correspond to strutural
@@ -661,8 +663,27 @@ class MarkupMap(object):
         elem '''
         return elem
 
-    def getStructureAttrib(self, token, structName):
-        return ('class', xmlquote(structName) )
+    def getStructureAttribs(self, token, structNames):
+        attribs = {}
+        for name in structNames:
+            if name[0] == '#':
+                #todo: if its a (c)URI, add namespace
+                attribs['id'] = xmlquote( name[1:] )
+                attribs['about'] = xmlquote( name )
+            elif ':' in name: #its a (C)URI
+                #todo: add namepsace if necessary 
+                attribs.setdefault('role', []).append(name) 
+            else:
+                attribs.setdefault('class', []).append(name) 
+
+        values = attribs.get('class')
+        if values:
+            attribs['class'] = xmlquote( ' '.join(values) )
+        #values = attribs.get('role') #todo
+        #if values:
+        #    attribs['role'] = Curi( ' '.join(values) )
+
+        return tuple( attribs.itervalues() )                 
                       
     def H(self, level, line):
         '''
@@ -702,7 +723,7 @@ class MarkupMap(object):
     def _fixupAnnotations(self, annotation):
         name = annotation.name 
         annotation.name = self.SPAN #todo: support attributes
-        annotation.attribs += [('class',xmlquote('zmlannotation ' + name, False) )]
+        annotation.attribs += [('class',xmlquote(self.annotationClass + ' ' + name, False) )]
         #todo:merge class atts
         for child in annotation.children:
             if hasattr(child, 'name'):
@@ -765,7 +786,7 @@ class MarkupMap(object):
             if annotations and annotations.children:
                 first = getattr(annotations.children[0], 'name',
                                 annotations.children[0])
-                if first != 'wiki:xlink-replace':                
+                if first != 'wiki:xlink-replace':     #todo: handle curi      
                     attribs += [ ('rel', xmlquote(first)) ]
             if generatedName:
                 return self.A, attribs, generatedName
@@ -872,9 +893,15 @@ def interWikiMapParser(interwikimap):
             interWikiMap[prefix.lower()] = url
     return interWikiMap
 
-urlchars = re.compile('|\\'.join( r";[?@&=+$,!~*'()%#]{}")+'|:$' )
 def isQName(name):
-    return not (name.count(':') > 1 or re.search(urlchars, name))
+    parts = name.split(':')
+    if len(parts) > 2:
+        return False
+    return bool( [p for p in parts if isNCName(name)])
+
+_XMLNameChars = re.compile(r'[\w\.\-]+', re.U)
+def isNCName(name):
+    return re.match(_XMLNameChars, name) and name[0].isalpha()
 
 def stripQuotes(strQuoted, checkEscapeXML=True):    
     if strQuoted[0] == '`':
@@ -1007,6 +1034,11 @@ def parseLinkType(string, version=None):
     return handler.annotation
 
 def parseAttributes(string):
+    '''
+    Parses an attribute lists like "((foo=bar, ))((another=list))"
+    and returns the pos after the end of the list(s) and a list of 
+    attribute lists, each of which contain attribute name value pairs.
+    '''
     if not string.lstrip().startswith('(('):
         return 0, [ [] ]    
 
@@ -1122,7 +1154,10 @@ class ParseState(object):
         st.nlcount = 0 #how many blank lines following wikimarkup        
         st.useFreestr = False
         st.pseudoprog,st.endprogs,st.nameOrUriProg = st.makeTokenizer()
-
+        curiMatch = group(st.Name, st.URIRef)
+        structNameMatch = '(#X|X)(,\s*(#X|X))*'.replace('X',curiMatch)
+        st.structNameProg = re.compile(structNameMatch)
+        
     def setMarkupMode(self, mode):
         self.markupMode = mode
         self.want_freestr = not mode
@@ -1133,9 +1168,11 @@ class ParseState(object):
     COMMENTCHAR = '#' 
     NEWSTMTCHAR = ';'
 
-    #very loose URI match: start with alpha char followed by any number of
-    #the acceptable URI characters with some restrictions on the acceptable characters (')[];: 
-    Name =  r"[a-zA-Z_]([\w:.\-\]\[/?@&+$,!~*%#]*[\w.\-\/?@&+$,!~*%#])?"
+    #define name as a very loose URI match: start with alpha char followed 
+    #by any number of the acceptable URI characters with some restrictions on
+    #the acceptable characters (')[];: and more for the last character
+    Name =  r"[a-zA-Z_]([\w:.\-\]\[/?@&+$,!~*%#]*[\w.\-\/?@&+$!~*%#])?"
+    #rough URI match in brackets (todo: support IP6 addresses with []) 
     URIRef =  r"\[[a-zA-Z_][\w:.\-\]\[;/?@&=+$,!~*'()%#]*\]"
     
     def makeTokenizer(self):
@@ -1223,7 +1260,7 @@ class ParseState(object):
     def inlineTokenMap(st):
         return { '/' : st.mm.I, '_' : st.mm.B, '^' : st.mm.TT}
 
-    def processInlineToken(st, elem, inlineTokens=None):
+    def processInlineToken(st, elem, inlineTokens=None, userAttribs=() ):
         if isinstance(elem, tuple):
             name = elem[0]
         else:
@@ -1235,7 +1272,7 @@ class ParseState(object):
         if open: #if the elem is open, close it
             st.popWikiStack(elem) #pop all elements until we reach this one
         else: 
-            st.pushWikiStack(elem,defaultElemClass=_WikiInlineElemName)
+            st.pushWikiStack(elem, userAttribs, _WikiInlineElemName)
      
     def handleInlineWiki(st, string, wantTokenMap=None, userTextHandler=None):
         inlineTokens = st.inlineTokenMap()
@@ -1267,13 +1304,24 @@ class ParseState(object):
                 if st.nlcount:
                     st.pushWikiStack(st.mm.P)
                     st.nlcount = 0
+
+                elem = wantTokenMap.get(token)
+                if elem or token in "~'[":
+                    textHandler(string[pos:start])
+                    if st.forVersion[0] >= 0.8:
+                        newpos, customAttributes = parseAttributes(
+                            string[start:])
+                        assert customAttributes
+                        start += newpos
+                    else:
+                        customAttributes = (None,)                        
+  
                 elem = wantTokenMap.get(token)
                 if elem:                
-                    textHandler(string[pos:start])
                     if token == '=':
                         del wantTokenMap['='] #only do this once per line
                     elif token == '|':
-                        #|| == header
+                        #if || its a TH
                         if len(string) > start+1 and string[start+1] == '|': 
                             cell = st.mm.TH
                             end += 1 #skip second |
@@ -1284,30 +1332,31 @@ class ParseState(object):
                         wantTokenMap['|'] = cell 
 
                     if token in inlineTokens.keys():
-                        st.processInlineToken(elem, inlineTokens)
+                        st.processInlineToken(elem, inlineTokens, 
+                            customAttributes[0])
                     else:
                         st.popWikiStack() #pop the DT or last TD or TH
-                        st.pushWikiStack(elem) #push the DD or TD or TH
+                        #push the DD or TD or TH
+                        st.pushWikiStack(elem,customAttributes[0]) 
                     pos = end
                 elif token == '~': #<BR>
-                    textHandler(string[pos:start])
-                    st.pushWikiStack(st.mm.BR)
+                    st.pushWikiStack(st.mm.BR, customAttributes[0])
                     st.popWikiStack()
                     pos = end
-                elif token in '[`': #its a link
+                elif token in "['": #its a link
                     #handle special case of "[]" -- just print it 
                     if string[start+1] == ']':                        
-                        textHandler( string[pos:start+1] )
+                        textHandler( string[start:start+1] )
                         pos = start+1 
                         continue
-                    
-                    textHandler( string[pos:start] )
+                                        
                     pos = end
                     if st.forVersion[0] < 0.8:
                         delimLen = 1
                     else:
                         delimLen = 2
-                    linkToken = string[start+delimLen:end-delimLen] #strip [[ and ]] 
+                    #strip [[ and ]] 
+                    linkToken = string[start+delimLen:end-delimLen] 
 
                     nameAndLink = linkToken.split('|', 1)
                     if len(nameAndLink) == 1:
@@ -1363,8 +1412,12 @@ class ParseState(object):
                         type = None
                         
                     if type:
-                        #type is a list of Annotations
+                        #type is a list of Annotations 
                         type = parseLinkType(type, st.forVersion[0])
+                    if token == "'":
+                        if not type:
+                            type = Annotation()
+                        type.children.append( Annotation(st.mm.nameClass, type) )
                                                             
                     if link:                                                          
                         isInlineIMG = (link[link.rfind('.'):].lower()
@@ -1438,32 +1491,59 @@ class ParseState(object):
                                         % repr(uri))
             else:
                 #add another _ to assure we can split the URI into a qname
-                uri += '_' 
-        prefix, local = '',''
-        inScope = {} #find the namespaces in scope
-
+                uri += '_'
+                
+        prefix, local = '',''    
+        addNSMapping = True
+        namespaces = []
+        inScope = {}
+        #find the namespaces in scope
         for i in range(len(st.namespaceStack)-1,-1,-1): #reverse order            
             namespaceDict = st.namespaceStack[i] 
             for prefixCandidate, namespace in namespaceDict.items():                        
                 if prefixCandidate not in inScope:
                     #hasn't been overridden
-                    if uri.startswith(namespace):
-                        local = uri[len(namespace):]
-                        if local and (local[0].isalnum() or local[0] == '_'):
-                            prefix = prefixCandidate
-                            break
-                inScope[prefixCandidate] = namespace
+                    inScope[prefixCandidate] = namespace
+                    namespaces.append((prefixCandidate, namespace))
+
+        #first check if URI is a CURI
+        namespaceURI = ''
+        uri_parts = uri.split(':', 1)
+        namespace = inScope.get( uri_parts[0] )
+        if namespace:
+            uri = namespace + uri_parts[1]
+            if isNCName(uri_parts[1]):
+                prefix = uri_parts[0]
+                addNSMapping = False 
+        #todo: check given nsmapping
+        #elif uri_parts[0] in nsmapping:
+        #    #we need to add this ns mapping to the doc 
+        #    namespaceURI, local = nsmapping[ uri_parts[0] ],  uri_parts[1]
+        #    uri = namespaceURI + local
+        #    prefix = uri_parts[0]
+        
+        if not prefix:
+            #look for a namespace mapping that can be used
+            for (prefixCandidate, nsuri) in namespaces:
+                if uri.startswith(nsuri):
+                    local = uri[len(nsuri):]
+                    if isNCName(local):
+                        prefix = prefixCandidate
+                        addNSMapping = False
+                        break            
                 
-        if not prefix:                 
-            while 1:
-                #make sure the generated prefix doesn't override 
-                #an in-scope user declared prefix
-                st.nextGeneratedPrefixCounter += 1
-                prefix = 'ns' + str(st.nextGeneratedPrefixCounter)
-                if prefix not in inScope:
-                    break
-            
-            namespaceURI, local = splitURI(uri)
+        if addNSMapping: #add a namespace mapping  
+            if not prefix:                 
+                while 1:
+                    #make sure the generated prefix doesn't override 
+                    #an in-scope user declared prefix
+                    st.nextGeneratedPrefixCounter += 1
+                    prefix = 'ns' + str(st.nextGeneratedPrefixCounter)
+                    if prefix not in inScope:
+                        break
+                    
+            if not namespaceURI:
+                namespaceURI, local = splitURI(uri)
             if not local: #uri ended in a non-alphabetic character
                 local = u'_'                
             assert prefix and namespaceURI and local, "%s %s %s" % (
@@ -1501,18 +1581,25 @@ class ParseState(object):
         st.handler.startElement( name )
     
         for name, value in cleanAttribs:
-            #check for {URIRefs} and add namespaces declarations if necessary
+            #check for URIRefs and add namespaces declarations if necessary
             if not isQName(name):
                 name, newNS = st.uriToQName(name)
                 if newNS:
-                    st.handler.attrib(name, value)
+                    st.handler.attrib(newNS[0],newNS[1])
+            
+            #skip: don't treat values as URIRefs
             #if value and value[0] == '{':
             #    #note: this code results in a URIRef as an attribute value
             #    #being converted to a qname
             #    value, newNS = st.uriToQName(value)
             #    if newNS:
             #        st.handler.attrib(name, value)
-                    
+            #if isinstance(value, curis):
+            #    for curi in curis.split():
+                    #check if its a curi not a uri
+                    #if so, check if the prefix namespace declaration
+                    #hasn't been handled yet if not add it
+            #        pass
             st.handler.attrib(name, value)            
         st.attribs = []
         st.handler.endAttribs()
@@ -1537,7 +1624,8 @@ class ParseState(object):
         st.handler.endAttribs()
         return elem
             
-    def pushWikiStack(st,wikiElem, userAttribs=(), defaultElemClass=_WikiElemName):
+    def pushWikiStack(st,wikiElem, userAttribs=(),
+        defaultElemClass=_WikiElemName):
         name = st.addWikiElem(wikiElem, userAttribs)
         if not isinstance(name, _WikiElemName):
             name = defaultElemClass(name)
@@ -1601,15 +1689,28 @@ class ParseState(object):
             if lead == '1' and string[pos] == '.': #skip past the dot .
                 pos += 1
 
-            nameMatch = st.nameOrUriProg.match(string, pos)
+            nameMatch = st.structNameProg.match(string, pos)
             if nameMatch:
                 nameStart, pos = nameMatch.span()
                 structName = string[nameStart:pos]
+                #todo: bug: doesn't support URIs containing a ','
+                structNames = structName.split(',')         
+                structNames = [name.strip() 
+                    for name in structNames if name.strip()]        
+                idNames = [name for name in structNames if name.startswith('#')]
+                if idNames:
+                    if len(idNames) > 1:
+                        raise ZMLParseError(
+                        'more than one id defined (%s)' % structName)
+                    structNames.remove(idNames[0])
+                structName = ' '.join(structNames) 
             newpos,userAttribsList = parseAttributes(string[pos:])
             pos += newpos
             if nameMatch:
-                attrib = st.mm.getStructureAttrib(lead,structName)
-                if attrib:
+                attribs = []
+                if structNames:
+                    attribs.extend(st.mm.getStructureAttribs(lead,structNames) )
+                for attrib in attribs:
                     if attrib[0] not in dict(userAttribsList[0]):                        
                         userAttribsList[0].append( attrib )
             
@@ -1638,7 +1739,8 @@ class ParseState(object):
                     else:
                         structureElem = helem
 
-            if not done and parent in [st.mm.SECTION, st.mm.DIV, st.mm.BLOCKQUOTE]:
+            if not done and parent in [
+                st.mm.SECTION, st.mm.DIV, st.mm.BLOCKQUOTE]:
                 st.processOpenWikiElements(parent,popAndStop=True)
                 st.pushWikiStack(structureElem,
                             userAttribsList and userAttribsList.pop(0) or ())                    
@@ -1999,7 +2101,7 @@ class ParseState(object):
             #not sure why this happens
             raise ZMLParseError("unexpected token: " + repr(token))
 
-from rx.htmlfilter import HTMLFilter
+from rx.htmlfilter import HTMLFilter #todo: rx package dependency
 from HTMLParser import HTMLParseError
 
 class XMLParser(HTMLFilter):

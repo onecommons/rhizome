@@ -125,7 +125,8 @@ class OldParseState(ParseState):
     def parseXML(self, line):
         return line
     
-    def processInlineToken(st, elem, inlineTokens):
+    def processInlineToken(st, elem, inlineTokens=None, userAttribs=()):
+        assert not userAttribs
         if st.wikiStack.count(elem): #if the elem is open 
             while st.wikiStack[-1] != elem: #close it
                 wikiElem = st.popWikiStack()
@@ -136,8 +137,11 @@ class OldParseState(ParseState):
         else: #open the elem
             st.pushWikiStack(elem)
             st.toClose += 1 #update this so we pop the right amount below
-            
-    def pushWikiStack(st,wikiElem):
+
+    def pushWikiStack(st,wikiElem, userAttribs=(),
+        defaultElemClass=None):
+        assert not userAttribs
+        assert not defaultElemClass
         st.addWikiElem(wikiElem)
         st.wikiStack.append(wikiElem)
         
