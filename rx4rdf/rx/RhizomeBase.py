@@ -47,6 +47,7 @@ class RhizomeBase(object):
                                           
     def configHook(self, kw):
         self.log = logging.getLogger("rhizome." + self.server.appName)
+        self.spamLog = logging.getLogger("rhizome.spam." + self.server.appName)
         
         def initConstants(varlist, default):
             return raccoon.assignVars(self, kw, varlist, default)
@@ -485,7 +486,18 @@ class RhizomeBase(object):
         #print >>sys.stderr, 'sc', xmlDoc.documentElement
         return [ xmlDoc.documentElement ]
 
-    def isSpam(self, context, user_ip, user_agent, contents):        
+    MAX_SPAM_COMMENT_LOG_LEN = 10000
+    def isSpam(self, context, user_ip, user_agent, contents):
+        '''
+        Returns true if the contents are spam.
+        Returns false if content is not spam or if the spam check
+        failed for some reason.
+
+        Any message determined to be spam is logged, so you can search
+        the log file for false positives. Here's a regex for finding the log
+        messages:
+        r'askimet\.comment_check found spam: \((.*?)\), \(\((.*?)\)\) (<truncated>)?(.*)'
+        '''
         if not (self.akismetKey or self.akismetUrl):
             return raccoon.XFalse #no check
 
@@ -501,6 +513,11 @@ class RhizomeBase(object):
                 is_spam = akismet.comment_check(self.akismetKey,self.akismetUrl,                    
                   user_ip, user_agent, comment_content=contents)
                 if is_spam:
+                    if len(contents) > self.MAX_SPAM_COMMENT_LOG_LEN:
+                        contents = "<truncated>" + contents[
+                                        :self.MAX_SPAM_COMMENT_LOG_LEN]                        
+                    self.spamLog.info('askimet.comment_check found spam: '
+                        '(%s),((%s)) %s' % (user_ip, user_agent, contents) )
                     return raccoon.XTrue
                 else:
                     return raccoon.XFalse
