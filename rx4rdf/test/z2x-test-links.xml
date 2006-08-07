@@ -2,13 +2,13 @@
 </dd><dt><a href="term">linked term</a> </dt><dd> def without a [link]
 </dd></dl><hello><contains-text foo="2"><p><img src="image.gif" alt="image.gif"></img>
 <a href="example.png">not inlined</a>
-<span class="wiki:comment">Shouldn't we say more here?</span>
-<span class="wiki:comment">wiki:comment author='johnb';</span>
-<span class="done">done;</span>
-<span class="wiki:comment">wiki:comment author='johnb';wiki:annotation;</span>
+<span class="zmlannotation wiki:comment">Shouldn't we say more here?</span>
+<span class="zmlannotation wiki:comment">wiki:comment author='johnb';</span>
+<span class="zmlannotation done">done;</span>
+<span class="zmlannotation wiki:comment">wiki:comment author='johnb';wiki:annotation;</span>
 <a href="#foo">foo</a>
 [one bracket]
 [[two brackets] asdfasdf
 <a href="http://needs-xml-escaping?foo=1&amp;bar=2">http://needs-xml-escaping?foo=1&amp;bar=2</a>
 <a href="http://needs-xml-escaping?foo=1&amp;bar=2">one &amp; <em>two</em> &amp; three</a>
-<span class="test &amp; test some more">one &amp; <em>two</em> &amp; three</span></p></contains-text></hello>
+<span class="zmlannotation test &amp; test some more">one &amp; <em>two</em> &amp; three</span></p></contains-text></hello>

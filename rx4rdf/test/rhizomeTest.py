@@ -192,7 +192,7 @@ class RhizomeTestCase(unittest.TestCase):
 
     def _fineGrainedCheck(self, root, account, contents, expectNotAuthorized,
                 resourcesExp=None, kw=None, exceptionType=raccoon.NotAuthorized,
-                xpath=None, xpathValidate=None, more=0):
+                xpath=None, xpathValidate=None, more=0, save=False):
         kw = kw or {}
         kw['contents'] = contents
         kw['__account'] = account        
@@ -213,7 +213,10 @@ class RhizomeTestCase(unittest.TestCase):
         try:            
             vars, extFunMap = root.mapToXPathVars(kw, doAuth=True)
             root.evalXPath(xpath, vars, extFunMap)
-            root.txnSvc._prepareToVote() #we don't want to actually commit
+            if save:
+                root.txnSvc.commit()
+            else:
+                root.txnSvc._prepareToVote() #we don't want to actually commit
             if xpathValidate:
                 if more:
                     for xp in more:
@@ -228,8 +231,8 @@ class RhizomeTestCase(unittest.TestCase):
         else:
             if expectNotAuthorized:
                 self.fail('unexpectedly succeeded')
-
-        if root.txnSvc.isActive(): #else already aborted
+        
+        if not save and root.txnSvc.isActive(): #else already aborted
             root.txnSvc.abort()    #we don't want to actually commit this  
         
     def testFineGrainedAuthorization(self):
@@ -577,7 +580,8 @@ class RhizomeTestCase(unittest.TestCase):
 
     def testShredding(self):
         appVars = { 'useIndex':0,
-                    'DEFAULT_URI_SCHEMES':['http','data','file'],}
+                    'DEFAULT_URI_SCHEMES':['http','data','file'],
+                }
         root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
                             model_uri = 'test:', appVars = appVars )
         guestAccount = root.evalXPath("/*[foaf:accountName = 'guest']")
@@ -618,6 +622,115 @@ class RhizomeTestCase(unittest.TestCase):
         self._fineGrainedCheck(root, guestAccount, contents, False, xpath=xpath,
                                xpathValidate=xpathValidate)
 
+    def testShreddingContexts(self):
+        from rx import RxPath
+        appVars = { 'useIndex':0,
+                    'modelFactory' : RxPath.TransactionMemModel,
+                }
+        root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
+                            model_uri = 'test:', appVars = appVars )
+
+        guestAccount = root.evalXPath("/*[foaf:accountName = 'guest']")
+        self.failUnless(guestAccount)
+
+        scope = 'context:1'
+        #1. add prop to context
+        #check that its both in the context and the global context
+        #2. now remove the prop from the global context
+        #check that its still in the context
+        #3. now re-add the same statements to the context
+        #check its still not in the global context
+        #4. now remove it from the context
+        #check that's it been removed from the context        
+        #5. now re-add it to the context
+        #check that's now also in the global context
+
+        def _shred(contents, context):
+            contentsHeader = '''#?zml0.7 markup
+        rx:
+          prefixes:
+            wiki: `http://rx4rdf.sf.net/ns/wiki#
+            a: `http://rx4rdf.sf.net/ns/archive#
+            base: `test:
+        '''                        
+            xupdate = r'''<?xml version="1.0" ?> 
+        <xupdate:modifications version="1.0" xmlns:xupdate="http://www.xmldb.org/xupdate"
+            xmlns="http://rx4rdf.sf.net/ns/archive#" xmlns:wiki='http://rx4rdf.sf.net/ns/wiki#'            		    
+            xmlns:wf='http://rx4rdf.sf.net/ns/raccoon/xpath-ext#'
+            xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'>    
+            <xupdate:remove %s select="get-context('context:1')/*/*" />
+            <!-- re-add one of the statements -->
+            <xupdate:append select='/' %s>
+            <xupdate:variable name='shredded'
+            select="wf:shred(/*[wiki:name='ZMLSandbox'],
+             'http://rx4rdf.sf.net/ns/wiki#item-format-zml', $contents)"/>
+            </xupdate:append>
+        </xupdate:modifications>
+        ''' % (context, context)
+            kw = {}
+            kw['contents'] = contentsHeader+contents
+            kw['__account'] = guestAccount        
+            vars, extFunMap = root.mapToXPathVars(kw)
+            kw['__accountTokens'] = root.evalXPath(root.rhizome.accountTokens, vars, extFunMap)
+
+            root.txnSvc.begin()
+            root.txnSvc.state.kw = kw
+            root.txnSvc.join(root.domStore)
+            #print len(root.domStore.dom.childNodes)
+            root.xupdateRDFDom(root.domStore.dom, xupdate, kw)
+            #print 'a', [n.stmt for n in root.txnSvc.state.additions]
+            #print 'r', root.txnSvc.state.removals
+            #print len(root.domStore.dom.childNodes), root.domStore.dom.findSubject('test:test1')
+            root.txnSvc.commit()
+            #print len(root.domStore.dom.childNodes), root.domStore.dom.findSubject('test:test1')
+
+        contents1 = '''
+          base:test1:
+            base:prop1: `1
+            base:prop1: `2        
+        '''
+        _shred(contents1, "to-graph='context:1'")
+
+        globalProp1Exp = "/*[.='test:test1']/base:prop1"        
+        self.failUnless( len(root.evalXPath(globalProp1Exp))==2 )
+
+        contextProp1Exp = "get-context('context:1')/*[.='test:test1']/base:prop1"        
+        self.failUnless( len(root.evalXPath(contextProp1Exp))==2 )
+
+        contents2 = '''
+          base:test1:
+            base:prop1: `1
+        '''
+        #2. now remove one of the props from the global context
+        _shred(contents2, '')             
+        #only one predicate in global scope
+        self.failUnless( len(root.evalXPath(globalProp1Exp))==1 )
+        #context still has two predicates though        
+        self.failUnless( len(root.evalXPath(contextProp1Exp))==2 ) 
+
+        #3. now re-add the original statements to the context
+        _shred(contents1, "to-graph='context:1'")
+        #this should not have changed anything
+        #check its still not in the global context
+        self.failUnless( len(root.evalXPath(globalProp1Exp))==1 )
+        #and that the context still has just the predicates
+        self.failUnless( len(root.evalXPath(contextProp1Exp))==2 ) 
+
+        #4. now remove it from the context
+        #check that's it been removed from the context
+        _shred(contents2, "to-graph='context:1'")             
+        #only one predicate in global scope
+        self.failUnless( len(root.evalXPath(globalProp1Exp))==1 )
+        #context now only has one predicates though        
+        self.failUnless( len(root.evalXPath(contextProp1Exp))==1 ) 
+
+        #5. now re-add it to the context        
+        _shred(contents1, "to-graph='context:1'")
+        #check that's now also in the global context
+        self.failUnless( len(root.evalXPath(globalProp1Exp))==2 )
+        #context now has two predicates again        
+        self.failUnless( len(root.evalXPath(contextProp1Exp))==2 ) 
+        
     def _testGRDDL(self):
         appVars = { 'useIndex':0,
                     'DEFAULT_URI_SCHEMES':['http','data','file'],}
@@ -626,7 +739,90 @@ class RhizomeTestCase(unittest.TestCase):
         #import testgrddl.html
         #export testgrddl.html
         #verify 
+                    
+    def _testMemUse(self):
 
+        def getObjectsByType(oo):
+            typeMap = {}
+            for o in oo:
+                tid = id(type(o))
+                ignore, count = typeMap.get(tid, (None, 0))
+                typeMap[tid] = (type(o), count + 1)
+            return typeMap
+
+        def findMismatchedTypes(newtm, oldtm):
+            #cmp typemaps
+            for tid, (to, count) in newtm.iteritems():
+                if tid not in oldtm or count > oldtm[tid]:
+                    print to, count, count - oldtm.get(tid,0)
+                    yield to
+
+        appVars = { 'useIndex':0,
+                'XPATH_CACHE_SIZE': 3,
+                'ACTION_CACHE_SIZE': 3,
+                'XPATH_PARSER_CACHE_SIZE':3,
+                'STYLESHEET_CACHE_SIZE':2,
+                'FILE_CACHE_SIZE': 0 }
+
+        appVars = { 'useIndex':0,
+                'XPATH_CACHE_SIZE': 0,
+                'ACTION_CACHE_SIZE': 0,
+                'XPATH_PARSER_CACHE_SIZE':0,
+                'STYLESHEET_CACHE_SIZE':0,
+                'FILE_CACHE_SIZE': 0 }
+
+        root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
+                            model_uri = 'test:', appVars = appVars )
+        pages = root.evalXPath('/a:NamedContent/wiki:name')
+        def getCacheSizes(root):
+            return [(len(cache.nodeDict), cache._countNodes()) for cache in 
+                [root.expCache, root.styleSheetCache, root.actionCache, 
+                root.queryCache, raccoon.fileCache] ]        
+        import gc, types, traceback, sys
+        gc.collect()        
+        #from sets import Set
+        #set = Set
+        #ids = set([id(o) for o in gc.get_objects()])
+        tm1 = getObjectsByType(gc.get_objects())        
+
+        for i in range(20):            
+            for page in pages:
+                pagename = raccoon.StringValue(page)                
+                #print 'pass', i, len(ids)#gc.collect(), len(gc.get_objects())#getCacheSizes(root)
+                print 'pass', i#, gc.collect(), len(gc.get_objects())
+                try:
+                    url = 'http://www.foo.com/missing_page' #+pagename
+                    kw = {}#'_noErrorHandling':1}
+                    try:
+                        self.doHTTPRequest(root, kw, url)                        
+                    except (KeyboardInterrupt, SystemExit):
+                        raise
+                    except:
+                        print 'error raised'
+                    sys.exc_clear( ) 
+                    print 'collected', gc.collect()
+                    oo = gc.get_objects()
+                    tm2 = getObjectsByType(oo)
+                    typelist = list(findMismatchedTypes(tm2,tm1))
+                    for o in oo:
+                        break
+                        if isinstance(o, types.TracebackType):
+                            traceback.print_tb(o, 1) 
+                            print [type(r) for r in gc.get_referrers(o)]
+                            #pprint.pprint( [repr(r) for r in gc.get_referrers(o)] )
+                            #break
+                    #print [repr(o) for o in oo
+                    #        if id(type(o)) in tids]
+                    #tm1 = tm2
+                    del oo
+                    #newids = set([id(o) for o in gc.get_objects()])
+                    #leaked = newids - ids
+                    #print 'leaked', len(ids), len(newids), len(leaked) #, leaked
+                    #ids = newids
+                except:
+                    raise
+                    pass
+        
 def createRedlandDomStore():
   from rx import RxPath,DomStore
   return DomStore.RxPathDomStore(RxPath.initRedlandHashBdbModel)

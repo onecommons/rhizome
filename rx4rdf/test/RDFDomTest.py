@@ -15,6 +15,7 @@ from rx.RxPath import *
 def RDFDoc(model, nsMap):
     from rx import RxPathGraph
     graphManager = RxPathGraph.NamedGraphManager(model, None,None)
+    graphManager.createCtxResource = False
     return createDOM(model, nsMap, graphManager=graphManager)
 
 import difflib, time
@@ -186,7 +187,13 @@ class RDFDomTestCase(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def testNtriples(self):        
+    def testNtriples(self):
+        #we don't include scope as part of the Statements key
+        st1 = Statement('test:s', 'test:p', 'test:o', 'R', 'test:c')
+        st2 = Statement('test:s', 'test:p', 'test:o', 'R', '')
+        self.failUnless(st2 in [st1] and [st2].index(st1) == 0)
+        self.failUnless(st1 in {st2:1}  )
+        
         #test character escaping 
         s1 = r'''bug: File "g:\_dev\rx4rdf\rx\Server.py", '''
         n1 = r'''_:x1f6051811c7546e0a91a09aacb664f56x142 <http://rx4rdf.sf.net/ns/archive#contents> "bug: File \"g:\\_dev\\rx4rdf\\rx\\Server.py\", ".'''
@@ -802,12 +809,18 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         '''               
         applyXUpdate(self.rdfDom,xupdate)
         self.rdfDom.commit()
-        self.failUnless(len(adds) == 3) #2 statements plus the type statement
+        #print 'adds', len(adds)
+        #pprint([a.stmt for a in adds])
+        #2 statements plus type statement and 4 entailments
+        self.failUnless(len(adds) == 6) #3
 
-        res1 = self.rdfDom.evalXPath( "get-graph-predicates('context:1')")
-        self.failUnless(len(res1) == 3)
-
+        res1 = self.rdfDom.evalXPath( "get-context('context:1')/*/*")
+        #print len(res1)
+        #pprint([a.stmt for a in res1])
+        self.failUnless(len(res1) == 5) #3
+        
         db = self.db
+        #pprint( self.db._statements['default'] )
         statements = {'default': [(u'http://rx4rdf.sf.net/ns/archive/archive-example.rdf', u'http://purl.org/dc/elements/1.1/creator', u'Adam Souzis', u'', u'', u'L'),
                                   (u'http://rx4rdf.sf.net/ns/archive/archive-example.rdf', u'http://purl.org/dc/elements/1.1/date', u'2003-04-10', u'', u'', u'L'),
                                   (u'http://rx4rdf.sf.net/ns/archive/archive-example.rdf', u'http://purl.org/dc/elements/1.1/identifier', u'http://rx4rdf.sf.net/ns/archive', u'', u'', u'L'),
@@ -822,10 +835,11 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         currentStmts = [s for s in db._statements['default']
             if not s[4].startswith('context:add') and not s[4].startswith('context:txn')]
         currentStmts.sort()
-        #print 'XUPDATE ', pprint( currentStmts) 
+        print 'XUPDATE ', pprint( currentStmts) 
         expectedStmts = statements['default']
         expectedStmts.sort()
-        d = difflib.SequenceMatcher(None,currentStmts, expectedStmts )        
+        d = difflib.SequenceMatcher(None,currentStmts, expectedStmts )
+        #expectStmts + 2 type Property entailments
         self.failUnless( currentStmts == expectedStmts , 'statements differ: '+`d.get_opcodes()` )
 
         removes = []    
@@ -836,21 +850,27 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
             
         self.rdfDom.removeTrigger = removeTrigger
         xupdate=r'''<?xml version="1.0" ?> 
-        <xupdate:modifications version="1.0" xmlns:xupdate="http://www.xmldb.org/xupdate">    
-            <xupdate:remove to-graph='context:1' select="get-graph-predicates('context:1')" />
+        <xupdate:modifications version="1.0" xmlns:xupdate="http://www.xmldb.org/xupdate"
+            xmlns="http://rx4rdf.sf.net/ns/archive#" 
+            xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'>    
+            <xupdate:remove to-graph='context:1' select="get-context('context:1')/*/*" />
+            <!-- re-add one of the statements -->
+            <xupdate:append select='/' to-graph='context:1'>
+            <Contents rdf:about='urn:sha:2jmj7l5rSw0yVb/vlWAYkK/YBwk=' />
+            </xupdate:append>
         </xupdate:modifications>
         '''               
         applyXUpdate(self.rdfDom,xupdate)
         self.rdfDom.commit()
 
-        #print [p.stmt for p in removes]
-        self.failUnless(len(removes) == 3)
+        #print 'removes', len(removes), [p.stmt for p in removes]        
+        self.failUnless(len(removes) == 5) #3 + 2 type Property entailments
 
         changedStmts = [s for s in db._statements['default']
                         if not s[4].startswith('context:') or s[4].startswith('context:1')]        
         #pprint(changedStmts)
         #print len(changedStmts), len(currentStmts)
-        self.failUnless(len(changedStmts) == len(currentStmts) - 3)
+        self.failUnless(len(changedStmts) == len(currentStmts) - 2)
 
     def testXslt2(self):
         self.rdfDom = self.getModel(cStringIO.StringIO(self.model2) )
@@ -978,7 +998,11 @@ def profilerRun(testname, testfunc):
     stats.print_stats(100)            
 
 if __name__ == '__main__':
-    import sys    
+    import sys
+    from rx import logging
+    logging.root.setLevel(logging.DEBUG)
+    logging.basicConfig()
+
     #import os, os.path
     #os.chdir(os.path.basename(sys.modules[__name__ ].__file__))    
     if sys.argv.count('--driver'):
