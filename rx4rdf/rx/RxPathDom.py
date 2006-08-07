@@ -256,24 +256,34 @@ def looksLikeObject(node):
     if node.nodeType == Node.TEXT_NODE:
         return True
     elif node.nodeType == Node.ELEMENT_NODE:
-        if node.nextSibling != None or node.previousSibling != None: #can't have any siblings            
-            return False
-        return looksLikeResource(node)    
+        if node.nextSibling != None or node.previousSibling != None:
+            #can't have any siblings
+            return False        
+        if hasattr(node.ownerDocument, 'globalRecurseCheck'):
+            try:
+                oldVal = node.ownerDocument.globalRecurseCheck
+                node.ownerDocument.globalRecurseCheck = 1
+                return looksLikeResource(node)
+            finally:
+                node.ownerDocument.globalRecurseCheck = oldVal
+        else:
+            return looksLikeResource(node)
     return False
 
 def looksLikeResource(node):
-    if node.nodeType == Node.ELEMENT_NODE :#and\
-        #len(node.attributes) <= 1:
+    if node.nodeType == Node.ELEMENT_NODE :
+        #and len(node.attributes) <= 1:
         #if node.attributes and not node.hasAttributeNS(RDF_MS_BASE, 'about'):
         #    return False #the one attribute it has is not rdf:about
         #else:
-            return reduce(lambda x, y: x and looksLikePredicate(y), node.childNodes, True)
+            return reduce(lambda x, y: x and looksLikePredicate(y),
+                          node.childNodes, True)
     else:
         return False
     
 def looksLikePredicate(node):
-    if node.nodeType == Node.ELEMENT_NODE and \
-       len(node.childNodes) <= 1:
+    if (node.nodeType == Node.ELEMENT_NODE
+           and len(node.childNodes) <= 1):
         #todo validate attributes
         if len(node.childNodes) > 0: #empty predicates treated like empty literal
             return looksLikeObject(node.firstChild)
