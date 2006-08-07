@@ -310,7 +310,7 @@ def SerializeRDF(context, resultset, type='rdfxml',
     if resultset:
         uri2prefixMap=resultset[0].rootNode.nsRevMap        
         if resultset[0].nodeName == '#document':
-            resultset = n.childNodes
+            resultset = resultset[0].childNodes
             
         for n in resultset:
             nl = [n]
