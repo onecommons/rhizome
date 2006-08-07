@@ -1,8 +1,24 @@
 /*-------------------------------------------------------
 / The following are used by system files
 ------------------------------------------------------*/
-
 .zmlannotation { display: none; }
+
+a[rel~="rhizomename"] {
+  background-color: #DEE7F8; /* light blue */
+  padding-top: 1px;
+  padding-bottom: 1px;
+  padding-left: 5px;
+  padding-right: 8px;
+  border: thin solid #A4BDEC;	
+  -moz-border-radius: 12px; 
+  border-radius: 12px;
+  /* behavior: url(border-radius.htc);   this doesn't work yet */
+}
+
+a[rel~="rhizomename"]:hover {
+  background-color: #BBCEF1; /* darker blue */
+}
+
 
 /*-------------------------
 / used by diff-revisions.py (when comparing revisions)

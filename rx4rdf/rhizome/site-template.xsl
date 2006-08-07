@@ -92,7 +92,20 @@ doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"
 <xsl:if test="$previous:_robots"> 
   <meta name="robots" content="{$previous:_robots}" />
 </xsl:if>
-<xsl:comment>(c) 2003-4 by Adam Souzis (asouzis at users.sourceforge.net) All rights reserved.</xsl:comment>
+<!-- (c) 2003-4 by Adam Souzis (asouzis at users.sourceforge.net) All rights reserved. -->
+
+<xsl:if test="wf:file-exists('ie7/ie7-core.js')">
+<xsl:text disable-output-escaping='yes' >
+<![CDATA[
+<!-- compliance patch for microsoft browsers -->
+<!--[if lt IE 7]>
+<script src="site:///ie7/ie7-core.js" type="text/javascript"></script>
+<script src="site:///ie7/ie7-css2-selectors.js" type="text/javascript"></script>
+<![endif]-->
+]]>
+</xsl:text>
+</xsl:if>
+
 </head>
 
 <xsl:call-template name="theme-body" />
