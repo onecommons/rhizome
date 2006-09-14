@@ -491,6 +491,9 @@ def writeTriples(stmts, stream, enc='utf8'):
     objectType = 3
     scope = 4
     
+    import re
+    wspcProg = re.compile(r'\s')
+
     for stmt in stmts:       
         if stmt[0] is Comment:
             stream.write("#" + stmt[1].encode(enc, 'backslashreplace') + "\n")
@@ -501,18 +504,32 @@ def writeTriples(stmts, stream, enc='utf8'):
                 stream.write("#!remove "+stmt[scope].encode(enc)+"\n")
             else:
                 stream.write("#!remove\n")
+ 
+        for i in range(5):
+            if i == object and stmt[objectType] != OBJECT_TYPE_RESOURCE:
+                continue
+            if wspcProg.search(stmt[i]): 
+                raise RuntimeError("unable to write NTriples, statement "
+                    "contains an invalid URI: %s" % stmt[i])
                       
-        if stmt[scope]:
+        if stmt[scope]: 
             stream.write("#!graph "+stmt[scope].encode(enc)+"\n")
+                
         if stmt[subject].startswith(BNODE_BASE):
             stream.write('_:' + stmt[subject][BNODE_BASE_LEN:].encode(enc) ) 
         else:
-            stream.write("<" + stmt[subject].encode(enc) + ">")
+            subjectURI = stmt[subject]
+            stream.write("<" + subjectURI.encode(enc) + ">")
+            
         if stmt[predicate].startswith(BNODE_BASE):
             stream.write( '_:' + stmt[predicate][BNODE_BASE_LEN:].encode(enc) ) 
         else:            
             stream.write(" <" + stmt[predicate].encode(enc) + ">")
         if stmt[objectType] == OBJECT_TYPE_RESOURCE:
+            if wspcProg.search(stmt[subject]):
+                raise RuntimeError("unable to write NTriples, statement scope "
+                "is an invalid URI: %s" % stmt[scope])
+
             if stmt[object].startswith(BNODE_BASE):
                 stream.write(' _:' + stmt[object][BNODE_BASE_LEN:].encode(enc)  + " .\n") 
             else:
