@@ -13,6 +13,9 @@ version="1.0">
   <xu:if test="not($loginname)">
     <xu:message text="login name must be specified" terminate="yes"/>
   </xu:if>
+  <xu:if test="concat($BASE_MODEL_URI, $loginname) != wf:get-nameURI($loginname)">
+    <xu:message text="invalid characters in login name" terminate="yes"/>
+  </xu:if>
   <xu:if test="$password != $confirm-password">
     <xu:message text="password must match" terminate="yes"/>
   </xu:if>
@@ -23,9 +26,18 @@ version="1.0">
   
   <xu:if test="$action='creation'">
     <!-- new account -->
+    
+    <xu:variable name="accountURI" select="wf:get-nameURI(concat('accounts/',$loginname))"/>
+    <xu:variable name="userURI" select="wf:get-nameURI(concat('users/',$loginname))"/>
+    <xu:variable name="private-rwURI" select="wf:get-nameURI(concat('accounts/',$loginname,'/private-rw'))"/>
+    <xu:variable name="private-wURI" select="wf:get-nameURI(concat('accounts/',$loginname,'/private-w'))"/>
+    <xu:variable name="group-rwURI" select="wf:get-nameURI(concat('accounts/',$loginname,'/group-rw'))"/>
+    <xu:variable name="group-wURI" select="wf:get-nameURI(concat('accounts/',$loginname,'/group-w'))"/>
+
+    
     <xu:append select="/">
       <!-- add access tokens for private ownership -->
-      <auth:AccessToken rdf:about="{$BASE_MODEL_URI}accounts/{$loginname}/private-rw">
+      <auth:AccessToken rdf:about="{$private-rwURI}">
         <rdfs:label>Private</rdfs:label>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-view"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-view-metadata"/>
@@ -42,7 +54,7 @@ version="1.0">
         <auth:priority>1</auth:priority>
       </auth:AccessToken>
 
-      <auth:AccessToken rdf:about="{$BASE_MODEL_URI}accounts/{$loginname}/private-w">
+      <auth:AccessToken rdf:about="{$private-wURI}">
         <rdfs:label>Private Write/Public Read</rdfs:label>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-confirm-delete"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-delete"/>
@@ -56,7 +68,7 @@ version="1.0">
       <!-- adding group access-tokens enables us to easily allow access to only those that are 
             a member of one of the groups the user is a member of: -->
       
-      <auth:GroupAccessToken rdf:about="{$BASE_MODEL_URI}accounts/{$loginname}/group-rw">
+      <auth:GroupAccessToken rdf:about="{$group-rwURI}">
         <rdfs:label>Group</rdfs:label>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-view"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-view-metadata"/>
@@ -72,7 +84,7 @@ version="1.0">
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/auth#permission-add-statement"/>
         <auth:priority>1</auth:priority>
       </auth:GroupAccessToken>
-      <auth:GroupAccessToken rdf:about="{$BASE_MODEL_URI}accounts/{$loginname}/group-w">
+      <auth:GroupAccessToken rdf:about="{$group-wURI}">
         <rdfs:label>Group Write/Public Read</rdfs:label>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-confirm-delete"/>
         <auth:has-permission rdf:resource="http://rx4rdf.sf.net/ns/wiki#action-delete"/>
@@ -84,7 +96,7 @@ version="1.0">
         <auth:priority>1</auth:priority>
       </auth:GroupAccessToken>
       
-      <foaf:OnlineAccount rdf:about="{$BASE_MODEL_URI}accounts/{$loginname}">
+      <foaf:OnlineAccount rdf:about="{$accountURI}">
         <foaf:accountName>
           <xu:value-of select="$loginname"/>
         </foaf:accountName>
@@ -99,22 +111,22 @@ version="1.0">
         
         <auth:has-role rdf:resource="http://rx4rdf.sf.net/ns/auth#role-default"/>
         
-        <auth:has-rights-to rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/private-rw"/>
-        <auth:has-rights-to rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/private-w"/>
-        <auth:has-rights-to rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/group-rw"/>
-        <auth:has-rights-to rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/group-w"/>
+        <auth:has-rights-to rdf:resource="{$private-rwURI}"/>
+        <auth:has-rights-to rdf:resource="{$private-wURI}"/>
+        <auth:has-rights-to rdf:resource="{$group-rwURI}"/>
+        <auth:has-rights-to rdf:resource="{$group-wURI}"/>
 
-        <auth:can-assign-guard rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/private-rw"/>
-        <auth:can-assign-guard rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/private-w"/>
-        <auth:can-assign-guard rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/group-rw"/>
-        <auth:can-assign-guard rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/group-w"/>
-        
-        <auth:guarded-by rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/private-rw"/>
+        <auth:can-assign-guard rdf:resource="{$private-rwURI}"/>
+        <auth:can-assign-guard rdf:resource="{$private-wURI}"/>
+        <auth:can-assign-guard rdf:resource="{$group-rwURI}"/>
+        <auth:can-assign-guard rdf:resource="{$group-wURI}"/>
+       
+        <auth:guarded-by rdf:resource="{$private-rwURI}"/>
       </foaf:OnlineAccount>
     </xu:append>
 
     <xu:append select="/wiki:Folder[wiki:name='accounts']">
-      <wiki:has-child rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}"/>
+      <wiki:has-child rdf:resource="{$accountURI}"/>
     </xu:append>
 
     <!-- 
@@ -122,8 +134,8 @@ version="1.0">
     (in the future, the account could be associated with any foaf:Person resource)
     -->    
     <xu:append select="/">
-      <foaf:Person rdf:about="{$BASE_MODEL_URI}users/{$loginname}">
-        <foaf:holdsAccount rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}" />
+      <foaf:Person rdf:about="{$userURI}">
+        <foaf:holdsAccount rdf:resource="{$accountURI}" />
                   
         <wiki:name>
           <xu:value-of select="concat('users/',$loginname)"/>
@@ -134,15 +146,15 @@ version="1.0">
         <xu:if test="$email">
             <foaf:mbox rdf:resource='mailto:{$email}' />
         </xu:if>
-        <auth:guarded-by rdf:resource="{$BASE_MODEL_URI}accounts/{$loginname}/private-rw"/>
+        <auth:guarded-by rdf:resource="{$private-rwURI}"/>
       </foaf:Person>      
     </xu:append>
 
     <xu:append select="/wiki:Folder[wiki:name='users']">
-      <wiki:has-child rdf:resource="{$BASE_MODEL_URI}users/{$loginname}"/>
+      <wiki:has-child rdf:resource="{$userURI}"/>
     </xu:append>
 
-    <xu:variable name="account" select="/*[.=concat($BASE_MODEL_URI,'accounts/', $loginname)]"/>
+    <xu:variable name="account" select="/*[.=$accountURI]"/>
   </xu:if>
   
   <xu:if test="not($action='creation')">
