@@ -17,9 +17,13 @@ if __name__ == '__main__':
     import sys
     raccoon.main(sys.argv[1:])
 else:
+    import Ft.Xml
+    #need to set this first, before Domlette is imported
+    Ft.Xml.READ_EXTERNAL_DTD = False
     from rx import utils, glock, RxPath, MRUCache, XUpdate, DomStore, transactions
     import os, time, sys, base64, mimetypes, types, traceback
     import urllib, re
+    
     from Ft.Xml.Lib.Print import PrettyPrint
     from Ft.Xml.Xslt import XSL_NAMESPACE
     from Ft.Lib import Uri
@@ -58,7 +62,7 @@ else:
     from rx.Caching import *
     from rx.UriResolvers import *
     from rx import ContentProcessors
-    import rx.XhtmlWriter #adds the xhml method to xsl:output 
+    import rx.XhtmlWriter #adds the xhml method to xsl:output
     
     def OsPath2PathUri(context, path):
         """
@@ -162,7 +166,7 @@ match expressions. The action function returns a value which is passed
 onto the next Action in the sequence.
         '''
                 
-        def __init__(self, queries, action = None, matchFirst = True,
+        def __init__(self, queries=('true()',), action=None, matchFirst=True,
                 forEachNode = False, depthFirst=True, requiresContext=False,
                 cachePredicate=notCacheableKeyPredicate,
                 sideEffectsPredicate=None, sideEffectsFunc=None,
@@ -241,12 +245,7 @@ the Action is run (default is False).
                     break
             else:
                 varlist.append( (varName,  exps, assignWhenEmpty) )                    
-                
-    class FunctorAction(Action):
-        def __init__(self, actionFunc, indexes = [], **kw):
-            Action.__init__(self, ['true()'], (lambda *args: actionFunc(
-                                    *[args[i] for i in indexes])), **kw)
-                                                         
+                                                                         
     def assignVars(self, kw, varlist, default):
         '''
         Helper function for assigning variables from the config file.
