@@ -163,13 +163,13 @@ class SiteUriResolver(Uri.SchemeRegistryResolver):
         return '' #no safe prefix
                              
     def resolvePathScheme(self, uri, base=None):
-        path = urllib.url2pathname(uri)
+        path = uri
         if path.startswith('path:'):
-            #print 'path', path
             path = path[len('path:'):]
+        path = urllib.url2pathname(path)
 
         unauthorized = False
-        for prefix in self.path:
+        for prefix in self.path:            
             filepath = os.path.join(prefix.strip(), path)
             #check to make sure the path url was trying to sneak outside the path (i.e. by using ..)
             if self.server.SECURE_FILE_ACCESS:
