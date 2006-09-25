@@ -20,9 +20,9 @@ def RDFDoc(model, nsMap):
 
 import difflib, time
 
+from rx.RxPathUtils import _parseTriples as parseTriples
 try:
     from Ft.Rdf import Util
-    from rx.RxPathUtils import _parseTriples as parseTriples
     from Ft.Rdf.Statement import Statement as FtStatement
     from Ft.Rdf.Model import Model as Model4Suite
     #this function is no longer used by RxPath
@@ -209,7 +209,7 @@ class RDFDomTestCase(unittest.TestCase):
         [(subject, predicate, object, objectType, scope)] = [x for x in parseTriples([n3])]
         self.failUnless(object=="1" and objectType == 'http://www.w3.org/2001/XMLSchema#int')
 
-        sio = cStrin`gIO.StringIO()
+        sio = cStringIO.StringIO()
         writeTriples( [Statement('test:s', 'test:p', u'\x10\x0a\\\u56be',
                                  OBJECT_TYPE_LITERAL)], sio, 'ascii')
         self.failUnless(sio.getvalue() == r'<test:s> <test:p> "\u0010\n\\\u56BE" .'
