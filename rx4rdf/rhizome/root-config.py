@@ -127,7 +127,7 @@ _findAppAction = Action(
 
 actions = { 'http-request' : [
         _findAppAction, #find the associated app (i.e. the HTTPRequestProcessor)
-        FunctorAction(delegateRequest, [0,1,2,3]), #delegate the request to it
+        Action(action=delegateRequest), #delegate the request to it
         #note: if no match raccoon.default_not_found() will be invoked
     ] }
     
