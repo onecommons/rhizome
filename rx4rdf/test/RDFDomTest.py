@@ -209,11 +209,22 @@ class RDFDomTestCase(unittest.TestCase):
         [(subject, predicate, object, objectType, scope)] = [x for x in parseTriples([n3])]
         self.failUnless(object=="1" and objectType == 'http://www.w3.org/2001/XMLSchema#int')
 
-        sio = cStringIO.StringIO()
+        sio = cStrin`gIO.StringIO()
         writeTriples( [Statement('test:s', 'test:p', u'\x10\x0a\\\u56be',
                                  OBJECT_TYPE_LITERAL)], sio, 'ascii')
         self.failUnless(sio.getvalue() == r'<test:s> <test:p> "\u0010\n\\\u56BE" .'
                         '\n')                      
+
+        #test URI validation when writing triples
+        out = cStringIO.StringIO()
+        self.failUnlessRaises(RuntimeError, lambda:
+            writeTriples( [Statement(BNODE_BASE+'foo bar', 'http://foo bar', 
+                'http://foo bar')], out) )
+        writeTriples( [Statement(BNODE_BASE+'foobar', 'http://foo', 
+                'http://foo bar')], out)         
+        self.failUnlessRaises(RuntimeError, lambda:
+            writeTriples( [Statement(BNODE_BASE+'foobar', 'http://foo', 
+                'http://foo bar',OBJECT_TYPE_RESOURCE)], out) )
 
     def testDom(self):
         self.rdfDom = self.getModel(cStringIO.StringIO(self.model1) )
@@ -662,6 +673,22 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         res1 = self.rdfDom.evalXPath( xpath,  self.model1NsMap)
         self.failUnless( res1 )
 
+        self.rdfDom = self.getModel("about.rx.nt")
+        triples = '''<test:testrmxml1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#_1> <http://rx4rdf.sf.net/ns/rxml#first> .
+        <test:testrmxml1> <http://www.w3.org/1999/02/22-rdf-syntax-ns#_2> <http://rx4rdf.sf.net/ns/rxml#second> .
+        <test:testrmxml1> <http://www.w3.org/2000/01/rdf-schema#label> "test containers" .
+        '''
+        rdfns = u'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
+        subject = u'test:testrmxml1'
+        stmts = [Statement(subject, rdfns+'_1', 'first'),
+            Statement(subject, rdfns+'_2', 'second'),
+            Statement(subject, u'http://www.w3.org/2000/01/rdf-schema#label',
+                'test')]
+        self.rdfDom.pushContext('context:test')
+        addStatements(self.rdfDom, stmts)
+        self.rdfDom.popContext()
+        self.failUnless( self.rdfDom.findSubject(subject) )
+        
     def testId(self):
         #use this model because all resources appear as an object at least once]
         self.rdfDom = self.getModel(cStringIO.StringIO(self.loopModel) )
@@ -700,7 +727,7 @@ _:O4 <http://rx4rdf.sf.net/ns/archive#A> "".
         proc.appendStylesheet(STY)
         result = proc.run(SRC)
         self.failUnless(result == 'about')
-                
+
     def testDiff(self):
         self.rdfDom = self.getModel("about.rx.nt")
         updateDom = self.getModel("about.diff1.nt")
