@@ -118,6 +118,7 @@ def DocumentAsText(context, url):
     #have site resolver use this as the docbase
     file = InputSource.DefaultFactory.fromUri(urlString)
     bytes = file.read()
+    file.close()
     #print 'bytes', bytes[0:100]
     return bytes
 
@@ -133,7 +134,7 @@ def String2NodeSet(context, string):
 
 def Split(context, string, pattern=u' '):
     '''
-    Similar to Ft.Xml.Xslt.Exslt.String.Split but doesn't depend
+    Similar to Ft.Xml.Xslt.Exslt.String.Split but does not depend
     on a XSLT processor -- any XPath context will do.    
     '''
     string = StringValue(string)
@@ -243,20 +244,15 @@ def If(context, cond, v1, v2=None):
     from Ft.Xml.XPath import Conversions
     from rx import raccoon
     queryCache=getattr(context.node.ownerDocument, 'queryCache', None)
-    if Conversions.BooleanValue(cond):            
-        compExpr = raccoon.RequestProcessor.expCache.getValue(Conversions.StringValue(v1))
-        if queryCache:
-            return queryCache.getValue(compExpr, context)         
-        else:
-            return compExpr.evaluate(context)    
+    expCache = raccoon.RequestProcessor.expCache
+    if Conversions.BooleanValue(cond):
+        xpath = Conversions.StringValue(v1)
+        return RxPath.evalXPath(xpath,context,expCache,queryCache)
     elif v2 is None:
         return []
     else:
-        compExpr = raccoon.RequestProcessor.expCache.getValue(Conversions.StringValue(v2))
-        if queryCache:
-            return queryCache.getValue(compExpr, context)         
-        else:
-            return compExpr.evaluate(context)    
+        xpath = Conversions.StringValue(v2)
+        return RxPath.evalXPath(xpath,context,expCache,queryCache)
 
 def Map(context, nodeset, string):
     if type(nodeset) != type([]):
@@ -268,17 +264,15 @@ def Map(context, nodeset, string):
     mapContext.size = len(nodeset)
     mapContext.position = 1
     #note: exslt-dyn:map implies that parse exception should be caught and an empty nodeset returned
-    exp = raccoon.RequestProcessor.expCache.getValue(StringValue(string))
+    expCache = raccoon.RequestProcessor.expCache
+    xpath = StringValue(string)
     queryCache=getattr(context.node.ownerDocument, 'queryCache', None)
 
     def eval(l, node):
         mapContext.node = node
         mapContext.position += 1
         mapContext.varBindings[(RXWIKI_XPATH_EXT_NS, 'current')] = node
-        if queryCache:
-            result = queryCache.getValue(exp, mapContext)         
-        else:
-            result = exp.evaluate(mapContext)            
+        result = RxPath.evalXPath(xpath,mapContext,expCache,queryCache)
         if type(result) != type([]):
             if not isinstance(result, unicode):
                 result = unicode(str(result), 'utf8')                
@@ -301,14 +295,24 @@ def ParseRDF(context, contents, type='unknown', uri=''):
     stmts = RxPath.parseRDFFromString(contents, uri, type)            
     return [RxPath.RxPathDOMFromStatements(stmts, nsRevMap, uri,schemaClass)]
 
-def SerializeRDF(context, resultset, type='rdfxml',
+def SerializeRDF(context, resultset, type='rdfxml', nsMapString = None,
                                  fixUp=None, fixUpPredicate=None):
-    '''Returns a nodeset containing a RDF/XML representation of the
-  RxPathDOM nodes contained in resultset parameter. If
-  resultset is None, it will be set to the context node '''
+    '''Returns a nodeset containing a RDF serialization of the
+  RxPathDOM nodes contained in resultset parameter.
+  
+  nsMapString is a namespace dictionary encoded as a string in the form of "prefix^uri^prefix^uri..."
+  
+  '''
     stmts = []    
+    uri2prefixMap = None
+    if nsMapString:
+        import itertools
+        nslist = StringValue(nsMapString).split('^')
+        uri2prefixMap = dict(itertools.izip(itertools.islice(nslist, 1, None,2),
+                itertools.islice(nslist, 0, None,2)) )
     if resultset:
-        uri2prefixMap=resultset[0].rootNode.nsRevMap        
+        if uri2prefixMap is None:
+            uri2prefixMap=resultset[0].rootNode.nsRevMap        
         if resultset[0].nodeName == '#document':
             resultset = resultset[0].childNodes
             
@@ -328,8 +332,6 @@ def SerializeRDF(context, resultset, type='rdfxml',
                     #object is a list so add all the list items too
                     stmts.extend(p.firstChild.getModelStatements())        
                                         
-    else:
-        uri2prefixMap = None
     return RxPath.serializeRDF(stmts, type, uri2prefixMap,fixUp, fixUpPredicate)
 
 import Ft
