@@ -6,6 +6,8 @@
     http://rx4rdf.sf.net    
 """
 from rx.RhizomeBase import *
+from StringIO import StringIO
+import sys, traceback
 
 class RhizomeBaseMarkupMap(zml.LowerCaseMarkupMap):
     def __init__(self, rhizome):
@@ -381,6 +383,7 @@ class RhizomeContent(RhizomeBase):
             isinstance(result, str) and result or raccoon.StringValue(result),
                                     requiresContext = True) #get its content
         self.interWikiMap = None
+        self.namespaceMap = None
         self.zmlContentProcessor=raccoon.ContentProcessors.ZMLContentProcessor()
         self.zmlContentProcessor.getInterWikiMap = self.getInterWikiMap
         self.mmf = MarkupMapFactory(self.zmlContentProcessor)
@@ -397,6 +400,21 @@ class RhizomeContent(RhizomeBase):
            return self.interWikiMap
         return {}
 
+    def getNamespaceMap(self):
+        if self.namespaceMap is not None:
+            return self.namespaceMap
+        #in case this is call before configuration is completed
+        namespaceMapURL = getattr(self, 'namespaceMapURL', None) 
+        if namespaceMapURL:
+           self.namespaceMap = zml.interWikiMapParser(
+               InputSource.DefaultFactory.fromUri(namespaceMapURL).stream,
+               False, { 'BASE_MODEL_URI' : self.BASE_MODEL_URI })
+           return self.namespaceMap
+        return self.server.nsMap
+
+    def getNamespaceMapString(self, context=None):
+        return u'^'.join(utils.flattenSeq( self.getNamespaceMap().iteritems() ))
+    
     ######content processing####    
     def processTemplateAction(self, resultNodeset, kw, contextNode, retVal):
         #the resultNodeset is the template resource
@@ -448,7 +466,7 @@ class RhizomeContent(RhizomeBase):
         kw['__resource'] = resource
         kw['_format'] = format
         changeCount = len(self.server.txnSvc.state.additions)
-        result = self.server.runActions('shred', kw, content,newTransaction=False)
+        result = self.server.runActions('shred', kw, content, newTransaction=False)
         #print 'shredded', [p.stmt for p in self.server.txnSvc.state.additions]
         changes = len(self.server.txnSvc.state.additions) > changeCount
         #change is inaccurate if the shredder removed some change
@@ -490,4 +508,23 @@ class RhizomeContent(RhizomeBase):
         result = self.server.runActions('shred', kw, initVal, newTransaction=False)
         changes = len(self.server.txnSvc.state.additions) > changeCount
         return changes and raccoon.XTrue or raccoon.XFalse
+
+class InterWikiMapShredder(raccoon.ContentProcessors.ContentProcessor):
+    uri = 'http://rx4rdf.sf.net/ns/wiki#item-format-text'
+    mimetype='text/plain'
+
+    def __init__(self, rhizome):
+        super(InterWikiMapShredder, self).__init__()
+        self.rhizome = rhizome
+        
+    def processContents(self,result, kw, contextNode, contents):
+        name = kw['__server__'].evalXPath('string(wiki:name)', 
+                                            node = kw['__resource'][0])
+        if name:
+            if name == self.rhizome.interWikiMapURL:
+                self.rhizome.interWikiMap = zml.interWikiMapParser(StringIO(contents))
+            elif name == self.rhizome.namespaceMapURL:
+                self.rhizome.namespaceMap = zml.interWikiMapParser(StringIO(contents),
+                         False, { 'BASE_MODEL_URI' : self.BASE_MODEL_URI })
+        return contents
 
