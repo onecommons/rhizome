@@ -156,9 +156,10 @@ def NTriples2Statements(stream, defaultScope='', baseuri=None,
         stream,  makebNode, charencoding=charencoding, baseuri=baseuri,
         yieldcomments=incrementHook):        
         if stmt[0] is Removed:
+            stmt, forContext = stmt[1], stmt[2]
             if incrementHook:
-                stmt = incrementHook.remove(stmt[1], stmt[2])
-            stmt = stmt[1][:4] #don't include scope in key
+                stmt = incrementHook.remove(stmt, forContext)
+            stmt = stmt[:4] #don't include scope in key
             if stmt in stmtset:
                 del stmtset[stmt]
         elif stmt[0] is Comment:
@@ -244,8 +245,10 @@ def parseRDFFromString(contents, baseuri, type='unknown', scope=None,
         elif type == 'rdfxml':
             try:
                 #if rdflib is installed, use its RDF/XML parser because it doesn't suck            
-                import rdflib.TripleStore
-                ts = rdflib.TripleStore.TripleStore()
+                #import rdflib.TripleStore
+                #ts = rdflib.TripleStore.TripleStore()
+                import rdflib
+                ts = rdflib.Graph()
                 import StringIO as pyStringIO #cStringIO can't have custom attributes
                 contentsStream = pyStringIO.StringIO(contents)
                 #xml.sax.expatreader.ExpatParser.parse() calls
@@ -265,17 +268,17 @@ def parseRDFFromString(contents, baseuri, type='unknown', scope=None,
                     #fallback to 4Suite's obsolete parser
                     try:
                         from Ft.Rdf import Util
-                        model, db=Util.DeserializeFromString(contents,driver,
-                                                             dbName,False,baseuri)
+                        model, db=Util.DeserializeFromString(contents,scope=baseuri)
                         statements = RxPath.Ft2Statements(model.statements())
                         #we needed to set the scope to baseuri for the parser to
-                        #resolve relative URLs, so we now need reset the scope
+                        #resolve relative URLs, so we now need to reset the scope
                         for s in statements:
                             s.scope = scope
                         return statements
                     except ImportError:
                         raise ParseException("no RDF/XML parser installed")
     except:
+        #import traceback; traceback.print_exc()
         raise ParseException()
 
 def parseRDFFromURI(uri, type='unknown', modelbaseuri=None, scope=None,
@@ -422,7 +425,7 @@ def _parseTriples(lines, bNodeToURI = lambda x: x, charencoding='utf8',
             graph = None
             if yieldcomments:
                 yield (Comment, line[1:])
-            continue        
+            continue
         subject, predicate, object = line.split(None,2)
         if subject.startswith('_:'):
             subject = subject[2:] #bNode
