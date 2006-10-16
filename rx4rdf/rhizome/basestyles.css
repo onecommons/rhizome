@@ -11,8 +11,8 @@ a[rel~="rhizomename"] {
   padding-right: 8px;
   border: thin solid #A4BDEC;	
   -moz-border-radius: 12px; 
-  border-radius: 12px;
-  /* behavior: url(border-radius.htc);   this doesn't work yet */
+  -khtml-border-radius: 12px; /*for safari */
+  /* behavior: url(border-radius.htc);  for IE; this doesn't work yet */
 }
 
 a[rel~="rhizomename"]:hover {
