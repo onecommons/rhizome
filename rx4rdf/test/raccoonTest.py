@@ -62,6 +62,32 @@ class RaccoonTestCase(unittest.TestCase):
         #print type(result), result
         self.failUnless( '<html><body>not found!</body></html>' == result)
 
+    def testErrorHandling(self):
+        root = raccoon.RequestProcessor(a='testErrorHandling-config.py',model_uri = 'test:')
+        result = root.runActions('test-error-request', utils.kw2dict(_name='foo'))
+        
+        response = "404 not found"
+        self.failUnless(response == result)
+
+    def testIncrementalLoad(self):
+        appVars = { 'useIndex':0,
+                    'STORAGE_TEMPLATE':
+r'''#!graph context:add:context:txn:test:;1;;context:extracted:bnode:xeec53da980d74a0289dacd125017fbc8x2
+_:xeec53da980d74a0289dacd125017fbc8x4 <http://rx4rdf.sf.net/ns/wiki#question> "<p>1What does ZML stand for? blah\n</p>" .
+#!remove context:add:context:txn:test:;1;;context:extracted:bnode:xeec53da980d74a0289dacd125017fbc8x2
+#!graph context:add:context:txn:test:;1;;context:extracted:bnode:xeec53da980d74a0289dacd125017fbc8x2
+_:xeec53da980d74a0289dacd125017fbc8x4 <http://rx4rdf.sf.net/ns/wiki#question> "<p>1What does ZML stand for? blah\n</p>" .
+#!graph context:add:context:txn:test:;2;;context:extracted:bnode:xeec53da980d74a0289dacd125017fbc8x8
+<test:testctxtentail#1> <http://rx4rdf.sf.net/ns/wiki#question> "<p>1What does ZML stand for? blah\n</p>" .
+#!remove context:add:context:txn:test:;2;;context:extracted:bnode:xeec53da980d74a0289dacd125017fbc8x8
+#!graph context:add:context:txn:test:;2;;context:extracted:bnode:xeec53da980d74a0289dacd125017fbc8x8
+<test:testctxtentail#1> <http://rx4rdf.sf.net/ns/wiki#question> "<p>1What does ZML stand for? blah\n</p>" .
+#!graph context:add:context:txn:test:;3;;context:extracted:bnode:xeec53da980d74a0289dacd125017fbc8x14
+<test:testctxtentail#1> <http://rx4rdf.sf.net/ns/wiki#question> "<p>2What does ZML stand for? blah2\n</p>" .'''
+                }
+        root = raccoon.HTTPRequestProcessor(a='testAuthAction.py', model_uri = 'test:', appVars = appVars )
+        self.failUnless( len(root.evalXPath('/*[.="test:testctxtentail#1"]/*/node()')) == 1)
+        
     def testContentProcessing(self):
         root = raccoon.RequestProcessor(a='testContentProcessor.py',
                                         model_uri='test:')
@@ -84,7 +110,7 @@ class RaccoonTestCase(unittest.TestCase):
         
         root = raccoon.RequestProcessor(a='testMinimalApp.py',model_uri='test:')        
         root.actions={ 'test' : [
-            raccoon.FunctorAction(lambda *args: StringIO(testString)),
+            raccoon.Action(action=lambda *args: StringIO(testString)),
             #assume the content is text
             raccoon.Action(["'http://rx4rdf.sf.net/ns/wiki#item-format-text'"],
                    root.processContents, canReceiveStreams=True),
@@ -177,8 +203,9 @@ if __name__ == '__main__':
     #os.chdir(os.path.basename(sys.modules[__name__ ].__file__))
     try:
         test=sys.argv[sys.argv.index("-r")+1]
+    except (IndexError, ValueError):
+        unittest.main()
+    else:
         tc = RaccoonTestCase(test)
         tc.setUp()
         getattr(tc, test)() #run test
-    except (IndexError, ValueError):
-        unittest.main()
