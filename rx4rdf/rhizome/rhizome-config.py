@@ -87,7 +87,7 @@ rhizome.authorizationQueryTemplate = '''$__authResources[wf:max(%(required)s
 rhizome.resourceAuthorizationAction = Action([
  #super-user can always get in
  '''f:if($__account/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser', 
-    $STOP)''', 
+    $__STOP)''', 
  '''wf:if(%s, "wf:error('Not Authorized', 401)")''' % 
  (rhizome.authorizationQueryTemplate % {'minpriority': '0', 'required' : 
             "("+rhizome.findTokens+"|"+rhizome.findClassTokens+
@@ -110,7 +110,7 @@ rhizome.resourceAuthorizationAction.assign("__accountTokens",
 #now find a resource that will be used to display the resource
 contentHandlerQueries= [
 #don't do anything with external files:
-"f:if(self::*='http://rx4rdf.sf.net/ns/wiki#ExternalResource', $STOP)", 
+"f:if(self::*='http://rx4rdf.sf.net/ns/wiki#ExternalResource', $__STOP)", 
 #if the request has an action associated with it:
 #find the action that handles the most derived subtype of the resource
 #(or of the resource itself (esp. for the case where the context is a class resource))
@@ -193,12 +193,12 @@ rhizome.processContentAction = Action(encodingQueries, __server__.processContent
 #we want to pass the results onto.
 templateQueries=[
 #'''$REDIRECT''', #todo: set this to the resource you want to redirect to
-#short circuit -- $STOP is a magic variable that stops the evaluation of the queries
-'''f:if($externalfile,$STOP)''', 
-'''f:if($action="view-source",$STOP)''', #todo: fix this hack
+#short circuit -- $__STOP is a magic variable that stops the evaluation of the queries
+'''f:if($externalfile,$__STOP)''', 
+'''f:if($action="view-source",$__STOP)''', #todo: fix this hack
 'f:if($_doctype, /*[wiki:handles-doctype/*=$_doctype])',
-'''f:if($_disposition='http://rx4rdf.sf.net/ns/wiki#item-disposition-complete', $STOP)''', #short circuit
-'''f:if($_disposition='http://rx4rdf.sf.net/ns/wiki#item-disposition-template', $STOP)''', #short circuit
+'''f:if($_disposition='http://rx4rdf.sf.net/ns/wiki#item-disposition-complete', $__STOP)''', #short circuit
+'''f:if($_disposition='http://rx4rdf.sf.net/ns/wiki#item-disposition-template', $__STOP)''', #short circuit
 'f:if($_disposition, /*[wiki:handles-disposition=$_disposition])',
 #if your application needs a default template:
 #'''/*[wiki:name='_default-template']''', 
@@ -281,8 +281,8 @@ errorAction.assign('error:userMsg',
 ##define the various authorization actions invoked when committing changes
 ###############################################################################
 
-classAuthenticateNewResourceAction = Action( [ 
-'''f:if($__account/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser', $STOP)''',
+classAuthenticateNewResourceAction = Action( [ 'f:if($__skipAuth, $__STOP)',
+'''f:if($__account/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser', $__STOP)''',
 rhizome.authorizationQueryTemplate % {'minpriority': rhizome.minPriority, 
  'required': "("+rhizome.findClassTokens+")[auth:has-permission=$__authAction]"},
 ], rhizome.raiseClassUnAuthorized)
@@ -313,8 +313,8 @@ classAuthenticateRemovesAction.assign("__authResources",
 ##relationships we are essentially creating new objects and these
 ##statements may have different meaning in the system so we need to
 ##check if the user has the right to (re)assert them.
-recheckAuthorizations = Action([ 
- '''f:if($__account/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser', $STOP)''',
+recheckAuthorizations = Action([ 'f:if($__skipAuth, $__STOP)',
+ '''f:if($__account/auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser', $__STOP)''',
  '$_added/self::auth:requires-authorization-for', 
   ], lambda result, kw, contextNode, retVal, rhizome=rhizome: 
        rhizome.recheckAuthorizations(result, kw))
@@ -331,15 +331,29 @@ shredders = [
     rx.rhizome.raccoon.ContentProcessors.RDFShredder(
         'http://rx4rdf.sf.net/ns/wiki#item-format-ntriples',
               mimetype='text/plain', label='NTriples', rdfFormat='ntriples'),
+    rx.rhizome.InterWikiMapShredder(rhizome),
     #PythonSourceCodeShredder(), #todo
 ]
         
-shredderRequestSequence = [ 
+shredderRequestSequence = [
   Action(['$_format'],
          lambda result, kw, contextNode, contents, rhizome=rhizome:
             rhizome.server.processContents(result, kw, 
-     rhizome.server.domStore.dom, contents, contentProcessors=rhizome.shredders))
+                rhizome.server.domStore.dom, contents,
+                contentProcessors=rhizome.shredders))
 ]
+
+importAction = Action(["$import", '$i'], 
+                    lambda result, kw, contextNode, retVal, rhizome=rhizome: 
+                      rhizome.doImport(result, **kw) and None)
+#assume cmd line cmds don't run with user credentials                      
+importAction.assign("__skipAuth", "true()")   
+
+exportAction =  Action(['$export', '$e'], 
+                    lambda result, kw, contextNode, retVal, rhizome=rhizome: 
+                      rhizome.doExport(result, kw) and None)
+#assume cmd line cmds don't run with user credentials                      
+exportAction.assign("__skipAuth", "true()")  
 
 ###############################################################################
 ##associate all these Action sequences with the appropriate request triggers
@@ -351,14 +365,12 @@ actions = {
     'shred' : shredderRequestSequence, #rhizome-specific trigger
     
     #rhizome adds two command line options: --import and --export
-    'run-cmds' : [ Action(["$import", '$i'], 
-                    lambda result, kw, contextNode, retVal, rhizome=rhizome: 
-                      rhizome.doImport(result, **kw)),
-                   Action(['$export', '$e'], 
-                    lambda result, kw, contextNode, retVal, rhizome=rhizome: 
-                      rhizome.doExport(result, kw)),
-                ],
-    'load-model' : [ FunctorAction(rhizome.initIndex) ],
+    'run-cmds' : [ importAction,
+                        exportAction,
+                     ],
+    'load-model' : [ 
+      Action(action=lambda result, kw, contextNode, retVal, rhizome=rhizome:
+                    rhizome.initIndex() )],
     
     'before-add': [ Action(['$__skipAuth', '''wf:authorize-statements($_added,
       "http://rx4rdf.sf.net/ns/auth#permission-add-statement", 
@@ -379,15 +391,15 @@ actions = {
      #This trigger is called before its statements are added. You could use it, 
      #for example, to prevent reserved identifiers from being used.
         
-    'before-prepare': [ 
+    'before-prepare': [
         Action(['''wf:request('update-triggers', '_noErrorHandling', 1,
                 '_added', $_added, '_removed', $_removed)''']),
         recheckAuthorizations,
         classAuthenticateNewResourceAction,
         #invoke the validatation schematron document on the changes
         Action(['''wf:request('validate-schema', '_noErrorHandling', 1,
-         'phase', 'incremental', '_added', $_added, '_removed', $_removed)''']),
-        ],
+         'phase', 'incremental', '_added', $_added, '_removed', $_removed)''']
+        ),],
 
     #'before-commit' 
     #'after-commit'  #todo: notifications, e.g. emails 
@@ -395,7 +407,7 @@ actions = {
 
 #if any of the parameters listed here exist they will preserved 
 #during template processing (see rhizome.processTemplateAction)
-globalRequestVars = ['__account', '__accountTokens', '_static', '_disposition']
+globalRequestVars = ['__account', '__accountTokens', '_static', '_disposition', '__skipAuth']
 
 ##############################################################################
 ## other config settings
@@ -480,6 +492,7 @@ extFunctions = {
 (RXWIKI_XPATH_EXT_NS, 'shred-with-xslt') :  rhizome.shredWithStylesheet,
 (RXWIKI_XPATH_EXT_NS, 'is-spam') :  rhizome.isSpam,
 (RXWIKI_XPATH_EXT_NS, 'name-from-url'): rhizome.nameFromURL,
+(RXWIKI_XPATH_EXT_NS, 'get-namespaces'): rhizome.getNamespaceMapString,
 }
 
 NOT_CACHEABLE_FUNCTIONS = {
@@ -498,7 +511,7 @@ NOT_CACHEABLE_FUNCTIONS = {
 #authorize XPath function calls based on the context and arguments
 #It should return a list of access token resource URIs to authorize 
 #or raise NotAuthorized
-authFunctionFunc = lambda name, context, args, rhizome=rhizome: (
+authFunctionFunc = lambda name, context, args, isSuperUser, rhizome=rhizome: (
         ['%sexecute-function-token'% rhizome.BASE_MODEL_URI], args)
 
 authorizedExtFunctions = {
@@ -606,7 +619,8 @@ rhizome._addItemTuple('bookmarksetup',loc='path:help/bookmarksetup.xsl',
 #added in 0.6.1:
 rhizome._addItemTuple('show-revision-contexts',loc='path:show-revision-contexts.xsl', format='rxslt', disposition='entry',handlesAction=['showrevisions'],actionType='rdfs:Resource'), 
 rhizome._addItemTuple('s5-template',loc='path:s5-template.xsl', format='rxslt', 
-                        disposition='complete', handlesDisposition='s5-template'), 
+                        disposition='complete', handlesDisposition='s5-template'),
+rhizome._addItemTuple('namespaces.txt',format='text', loc='path:namespaces.txt'),
 
 #administration pages
 rhizome._addItemTuple('administration', loc='path:administer.xsl', disposition='entry', format='rxslt', title="Administration"), 
@@ -894,8 +908,18 @@ authStructure =\
   auth:with-property: wiki:has-child
   auth:priority: 90
 
+ base:modify-structure-token:
+  rdf:type: auth:AccessToken
+  rdfs:label: `prevents resources from being modified, but allow new ones
+  auth:has-permission: auth:permission-add-statement
+  auth:has-permission: auth:permission-remove-statement   
+  auth:priority: 90
+
  #a:Context:
- #  auth:type-guarded-by: base:write-structure-token
+ # auth:type-guarded-by: base:modify-structure-token
+
+ a:TransactionContext:
+   auth:type-guarded-by: base:write-structure-token
 
  a:CurrentTransactionContext:
    auth:type-guarded-by: base:current-transaction-override-token
