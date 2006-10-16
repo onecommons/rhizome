@@ -34,7 +34,8 @@ def kw2dict(**kw):
     #not needed in python 2.3, dict ctor does the same thing
     return kw
 
-def flattenSeq(args, depth=0xFFFF):
+_flattenTypes = (list,tuple, GeneratorType, type({}.iteritems()) )
+def flattenSeq(seq, depth=0xFFFF, flattenTypes=None):
     '''
     >>> list(flattenSeq([ [1,2], 3, [4,5]]))
     [1, 2, 3, 4, 5]
@@ -47,9 +48,10 @@ def flattenSeq(args, depth=0xFFFF):
     >>> list(flattenSeq([ [1,2], 3, [4,[5] ]], 1 ))
     [1, 2, 3, 4, [5]]
 '''
-    
-    for a in args:
-        if depth > 0 and isinstance(a, (list,type, GeneratorType) ):
+    if flattenTypes is None:
+        flattenTypes = _flattenTypes
+    for a in seq:
+        if depth > 0 and isinstance(a, flattenTypes):
             for i in flattenSeq(a, depth-1):
                 yield i
         else:
