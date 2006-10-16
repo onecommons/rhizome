@@ -159,6 +159,7 @@ class _NamedGraphManagerBase(object):
             #remove the stmt to the ContextDoc
             #we set dontPropagate because its already been removed from
             #this doc
+            saveDontPropagate = doc.graphManager.dontPropagate
             doc.graphManager.dontPropagate = True
             subjectNode = doc.findSubject(stmt.subject)
             if subjectNode:
@@ -168,7 +169,7 @@ class _NamedGraphManagerBase(object):
                     return True
             return False
         finally:
-            doc.graphManager.dontPropagate = False                          
+            doc.graphManager.dontPropagate = saveDontPropagate                          
 
     def propagateAdd(self, doc, stmt):
         return self._propagateAdds(doc, [stmt])
@@ -177,6 +178,7 @@ class _NamedGraphManagerBase(object):
         try:
             #add the stmt to the doc
             #we set dontPropagate because its already been added to this doc
+            saveDontPropagate = doc.graphManager.dontPropagate
             doc.graphManager.dontPropagate = True                
             try:
                 return RxPath.addStatements(doc, stmts)
@@ -185,7 +187,7 @@ class _NamedGraphManagerBase(object):
                 #to add to the DOM anyways
                 return None
         finally:
-            doc.graphManager.dontPropagate = False          
+            doc.graphManager.dontPropagate = saveDontPropagate
         
     def revertRemoveIfNecessary(self, stmt, currentTxn):
         if (stmt,stmt.scope) in currentTxn.removes:
@@ -343,7 +345,7 @@ class NamedGraphManager(_NamedGraphManagerBase):
                 raise IndexError('inserting node into current context instead') 
         
         if node and self.doc.addTrigger:
-               self.doc.addTrigger(node)                  
+            self.doc.addTrigger(node)                  
         
     def add(self, stmt, node=None):
         if self.dontPropagate:

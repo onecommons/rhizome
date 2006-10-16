@@ -745,11 +745,13 @@ class Subject(Resource):
                     self.ownerDocument.graphManager.add(stmt,predicateNode)
                 else:
                     self.ownerDocument.model.addStatement(stmt)
-            elif stmt.predicate == RDF_SCHEMA_BASE+'member': 
+            elif stmt.predicate == RDF_SCHEMA_BASE+'member':                
                 if refChild:
-                    raise NotSupportedErr("inserting items into lists not yet supported") #todo
+                    raise NotSupportedErr("inserting items into lists not "
+                                          "yet supported") #todo
                 ordinal = 0
-                for i in xrange(len(self.childNodes)-1, -1, -1): #iterate through in reverse order
+                for i in xrange(len(self.childNodes)-1, -1, -1):
+                    #iterate through in reverse order
                     if self.childNodes[i].listID:
                         childListID = self.childNodes[i].listID
                         assert childListID.startswith(RDF_MS_BASE+'_')
@@ -757,9 +759,11 @@ class Subject(Resource):
                         break
                 ordinal += 1                
                 if listID:
-                    assert listID.startswith(RDF_MS_BASE+'_'), 'invalid listID resource '+ listID
+                    assert listID.startswith(RDF_MS_BASE+'_'), ('invalid '
+                                'listID resource: '+ listID)
                     listIDordinal = int(listID[len(RDF_MS_BASE+'_'):])
-                    assert listIDordinal >= ordinal, 'out of order listID resource '+ listID 
+                    assert listIDordinal >= ordinal, ('out of order listID '
+                                'resource '+ listID + ', expected:', ordinal)
                 listID = listID or RDF_MS_BASE+'_'+str(ordinal + 1)
                 containerStmts = self.ownerDocument.model.getStatements(
                                 stmt.subject, listID)
@@ -1661,7 +1665,7 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         if node.uri != uri: 
             return None    
         else:
-            #print 'found subject in not in dict!', uri #todo: why is this happening?            
+            #print 'found subject in not in dict!', uri #todo: why is this happening?
             return node
 
     def getModelStatements(self):
@@ -1859,12 +1863,20 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
     def _entailmentChange(self, stmt, add):
         if self._childNodes is not None: #already created them
             if self.graphManager:
-                subjectNode = self.findSubject(stmt.subject)
-                if not subjectNode or subjectNode._childNodes is not None:
-                    if add:               
-                        self.graphManager.propagateAdd(self, stmt) 
-                    else:
-                        self.graphManager.propagateRemove(self, stmt) 
+                try:
+                    #pushContext() in case we're in a context because
+                    #ContextNamedGraphManager will add a statement to the model
+                    #todo: ideally we'd add the node to the context doc too
+                    self.pushContext(None)
+                    subjectNode = self.findSubject(stmt.subject)
+                    if not subjectNode or subjectNode._childNodes is not None:
+                        #propagateAdd/Remove will update the DOM but not the model
+                        if add:               
+                            self.graphManager.propagateAdd(self, stmt) 
+                        else:
+                            self.graphManager.propagateRemove(self, stmt) 
+                finally:
+                    self.popContext()
             else:
                 self._childNodes = None
                 self.subjectDict = {}  
