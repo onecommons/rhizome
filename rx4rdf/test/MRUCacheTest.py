@@ -17,44 +17,44 @@ class MRUCacheTestCase(unittest.TestCase):
         self.cache = None
 
     def test1(self):
-        v1 = self.cache.getValue('a'*5)
-        v2 = self.cache.getValue('a'*5)
-        self.failUnless(v2 == 'a'*5 and v1 is v2) #it's in the cache
+        v1 = self.cache.getValue(tuple('a'*5))
+        v2 = self.cache.getValue(tuple('a'*5))
+        self.failUnless(v2 == tuple('a'*5) and v1 is v2) #it's in the cache
         self.failUnless(self.cache.nodeSize == 5)
 
         #this is item is bigger than the entire cache and so not be placed in the cache
-        v3 = self.cache.getValue('b'*15)
-        v4 = self.cache.getValue('b'*15)
-        self.failUnless(v3 == 'b'*15 and v3 is not v4) #it's not in the cache        
+        v3 = self.cache.getValue(tuple('b'*15) ) 
+        v4 = self.cache.getValue(tuple('b'*15) )
+        self.failUnless(v3 == tuple('b'*15) and v3 is not v4) #it's not in the cache        
         self.failUnless(self.cache.nodeSize == 5)
 
-        v5 = self.cache.getValue('c'*7)
-        v6 = self.cache.getValue('c'*7)
-        self.failUnless(v6 == 'c'*7)
+        v5 = self.cache.getValue(tuple('c'*7))
+        v6 = self.cache.getValue(tuple('c'*7))
+        self.failUnless(v6 == tuple('c'*7))
         self.failUnless(v5 is v6) #it's in the cache
         self.failUnless(self.cache.nodeSize == 12)
 
         #now our cache is now full (over 12 characters!)    
         #so adding another item will push out the first item, but not the second
-        v7 = self.cache.getValue('d'*7)
-        v8 = self.cache.getValue('d'*7)
-        self.failUnless(v7 == 'd'*7)
+        v7 = self.cache.getValue(tuple('d'*7))
+        v8 = self.cache.getValue(tuple('d'*7))
+        self.failUnless(v7 == tuple('d'*7))
         self.failUnless(v7 is v8) #it's in the cache
         self.failUnless(self.cache.nodeSize == 14)
 
         #the second item is in the cache
-        v9 = self.cache.getValue('c'*7)
+        v9 = self.cache.getValue(tuple('c'*7))
         self.failUnless(v9 == v5)        
         self.failUnless(v9 is v5)
                         
         #but the first item is not
-        v10 = self.cache.getValue('a'*5)
+        v10 = self.cache.getValue(tuple('a'*5))
         self.failUnless(v10 == v1)
         self.failUnless(v10 is not v1)
         self.failUnless(self.cache.nodeSize == 12)
         
         #the second item is in the cache
-        v11 = self.cache.getValue('c'*7)
+        v11 = self.cache.getValue(tuple('c'*7))
         #you're still there, right? (just checking)
         self.failUnless(v11 == v5)        
         self.failUnless(v11 is v5)
@@ -64,7 +64,7 @@ class MRUCacheTestCase(unittest.TestCase):
         self.failUnless(self.cache.nodeSize == 0)
 
         #the cache is now empty
-        v12 = self.cache.getValue('c'*7)
+        v12 = self.cache.getValue(tuple('c'*7))
         self.failUnless(v12 == v5)        
         self.failUnless(v12 is not v5)
         self.failUnless(self.cache.nodeSize == 7)
