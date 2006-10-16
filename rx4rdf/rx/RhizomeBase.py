@@ -101,6 +101,8 @@ class RhizomeBase(object):
                   'SAVE_DIR must be a distinct sub-directory of a directory on the PATH'
                 
         self.interWikiMapURL = kw.get('interWikiMapURL', 'site:///intermap.txt')
+        self.namespaceMapURL = kw.get('namespaceMapURL', 'site:///namespaces.txt')
+        
         initConstants( ['useIndex'], 1)
         initConstants( ['RHIZOME_APP_ID'], '')
         initConstants( ['akismetKey','akismetUrl'], '')
@@ -487,11 +489,10 @@ class RhizomeBase(object):
         return [ xmlDoc.documentElement ]
 
     MAX_SPAM_COMMENT_LOG_LEN = 10000
-    def isSpam(self, context, user_ip, user_agent, contents):
+    def isSpam(self, context, user_ip, user_agent, contents, treatErr):
         '''
-        Returns true if the contents are spam.
-        Returns false if content is not spam or if the spam check
-        failed for some reason.
+        Returns one of "spam", "ham" (not spam), "error" (spam check failed),
+        or "disabled" (spam check not enabled).
 
         Any message determined to be spam is logged, so you can search
         the log file for false positives. Here's a regex for finding the log
@@ -499,7 +500,7 @@ class RhizomeBase(object):
         r'askimet\.comment_check found spam: \((.*?)\), \(\((.*?)\)\) (<truncated>)?(.*)'
         '''
         if not (self.akismetKey or self.akismetUrl):
-            return raccoon.XFalse #no check
+            return u'disabled' #no check
 
         from rx import akismet, __version__
         try:
@@ -518,19 +519,19 @@ class RhizomeBase(object):
                                         :self.MAX_SPAM_COMMENT_LOG_LEN]                        
                     self.spamLog.info('askimet.comment_check found spam: '
                         '(%s),((%s)) %s' % (user_ip, user_agent, contents) )
-                    return raccoon.XTrue
+                    return u'spam' 
                 else:
-                    return raccoon.XFalse
+                    return u'ham' 
             else:
                 self.log.warning('akismet.verify_key failed')
-                return raccoon.XFalse
+                return u'error' 
         except akismet.AkismetError, e:            
             self.log.warning('error invoking akismet API: %s %s' % (e.response, e.statuscode))
-            return raccoon.XFalse
+            return u'error' 
         except:
             #akismet module doesn't handle, for example, socket errors
             self.log.exception('unexpected error invoking akismet')
-            return raccoon.XFalse
+            return u'error' 
 
 
     ###text indexing ###
