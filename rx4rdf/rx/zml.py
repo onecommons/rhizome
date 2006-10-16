@@ -683,7 +683,7 @@ class MarkupMap(object):
         #if values:
         #    attribs['role'] = Curi( ' '.join(values) )
 
-        return tuple( attribs.itervalues() )                 
+        return tuple( attribs.iteritems() )                 
                       
     def H(self, level, line):
         '''
@@ -883,13 +883,16 @@ class MarkupMapFactoryHandler(Handler):
                 self.st.mm = mm
         super(MarkupMapFactoryHandler, self).pi(name, value)
 
-def interWikiMapParser(interwikimap):
+def interWikiMapParser(interwikimap, xmlescape=True, replaceDict=None):
     interWikiMap = {}
     for line in interwikimap:
         line = line.strip()
         if line and not line.startswith('#'):
             prefix, url = line.split()
-            url = url.replace('&', '&amp;').replace('<', '&lt;')
+            if replaceDict:
+                url = url % replaceDict
+            if xmlescape:
+                url = url.replace('&', '&amp;').replace('<', '&lt;')
             interWikiMap[prefix.lower()] = url
     return interWikiMap
 
