@@ -171,11 +171,11 @@ def _compileXPath(xpath, context, expCache=None, useEngine=None):
             #don't modify the compExpr saved in the cache
             compExpr = XPath.Compile(xpath)
     
-    if useEngine:
+    if useEngine:        
         import RxPathQuery
         transform = RxPathQuery.ReplaceRxPathSubExpr(context, compExpr)
-        if transform.changed:
-            compExpr = transform.resultExpr
+        if transform.changed:            
+            compExpr = transform.resultExpr            
         else:
             origCompExpr.skipQuery = True
 
@@ -189,7 +189,10 @@ if _saveStats:
     evalRunOut = file('evalRun.txt', 'w')
 
 def evalXPath(xpath, context, expCache=None, queryCache=None, useEngine=None):
-    context.functions.update(BuiltInExtFunctions)
+    if not context.node or hasattr(context.node.ownerDocument, 'nsRevMap'):
+        context.functions.update(BuiltInExtFunctions) #its an RxPathDom
+    else:
+        useEngine = False
 
     from time import time as timer
     start = timer() 
