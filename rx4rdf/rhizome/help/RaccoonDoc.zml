@@ -167,7 +167,7 @@ For all requests, Raccoon will add these variables to the request metadata:
 +\__requestor\__=a ^^Requestor^^ object that can invoke requests as function calls.
 
 In addition, when a request dictionary is mapped to XPath variables, the following XPath variables are added:
-+STOP=When an action's match expression evaluates to this variable, the RequestProcessor will stop evaluating the rest of the action's match expressions.
++__STOP=When an action's match expression evaluates to this variable, the RequestProcessor will stop evaluating the rest of the action's match expressions.
 +_APP_BASE=The value of the ^^appBase^^ config setting
 +BASE_MODEL_URI=The value of the ^^BASE_MODEL_URI^^ config setting
 +__store=A reference to the application store's root Document node. Using this variable allows RxPath expressions to be executed when the store isn't part of XPath context, for example when executing a regular XSLT stylesheet. 
