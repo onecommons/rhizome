@@ -55,7 +55,7 @@
     <xsl:variable name='fixupPredicate' select=
     "&quot;&lt;a href='site:///search?search=%%2F*%%2F*%%5Bis-subproperty-of%%28%%40uri%%2C%%27%(encodeduri)s%%27%%29%%5D&amp;amp;searchType=RxPath&amp;amp;view=html&amp;amp;title=Property%%20Usage'>%(predicate)s&lt;/a>&quot;" />
                
-    <xsl:value-of disable-output-escaping='yes' select="wf:serialize-rdf($resource, 'rxml_zml', $fixup, $fixupPredicate)" />
+    <xsl:value-of disable-output-escaping='yes' select="wf:serialize-rdf($resource, 'rxml_zml', wf:get-namespaces(), $fixup, $fixupPredicate)" />
 </pre>
 
 </xsl:template>

@@ -194,14 +194,14 @@ No results found.
 </xsl:if>
 <pre>
 <xsl:variable name='fixup' select="&quot;&lt;a href='site:///.?action=view-metadata&amp;amp;about=%(encodeduri)s'>%(res)s&lt;/a>&quot;" />
-<xsl:value-of disable-output-escaping='yes' select="wf:serialize-rdf($results, 'rxml_zml', $fixup)" />
+<xsl:value-of disable-output-escaping='yes' select="wf:serialize-rdf($results, 'rxml_zml', wf:get-namespaces(), $fixup)" />
 </pre>
        </xsl:when>
        <xsl:when test="$view = 'rdf'">
 <xsl:variable name='_disposition' select="wf:assign-metadata('_disposition', /*[.='http://rx4rdf.sf.net/ns/wiki#item-disposition-complete'])" />              
 <!-- 'application/rdf+xml' is more correct but browser display the xml mimetype better --> 
 <xsl:variable name='content-type' select="wf:assign-metadata('_contenttype', 'application/xml')" />               
-<xsl:value-of select="wf:serialize-rdf($results, 'rdfxml')" disable-output-escaping='yes' />
+<xsl:value-of select="wf:serialize-rdf($results, 'rdfxml', wf:get-namespaces())" disable-output-escaping='yes' />
        </xsl:when>
        <xsl:when test="$view = 'ntriples'">
 <xsl:variable name='_disposition' select="wf:assign-metadata('_disposition', /*[.='http://rx4rdf.sf.net/ns/wiki#item-disposition-complete'])" /> 
@@ -223,7 +223,7 @@ No results found.
         Edit Metadata
          <br/>
 	<textarea NAME="metadata" ROWS="30" COLS="75" STYLE="width:100%" WRAP="off">
-	<xsl:value-of select="wf:serialize-rdf($results, $editFormat)" />
+	<xsl:value-of select="wf:serialize-rdf($results, $editFormat, wf:get-namespaces())" />
 	</textarea>
 	<br/>
 	<input TYPE="submit" NAME="save" VALUE="Save" />	

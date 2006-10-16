@@ -51,7 +51,7 @@ function changetype(rdfFormat) {
         </xsl:for-each>
          <br/>
 	<textarea NAME="metadata" ROWS="20" COLS="75" STYLE="width:100%" WRAP="off">
-	<xsl:value-of select="wf:serialize-rdf($__resource | $revision | $transforms,$rdfFormat)" />
+	<xsl:value-of select="wf:serialize-rdf($__resource | $revision | $transforms,$rdfFormat, wf:get-namespaces())" />
 	</textarea>
 	<br/>
 	<input TYPE="submit" NAME="save" VALUE="Save" />

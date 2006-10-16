@@ -22,6 +22,6 @@
 <!-- hack: we want plain text output, setting _noErrorHandling will generate a plain text error stack -->
 <xsl:variable name='_noErrorHandling' select="wf:assign-metadata('_noErrorHandling', true())" />
 <xsl:value-of disable-output-escaping='yes' 
-   select="wf:serialize-rdf(wf:parse-rdf($contents, $fromFormat), $toFormat)"/>      
+   select="wf:serialize-rdf(wf:parse-rdf($contents, $fromFormat), $toFormat, wf:get-namespaces())"/>      
 </xsl:template>
 </xsl:stylesheet>
