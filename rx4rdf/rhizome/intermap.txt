@@ -1,5 +1,4 @@
 #interwiki link definitions
-#note: you will need to restart Rhizome for changes to this to take affect
 
 rx4rdf http://rx4rdf.liminalzone.org/
 

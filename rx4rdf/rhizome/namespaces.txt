@@ -1,0 +1,11 @@
+#this list of prefixes and namespaces is used when serializing RDF
+#(e.g. when generating RxML or RDF/XML) 
+a    http://rx4rdf.sf.net/ns/archive#
+dc   http://purl.org/dc/elements/1.1/
+rdf  http://www.w3.org/1999/02/22-rdf-syntax-ns#
+rdfs http://www.w3.org/2000/01/rdf-schema#
+wiki http://rx4rdf.sf.net/ns/wiki#
+auth http://rx4rdf.sf.net/ns/auth#
+foaf http://xmlns.com/foaf/0.1/
+base %(BASE_MODEL_URI)s
+kw   %(BASE_MODEL_URI)skw#
