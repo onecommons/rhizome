@@ -183,10 +183,10 @@ class ReplaceRxPathSubExpr(utils.XPathExprVisitor):
                             nodeset.append(node)
                     return nodeset
                 except:
-                    print 'bad result',list(result )
-                    print repr(astRoot)
-                    result.explain(sys.stdout)
-                    raise
+                    #print 'bad result',list(result )
+                    #print repr(astRoot)
+                    #result.explain(sys.stdout)
+                    raise                
         
         evaluateQuery.xpathExprs = ast.xpathExprs
         funcCall._func = evaluateQuery
@@ -415,11 +415,11 @@ class SelectOp(QueryOp):
     def __repr__(self):
          args = ', '.join([repr(a) for a in flattenSeq(self.predicates)])
          if self.xpathExp:
-             with = ' with ' + repr(self.xpathExp)
+             withExp = ' with ' + repr(self.xpathExp)
          else:
-             with = ''
+             withExp = ''
          pos = 'select ' + str(self.finalPosition) + ' from ' + str(self.joinPosition)
-         return pos + ' where(' + args + ')' + with
+         return pos + ' where(' + args + ')' + withExp
 
     #def __iter__(self):
     #    yield self        
@@ -1448,6 +1448,8 @@ class Projection(RxPath.Tupleset):
 
         for row in self.tupleset:
             result = row[:self.groupby_offset]
+            assert len(result) == self.groupby_offset, '%s should be %s in %s' %(
+                                len(result),self.groupby_offset, self.tupleset)
             if distinct:                
                 if result == last:
                     continue
@@ -1701,6 +1703,8 @@ class SimpleQueryEngine(object):
         '''
         result = self._evalAnd(args, context)
         if op.getPosition() > -1:# and op.joinPosition < 0:
+            if op.finalPosition > 0:
+                result = result.toStatements(context)
             result = Projection(result, op.finalPosition,op='Indep SelectOp')
             
         if not op.xpathExp:
@@ -1721,12 +1725,11 @@ class SimpleQueryEngine(object):
                 for arg in flattenOp(preds, AndOp):
                      yield (arg.cost(self, context), i, arg)
 
-        args = [x for x in getArgs()]
-
+        args = [x for x in getArgs()]        
         if not args and not op.xpathExp:
             if op.finalPosition > -1:
-                return Projection(context.currentTupleset, op.finalPosition,
-                                                              op='NoOpSelectOp')
+                tupleset = context.currentTupleset
+                return Projection(tupleset,op.finalPosition,op='NoOpSelectOp')
             else:
                 return context.currentTupleset
         
@@ -1737,20 +1740,20 @@ class SimpleQueryEngine(object):
             
         if op.joinPosition == 0:                          
             if _findModel(right):
-                #everything matches
+                #'everything matches'
                 return context.currentTupleset
             elif _findModel(context.currentTupleset) or _findModel(context.joinTupleset): 
                 #current model is all the statements, so no need to join
                 if isinstance(right, NodesetTupleset):
-                    right = right.leftinnerhack()  
+                    right = right.leftinnerhack()
                 return Projection(right, 0,op='Subject SelectOp')
             else:
                  #todo: order issue if joinPos == object 
                 lslice = slice( op.joinPosition, op.joinPosition+1)
-                rslice = slice( 0, 1) #subject               
+                rslice = slice( 0, 1) #subject
                 return MergeJoin(context.joinTupleset, right, lslice,rslice)
         else:
-            #either absolute or relative to the initial model, so join isn't necessary            
+            #either absolute or relative to the initial model, so join isn't necessary
             return right
                     
     def costSelectOp(self, op, context):
@@ -1995,11 +1998,11 @@ class SimpleQueryEngine(object):
         
         context = copy.copy( context )
         if selectop.joinPosition < 1: #for 0 (join on subject) or -1 (absolute, no join)
-            context.joinTupleset =  context.currentTupleset
-            tupleset = context.initialModel.toStatements(context) 
+            context.joinTupleset =  context.currentTupleset            
+            tupleset = context.initialModel.toStatements(context)
         else: #no join -1 (absolute) or pred or obj
             tupleset = context.currentTupleset.toStatements(context)
-        
+
         context.currentTupleset = SimpleTupleset(
                     lambda: tupleset.filter(
                     #todo: modelContext?
