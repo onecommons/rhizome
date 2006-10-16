@@ -11,6 +11,53 @@ import unittest, os, os.path, shutil, glob, time, pprint, sys, repr as Repr
 
 RHIZOMEDIR = '../rhizome'
 
+import gc
+class TrackRefs:
+    """Object to track reference counts across test runs."""
+
+    def __init__(self):
+        self.type2count = {}
+        self.type2all = {}
+        self.type2ids = {}        
+
+    def update(self, dumpObjects=False):
+        obs = sys.getobjects(0)
+        type2count = {}
+        type2all = {}
+        type2o = {}
+        for o in obs:
+            all = sys.getrefcount(o)
+            t = type(o)
+            if t in type2count:
+                type2count[t] += 1
+                type2all[t] += all
+                type2o[t].append(o)
+            else:
+                type2count[t] = 1
+                type2all[t] = all
+                type2o[t] = [o]
+
+        ct = [(type2count[t] - self.type2count.get(t, 0),
+               type2all[t] - self.type2all.get(t, 0),
+               t)
+              for t in type2count.iterkeys()]
+        ct.sort()
+        ct.reverse()
+        for delta1, delta2, t in ct:
+            if delta1 or delta2:
+                print "%-55s %8d %8d" % (t, delta1, delta2)
+                if not dumpObjects: continue
+                oldids = self.type2ids.get(t,[])
+                for o in type2o[t]:
+                    if id(o) not in oldids:
+                        print 'leak?', o
+
+        self.type2count = type2count
+        self.type2all = type2all
+        self.type2ids = dict([(k, [id(o) for o in olist])
+                              for k,olist in type2o.iteritems()])
+        
+
 class RhizomeTestCase(unittest.TestCase):
     '''
     Run test "scripts".
@@ -634,6 +681,14 @@ class RhizomeTestCase(unittest.TestCase):
         self.failUnless(guestAccount)
 
         scope = 'context:1'
+        #a triple set view of a global quad set
+        #you can also manipulate and view a context quad set
+        #conceptually:
+        #if quad added to context copy to global quadset
+        #if quad removed from context remove from global quadset
+        #can remove a triple from global, but doesn't remove from context
+        #can add a triple to global, doesn't effect context
+                
         #1. add prop to context
         #check that its both in the context and the global context
         #2. now remove the prop from the global context
@@ -644,6 +699,9 @@ class RhizomeTestCase(unittest.TestCase):
         #check that's it been removed from the context        
         #5. now re-add it to the context
         #check that's now also in the global context
+        #6. now add it to the global context also
+        #7. remove it from the context
+        #check that its still in the global context
 
         def _shred(contents, context):
             contentsHeader = '''#?zml0.7 markup
@@ -730,13 +788,52 @@ class RhizomeTestCase(unittest.TestCase):
         self.failUnless( len(root.evalXPath(globalProp1Exp))==2 )
         #context now has two predicates again        
         self.failUnless( len(root.evalXPath(contextProp1Exp))==2 ) 
+
+        #6. now add it to the global context also
+        _shred(contents1, '')
+        self.failUnless( len(root.evalXPath(globalProp1Exp))==2 )
+        #7. remove it from the context
+        _shred(contents2, "to-graph='context:1'")
+        self.failUnless( len(root.evalXPath(contextProp1Exp))==1 ) 
+        #check that its still in the global context
+        self.failUnless( len(root.evalXPath(globalProp1Exp))==2 )
         
-    def _testGRDDL(self):
-        appVars = { 'useIndex':0,
-                    'DEFAULT_URI_SCHEMES':['http','data','file'],}
-        root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
-                            model_uri = 'test:', appVars = appVars )
-        #import testgrddl.html
+    def testGRDDLImport(self):
+        storepath = os.tempnam(None,'wikistore')
+        try:
+            appVars = { 'useIndex':0,
+                        'DEFAULT_URI_SCHEMES':['http','data','file'],}
+            #import testgrddl.html
+            root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
+                                model_uri = 'test:', appVars = appVars,
+                    m=storepath, argsForConfig = ['--import', 'testgrddl.html'])
+            res = root.evalXPath('/*[wiki:name="testgrddl"]')
+            self.failUnless(res)        
+            #'get-context(./preceeding::a:from-source/*/a:entails)/*/*'
+            extracted = root.evalXPath(
+                'get-context(/*[a:from-source = $__context]/a:entails)/*/*',
+                node=res[0])
+            self.failUnless(extracted)
+            testProp = root.evalXPath("/*/*[uri(.)='http://purl.org/dctitle']")
+            self.failUnless(testProp)
+
+            adminAccount = root.evalXPath("/*[foaf:accountName = 'admin']")
+            self.failUnless(adminAccount)
+            xpath = "wf:request('testgrddl', '_noErrorHandling', 1,'action', 'delete')"
+            #this extracted property should have been deleted:
+            xpathValidate = "not(/*/*[uri(.)='http://purl.org/dctitle'])"
+            self._fineGrainedCheck(root, adminAccount, '', False, xpath=xpath,
+                                   xpathValidate=xpathValidate)
+        finally:            
+            if SAVE_WORK:
+                print 'saved testGRDDLImport model at ', storepath
+            else:
+                try:
+                    os.unlink(storepath)
+                except OSError:
+                    pass
+                    
+
         #export testgrddl.html
         #verify 
                     
@@ -786,22 +883,28 @@ class RhizomeTestCase(unittest.TestCase):
         tm1 = getObjectsByType(gc.get_objects())        
 
         for i in range(20):            
-            for page in pages:
+            for page in pages[:10]:
                 pagename = raccoon.StringValue(page)                
                 #print 'pass', i, len(ids)#gc.collect(), len(gc.get_objects())#getCacheSizes(root)
-                print 'pass', i#, gc.collect(), len(gc.get_objects())
+                print 'pass', i, gc.collect(), len(gc.get_objects())
                 try:
-                    url = 'http://www.foo.com/missing_page' #+pagename
+                    url = 'http://www.foo.com/'+pagename #ZML' #missing_page' 
+                    #kw = dict(search='..', searchType='RxPath')
+                     #,_disposition='http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-print')
                     kw = {}#'_noErrorHandling':1}
+                    #kw = dict(_originalContext=[], _previousContext=[],
+                    #    _prevkw=dict(_template=[], __resource=[]) )
                     try:
                         self.doHTTPRequest(root, kw, url)                        
                     except (KeyboardInterrupt, SystemExit):
                         raise
                     except:
+                        traceback.print_exc()
                         print 'error raised'
                     sys.exc_clear( ) 
                     print 'collected', gc.collect()
                     oo = gc.get_objects()
+                    print 'object count', len(oo)                    
                     tm2 = getObjectsByType(oo)
                     typelist = list(findMismatchedTypes(tm2,tm1))
                     for o in oo:
@@ -813,7 +916,7 @@ class RhizomeTestCase(unittest.TestCase):
                             #break
                     #print [repr(o) for o in oo
                     #        if id(type(o)) in tids]
-                    #tm1 = tm2
+                    tm1 = tm2
                     del oo
                     #newids = set([id(o) for o in gc.get_objects()])
                     #leaked = newids - ids
@@ -822,6 +925,57 @@ class RhizomeTestCase(unittest.TestCase):
                 except:
                     raise
                     pass
+
+    def _testMemUse(self):
+        import gc
+        appVars = { 'useIndex':0,
+                'XPATH_CACHE_SIZE': 0,
+                'ACTION_CACHE_SIZE': 0,
+                'XPATH_PARSER_CACHE_SIZE':0,
+                'STYLESHEET_CACHE_SIZE':0,
+                'FILE_CACHE_SIZE': 0 }
+
+        root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
+                            model_uri = 'test:', appVars = appVars )
+        print len( root.evalXPath('/a:NamedContent/wiki:name') ), 'pages'        
+        gc.collect()        
+        REFCOUNT = 1 
+        if REFCOUNT:
+            rc = sys.gettotalrefcount()
+            track = TrackRefs()
+        i = 0
+        while True:
+            i += 1
+            #runner(files, test_filter, debug)
+            try:
+                url = 'http://www.foo.com/basestyles.css' #missing_page' 
+                #kw = dict(search='..', searchType='RxPath')
+                 #,_disposition='http%3A//rx4rdf.sf.net/ns/wiki%23item-disposition-print')
+                kw = {}#'_noErrorHandling':1}
+                #kw = dict(_originalContext=[], _previousContext=[],
+                #    _prevkw=dict(_template=[], __resource=[]) )
+                try:
+                    self.doHTTPRequest(root, kw, url)                        
+                except (KeyboardInterrupt, SystemExit):
+                    raise
+                except:
+                    traceback.print_exc()
+                    print 'error raised'
+                del kw
+                sys.exc_clear( ) 
+            except:
+                raise
+                pass
+
+            gc.collect()
+            if gc.garbage:
+                print "GARBAGE:", len(gc.garbage), gc.garbage
+                return
+            if REFCOUNT:
+                prev = rc
+                rc = sys.gettotalrefcount()
+                print "totalrefcount=%-8d change=%-6d" % (rc, rc - prev)
+                track.update(i > 1)
         
 def createRedlandDomStore():
   from rx import RxPath,DomStore
