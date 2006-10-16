@@ -656,10 +656,9 @@ the Action is run (default is False).
                         if x[0] not in self.COMPLEX_REQUESTVARS
                            and x[0] != '_metadatachanges'
                         ])
-
             vars[ (None, '__store')] = [ self.domStore.dom ]
             #magic constants:
-            vars[(None, 'STOP')] = self.STOP_VALUE
+            vars[(None, '__STOP')] = self.STOP_VALUE
             if not kw.has_key('_APP_BASE'): #let request override appBase  
                 vars[(None, '_APP_BASE')] = self.appBase
             vars[(None, 'BASE_MODEL_URI')] = self.BASE_MODEL_URI        
@@ -702,6 +701,7 @@ the Action is run (default is False).
                         self.log.debug(e.message) #undefined variables are ok
                         return None
                     else:
+                        self.log.warning('exception while evaluating ' + xpath)
                         raise
             finally:
                 Uri.BASIC_RESOLVER = oldResolver
@@ -875,10 +875,10 @@ the Action is run (default is False).
                         import traceback as traceback_module
                         def extractErrorInfo(type, value):
                             #value may be either the nested exception
-                            #or the wrapper exception
+                            #or the wrapper exception                            
                             message = str(value)
                             module = '.'.join( str(type).split('.')[:-1] )
-                            name = str(type).split('.')[-1]
+                            name = str(type).split('.')[-1].strip("'>")
                             errorCode = getattr(value, 'errorCode', '')
                             return message, module, name, errorCode
                         
@@ -1259,16 +1259,13 @@ the Action is run (default is False).
             DOMnsMap = dict([(y,x) for x,y in
                 getattr(context.node.ownerDocument,'nsRevMap', {}).items()])
             context.processorNss.update(DOMnsMap)
-            xpath = StringValue(expr)
-            #use if caches available
-            compExpr = self.expCache.getValue(xpath)
-            #todo: nsMap should be part of the key
+            #todo: nsMap should be part of the query cache key
             # -- until then clear the cache if you change that!
+
+            xpath = StringValue(expr)            
             queryCache= getattr(context.node.ownerDocument, 'queryCache', None)
-            if queryCache:
-                res = queryCache.getValue(compExpr, context)         
-            else:
-                res = compExpr.evaluate(context)
+            res=RxPath.evalXPath(xpath,context,self.expCache,queryCache)
+            
             context.processorNss = oldNss    
             return res
 
