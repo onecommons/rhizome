@@ -309,6 +309,11 @@ interWikiLinkIndicator=True
 #default is 'site:///intermap.txt'
 interWikiMapURL=''
 
+#namespaceMapURL is the URL to the file that lists the namespace prefixes that
+#will be used when serializing RDF (e.g. when displaying RxML)
+#default is 'site://namespaces.txt'
+namespaceMapURL='site://namespaces.txt'
+
 #ZMLDefaultVersion indicates the version of the ZML syntax that should be assumed when 
 #the ZML header (e.g. #?zml0.7) is missing from ZML text.
 #default: the value of zml.defaultZMLVersion (currently 0.7)
