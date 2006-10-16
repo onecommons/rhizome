@@ -768,7 +768,7 @@ if not adminShaPassword:
     adminShaPassword = sha.sha( locals().get('ADMIN_PASSWORD',rhizome.defaultPassword)+ secureHashSeed ).hexdigest()    
 
 authorizationDigests = { 
-    'swGuTVkdKI8+vU7Xdj4SQObhivM=' : 1, #for diff-revisions.py
+    'wZsW3ks2YDpAZth82WLWUOuEE3E' : 1, #for diff-revisions.py
 }
 
 #rxml
