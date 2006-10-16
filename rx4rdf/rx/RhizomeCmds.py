@@ -87,6 +87,7 @@ Their value can be either an URI or a QName.
         #todo: support storing contents directly in model (use saveContents()?)
             
         def fileFunc(path, filename):
+            #path includes filename
             if filePattern and not fnmatch.fnmatch(filename, filePattern):
                 return
             if os.path.splitext(filename)[1]==METADATAEXT:
@@ -161,24 +162,24 @@ Their value can be either an URI or a QName.
                    wiki:Item/a:contents/a:ContentTransform/a:transformed-by/
                    wiki:ItemFormat)''',
                    nsMap = self.server.nsMap)
-                contentTransform = rdfDom.evalXPath(
-                '''string((/*[wiki:name]/wiki:revisions/*/rdf:first)[last()]/
-                   wiki:Item/a:contents/a:ContentTransform)''',
-                   nsMap = self.server.nsMap)
             else:
-                #no metadata file found -- try to guess the some default metadata
-                if not filenameonly:
-                    filepath = path[len(rootPath)+1:]
-                else:
+                #no metadata file found -- try to guess the some default metadata                
+                if filenameonly:
                     filepath = filename
+                else:
+                    filepath = path[len(rootPath)+1:]
+                    if not filepath:
+                        filepath = rootPath #rootPath is just the filename
                 if folder:
                    filepath = folder + filepath
+                assert filepath
                 if not keepext:
                     wikiname = os.path.splitext(filepath)[0]
                 else:
                     wikiname = filepath
                 wikiname = filter(lambda c: c.isalnum() or c in '_-./',
                                   wikiname)
+                assert wikiname
                 if save and self.server.evalXPath("/*[wiki:name='%s']"% wikiname):
                     self.log.warning('there is already an item named '
                                      + wikiname +', skipping import')
@@ -223,7 +224,6 @@ Their value can be either an URI or a QName.
                 triplesDict[wikiname] = triples
                 title = ''
                 resourceURI = self.getNameURI(None, wikiname)
-                contentTransform = 'bnode:' + wikiname + '1Content'
                             
             if dest:
                 import shutil
@@ -242,7 +242,9 @@ Their value can be either an URI or a QName.
                                                resourceURI, [resourceURI])
             
             if save and not noshred:
-                contextURI = 'context:'+contentTransform
+                from rx.RxPathGraph import EXTRACTCTX
+                contextURI = EXTRACTCTX+resourceURI
+                
                 self.server.domStore.dom.pushContext(contextURI)
                 try:
                     xpath = '''wf:shred(/*[.='%s'],'%s', $contents)
@@ -253,7 +255,7 @@ Their value can be either an URI or a QName.
                     Res.nsMap = self.nsMap
                     rdfSource = Res()
                     rdfSource['rdf:type'] = Res('a:RDFSource')                       
-                    rdfSource['a:from-source']=Res(contentTransform)
+                    rdfSource['a:from-source']=Res(resourceURI)
                     rdfSource['a:entails'] = Res(contextURI)
                     self.server.updateStoreWithRDF(rdfSource.toTriplesDeep(),
                                                    'ntriples',resourceURI)
