@@ -5,16 +5,16 @@
     xmlns:wf="http://rx4rdf.sf.net/ns/raccoon/xpath-ext#" 
     xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' >    
     
-    <xu:remove select="$__resource" />
-
     <!-- don't try to display a page that no longer exists! -->
     <xu:variable name='noredirect' select="wf:assign-metadata('no-redirect', 1)" /> <!-- used by the item-disposition-handler --> 
 
-    <!-- remove any shredded statements from this resource-->
-    <xu:variable name='graphSource' select="/*[a:from-source = ($__resource/wiki:revisions/*/rdf:first/*)[last()]/a:contents/*]" />
+    <!-- first remove any shredded statements from this resource-->
+    <xu:variable name='graphSource' select="/*[a:from-source = $__resource]" />
     <xu:if test='$graphSource'>
-         <xu:remove select='get-context($graphSource/a:entails)/*/*' />
+            <xu:remove to-graph='{$graphSource/a:entails}' select='get-context($graphSource/a:entails)/*/*' /> 
     </xu:if>
+
+    <xu:remove select="$__resource" />
 
     <!-- delete external contents if necessary 
     todo: need to implement this: 
