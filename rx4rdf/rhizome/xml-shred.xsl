@@ -133,6 +133,7 @@
     </xsl:template>
    
  <xsl:template match='a | area | html:a | html:area'>
+    <xsl:variable name='href' select='@href' />
     <xsl:if test='@href'>
        <xsl:call-template name='add-urlref'>
         <xsl:with-param name='url' select='@href' />
@@ -145,7 +146,7 @@
   <xsl:param name='pagename' select='$__resource/wiki:name' />
   <xsl:param name='url' select='.' />
   <xsl:param name='relation' select='"wiki:links-to"' />
-  
+
   <xsl:variable name='absurl'>
     <xsl:choose>
      <!-- anchor: ignore -->
@@ -158,12 +159,12 @@
      <xsl:when test="starts-with($url,'site:')"><xsl:value-of select=
        "f:resolve-url(concat('site:///', $pagename), substring($url,6))" /></xsl:when>
 
-     <!-- when doesn't it contain a ':' assume it's a relative url -->
+     <!-- when doesn't it contain a ':' assume it's a relative url  todo: wrong, relative path can contain ":" -->
      <xsl:when test="not(contains($url,':'))"><xsl:value-of 
         select="f:resolve-url(concat('site:///', $pagename), $url)" /></xsl:when>     
 
       <!-- external -->
-     <xsl:otherwise><xsl:value-of select="." /></xsl:otherwise>
+     <xsl:otherwise><xsl:value-of select="$url" /></xsl:otherwise>
     </xsl:choose>
   </xsl:variable>   
 
