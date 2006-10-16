@@ -15,7 +15,8 @@ def getRevision(rev, __kw__, __server__, sep='\n'):
         node = __server__.domStore.dom.findSubject(uri)
         context = RxPath.XPath.Context.Context(node)
         oldNode = showRevision(context, [node], rev)
-        return SerializeRDF(context, oldNode,'rxml_zml')
+        return SerializeRDF(context, oldNode,'rxml_zml',
+             __server__.rhizome.getNamespaceMapString(context))
 
     if 'revres' in __kw__:
         contents = _getMetadata(rev, __server__, __kw__['revres'])
