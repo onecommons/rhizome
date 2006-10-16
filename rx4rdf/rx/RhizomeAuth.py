@@ -336,11 +336,14 @@ class RhizomeAuth(RhizomeBase):
                     self.server.requestContext[-1].get(name, []))
                     for name in ['__account', '__accountTokens']]
         
-    def validateXPathFuncArgs(self,name,context,args):
-        #by appending to args these we override any attempts to pass in
+    def validateXPathFuncArgs(self,name,context,args, isSuperUser):
+        #by appending these to args we override any attempts to pass in
+        #a different __account
+        #also do this if we're the super user and didn't specify another account
         args = list(args)
-        values = self._getRequiredAccountValues(context.varBindings)
-        args.extend(['__account', values[0], '__accountTokens', values[1]])
+        if not isSuperUser or '__account' not in args:
+            values = self._getRequiredAccountValues(context.varBindings)
+            args.extend(['__account', values[0], '__accountTokens', values[1]])
         return [], args
 
     def getValidateXPathFuncArgsCacheKey(self, cacheFuncName, cacheFunc):
@@ -364,42 +367,47 @@ class RhizomeAuth(RhizomeBase):
         account = context.varBindings.get( (None, '__account'))
         if not account:
             raise raccoon.NotAuthorized(
-                'No account found when authorizing of %s' % name[1])                
-        if not self.server.evalXPath(
+                'No account found when authorizing of %s' % name[1])
+
+        isSuperUser = self.server.evalXPath(
             "auth:has-role='http://rx4rdf.sf.net/ns/auth#role-superuser'",
-            node=account[0]):
+            node=account[0])
+        tokenUris, args = authFunc(name,context,args,isSuperUser)
+        if not isSuperUser:
             #if not superuser, check authorization:
-            tokens, args = authFunc(name,context,args)
-            if tokens:
+            if tokenUris:
+                tokenUris, args = authFunc(name,context,args)
                 tokens = [context.node.ownerDocument.findSubject(res)
-                          for res in tokens]
-                notFound = [t for t in tokens if not t]
+                          for res in tokenUris]
+                notFound = [t[1] for t in zip(tokens,tokenUris) if not t[0]]
                 if notFound:
                     raise raccoon.NotAuthorized(
-            'Unexpected error authorizing %s: resources %s not found'
-            % (name[1], notFound) )
+                    'Unexpected error authorizing %s: resources %s not found'
+                        % (name[1], notFound) )
                 accountTokens = context.varBindings.get(
-                    (None, '__accountTokens'),[])            
+                            (None, '__accountTokens'),[])            
                 extraPrivilegesRes = context.varBindings.get(
-                    (None, '__handlerResource'),
-                    context.varBindings.get(
+                            (None, '__handlerResource'),
+                            context.varBindings.get(
     ('http://rx4rdf.sf.net/ns/raccoon/previous#','__handlerResource'), []))
                 
-                authkw = kw2vars(
-            __authAction='http://rx4rdf.sf.net/ns/auth#permission-execute',
-            __accountTokens=accountTokens,
-            #'required' predicate is independent of this,
-            #so it can be any resource
-            __authResources=account,
-            #used by minpriority:
-            __extraPrivilegeResources=extraPrivilegesRes, 
-            required=tokens)
+                authkw = kw2vars(__authAction=
+                    'http://rx4rdf.sf.net/ns/auth#permission-execute',
+                    __accountTokens=accountTokens,
+                    #'required' predicate is independent of this,
+                    #so it can be any resource
+                    __authResources=account,
+                    #used by minpriority:
+                    __extraPrivilegeResources=extraPrivilegesRes, 
+                    required=tokens)
                 xpath = self.authorizationQueryTemplate % {'minpriority':
                                 self.minPriority, 'required':'$required'}
                 result = self.server.evalXPath(xpath, authkw)
                 if result:
                     raise raccoon.NotAuthorized(
             'You are not authorized to execute this function: '+ name[1])
+        else:
+            pass #print 'super user!' 
         return func(context, *args)
 
     def authorizeXPathFuncs(self, extFuncDict, extFuncCacheDict):
@@ -435,13 +443,13 @@ class RhizomeAuth(RhizomeBase):
             actionName = 'add'
         elif action == 'http://rx4rdf.sf.net/ns/auth#permission-remove-statement':
             actionName = 'remove'
-        elif action == 'http://rx4rdf.sf.net/ns/auth#permission-new-statement':
+        elif action == 'http://rx4rdf.sf.net/ns/auth#permission-new-resource-statement':
             actionName = 'create'
         else:
             actionName = action                    
        
         raise raccoon.NotAuthorized(
             'You are not authorized to %s properties for one or more'
-            'of these resources:\n'% actionName
+            ' of these resources:\n'% actionName
             + '\n'.join([r.uri for r in kw['__authResources']]))
  
