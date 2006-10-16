@@ -325,11 +325,11 @@ def getRXAsZMLFromNode(resourceNodes, nsMap=None, includeRoot = False,
             printResourceElem = True
         elif revNsMap.has_key(prefixURI):
             printResourceElem = False
-        elif resNode.ownerDocument.nsRevMap.has_key(prefixURI):
-            prefix = resNode.ownerDocument.nsRevMap[prefixURI]
-            nsMap[prefix] = prefixURI
-            revNsMap[prefixURI] = prefix
-            printResourceElem = False
+        #elif resNode.ownerDocument.nsRevMap.has_key(prefixURI):
+        #    prefix = resNode.ownerDocument.nsRevMap[prefixURI]
+        #    nsMap[prefix] = prefixURI
+        #    revNsMap[prefixURI] = prefix
+        #    printResourceElem = False
         else:
             printResourceElem = True
             
