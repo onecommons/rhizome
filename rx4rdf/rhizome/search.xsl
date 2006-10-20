@@ -203,10 +203,10 @@ No results found.
 <xsl:variable name='content-type' select="wf:assign-metadata('_contenttype', 'application/xml')" />               
 <xsl:value-of select="wf:serialize-rdf($results, 'rdfxml', wf:get-namespaces())" disable-output-escaping='yes' />
        </xsl:when>
-       <xsl:when test="$view = 'ntriples'">
+       <xsl:when test="$view = 'ntriples' or $view = 'json'">
 <xsl:variable name='_disposition' select="wf:assign-metadata('_disposition', /*[.='http://rx4rdf.sf.net/ns/wiki#item-disposition-complete'])" /> 
 <xsl:variable name='_nextFormat' select="wf:assign-metadata('_nextFormat', 'http://rx4rdf.sf.net/ns/wiki#item-format-text')" />
-<xsl:value-of select="wf:serialize-rdf($results,'ntriples')" disable-output-escaping='yes'/>
+<xsl:value-of select="wf:serialize-rdf($results,$view)" disable-output-escaping='yes'/>
        </xsl:when>       
        <xsl:when test="$view = 'edit'">
 <div class="title"><xsl:value-of select="$searchType" /> Search Results for "<xsl:value-of select="$search" />"</div>

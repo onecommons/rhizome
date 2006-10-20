@@ -226,6 +226,24 @@ class RDFDomTestCase(unittest.TestCase):
             writeTriples( [Statement(BNODE_BASE+'foobar', 'http://foo', 
                 'http://foo bar',OBJECT_TYPE_RESOURCE)], out) )
 
+    def testSerializeJson(self):
+        model = r'''<urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://rx4rdf.sf.net/ns/archive#Contents> .
+<urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> <http://rx4rdf.sf.net/ns/archive#sha1-digest> "ndKxl8RGTmr3u/omnJxVdGnWgXuA=" .
+<urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> <http://rx4rdf.sf.net/ns/archive#hasContent> " llll"@en-US .
+<urn:sha:ndKxl8RGTmr3uomnJxVdGnWgXuA=> <http://rx4rdf.sf.net/ns/archive#content-length> "5"^^http://www.w3.org/2001/XMLSchema#int .
+_:1 <http://rx4rdf.sf.net/ns/wiki#name> _:1 .
+_:1 <http://rx4rdf.sf.net/ns/wiki#name> _:2 .
+'''
+        model = self.loadModel(cStringIO.StringIO(model), 'nt')
+        stmts = model.getStatements()
+        json = serializeRDF(stmts, 'json')
+        newstmts = parseRDFFromString(json,'', 'json')
+        stmts.sort()
+        newstmts.sort()
+        #print stmts
+        #print newstmts
+        self.failUnless(stmts == newstmts)
+        
     def testDom(self):
         self.rdfDom = self.getModel(cStringIO.StringIO(self.model1) )
 

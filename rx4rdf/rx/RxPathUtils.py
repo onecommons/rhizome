@@ -172,6 +172,140 @@ def NTriples2Statements(stream, defaultScope='', baseuri=None,
     for stmt, scope in stmtset.iteritems():
         yield Statement(stmt[0], stmt[1], stmt[2],stmt[3],
                                  scope or defaultScope)
+
+def _parseRDFJSON(json, defaultScope=None):
+    '''
+    Parses JSON that followes the format described in _encodeRDFAsJson
+    Returns a list of RDF Statements
+    '''
+    import simplejson
+    stmts = []
+    #print '('+json+')'
+    jsonDict = simplejson.loads(json)
+    #eval('('+json+')') #todo: use safeeval(json)
+    if 'quads' in jsonDict:
+        del jsonDict['quads']
+        items = jsonDict.iteritems()
+    else:
+        items = ((defaultScope, jsonDict),)
+    for scope, tripleDict in items:
+        for subject, values in tripleDict.iteritems():
+            if subject == 'triples':
+                continue
+            if subject.startswith('_:'):
+                subject = BNODE_BASE+subject[2:] #bNode            
+            for pred, objects in values.iteritems():
+                for count, object in enumerate(objects):                    
+                    objectType = object['type']
+                    value = object['value']
+                    if objectType == 'uri':
+                        objectType = OBJECT_TYPE_RESOURCE
+                    elif objectType == 'bnode':
+                        objectType = OBJECT_TYPE_RESOURCE
+                        value = BNODE_BASE + value                        
+                    elif objectType == 'literal':
+                        if 'xml:lang' in object:
+                            objectType = object['xml:lang']
+                        else:
+                            objectType = OBJECT_TYPE_LITERAL
+                    elif objectType == 'typed-literal':
+                        objectType = object['datatype']
+                    else:
+                        raise ParseException('unexpected object type', objectType)
+                            
+                    if pred == '#member':
+                        stmtpred = base+'_'+str(count+1)
+                    else:
+                        stmtpred = pred
+                    assert pred not in ['#first','#rest'], 'not yet implemented' #todo
+                    stmts.append( Statement(subject, stmtpred, value, objectType, scope) )
+    return stmts
+
+def _encodeStmtObject(stmt, iscompound):
+    '''
+    return a string encoding the object in one of these ways: 
+    (from http://www.w3.org/TR/2006/NOTE-rdf-sparql-json-res-20061004/)
+    {"type":"literal", ["xml:lang":" L ",] "value":" S"},
+    {"type":"typed-literal", "datatype":" D ", "value":" S "},
+    {"type":"uri|bnode", "value":"U"", "hint":"compound"} ] },
+    '''
+    import simplejson
+    type = stmt.objectType
+    if type == OBJECT_TYPE_RESOURCE:
+        if iscompound:
+            hint = ',"hint":"compound"';
+        else:
+            hint = ''
+
+        if stmt.subject.startswith(BNODE_BASE):
+            bnode = stmt.object[BNODE_BASE_LEN:]
+            return '{"type":"bnode","value":"%s"%s}' % (bnode, hint)
+        else:
+            return '{"type":"uri","value":"%s"%s}' % (stmt.object, hint)
+    else:
+        literal = simplejson.dumps(stmt.object)
+        if type.find(':') > -1:
+            #datatype is the datatype uri
+            return '{"type":"typed-literal","datatype":"%s","value":%s}'%(
+                                                                type,literal)
+        else:
+            if type == OBJECT_TYPE_LITERAL:
+                lang = ''
+            else: #datatype is the lang
+                lang = ',"xml:lang":"%s"' % type
+            return '{"type":"literal","value":%s%s}' % (literal,lang)
+
+def _encodeRDFAsJson(nodes):    
+    '''
+Encode a nodeset of RxPath resource nodes as JSON, using this format:
+{ 'quads':'1' , 'contexturi' :  
+    { 
+      'resourceuri' : { 'pred' : [
+      #from http://www.w3.org/TR/2006/NOTE-rdf-sparql-json-res-20061004/
+    {"type":"literal", ["xml:lang":" L ",] "value":" S"},
+    {"type":"typed-literal", "datatype":" D ", "value":" S "},
+    {"type":"uri|bnode", "value":"U"", "hint":"compound"} ] },
+        'containerresuri' : { '#member' : [] },
+        'listresourceuri' : { '#first' : [], '#rest' : ['rdf:nil'] }
+    }
+ }          
+    '''    
+    out = '{'
+    lastres = None
+    compoundResources = [] #we want closure on these resources
+    for res in nodes:
+        assert hasattr(res,'uri'), '_encodeRDFAsJson only can encode resource nodes'
+        if lastres:
+            out +=','
+        lastres = res
+        if res.uri.startswith(BNODE_BASE):
+            uri = '_:' + res.uri[BNODE_BASE_LEN:]
+        else:
+            uri = res.uri
+        out += '"' + uri + '": {'
+        lastpred = None
+        #assume ordered predicated
+        for pred in res.childNodes:
+            if lastpred == pred.stmt.predicate:                
+                isCompound = False #todo: pred.childNodes[0].isCompound()
+                out += ", " + _encodeStmtObject(pred.stmt, isCompound)
+                if isCompound:
+                    compoundResources.append(pred.childNodes[0])
+            else:
+                if lastpred:
+                    out += '], '
+                lastpred = pred.stmt.predicate
+                out +=  '"' + lastpred + '" : ['
+                isCompound = False #todo: pred.childNodes[0].isCompound()
+                out += _encodeStmtObject(pred.stmt, isCompound)
+        if lastpred:
+            out += ']\n'
+        out += '}\n'
+    #for node in compoundResources:
+    #    '"' + node.uri + ': {'
+    #    add "rdf:rest" and add listIds 
+    out += '}'
+    return out
     
 def parseRDFFromString(contents, baseuri, type='unknown', scope=None,
                        incrementHook=None):
@@ -277,6 +411,8 @@ def parseRDFFromString(contents, baseuri, type='unknown', scope=None,
                         return statements
                     except ImportError:
                         raise ParseException("no RDF/XML parser installed")
+        elif type == 'json':            
+            return _parseRDFJSON(contents, scope)
     except:
         #import traceback; traceback.print_exc()
         raise ParseException()
@@ -385,6 +521,12 @@ def serializeRDF(statements, type, uri2prefixMap=None,
         stringIO = StringIO.StringIO()
         writeTriples(statements, stringIO)
         return stringIO.getvalue()
+    elif type == 'json':
+        rdfDom = RxPathDOMFromStatements(statements, uri2prefixMap)
+        subjects = [s.subject for s in statements]
+        nodes = [node for node in rdfDom.childNodes
+                     if node.uri in subjects and not node.isCompound()]
+        return _encodeRDFAsJson(nodes)
         
 #see w3.org/TR/rdf-testcases/#ntriples 
 #todo: assumes utf8 encoding and not string escapes for unicode 

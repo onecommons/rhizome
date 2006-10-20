@@ -1446,7 +1446,13 @@ except ImportError:
         rdfFormats += [(_rfb+'rdfxml', 'RDF/XML', 1, 1)]
      except ImportError: 
         pass
-   
+
+try: 
+    import simplejson
+    rdfFormats += [(_rfb+'json', 'JSON',1,1)]
+except ImportError:
+    pass
+    
 #define the APPLICATION_MODEL (static, read-only statements in the 'context:application' scope)
 APPLICATION_MODEL= (
   addStructure('http://rx4rdf.sf.net/ns/wiki#ItemFormat', itemFormats, 
