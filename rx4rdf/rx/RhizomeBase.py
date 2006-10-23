@@ -489,7 +489,7 @@ class RhizomeBase(object):
         return [ xmlDoc.documentElement ]
 
     MAX_SPAM_COMMENT_LOG_LEN = 10000
-    def isSpam(self, context, user_ip, user_agent, contents, treatErr):
+    def isSpam(self, context, user_ip, user_agent, contents):
         '''
         Returns one of "spam", "ham" (not spam), "error" (spam check failed),
         or "disabled" (spam check not enabled).

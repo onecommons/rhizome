@@ -376,7 +376,6 @@ class RhizomeAuth(RhizomeBase):
         if not isSuperUser:
             #if not superuser, check authorization:
             if tokenUris:
-                tokenUris, args = authFunc(name,context,args)
                 tokens = [context.node.ownerDocument.findSubject(res)
                           for res in tokenUris]
                 notFound = [t[1] for t in zip(tokens,tokenUris) if not t[0]]
