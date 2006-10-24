@@ -398,6 +398,12 @@ if not globals().has_key('hotReload'):
             # Put _data in a StringIO so FieldStorage can read it
             _newRfile=cStringIO.StringIO(_data)
             _forms=cgi.FieldStorage(fp=_newRfile, headers=request.headerMap, environ={'REQUEST_METHOD':'POST'}, keep_blank_values=1)
+            #rhizome change: 
+            if _forms.list is None:
+                assert _forms.file is not None
+                request.paramMap['_postContent'] = _forms.file.read() 
+                return
+                 
             for _key in _forms.keys():
                 # Check if it's a list or not
                 _valueList=_forms[_key]
