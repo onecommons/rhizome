@@ -217,6 +217,7 @@ No results found.
     <input TYPE="hidden" NAME="itemname" VALUE="save-metadata" />
     <input TYPE="hidden" NAME="action" VALUE="save-metadata" />    
     <input type="hidden" name="rdfFormat" value="{$editFormat}"/>
+    <input type="hidden" name="_editContext" value="{$__current-transaction}"/>    
     <xsl:for-each select="$results">    
         <input TYPE="hidden" NAME="resource" VALUE="{.}" />
     </xsl:for-each>

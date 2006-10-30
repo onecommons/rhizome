@@ -918,11 +918,10 @@ def getContext(context, uri):
     else:
         return [ContextDoc(context.node.rootNode, uri)]
     
-def _getRevisions(resource):    
-    stmts = resource.ownerDocument.model.getStatements(subject=resource.uri,
-                                                                asQuad=True)        
-    delstmts = resource.ownerDocument.graphManager.delmodel.getStatements(
-                                            subject=resource.uri,asQuad=True)
+def _getRevisions(doc, resourceuri):    
+    stmts = doc.model.getStatements(subject=resourceuri, asQuad=True)        
+    delstmts = doc.graphManager.delmodel.getStatements(
+                                            subject=resourceuri,asQuad=True)
     #get a unique set of transaction context uris, sorted by revision order
     import itertools
     contexts = set([getTransactionContext(s.scope)
@@ -933,9 +932,51 @@ def _getRevisions(resource):
     contexts.sort(comparecontextversion)
     return contexts, [s for s in stmts if s.scope], delstmts
 
-def getRevisionContexts(context, resourcenode):    
-    assert len(resourcenode) == 1 and hasattr(resourcenode[0], 'uri')
-    contexts, addstmts, removestmts = _getRevisions(resourcenode[0])    
+def isModifiedAfter(context, contextUri, nodeset, excludeCurrent = True):
+    '''
+    returns nodeset of resources that were modified after the given context.
+    '''
+    contextUri = RxPath.StringValue(contextUri)    
+    if not nodeset:
+        return []
+    doc = nodeset[0].ownerDocument
+    resources = {}
+    for node in nodeset:
+        if isinstance(node, RxPathDom.Predicate):
+            #removed nodes will not have a subject parentNode
+            if not resources.get(node.stmt.subject):
+                resources[node.stmt.subject] = node.parentNode
+        else:
+            assert hasattr(node, 'uri'), 'expecting resource node'
+            resources[node.uri] = node
+    currentContextUri = doc.graphManager.getTxnContext()
+    contexts = [] 
+    for resUri, resNode in resources.iteritems():
+        rescontexts = _getRevisions(doc, resUri)[0]
+        if rescontexts:
+            latestContext = rescontexts.pop()
+            if excludeCurrent:              
+                #don't include the current context in the comparison
+                cmpcurrent = comparecontextversion(currentContextUri, latestContext)
+                assert cmpcurrent >= 0, 'context created after current context!?'
+                if cmpcurrent == 0:
+                    if not rescontexts:
+                        continue
+                    latestContext = rescontexts.pop()
+            contexts.append((latestContext, resUri, resNode))
+    if not contexts:
+        return []
+    contexts.sort(lambda x, y: comparecontextversion(x[0],y[0]))
+    #include resources that were modified after the given context
+    #todo!: fix hack of leaving a string if node is missing
+    return filter(None, [resNode or doc.findSubject(resUri) or resUri
+                        for latestContext, resUri, resNode in contexts
+              if comparecontextversion(contextUri, latestContext) < 0])
+          
+def getRevisionContexts(context, resourcenodeset):    
+    assert len(resourcenodeset) == 1 and hasattr(resourcenodeset[0], 'uri')
+    res = resourcenodeset[0]
+    contexts, addstmts, removestmts = _getRevisions(res.ownerDocument, res.uri)    
     #order by ancestory xpath('id($graphs)//depends-on/*')
     contextnodes = RxPath.Id(context, contexts)
     contextnodes.sort(lambda x,y: comparecontextversion(x.uri,y.uri)) 
@@ -967,7 +1008,8 @@ def showRevision(context, resourceNodeset, revisionNum):
     if not revisionNum:
         return []
     revisionNum = RxPath.NumberValue(revisionNum)-1
-    contextsenum, addstmts, removestmts = _getRevisions(resourceNodeset[0])
+    res = resourceNodeset[0]
+    contextsenum, addstmts, removestmts = _getRevisions(res.ownerDocument, res.uri)        
     stmts = _showRevision(contextsenum, addstmts, removestmts, revisionNum)
     
     docTemplate = resourceNodeset[0].ownerDocument
@@ -1029,7 +1071,7 @@ def _getContextRevisions(model, delmodel, srcContext):
     txncontexts.sort(comparecontextversion)
     #print 'txncts', txncontexts
     return txncontexts, txns
-
+  
 def _showContextRevision(model, delmodel, srcContext, revision):
     txncontexts, txns = _getContextRevisions(model, delmodel, srcContext)
 
@@ -1098,6 +1140,7 @@ RxPath.BuiltInExtFunctions.update({
 (RxPath.RXPATH_EXT_NS, 'get-revision-contexts-for-context'): getRevisionContextsForContext,
 (RxPath.RXPATH_EXT_NS, 'get-context-revision'): showContextRevision,
 (RxPath.RXPATH_EXT_NS, 'get-context'): getContext,
+(RxPath.RXPATH_EXT_NS, 'is-modified-after-context'): isModifiedAfter,
 })
 
 #todo: expose this XPath func?

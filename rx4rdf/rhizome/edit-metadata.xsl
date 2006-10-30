@@ -10,10 +10,11 @@
 		xmlns:response-header = 'http://rx4rdf.sf.net/ns/raccoon/http-response-header#'
 		exclude-result-prefixes = "rdfs f wf a wiki rdf response-header" >		
 
-<xsl:output omit-xml-declaration='yes' encoding="UTF-8" indent='no' />
+<xsl:output omit-xml-declaration='yes' method='xhtml' encoding="UTF-8" indent='yes' />
 <xsl:param name="_name" />
 <xsl:param name="__resource" />
 <xsl:param name="rdfFormat" select="'http://rx4rdf.sf.net/ns/wiki#rdfformat-rxml_zml'" />
+<xsl:param name="__current-transaction" select="'foo'"/>
 
 <!-- this edit page is always html, not the content's mimetype -->
 <xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />
@@ -42,6 +43,7 @@ function changetype(rdfFormat) {
 	<input TYPE="hidden" NAME="resource" VALUE="{$__resource}" />
     <input TYPE="hidden" NAME="resource" VALUE="{$revision}" />
     <input type="hidden" name="rdfFormat" value="{$rdfFormat}"/>
+    <input type="hidden" name="_editContext" value="{$__current-transaction}"/>    
     <xsl:for-each select="$transforms">
         	<input TYPE="hidden" NAME="resource" VALUE="{.}" />
     </xsl:for-each>

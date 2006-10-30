@@ -396,6 +396,11 @@ actions = {
                 '_added', $_added, '_removed', $_removed)''']),
         recheckAuthorizations,
         classAuthenticateNewResourceAction,
+        #if _editContext is defined, do a "row"-level optimistic locking check
+        Action(["is-modified-after-context($previous:_editContext,"
+                "$_added/..|$_removed)"],
+         lambda result, kw, contextNode, retVal, Error=rx.rhizome.raccoon.Error:                    
+         Error(None,'A resource was modified by someone else after you began editing it.')),
         #invoke the validatation schematron document on the changes
         Action(['''wf:request('validate-schema', '_noErrorHandling', 1,
          'phase', 'incremental', '_added', $_added, '_removed', $_removed)''']
