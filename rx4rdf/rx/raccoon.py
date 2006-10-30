@@ -847,7 +847,7 @@ the Action is run (default is False).
                 if newTransaction:
                     retVal = self._doActionsTxn(sequence, kw,
                                                 contextNode, retVal)
-                else:
+                else:                    
                     if '__current-transaction' not in kw:
                         txnCtxtResult = self.domStore.getTransactionContext()
                         kw['__current-transaction'] = txnCtxtResult or []
@@ -1337,6 +1337,8 @@ the Action is run (default is False).
 
             rootpath = context.varBindings.get(
                     (None,'_APP_BASE'),self.appBase)
+            if rootpath[-1] != '/':                        
+                rootpath = rootpath + '/'            
             value = value.replace('site:///', rootpath)
             return value.replace('site:', '')
             
