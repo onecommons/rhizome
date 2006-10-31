@@ -262,7 +262,7 @@ saveResult : boolean If this is true an array (or maybe an Iterator?) will be se
 		     */
 		      keywordArgs = keywordArgs || {};
 		     //todo: use this._results to implement caching
-		     var result = new dojo.data.Result(query, this, keywordArgs);
+		     var result = new rhizome.data.Result(query, this, keywordArgs);
 		     var This = this;		     
              var bindfunc = function(type, data, evt) {
                     var scope= result.scope||dj_global;

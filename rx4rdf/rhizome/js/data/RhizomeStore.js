@@ -9,7 +9,7 @@ function DatatypeSerializer(type, convert, uri) {
     this.serialize = function(value) { return this._converter.call(value, value); }     
 }
 
-dojo.declare("rhizome.data.RhizomeStore", dojo.data.RemoteStore, {
+dojo.declare("rhizome.data.RhizomeStore", rhizome.data.RemoteStore, {
 
       _datatypeMap : {
           //map datatype strings to constructor function
