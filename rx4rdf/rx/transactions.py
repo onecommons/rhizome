@@ -5,16 +5,19 @@ import os, os.path
 from rx import utils
 from rx import logging #for python 2.2 compatibility
 
-class NotReadyError(Exception):
+class TransactionError(Exception):
+    '''Base transaction error'''
+
+class NotReadyError(TransactionError):
     """One or more transaction participants were unready too many times"""
 
-class TransactionInProgress(Exception):
+class TransactionInProgress(TransactionError):
     """Action not permitted while transaction is in progress"""
 
-class OutsideTransaction(Exception):
+class OutsideTransaction(TransactionError):
     """Action not permitted while transaction is not in progress"""
 
-class BrokenTransaction(Exception):
+class BrokenTransaction(TransactionError):
     """Transaction can't commit, due to participants breaking contracts
        (E.g. by throwing an exception during the commit phase)"""
 
@@ -359,6 +362,7 @@ class RaccoonTransactionService(TransactionService,utils.object_with_threadlocal
         #and gives you a chance to abort the transaction        
         assert not self.state.safeToJoin 
         try:
+            #print self.state.additions
             self._runActions('before-commit')
         except:
             self.abort()
