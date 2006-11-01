@@ -1,5 +1,28 @@
 Rx4RDF and Rhizome Changelog
 ============================
+Changes in Version 0.6.1 (??, 2006)
+----------------------------------------
+* dropped support for Python 2.2, now requires Python 2.3
+* added support for Python 2.5
+* zml: fix encoding non-ascii characters in markup mode, better handling of file encodings
+* raccoon: pass config vars directly to DomStore and Model factory functions
+* RxPath: more support for named graphs/contexts:
+** support removes from specific contexts in NTriples parser
+** store version history in separate store (versionModel config settings)
+** RxPathNamedGraph module
+** add asQuad argument to getStatements()
+* XUpdate: change xupdate:include href attribute to Attribute Value Template
+* RxPath: get Redland adapter working again(!)
+* raccoon:  fix uri resolver bug exposed by Python 2.5
+* rhizome: lozenge effect (requires IE7 javascript library)
+* http://rdflib.net/2.3.2/
+* rhizome: fix import cmd 
+* rhizome: added namespaces.txt specifying which namespaces to use when serializing RDF (e.g. when displaying RxML)
+* raccoon: change $STOP to $__STOP
+* raccoon: make wf:evaluate, wf:if, wf:map use RxPath query engine
+* rhizome: change wf:is-spam() return value 
+* rhizome: add support for row-based optimistic locking (on edit, set $_editContext to $__current-transaction)
+
 Changes in Version 0.6.0 (March 31, 2006)
 ----------------------------------------
 * RxPath: Replaced rdf:ID attribute with get-statement-uris() function
