@@ -836,7 +836,67 @@ class RhizomeTestCase(unittest.TestCase):
 
         #export testgrddl.html
         #verify 
-                    
+
+    def testOptimisticLocking(self):
+        from rx import RxPath
+        appVars = { 'useIndex':0,
+                    #set the next two so we don't save anything to disk
+                    'modelFactory' : RxPath.TransactionMemModel,
+                    'MAX_MODEL_LITERAL':-1,
+                }
+        root = raccoon.HTTPRequestProcessor(a=RHIZOMEDIR+'/rhizome-config.py',
+                            model_uri = 'test:', appVars = appVars)
+
+        #this doesn't work, xhtml is being escaped, but current-transaction isn't set
+        #invoke edit-metadata, grep for currentcontext
+        #xpath = '''wf:request('index','_noErrorHandling', 1, 'action', 'edit-metadata')'''
+        #res = root.evalXPath(xpath)
+        #self.failUnless(isinstance(res, unicode) )
+        #res = res.encode('utf8')
+        #from Ft.Xml import Domlette
+        #xmldoc = Domlette.NonvalidatingReader.parseString(res)
+        #contexturi = RxPath.XPath.Evaluate("//input[@name='_editContext']/@value", xmldoc)
+        #self.failUnless(contexturi)
+
+        guestAccount = root.evalXPath("/*[foaf:accountName = 'guest']")
+        self.failUnless(guestAccount)
+
+        #set _editContext to the initial txn context uri
+        kw = dict(_editContext="context:txn:test:;1")
+
+        #now modify the store (add a new resource)
+        contents = '''
+          {test:newResource}:
+            {test:prop1}: `1
+        '''
+        self._fineGrainedCheck(root, guestAccount, contents, False,kw=kw, save=True)
+
+        #modify a resource using the edit context (this should work)
+        resourceuri = 'test:ZMLSandbox'
+        contents = '''
+          {%s}:
+            {test:prop1}: `1
+        ''' % resourceuri
+
+        self._fineGrainedCheck(root, guestAccount, contents, False,
+                               kw=kw, save=True)
+
+        #modify the same resource again using the edit context
+        #(this should raise a resource already modified error)
+        contents = '''
+          {%s}:
+            {test:prop2}: `1
+        ''' % resourceuri
+
+        self._fineGrainedCheck(root, guestAccount, contents, True,kw=kw, save=True,
+                               exceptionType=raccoon.XPathUserError)
+
+        #delete the same resource again using the edit context
+        #(this should raise a resource already modified error)
+        self._fineGrainedCheck(root, guestAccount, "", True,kw=kw, save=True,
+                            resourcesExp="/*[wiki:name='ZMLSandbox']",
+                            exceptionType=raccoon.XPathUserError)
+        
     def _testMemUse(self):
 
         def getObjectsByType(oo):
