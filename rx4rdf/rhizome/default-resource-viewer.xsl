@@ -23,7 +23,7 @@
 <xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />
 <xsl:variable name='_robots' select="wf:assign-metadata('_robots', 'nofollow,noindex')" />
 
-<xsl:variable name='shreddedContext' select="/*[a:from-source = ($resource/wiki:revisions/*/rdf:first/*)[last()]/a:contents/*]/a:entails" />
+<xsl:variable name='shreddedContext' select="/*[a:from-source = $resource]/a:entails" />
 
 <!-- note: the same template is used in search.xsl for the rxml output -->
 <xsl:if test='not($revnum)'> <!-- can't edit previous revisions -->

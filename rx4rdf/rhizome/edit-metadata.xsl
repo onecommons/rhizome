@@ -14,7 +14,7 @@
 <xsl:param name="_name" />
 <xsl:param name="__resource" />
 <xsl:param name="rdfFormat" select="'http://rx4rdf.sf.net/ns/wiki#rdfformat-rxml_zml'" />
-<xsl:param name="__current-transaction" select="'foo'"/>
+<xsl:param name="__current-transaction" />
 
 <!-- this edit page is always html, not the content's mimetype -->
 <xsl:variable name='content-type' select="wf:assign-metadata('response-header:content-type', 'text/html')" />
