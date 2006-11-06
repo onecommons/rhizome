@@ -27,8 +27,9 @@ class DomStore(transactions.TransactionParticipant):
         pass
     
     def loadDom(self,requestProcessor, location, defaultDOM):
-        ''' Load the DOM located at location (a filepath).
-        If location doesn't exist create a new DOM that is a copy of 
+        ''' 
+        Load the DOM located at location (a filepath).
+        If location does not exist create a new DOM that is a copy of 
         defaultDOM, a file-like of appropriate type
         (e.g. an XML or RDF NTriples file).
         '''
@@ -159,9 +160,7 @@ class RxPathDomStore(DomStore):
         modelFactory is a RxPath.Model class or factory function that takes
         two parameters:
           a location (usually a local file path) and iterator of Statements
-          to initialize the model if it needs to be creator
-                
-        schemaClass 
+          to initialize the model if it needs to be creator 
         '''
         self.modelFactory = modelFactory
         self.versionModelFactory = versionModelFactory or modelFactory
@@ -189,8 +188,8 @@ class RxPathDomStore(DomStore):
         defaultStmts = RxPath.NTriples2Statements(self.defaultTripleStream, initCtxUri)
 
         if self.VERSION_STORAGE_PATH:
-            normalizeSource = getattr(self.versionModelFactory, 'normalizeSource',
-                                  DomStore._normalizeSource)
+            normalizeSource = getattr(self.versionModelFactory, 
+                    'normalizeSource', DomStore._normalizeSource)
             versionStoreSource = normalizeSource(self, requestProcessor,
                                                  self.VERSION_STORAGE_PATH)
             delmodel = self.versionModelFactory(source=versionStoreSource,
@@ -209,7 +208,8 @@ class RxPathDomStore(DomStore):
                     defaultStatements=defaultStmts, incrementHook=dmc)
             lastScope = dmc.lastScope
         else:
-            model = self.modelFactory(source=source, defaultStatements=defaultStmts)
+            model = self.modelFactory(source=source,
+                    defaultStatements=defaultStmts)
             lastScope = None
                 
         if self.APPLICATION_MODEL:
@@ -228,7 +228,7 @@ class RxPathDomStore(DomStore):
             graphManager = None
         
         #reverse namespace map #todo: bug! revNsMap doesn't work with 2 prefixes one ns            
-        revNsMap = dict(map(lambda x: (x[1], x[0]), requestProcessor.nsMap.items()) )
+        revNsMap = dict([(x[1], x[0]) for x in requestProcessor.nsMap.items()])
         self.dom = RxPath.createDOM(model, revNsMap,
                                 modelUri=modelUri,
                                 schemaClass = self.schemaFactory,
@@ -240,7 +240,7 @@ class RxPathDomStore(DomStore):
         #associate the queryCache with the DOM Document
         self.dom.queryCache = requestProcessor.queryCache 
 
-    def applyXslt(self, xslStylesheet, topLevelParams = None, extFunctionMap = None,
+    def applyXslt(self, xslStylesheet, topLevelParams=None, extFunctionMap=None,
               baseUri='file:', styleSheetCache = None):
         processor = RxPath.RxSLTProcessor()
         result = RxPath.applyXslt(self.dom, xslStylesheet, topLevelParams,
