@@ -379,10 +379,14 @@ def parseRDFFromString(contents, baseuri, type='unknown', scope=None,
         elif type == 'rdfxml':
             try:
                 #if rdflib is installed, use its RDF/XML parser because it doesn't suck            
-                #import rdflib.TripleStore
-                #ts = rdflib.TripleStore.TripleStore()
                 import rdflib
-                ts = rdflib.Graph()
+                try:
+                    ts = rdflib.Graph()
+                except AttributeError:
+                    #for old versions of rdflib (e.g. 2.0.6)
+                    import rdflib.TripleStore
+                    ts = rdflib.TripleStore.TripleStore()
+                
                 import StringIO as pyStringIO #cStringIO can't have custom attributes
                 contentsStream = pyStringIO.StringIO(contents)
                 #xml.sax.expatreader.ExpatParser.parse() calls
