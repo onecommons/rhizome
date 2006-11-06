@@ -93,7 +93,7 @@ class CurrentTxN:
     def __init__(self, txnCtxt):
         self.txnContext = txnCtxt
         self.adds = {} #(stmt, stmt.scope) => [model, stmt)*]
-        self.removes = {} #(stmt, stmt.scope) => [(add/remove, model, stmt)*], visible, srcCtxt
+        self.removes = {} #(stmt, stmt.scope) => [[(add/remove, model, stmt)*], visible]
         self.specificContexts = [None]
         # ctxt => [src stmts], [new stmts] #remove new when src is empty
         self.includeCtxts = {}
@@ -301,6 +301,10 @@ class NamedGraphManager(_NamedGraphManagerBase):
 
     def setDoc(self, doc):
         super(NamedGraphManager, self).setDoc(doc)
+        if not self.lastVersion and self.createCtxResource:
+            #model hasn't been saved yet, so create initial context resource
+            scope = getTxnContextUri(self.doc.modelUri, self.lastVersion)
+            self._createCtxResource(scope)
         self.initializeTxn()
  
     def getTxnContext(self):
@@ -394,10 +398,10 @@ class NamedGraphManager(_NamedGraphManagerBase):
                                         % (str(stmt), contextDoc.contexturi))            
             #see if the node is still visible
             #stmt will not be in removes if the remove just reverted an add
-            #so set the default to True because in that case the node was
-            #added here also
+            #so set the default visibility to False because in that case the
+            #node was added here also and should be removed
             newstmts, visible = self.currentTxn.removes.get(
-                      (stmt,contextDoc.contexturi), (1, True))
+                      (stmt,contextDoc.contexturi), (1, False))
             if visible:
                 noneAreVisible = False
         if not noneAreVisible and self.doc.removeTrigger:
@@ -413,7 +417,7 @@ class NamedGraphManager(_NamedGraphManagerBase):
         if self.currentTxn.specificContexts[-1]:
             #we've already handled this in isRemoveNecessary()
             return
-                  
+        
         srcstmt = Statement(scope='', *srcstmt[:4]) #make sure no scope is set
         if self.revertAddIfNecessary(srcstmt,self.currentTxn):
             return
@@ -436,7 +440,6 @@ class NamedGraphManager(_NamedGraphManagerBase):
             if stmt.scope.startswith(TXNCTX):
                 assert not txnctxEncountered
                 txnctxEncountered = 1
-                scope = stmt.scope or TXNCTX + self.doc.modelUri + ';0'
                 self.currentTxn.recordRemoves(stmt, self.delmodel, True,
                   Statement(stmt[0],stmt[1],stmt[2],                                                     
                   stmt[3],ORGCTX+ stmt.scope +';;'+currentDelContext))
@@ -457,7 +460,7 @@ class NamedGraphManager(_NamedGraphManagerBase):
                 else:
                     self.currentTxn.del3Ctxts[srcContext][0].append(stmt)
             elif not stmt.scope:
-                scope = TXNCTX + self.doc.modelUri + ';0'
+                scope = getTxnContextUri(self.doc.modelUri, 0)
                 self.currentTxn.recordRemoves(stmt, self.delmodel, True,
                     Statement(stmt[0],stmt[1],stmt[2],                                                     
                     stmt[3],ORGCTX+ scope +';;'+currentDelContext))
@@ -492,7 +495,12 @@ class NamedGraphManager(_NamedGraphManagerBase):
 
         if not self.createCtxResource:
             return
-        #create a new context resource     
+ 
+        self._createCtxResource(scope)
+
+    def _createCtxResource(self, scope):
+        '''create a new context resource'''
+ 
         ctxStmts = [
             Statement(scope, RDF_MS_BASE+'type',CTX_NS+'TransactionContext',
                       OBJECT_TYPE_RESOURCE, scope),
@@ -575,7 +583,8 @@ class ContextDoc(RxPathDom.Document):
         else:
             stmts = basemodel.getStatements(context=contexturi)
         model = RxPath.ViewModel(basemodel, stmts)
-        graphManager = ContextNamedGraphManager(model,basedoc.graphManager.delmodel)
+        graphManager = ContextNamedGraphManager(model, 
+                        basedoc.graphManager.delmodel)
         schemaClass = RxPath.BaseSchema #basedoc.schemaClass
         super(ContextDoc, self).__init__(model, basedoc.nsRevMap,
                                          basedoc.modelUri, schemaClass,
@@ -849,7 +858,8 @@ class DeletionModelCreator(object):
                         Statement(stmt[0],stmt[1],stmt[2],stmt[3], srcCtxt))
                   
                     self.delmodel.addStatement(
-                     Statement(stmt[0],stmt[1],stmt[2],stmt[3],currentDelContext))
+                     Statement(stmt[0],stmt[1],stmt[2],stmt[3], 
+                        currentDelContext))
                     
                     self.delmodel.addStatement(
                         Statement(stmt[0],stmt[1],stmt[2],stmt[3],
@@ -870,7 +880,7 @@ class DeletionModelCreator(object):
                        currentDelContext))
                     stmtsRemovedSoFar.add(stmt)
                 
-                scope = stmt[4] or TXNCTX + self.doc.modelUri + ';0'
+                scope = stmt[4] or getTxnContextUri(self.doc.modelUri, 0)
                 self.delmodel.addStatement(
                     Statement(stmt[0],stmt[1],stmt[2],stmt[3],
                       ORGCTX+ stmt[4] +';;'+currentDelContext))
@@ -928,7 +938,6 @@ def _getRevisions(doc, resourceuri):
                 for s in itertools.chain(stmts, delstmts)#todo: 2.3 dep
                 if getTransactionContext(s.scope)]) #todo: what about s.scope == ''?
     contexts = list(contexts)
-    #print contexts #, stmts, delstmts
     contexts.sort(comparecontextversion)
     return contexts, [s for s in stmts if s.scope], delstmts
 
@@ -957,7 +966,8 @@ def isModifiedAfter(context, contextUri, nodeset, excludeCurrent = True):
             latestContext = rescontexts.pop()
             if excludeCurrent:              
                 #don't include the current context in the comparison
-                cmpcurrent = comparecontextversion(currentContextUri, latestContext)
+                cmpcurrent = comparecontextversion(currentContextUri, 
+                latestContext)
                 assert cmpcurrent >= 0, 'context created after current context!?'
                 if cmpcurrent == 0:
                     if not rescontexts:
@@ -1069,7 +1079,6 @@ def _getContextRevisions(model, delmodel, srcContext):
         txns.setdefault(getTransactionContext(ctx), []).append(ctx)
     txncontexts = txns.keys()
     txncontexts.sort(comparecontextversion)
-    #print 'txncts', txncontexts
     return txncontexts, txns
   
 def _showContextRevision(model, delmodel, srcContext, revision):
@@ -1082,16 +1091,19 @@ def _showContextRevision(model, delmodel, srcContext, revision):
             break
         for ctx in txns[txnctx]:
             if ctx.startswith(ADDCTX):
-                addstmts = set([s for s in model.getStatements(context=ctx) if s.subject != ctx])
+                addstmts = set([s for s in model.getStatements(context=ctx) 
+                    if s.subject != ctx])
                 stmts += addstmts
                 delstmts -= addstmts
             elif ctx.startswith(DELCTX):
-                globaldelstmts = set([s for s in delmodel.getStatements(context=ctx) if s.subject != ctx])
+                globaldelstmts = set([s for s in 
+                    delmodel.getStatements(context=ctx) if s.subject != ctx])
                 #re-add these if not also removed by del4
                 globaldelstmts -= delstmts
                 stmts += globaldelstmts
             elif ctx.startswith(DEL4CTX):
-                delstmts = set([s for s in delmodel.getStatements(context=ctx) if s.subject != ctx])
+                delstmts = set([s for s in 
+                    delmodel.getStatements(context=ctx) if s.subject != ctx])
                 stmts -= delstmts
             else:
                 assert 0, 'unrecognized context type: ' + ctx
