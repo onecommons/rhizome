@@ -1885,10 +1885,9 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
         
 import traceback, sys, re
 
-def invokeRxSLT(RDFPath, stylesheetPath):
+def invokeRxSLT(modelPath, stylesheetPath):
     #_4suiteModel, db = RxPath.deserializeRDF( RDFPath )
     #model = RxPath.FtModel(_4suiteModel)
-    
     uri = RxPath.Uri.OsPathToUri(modelPath)
     model = RxPath.MemModel(RxPath.parseRDFFromURI(uri))    
     rxPathDom = RxPath.createDOM(model)
