@@ -36,7 +36,10 @@ __addRxML__(replace = '@sitevars', contents = '''
   wiki:footer-text: `&#169; 2005 Liminal Systems All Rights Reserved
   wiki:uses-theme: base:default-theme
   wiki:uses-skin:  base:skin-lightblue.css
-  
+
+ bnode:FAQ1Item:
+   wiki:doctype: wiki:doctype-faq   
+
  base:ZML:
   wiki:alias: `zml
   wiki:alias: `RhizML
