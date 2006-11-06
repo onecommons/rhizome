@@ -590,7 +590,26 @@ if not globals().has_key('hotReload'):
                 if _sendCachedPageIfPossible(_now, _wfile): return
 
                 _fname = fsDir+_path[len(urlDir):] 
-                _stat = os.stat(_fname)
+                try:
+                    _stat = os.stat(_fname) 
+                except OSError, e:
+                    response.headerMap = {'status': '404 Not Found',
+                        'content-type' : 'text/html', 
+                        'date': _date}
+                    response.body = '''<html><head><title>Error 404</title>
+<meta name="robots" content="noindex" />
+</head><body>
+<h2>HTTP Error 404</h2>
+<p><strong>404 Not Found</strong></p>
+<p>The Web server cannot find the file or script you asked for.
+Please check the URL to ensure that the path is correct.</p>
+<p>Please contact the server's administrator if this problem persists.</p>
+</body></html>'''
+                    logMessage("%s does not exist"%(_fname))
+                    initResponse()
+                    _sendResponse(_wfile)
+                    return
+
                 if type(_stat) == type(()): # Python2.1
                     _modifTime = _stat[9]
                 else:
