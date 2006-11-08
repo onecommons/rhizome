@@ -2,8 +2,8 @@
 #warning global-exclude doesn't work right in python 2.2 only in python2.3
 #Thumbs.db and bdb db 
 include rhizome/*
-recursive-include rdfscribbler *
-include test/*
+#recursive-include rdfscribbler *
+include tests/*
 recursive-include rx/logging22 *
 include site/*
 exclude site/test-config*.py
