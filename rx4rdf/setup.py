@@ -77,7 +77,7 @@ os.path.walk('docs', _addFiles, data_files)
 os.path.walk('blank', _addFiles, data_files)
 os.path.walk('test', _addFiles, data_files)
 
-packages = ['rx']
+packages = ['rx', 'lupy']
 if sys.version_info < (2, 3):
     #add logging package if < 2.3
     packages.append('rx/logging22')
