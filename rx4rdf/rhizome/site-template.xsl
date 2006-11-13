@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
+<!-- (c) 2003-6 by Adam Souzis (asouzis at users.sourceforge.net) All rights reserved. -->
 <xsl:stylesheet version="1.0"
         xmlns:a="http://rx4rdf.sf.net/ns/archive#"
         xmlns:wiki="http://rx4rdf.sf.net/ns/wiki#"
@@ -51,7 +52,7 @@
     <xsl:param name="previous:_template" />
     <xsl:param name="previous:__resource" />
     
-<xsl:output method='xhtml' omit-xml-declaration="yes" encoding="UTF-8" indent='no' 
+<xsl:output method='xhtml' omit-xml-declaration="yes" encoding="UTF-8" indent='yes' 
 doctype-public="-//W3C//DTD XHTML 1.0 Transitional//EN" 
 doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd" 
 />
@@ -92,15 +93,14 @@ doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"
 <xsl:if test="$previous:_robots"> 
   <meta name="robots" content="{$previous:_robots}" />
 </xsl:if>
-<!-- (c) 2003-4 by Adam Souzis (asouzis at users.sourceforge.net) All rights reserved. -->
 
-<xsl:if test="wf:file-exists('ie7/ie7-core.js')">
+<xsl:if test="wf:file-exists('ie7/js/ie7-core.js')">
 <xsl:text disable-output-escaping='yes' >
 <![CDATA[
-<!-- compliance patch for microsoft browsers -->
+<!-- enable CSS 2 selectors for IE < 7 -->
 <!--[if lt IE 7]>
-<script src="site:///ie7/ie7-core.js" type="text/javascript"></script>
-<script src="site:///ie7/ie7-css2-selectors.js" type="text/javascript"></script>
+<script src="site:///js/ie7-core.js" type="text/javascript"></script>
+<script src="site:///js/ie7-css2-selectors.js" type="text/javascript"></script>
 <![endif]-->
 ]]>
 </xsl:text>
