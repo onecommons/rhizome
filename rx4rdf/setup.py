@@ -1,21 +1,24 @@
 #!/usr/bin/env python
-
+#from ez_setup import use_setuptools
+#use_setuptools()
+#from setuptools import setup
+from distutils.core import setup    
 import sys, glob, os, os.path, tempfile
-from distutils.core import setup
-#import py2exe
 
-version_string = "0.6.0"
+version_string = "0.6.9"
 
 PACKAGE_NAME = 'rx4rdf'
 
-if sys.version_info[:2] < (2,2):
-	print "Sorry, %s requires version 2.2 or later of Python" % PACKAGE_NAME
+if sys.version_info[:2] < (2,3):
+	print "Sorry, %s requires version 2.3 or later of Python" % PACKAGE_NAME
 	sys.exit(1)
 
 classifiers = """\
 Development Status :: 3 - Alpha
 Intended Audience :: Developers
 Intended Audience :: Other Audience
+License :: OSI Approved :: Mozilla Public License 1.1 (MPL 1.1)
+License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)
 License :: OSI Approved :: GNU General Public License (GPL)
 Programming Language :: Python
 Topic :: Internet :: WWW/HTTP
@@ -61,11 +64,12 @@ data_files = [
         ]
 
 #setup doesn't handle directory trees well, e.g. just using glob on each subtree doesn't work
-def _addFiles(data_files, dirname, names):     
-    try: 
-        names.remove('CVS') #skip CVS directories
-    except ValueError:
-        pass
+def _addFiles(data_files, dirname, names):
+    for skipdir in ['.svn', 'contentindex', 'sessions', '.DS_Store']:     
+        try: 
+            names.remove(skipdir) 
+        except ValueError:
+            pass
     data_files.append( ( os.path.join('share/rx4rdf', dirname), 
        [os.path.join(dirname, name) for name in names 
            if os.path.isfile(os.path.join(dirname, name))]) 
@@ -75,13 +79,14 @@ os.path.walk('site', _addFiles, data_files)
 os.path.walk('rhizome', _addFiles, data_files)
 os.path.walk('docs', _addFiles, data_files)
 os.path.walk('blank', _addFiles, data_files)
-os.path.walk('test', _addFiles, data_files)
+os.path.walk('tests', _addFiles, data_files)
 
-packages = ['rx', 'lupy']
-if sys.version_info < (2, 3):
-    #add logging package if < 2.3
-    packages.append('rx/logging22')
-   
+#from pprint import pprint 
+#pprint(data_files)
+#sys.exit(1)
+
+packages = ['rx', 'lupy', 'lupy.index', 'lupy.search']
+
 setup(name=PACKAGE_NAME,
 #metadata:
 	  version=version_string,
@@ -90,7 +95,7 @@ setup(name=PACKAGE_NAME,
 	  author_email="asouzis@users.sf.net",      
 	  url="http://rx4rdf.sf.net",
 	  download_url="http://prdownloads.sourceforge.net/rx4rdf/rx4rdf-"+version_string+".tar.gz?download",
-	  license = "GNU GPL",
+	  license = "MPL",
 	  platforms = ["any"],	  
 	  classifiers = filter(None, classifiers.split("\n")),
           long_description= """Rx4RDF shields developers from the complexity of RDF by enabling you to
@@ -105,11 +110,3 @@ markup languages for authoring XML and RDF, and RDFScribbler, for viewing and ed
 	              createScript('zml', 'zml.py'),
 	            ]
 	  )
-
-if sys.version_info < (2, 3):
-    _setup = setup
-    def setup(**kwargs):
-        if kwargs.has_key("classifiers"):
-            del kwargs["classifiers"]
-            del kwargs["download_url"]
-        _setup(**kwargs)	

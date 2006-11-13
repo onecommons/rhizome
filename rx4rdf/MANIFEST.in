@@ -1,19 +1,16 @@
 #python setup.py sdist --force-manifest --formats=gztar,zip
 #warning global-exclude doesn't work right in python 2.2 only in python2.3
-#Thumbs.db and bdb db 
 include rhizome/*
-#recursive-include rdfscribbler *
 include tests/*
-recursive-include rx/logging22 *
 include site/*
 exclude site/test-config*.py
 include blank/*
 include docs/*
-global-exclude .cvsignore .DS_Store
-global-exclude *.bak *.bk? *.nt *.metarx *.pyc *.log *.lock *.tmp *.bpl *.prof *.db
+global-exclude .DS_Store *.bak *.bk? *.nt *.metarx *.pyc *.log *.lock *.tmp *.bpl *.prof *.db
 include test/*.nt
 recursive-include rhizome *.nt
 global-exclude */CVS/*
+global-exclude */.svn/*
 global-exclude */sessions/*
 global-exclude */contentindex/*
 include COPYING
