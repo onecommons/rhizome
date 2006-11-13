@@ -572,7 +572,7 @@ class ContextDoc(RxPathDom.Document):
     def __init__(self, basedoc, contexturi):
         self.contexturi = contexturi
         self.basedoc = basedoc
-        if contexturi.startswith(TXNCTX) or contexturi.startswith(ADDCTX):
+        if [uri for uri in[TXNCTX,ADDCTX,APPCTX] if contexturi.startswith(uri)]:
             basemodel = basedoc.model
         else:
             basemodel = basedoc.graphManager.delmodel            
