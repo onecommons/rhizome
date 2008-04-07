@@ -20,6 +20,7 @@
 <xsl:param name="_url" />
 <xsl:param name="_name" />
 <xsl:param name="BASE_MODEL_URI" />
+<xsl:param name="__current-transaction" />
 <xsl:param name="editFormat" select="'rxml_zml'" />
 <xsl:param name="sortKey" select="'position()'" />
 <xsl:param name="sortKeyType" select="'text'" />
