@@ -17,6 +17,10 @@
    <xsl:template name='set-doctype'>
       <xsl:param name='doctype' />
      <xsl:if test='$doctype' >
+      <xsl:message terminate='no'>
+        setting doctype <xsl:value-of select="$doctype"/>
+      </xsl:message>      
+      <xupdate:message terminate='no' text='removing {{($__resource/wiki:revisions/*/rdf:first)[last()]/*/wiki:doctype/*}} for {$doctype}' />
       <xupdate:remove select='($__resource/wiki:revisions/*/rdf:first)[last()]/*/wiki:doctype' />
       <xupdate:append select='($__resource/wiki:revisions/*/rdf:first)[last()]/*'>
          <wiki:doctype rdf:resource="{$doctype}"/>
@@ -50,6 +54,10 @@
            select='$__store/*[dataview:doctypeTransformation=$doctype]/wiki:name' />
 
       <xsl:if test='$doctypeShredderName'>      
+      <xsl:message terminate='no'>
+        Shredding doctype <xsl:value-of select="$doctypeShredderName"/>
+      </xsl:message>
+
         <xsl:variable name='dummy' 
           select="wf:shred-with-xslt(concat('site:///', $doctypeShredderName),$doc,$__resource)" />      
       </xsl:if>
@@ -75,7 +83,8 @@
       <xsl:variable name='doctypeTransformName' 
            select='$__store/*[wiki:handles-doctype=$doctype]/wiki:name' />
 
-      <xsl:if test='$doctypeTransformName'>      
+      <xsl:if test='$doctypeTransformName'>  
+          
         <xsl:variable name='dummy1' 
           select="wf:shred-with-xslt(concat('site:///',$doctypeTransformName),$doc,$__resource)" />      
       </xsl:if>
