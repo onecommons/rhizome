@@ -467,7 +467,6 @@ class RhizomeContent(RhizomeBase):
         kw['_format'] = format
         changeCount = len(self.server.txnSvc.state.additions)
         result = self.server.runActions('shred', kw, content, newTransaction=False)
-        #print 'shredded', [p.stmt for p in self.server.txnSvc.state.additions]
         changes = len(self.server.txnSvc.state.additions) > changeCount
         #change is inaccurate if the shredder removed some change
         #and then added the same number of new ones

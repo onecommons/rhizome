@@ -2451,6 +2451,7 @@ ZML to XML options:
 -m               assume ZML source is in markup mode
 -r [rootelement] wrap in root element (default: "zml")
 -mm markupmap    Python class to use as markup map
+-v version       treat ZML as version
         ''' % sys.argv[0]
         print cmd_usage
         sys.exit(0)
@@ -2487,7 +2488,8 @@ ZML to XML options:
     prettyprint = switch('-p', '--pretty')
     rootElement = opt('-r', 'zml')
     markupOnly = switch('-m')
-
+    version = float( opt('-v', defaultZMLVersion) )
+    
     klass = opt('-mm', '')
     if klass:
         qualifiers = klass.split('.')
@@ -2517,9 +2519,12 @@ ZML to XML options:
     if enc or sys.platform == 'win32':
         import codecs
         #use the OS codepage
-        file = codecs.EncodedFile(file, 'utf8',enc or 'mbcs') 
+        file = codecs.EncodedFile(file, 'utf8',enc or 'mbcs')
+    if debug:
+        print 
     print zml2xml(file, mmf, debug, prettyprint=prettyprint,
-            rootElement = rootElement, mixed=not markupOnly)    
+        rootElement = rootElement, mixed=not markupOnly, 
+        zmlVersion = version)    
 
 if __name__ == '__main__':
     main()

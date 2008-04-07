@@ -1534,8 +1534,8 @@ Please check the URL to ensure that the path is correct.</p>
 
         def saveRequestHistory(self):
             if self.requestsRecord:
-                requestRecordFile = file(requestRecordFilePath, 'wb')
-                pickle.dump(requestsRecord, requestRecordFile)
+                requestRecordFile = file(self.requestRecordPath, 'wb')
+                pickle.dump(self.requestsRecord, requestRecordFile)
                 requestRecordFile.close()       
 
     #################################################

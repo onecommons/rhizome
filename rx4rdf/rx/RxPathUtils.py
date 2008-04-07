@@ -172,6 +172,15 @@ def NTriples2Statements(stream, defaultScope='', baseuri=None,
     for stmt, scope in stmtset.iteritems():
         yield Statement(stmt[0], stmt[1], stmt[2],stmt[3],
                                  scope or defaultScope)
+                                 
+def _parseSPARQLResults(json, defaultScope=None):
+    #this currently isn't used
+    stmts = []
+    for stmt in json['results']['bindings']:
+        stmts.append( Statement(_decodeJsonRDFValue(stmt['s'])[0],
+            _decodeJsonRDFValue(stmt['p'])[0],
+            *_decodeJsonRDFValue(stmt['o'])+(defaultScope,)  ))
+    return stmts
 
 def _parseRDFJSON(json, defaultScope=None):
     '''
@@ -180,9 +189,7 @@ def _parseRDFJSON(json, defaultScope=None):
     '''
     import simplejson
     stmts = []
-    #print '('+json+')'
     jsonDict = simplejson.loads(json)
-    #eval('('+json+')') #todo: use safeeval(json)
     if 'quads' in jsonDict:
         del jsonDict['quads']
         items = jsonDict.iteritems()
@@ -196,30 +203,35 @@ def _parseRDFJSON(json, defaultScope=None):
                 subject = BNODE_BASE+subject[2:] #bNode            
             for pred, objects in values.iteritems():
                 for count, object in enumerate(objects):                    
-                    objectType = object['type']
-                    value = object['value']
-                    if objectType == 'uri':
-                        objectType = OBJECT_TYPE_RESOURCE
-                    elif objectType == 'bnode':
-                        objectType = OBJECT_TYPE_RESOURCE
-                        value = BNODE_BASE + value                        
-                    elif objectType == 'literal':
-                        if 'xml:lang' in object:
-                            objectType = object['xml:lang']
-                        else:
-                            objectType = OBJECT_TYPE_LITERAL
-                    elif objectType == 'typed-literal':
-                        objectType = object['datatype']
-                    else:
-                        raise ParseException('unexpected object type', objectType)
-                            
+                    value, objectType = _decodeJsonRDFValue(object)        
                     if pred == '#member':
                         stmtpred = base+'_'+str(count+1)
                     else:
                         stmtpred = pred
-                    assert pred not in ['#first','#rest'], 'not yet implemented' #todo
-                    stmts.append( Statement(subject, stmtpred, value, objectType, scope) )
+                    #todo:
+                    assert pred not in ['#first','#rest'], 'not yet implemented' 
+                    stmts.append( 
+                        Statement(subject, stmtpred, value, objectType, scope) )
     return stmts
+
+def _decodeJsonRDFValue(object):
+    objectType = object['type']
+    value = object['value']
+    if objectType == 'uri':
+        objectType = OBJECT_TYPE_RESOURCE
+    elif objectType == 'bnode':
+        objectType = OBJECT_TYPE_RESOURCE
+        value = BNODE_BASE + value                        
+    elif objectType == 'literal':
+        if 'xml:lang' in object:
+            objectType = object['xml:lang']
+        else:
+            objectType = OBJECT_TYPE_LITERAL
+    elif objectType == 'typed-literal':
+        objectType = object['datatype']
+    else:
+        raise ParseException('unexpected object type', objectType)
+    return value, objectType
 
 def _encodeStmtObject(stmt, iscompound):
     '''
