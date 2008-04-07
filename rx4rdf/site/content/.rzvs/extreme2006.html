@@ -1,0 +1,476 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns='http://www.w3.org/TR/xhtml1' >
+  <head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+    <title>RxPath: A mapping of RDF to the XPath Data Model</title>
+    <meta content="S5" name="generator" />
+    <meta content="S5 1.1" name="version" />
+    <link href="basestyles.css" type="text/css" rel="stylesheet" />
+    <link media="projection" href="site:///s5/ui/default/slides.css" type="text/css" id="slideProj" rel="stylesheet" />
+    <link media="screen" href="site:///s5/ui/default/outline.css" type="text/css" id="outlineStyle" rel="stylesheet" />
+    <link media="print" href="site:///s5/ui/default/print.css" type="text/css" id="slidePrint" rel="stylesheet" />
+    <link media="projection" href="site:///s5/ui/default/opera.css" type="text/css" id="operaFix" rel="stylesheet" />
+    <script src="site:///s5/ui/default/slides.js" type="text/javascript" ></script>
+    <style>
+    .highlight { font-weight: bold; color: red!important; } 
+    .xml { font-size: smaller; } 
+    .ntriples { font-size: 14pt; }
+    tt { font-size: smaller; } 
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <div id="controls" ></div>
+      <div id="currentSlide" ></div>
+      <div id="header" ></div>
+      <div id="footer">
+        <h1>RxPath: A mapping of RDF to the XPath Data Model</h1>
+        <h2>Adam Souzis &#8226; Extreme Markup 2006</h2>
+      </div>
+    </div>
+    <div class="presentation"><div>
+
+    <div class="slide"><h1>RxPath</h1>
+    <h2>A mapping of RDF to the XPath Data Model</h2>
+    <h5>http://www.liminalzone.org/RxPath</h5>
+    </div>
+    
+    <div class="slide"><h1>What is RxPath?</h1>
+     <ul>
+      <li>A deterministic, comprehensive mapping from RDF to XPath.</li>
+      <li>Map the RDF graph model to the XPath data model</li>
+      <li>Syntactically identical to XPath 1.0</li>
+      <li>Allows XPath-based languages to operate on a RDF graph instead of a XML document</li>
+      <li>e.g. XSLT, Schematron, XUpdate, XForms, XProc </li>
+      </ul>
+      
+    </div>
+
+<div class="slide"><h1>Why RxPath?</h1>
+ <ul>
+      <li>Provide RDF with the wide range of tools available for XML, reusing mature and widely understood XML languages.</li>
+<li>Reduce the "conceptual impedance" between RDF and XML</li>
+
+<li>Ease the migration and integration of RDF with existing XML-based web applications.</li>
+<li>Provide a concise, easy to use query language that fits well with RDF's graph-based model.</li>
+      </ul>
+</div>
+
+    <div class="slide"><h1>Design Requirements</h1>
+     <ul>
+        <li> MUST be syntactically identical to XPath 1.0.
+</li>
+            <li>MUST be able to represent any valid RDF graph.
+</li>
+            <li>All information from the RDF Model MUST be available. 
+</li>
+            <li>Deterministic - only one RxPath representation for a RDF graph.
+</li>
+            <li> RxPath expressions SHOULD be amenable to static analysis. <!-- For example, it should be possible to determine for any step in an XPath expression its corresponding position in a RDF triple. -->
+</li>
+            <li> RxPath expressions SHOULD enable efficient processing. <!-- For example, the descendent axis should not imply an exhaustive search through the entire RDF model. -->
+</li>
+            <li> RxPath expressions SHOULD be conform closely XPath behavior.
+</li>
+            <li> RxPath expressions SHOULD provide intuitive navigation.</li>
+
+      </ul>
+      
+    </div>
+
+
+<div class="slide"><h1>RDF Intro</h1>
+
+<pre class='ntriples' >
+&lt;http://www.w3.org/TR/rdf...> &lt;ex:editor> _:abc.
+&lt;http://www.w3.org/TR/rdf...> &lt;rdf:type> &lt;ex:Document>.
+&lt;http://www.w3.org/TR/rdf...> &lt;dc:title>  "RDF/XML Syntax Specification (Revised)"@en.
+_:abc &lt;ex:homePage> &lt;http://purl.org/net/dajobe>.
+_:abc &lt;ex:fullName> "Dave Beckett".
+</pre>
+
+<ul>
+<li>Set of statements about resources</li>
+<li>URIs, literal strings, and anonymous nodes</li>
+<li>Abbreviating URIs as QNames is nice.</li>
+</ul>
+
+</div>
+
+<div class="slide"><h1>RDF Intro cont'd</h1>
+
+<pre class='xml' >
+&lt;ex:Document> &lt;rdf:type> &lt;rdfs:Class>.
+&lt;http://purl.org/net/dajobe> &lt;rdf:type> &lt;rdfs:Resource>.
+_:abc &lt;rdf:type> &lt;rdfs:Resource>.
+&lt;ex:editor> &lt;rdf:type> &lt;rdf:Property>. 
+(etc.for each property...)
+</pre>
+
+<ul>
+<li>Additional statements can be inferred from an ontology.</li>
+<li>RDF Schema is a very simple ontology language.</li>
+</ul>
+
+</div>
+
+<div class="slide"><h1>RDF Intro cont'd</h1>
+
+<img src='rdfgraph.png' />
+
+<h3>Statements can be visualized as a labeled, directed graph.</h3>
+</div>
+
+
+<!--
+<div class="slide"><h1> RDF/XML example</h1>
+
+<pre class='xml' >
+&lt;ex:Document rdf:about="http://www.w3.org/TR/rdf-syntax-grammar">
+  &lt;ex:editor>
+    &lt;rdfs:Resource nodeID="abc">
+      &lt;ex:homePage>
+        &lt;rdfs:Resource rdf:about="http://purl.org/net/dajobe/" />
+      &lt;/ex:homePage>
+      &lt;ex:fullName>Dave Beckett&lt;/ex:fullName>
+    &lt;/rdfs:Resource>
+  &lt;/ex:editor>
+  &lt;dc:title xml:lang="en">RDF/XML Syntax Specification (Revised)&lt;/dc:title>
+&lt;/ex:Document>
+</pre>
+
+</div>
+-->
+
+<div class="slide"><h1>Step 1</h1>
+
+<pre class='xml' >
+&lt;rdfs:Resource rdf:about="bnode:abc" />
+&lt;rdfs:Resource rdf:about="http://example.org/stuff/1.0/Document"/>
+&lt;rdfs:Resource rdf:about="http://purl.org/net/dajobe/" />
+&lt;ex:Document rdf:about="http://www.w3.org/TR/rdf-syntax-grammar" />
+</pre>
+
+<ul>
+<li>For each resource in the graph, create a top-level element.</li>
+<li>The element name is set the resource's RDF type.</li>
+<li>Has an <tt>rdf:about</tt> attribute.
+</ul>
+<ul class='incremental'>
+<li> <tt>/*</tt> selects all the resources in the model</li>
+<li> <tt>/*[@rdf:about="http://www.w3.org/TR/rdf-syntax-grammar"] </tt> selects the resource identified by the given URI.</li>
+</ul> 
+</div>
+
+<div class="slide"><h1>Step 2</h1>
+
+<pre class='xml' >
+&lt;rdfs:Resource rdf:about="bnode:abc">
+  &lt;ex:homePage>
+    &lt;rdfs:Resource rdf:about="http://purl.org/net/dajobe/" />        
+  &lt;/ex:homePage>
+  &lt;ex:fullName>Dave Beckett&lt;/ex:fullName>
+  &lt;rdf:type>
+    &lt;rdfs:Class rdf:about="http://www.w3.org/2000/01/rdf-schema#Resource" />
+  &lt;/rdf:type>    
+&lt;/rdfs:Resource>
+...
+</pre>
+
+<ul>
+<li>Add a child element for each property that the resource has.</li>
+<li>Each property element has one child node.</li>
+<li>Which either a text node or an element.</li>
+</ul>
+
+</div>
+
+<div class="slide"><h1>Step 2 cont'd</h1>
+
+<pre class='xml' >
+&lt;rdfs:Resource rdf:about="bnode:abc">
+  &lt;ex:homePage>
+    &lt;rdfs:Resource rdf:about="http://purl.org/net/dajobe/" />        
+  &lt;/ex:homePage>
+  &lt;ex:fullName>Dave Beckett&lt;/ex:fullName>
+  &lt;rdf:type>
+    &lt;rdfs:Class rdf:about="http://www.w3.org/2000/01/rdf-schema#Resource" />
+  &lt;/rdf:type>    
+&lt;/rdfs:Resource>
+...
+</pre>
+
+<ul class='incremental'>
+            <li> <tt>/*/*</tt> selects all the property elements. <!--This is equivalent to selecting all the statements in the model, as for each statement there will be one property element (whose parent is the subject element and whose only child is the object node). --></li>
+            <li> <tt>/*/ex:homePage/*</tt> selects resource that are home pages.</li>
+            <li> <tt>/*/ex:fullName/text()</tt> select only literals</li>
+</ul> 
+
+
+</div>
+
+<div class="slide"><h1>Step 3</h1>
+
+<pre class='xml'  id='step3'>
+...
+&lt;ex:Document rdf:about="http://www.w3.org/TR/rdf-syntax-grammar" >
+  &lt;ex:editor>
+    &lt;rdfs:Resource <!--<span class='apply'>nodeID="abc"</span>--> <span class='apply'>rdf:about="bnode:abc"</span> >
+      &lt;ex:homePage>
+        &lt;rdfs:Resource rdf:about="http://purl.org/net/dajobe/" />
+      &lt;/ex:homePage>
+      &lt;ex:fullName>Dave Beckett&lt;/ex:fullName>
+    &lt;/rdfs:Resource>
+  &lt;/ex:editor>
+  ...
+&lt;/ex:Document></span>
+</pre>
+
+<ul class="incremental" >
+<li>Object elements in the has children just like the top-level elements</li>
+<li> <tt>/*/ex:editor/*/ex:homePage/*</tt></li>
+<li transition-container='step3' transition-class='apply'>
+Looks like the RDF/XML "striped' syntax (almost).
+</li>
+</ul>
+
+<!--
+<ul>
+<li class="incremental" transition-container='step1' from-class='apply' to-class='hidden'>
+Replace "nodeid" attributes
+</li>
+<li class="incremental" transition-container='step1' from-class='apply2' to-class='show'>
+With "bnode" psuedo URLs
+</li>
+</ul>
+-->
+
+</div>
+
+<!--
+<div class="slide"><h1> RxPath example cont'd</h1>
+
+<pre class='xml' >
+&lt;rdfs:Resource rdf:about="bnode:abc">
+  &lt;ex:homePage>
+    &lt;rdfs:Resource rdf:about="http://purl.org/net/dajobe/" />        
+  &lt;/ex:homePage>
+  &lt;ex:fullName>Dave Beckett&lt;/ex:fullName>
+  &lt;rdf:type>
+    &lt;rdfs:Class rdf:about="http://www.w3.org/2000/01/rdf-schema#Resource" />
+  &lt;/rdf:type>    
+&lt;/rdfs:Resource>
+
+&lt;rdfs:Resource rdf:about="http://example.org/stuff/1.0/Document">
+  &lt;rdf:type>
+    &lt;rdfs:Class rdf:about="http://example.org/stuff/1.0/Document" />
+  &lt;/rdf:type>    
+&lt;/rdfs:Resource>
+
+&lt;rdfs:Resource rdf:about="http://purl.org/net/dajobe/" />
+  &lt;rdf:type>
+    &lt;rdfs:Class rdf:about="http://www.w3.org/2000/01/rdf-schema#Resource" />
+  &lt;/rdf:type>    
+&lt;/rdfs:Resource>
+</pre>
+
+</div>
+
+<div class="slide"><h1> overview of transformation</h1>
+
+         <ul>
+            <li> <tt>/*</tt> selects all the resources in the model
+</li>
+            <li> <tt>/ex:Document</tt> selects all the resources of type "http://example.org/stuff/1.0/Document"</li>
+            <li> <tt>/*/*</tt> select all the property elements.</li>
+            <li> <tt>/*/ex:editor/*</tt> selects all resources that are editors.</li>
+            <li> <tt>/*/ex:editor/*/ex:homePage/*</tt> selects all the home page resources of editors. </li>
+            <li> <tt>/*/ex:editor/*/ex:homePage/text()</tt> to select only literals</li>
+            <li> <tt>/*[@rdf:about="http://www.w3.org/TR/rdf-syntax-grammar"] </tt> selects the resource identified by the given URI.</li>
+          </ul>
+          
+</div>
+
+-->
+
+<div class="slide"><h1>RxPath Semantics</h1>
+
+<ul>    
+<li>String Value</li>
+<li>Name tests</li>
+<li>Descendant and ancestor axes</li>
+<li>Preceding axis</li>
+</ul>
+
+</div>
+
+<div class="slide"><h1>String Value</h1>
+<ul>
+<li>The string value of a resource (subject or object) element is its URI (the value of its <tt>rdf:about</tt> attribute).</li>
+<li>Thus: <tt>/*[.='http://www.w3.org/TR/rdf-syntax-grammar']</tt></li>
+
+<li>Don't change XPath's string-value rules for the property elements</li>
+<li>Thus:<tt>/*/dc:title[.="RDF/XML Syntax Specification (Revised)"]</tt>
+</li>
+</ul>
+
+</div>
+
+<div class="slide"><h1>Name Tests</h1>
+<ul>
+<li>
+<tt>/className</tt> matches resource elements where: <br/>
+<tt>&lt;element URI reference&gt; rdf:type &lt;NameTest URI reference&gt;.</tt>
+<br/> holds.
+</li>
+<li><tt>/*/propertyName</tt> matches any property element where: <br/>
+<tt>&lt;element URI reference&gt; rdfs:subPropertyOf &lt;NameTest URI reference&gt;.</tt>
+<br/> holds.
+</li>
+</ul>
+</div>
+
+<div class="slide"><h1>Descendant and ancestor axes</h1>
+<ul>
+<li>Equivalent to a transitive property match</li>
+<li>E.g. <tt>/*[.='http://example.org/great-grandmother']//ex:has-child/*</tt></li>
+<li>only match Predicate elements</li>
+<li>stop search descendants when match is not found</li>
+<li>statically analyze and efficiently evaluate</li> 
+</ul> 
+</div>
+
+<div class="slide"><h1>What about circularity!?</h1>
+
+<pre id='circ1' >
+&lt;<span class="">rdfs:Class</span> rdf:about="http://www.w3.org/2000/01/rdf-schema#Class" /&gt;
+   &lt;<span class="">rdf:type</span>&gt;
+      &lt;<span class="">rdfs:Class</span> rdf:about="http://www.w3.org/2000/01/rdf-schema#Class"&gt;
+         &lt;rdf:type&gt;
+            &lt;<span class="apply">rdfs:Class</span> rdf:about="http://www.w3.org/2000/01/rdf-schema#Class"&gt;
+                ....
+            &lt;/rdfs:Class&gt;
+        &lt;/rdf:type&gt;
+     &lt;/rdfs:Class&gt;
+  &lt;/rdf:type&gt;
+&lt;/rdfs:Class&gt;
+</pre>
+
+<li class="incremental" transition-container='circ1' transition-class='apply'>
+Consider: <tt>/*/rdf:type/*/rdf:type/*</tt>
+</li>
+</div>
+
+<div class="slide"><h1>Circularity cont'd</h1>
+
+<pre id='circ2' >
+&lt;<span class="apply">rdfs:Class</span> rdf:about="http://www.w3.org/2000/01/rdf-schema#Class" /&gt;
+   &lt;rdf:type&gt;
+      &lt;<span class="apply">rdfs:Class</span> rdf:about="http://www.w3.org/2000/01/rdf-schema#Class"&gt;
+         &lt;rdf:type&gt;
+            <span class="apply">&lt;rdfs:Class</span> rdf:about="http://www.w3.org/2000/01/rdf-schema#Class"&gt;
+                ....
+            &lt;/rdfs:Class&gt;
+        &lt;/rdf:type&gt;
+     &lt;/rdfs:Class&gt;
+  &lt;/rdf:type&gt;
+&lt;/rdfs:Class&gt;
+</pre>
+
+<li class="incremental" transition-container='circ2' transition-class='apply'>
+Now Consider: <tt>/*//rdf:type/*</tt>
+</li>
+</div>
+
+<div class="slide"><h1>Proceeding axis</h1>
+Redefines the "preceding" axis to select inverse relationship.
+<!-- the predicates that have the current resource node in the object  -->
+For example:
+<tt>/*[.='testresource']/preceding::foaf::knows/*</tt>
+is equivalent to:
+<tt>/*[foaf::knows ='testresource']</tt>
+
+</div>
+
+<!--
+<div class="slide"><h1>RDF collections and containers</h1>
+</div>
+
+<div class="slide"><h1>XPath extension functions</h1>
+</div>
+-->
+
+<div class="slide"><h1>Comparison to other approaches</h1>
+
+<ul>    
+<li>Syntactic</li>
+<li>XPath-like languages</li>
+<li>XSLT extension functions</li>
+<li>Semantic</li>
+</ul>
+
+</div>
+
+<!--
+<div class="slide"><h1> comparison to SPARQL</h1>
+</div>
+-->
+
+<div class="slide"><h1>XPath-based languages</h1> 
+
+<ul>
+<li>XSLT</li>
+<li>Schematron</li>
+<li>XUpdate</li>
+<li>XForms</li>
+<li>DOM API</li>
+</ul>
+
+</div>
+
+<!--
+<div class="slide"><h1> XSLT 
+</h1></div><div class="slide"><h1> Schematron 
+</h1></div><div class="slide"><h1> XUpdate
+</h1></div><div class="slide"><h1> XForms
+</h1></div>
+-->
+
+<div class="slide"><h1>Implementation</h1>
+<h3>Expressions are equivalent to these relational algebra operations:</h3>
+<ul>
+<li>Select: XPath predicates and name tests</li>
+<li>Join: reflexive equijoin and recursive reflexive equijoin</li>
+<li>Project: for parent axis</li>
+<li>Union: XPath union operator</li>
+<li>Group by: used for XPath nodeset uniqueness and context construction</li>
+</ul>
+<h3>Open Source, written in Python</h3>
+
+</div>
+
+<div class="slide"><h1>Rhizome</h1>
+
+<ul>
+<li>An open-source application stack for creating web applications that work directly with RDF representations.</li>
+<li>A wiki that let's users create dynamic, structured content with explicit semantics.</li>
+<li>Uses RxPath's mappings of XSLT, XUpdate and Schematron to implement application logic</li>
+</ul>
+
+</div>
+
+<div class="slide"><h1>Future</h1>
+<ul>
+<li>SPARQL transformation</li>
+<li>OWL support</li>
+<li>XPath 2.0/XQuery</li>
+</ul>
+<!--
+<p />
+<h5>http://www.liminalzone.org/RxPath</h5>
+-->
+</div>
+
+</div></div>
+  </body>
+</html>

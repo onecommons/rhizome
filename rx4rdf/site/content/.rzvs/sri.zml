@@ -1,0 +1,217 @@
+#?zml0.8
+
+!slide Semantic Wikis and Microformats
+
+!slide Wikis and the Wiki Way 
+
+* __Open__ - Should a page be found to be incomplete or poorly organized, any reader can edit it as they see fit.
+* __Incremental__ - Pages can cite other pages, including pages that have not been written yet.
+* __Organic__ - The structure and text content of the site are open to editing and evolution.
+* __Mundane__ - A small number of (irregular) text conventions will provide access to the most useful page markup.
+* __Universal__ - The mechanisms of editing and organizing are the same as those of writing so that any writer is automatically an editor and organizer.
+
+!slide Wikis and the Wiki Way 
+
+* __Overt__ - The formatted (and printed) output will suggest the input required to reproduce it.
+* __Unified__ - Page names will be drawn from a flat space so that no additional context is required to interpret them.
+* __Precise__ - Pages will be titled with sufficient precision to avoid most name clashes, typically by forming noun phrases.
+* __Tolerant__ - Interpretable (even if undesirable) behavior is preferred to error messages.
+* __Observable__ - Activity within the site can be watched and reviewed by any other visitor to the site.
+* __Convergent__ - Duplication can be discouraged or removed by finding and citing similar or related content.
+
+!slide Semantic Wikis
+
+* pretty much RDF (though Topic Maps-based wiki exists) 
+* pretty much just academic prototypes
+* Semantic MediaWiki extension has widest adoption
+
+* Two basic kinds
+** Add metadata to page or links
+** Edit RDF data in Wiki-like fashion
+
+* similar to: structured wikis, application wikis such as:
+** JotSpot 
+** OpenRecord
+
+!slide RDF is much harder than, say, HTML
+
+* specs written for computer scientists (e.g. anonymous nodes)
+* Very low level, verbose (e.g. N-ary relationships)
+* doesn't follow the "datalog" model 
+* requires precise specification (tightly coupled)
+
+!!incremental There needs to be other ways for users to create RDF
+
+!slide microformats
+
+* simple conventions for embedding semantic markup for a specific problem domain 
+* in human-readable (X)HTML/XML documents, Atom/RSS feeds, and "plain" XML
+* that normalize existing content usage patterns using brief, descriptive class names  
+* to enable decentralized development of resources, tools, and services
+
+!slide microformats are simple
+
+* class attribute to add semantic meaning to elements
+* rel attribute to describe a links relationship 
+* use (abuse?) abbrv element for ugly machine readable data
+* microformats have unique identify declared in HTML use the profile attribute 
+
+!slide GRDDL
+
+* "Gleaning Resource Descriptions from Dialects of Languages"
+* a way to declare a transformation (usually XSL) that, when apply to the page, results in RDF.
+* allows microformats to be transformed into RDF
+
+!slide RDF/A
+
+* Annotate HTML and XML with RDF 
+** use rel and rev attributes on links to create properties
+** or use "property" attribute  
+** establish resources adding "about" attribute to resources
+** use [[CURIEs | http://www.w3.org/2001/sw/BestPractices/HTML/2005-10-27-CURIE]] to abbreviate URLs
+
+[[Spec | http://www.w3.org/2006/07/SWD/RDFa/syntax/]]
+
+!slide Rhizome
+
+!!incremental An open-source, Python-based application stack for creating RDF-based web applications.
+
+!!incremental A wiki that let's users create dynamic, structured content with explicit semantics. [[don't forget to talk about this annotation | todo id=1: due: "oct 20";]]
+
+!slide Rhizome Architecture
+
+[[rhizomearch.png]]
+
+!slide Why Bother?
+
+*incremental rapid development
+** no fixed database schema needed 
+** application can focus on semantics not environment specifics
+* easily evolvable
+** loosly coupled, decomposable
+** easily create data with explict semantics, easily reused and repurposed  
+
+!slide RxPath
+
+* Deterministic mapping of the RDF model to the XML data model defined by XPath. 
+** used to query, update, and transform the RDF data store 
+** syntactically identical to XPath 1.0, minor semantic differences
+* Make RDF simple to use, by:
+** Reduce "cognitive impedance" between RDF and XML
+** Use existing tools and formats: XPath, XSLT, XForms, DOM, XUpdate, etc.
+* RxSLT - extract and translates RDF to XML
+* [[RxUpdate|save?action=view-source]] - update a Data store
+* [[Schematron|validate-schema?action=view-source]] - validate changes to data store via ad hoc assertions 
+
+!slide RxPath query engine
+
+* transates XPath expression to an AST of relational operators
+** just need select, project, join (reflexive equijoins and recursive joins), union
+** simple yet optimizing query engine that invokes basic lookup primitives
+** works with most popular RDF datastores with Python interfaces: Redland, RDFLib, 4Suite    
+** they in turn work with the most popular SQL and embedded databases
+* future:
+** translate to AST to SPARQL or SQL directly
+** allow pre-existing SQL schemas to be mapped to RDF queries
+** SKOS, OWL-Lite inferencing (currently only supports RDF Schema)
+
+!slide Raccoon 
+
+* An application server that presents applications running on it a uniform and purely semantic view of the environment (i.e. as RDF).
+* Roughly, Raccoon is to RDF as Apache's Cocoon is to XML.
+* Request ==> Application (Rules + Store) ==> Response
+** A request is a dictionary of simple values
+** Raccoon maps external requests such as HTTP, command line arguments
+* The application defines a pipeline of RxPath expressions that transforms a request into a response.
+
+!slide Raccoon
+
+* Can very aggressively cache throughout the pipeline
+** Dependencies on the data store can be analyzed 
+** side-effects can be played back 
+* Raccoon also coordinates transactions that update the store.
+
+!slide Rhizome Wiki
+
+* standard Wiki functionality
+* some more advance content management features:
+** flexible authorization model
+** draft/release workflow
+** [[browse|keyword-browser]] by tags 
+** supports popular XML vocabularies
+*** DocBook, Apache Forrest
+** edit via filesystem
+** static export
+
+!slide Rhizome Wiki Vision
+
+* WikNames that are universal - site A can refer to and elaborate on a WikiName  created by site B without conflict.
+* WikiNames that can refer to abstract entities, not content, such as
+** programming artifacts like a function
+** structured data such as a product description
+** concepts
+** relationships between entities, such as annotations or categories  
+
+!slide Rhizome Wiki Components
+
+* ZML
+* RxML
+* shredding
+** contexts 
+** GRDDL  
+* content ontology: deterministically describe how final output is created
+* authorization
+
+!slide ZML Goals
+
+* use wiki markup to write arbitrary html and xml 
+* allow roundtripping of zml to html or xml and back again, so content could be written in ZML, then editied in a WYSIWYG HTML editor, and then viewed as ZML as again.
+* semantic markup 
+** distinguish naming vs. pointing
+** microformat support: typed blocks/sections/spans
+** annotations 
+** outlining
+* needs work!
+
+!slide RxML
+
+* yet another alternative syntax for RDF 
+* target audience: those who don't know what RDF is
+* try to be simple as .ini file
+* uses ZML but specified as XML
+
+!slide Security and Authorization
+
+* Raccoon provides hooks for application specific authorization of most operations
+* RxPath/XSLT sandbox is theorectically secure, can rely on authorization
+* Python code local administrator must whitelist by content digest
+* Raccoon various standard features: sanitization of html output, whitelist/blacklist IPs/URLs, controlled access to local file system, audit trails etc.
+
+!slide Authorization
+
+* two levels
+** application-defined privileges (e.g. view, edit, save, etc.)
+** fine-grained authorization of changes to the data store
+* balance complexity and expressiveness
+* uses a single RxPath expression that:  
+** select all the access tokens that guard the target resource and apply to the requested privilege
+** select all the access tokens with privilege that is granted to the user
+** compare tokens, if the highest priority of the guard token is greater then the highest priority of user's tokens then access is denied  
+** "guards" and "grants" paths are configurable; can support roles, classes, and hierarchical groups 
+
+!slide Fine-grained authorization
+
+* Authorize updates to store by considering each changed statement separately and incrementally 
+** But RDF statements are too fine-grained for most rules, so aggregate entities using transitive closure  
+** inferencing makes class-based access tokens complicated, only allow those as a separate, step at end of a transaction.
+
+!slide Future Plans
+
+* more usable in the real-world
+** improve speed and scalability
+** improve documentation (thru self-shredding)
+** better UI (work with OpenRecord)
+* enable statements be published in a DHT like OpenHash 
+* new kind of commons: universally accessible ideas 
+* http://www.liminalzone.org
+

@@ -29,6 +29,17 @@ __addItem__('changelog.txt',loc='path:.rzvs/changelog.txt', format='text',
 __addItem__('xupdate-wd.html',loc='path:.rzvs/xupdate-wd.html', format='xml', 
        accessTokens=['base:save-only-token'], disposition='complete')
 
+__addItem__('extreme2006.html',loc='path:.rzvs/extreme2006.html', format='xml', 
+       accessTokens=['base:save-only-token'], disposition='complete')
+
+__addItem__('www2006',loc='path:.rzvs/www2006.zml', format='zml', 
+       title='Introducing Rhizome', 
+       accessTokens=['base:save-only-token'], disposition='s5-template')
+
+__addItem__('sri',loc='path:.rzvs/sri.zml', format='zml', 
+       title='Semantic Wikis and Microformats', 
+       accessTokens=['base:save-only-token'], disposition='s5-template')
+
 __addRxML__(replace = '@sitevars', contents = '''
  base:site-template:
   wiki:header-image: `Rx4RDFlogo.gif
@@ -56,6 +67,9 @@ __addRxML__(replace = '@sitevars', contents = '''
    
  base:sidebar:
    auth:guarded-by: base:save-only-token 
+
+ base:www2006:
+    wiki:footer-text: "Adam Souzis &#8226; WWW2006"
 ''')
 
 __addRxML__(replace = '@rx4rdfAliases', contents = '''
