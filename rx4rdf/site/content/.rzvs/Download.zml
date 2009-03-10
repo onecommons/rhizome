@@ -2,13 +2,13 @@
 
 [Source (tar.gz)|http://sourceforge.net/project/showfiles.php?group_id=85676]
 
-Rx4RDF requires Python 2.2 or later (2.4 recommended) and the 4Suite XML library  (at [http://4Suite.org], version 1.0a1 or later). 
+Rx4RDF requires Python 2.3 or later and the 4Suite XML library  (at [http://4Suite.org], version 1.0a1 or later). 
 
 Rx4RDF and Rhizome are tested on Linux, Windows XP, and OS X 10.4  
 and should work on any platform that supports Python and 4Suite.
 It has been also known to work on Windows 98, Windows 2000, Cygwin and BSD.
  
-If you're just interested in ZML you just need this one Python [file|http://cvs.sourceforge.net/viewcvs.py/rx4rdf/rx4rdf/rx/zml.py].
+If you're just interested in ZML you just need this one Python [file|http://rx4rdf.svn.sourceforge.net/viewvc/*checkout*/rx4rdf/trunk/rx4rdf/rx/zml.py?content-type=text%2Fplain].
 
 Optional RDF Libraries
 
@@ -25,6 +25,8 @@ Other optional packages:
 If Lupy is installed ([http://www.divmod.org/Home/Projects/Lupy]), Rhizome will
 perform full-text indexing of content (requires Python 2.3 or later). 
 See the Rhizome manual for more info.
+
+If simplejson is installed ([http://pypi.python.org/pypi/simplejson/]) json can used to represent RDF (following the sparql json results format).
 
 !Install
 This is a standard Python source distribution. To install:

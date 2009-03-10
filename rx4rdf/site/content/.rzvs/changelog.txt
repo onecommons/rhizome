@@ -1,21 +1,35 @@
 Rx4RDF and Rhizome Changelog
 ============================
-Changes in Version 0.6.1 (??, 2006)
+
+Changes in Version 0.6.9 
 ----------------------------------------
-* dropped support for Python 2.2, now requires Python 2.3
+* switch to MPL 1.1/GPL 2.0/LGPL 2.1 tri-license
+* migrate from CVS to SVN on sourceforge.net
+* rhizome: add s5 presentation as doc type
 * added support for Python 2.5
+* dropped support for Python 2.2, now requires Python 2.3
+* RxPath: full versioning of RDF store:
+** new RxPathNamedGraph module for managing named graphs/contexts
+** can store version history in separate store (see versionModel config settings)
+** support removes from specific contexts in NTriples parser
+** add asQuad argument to getStatements()
+* rhizome: display revisions for any resource and for all metadata 
+* initial support for zml0.8, including:
+** full nesting....
+** use '' (2 single quotes) to indicate a resource name
+** support for CURI as element and attribute names
+** allow custom attributes for inline wiki markup
+** allow id and multiple class/roles names for structural wiki markup
+* utils: parse and serialize RDF as json (following the SPARQL json result format) (requires the simplejson package)
+* raccoon: handle KeyboardInterrupt and SystemExit properly
+* utils: add support for parsing <> in NTriples
 * zml: fix encoding non-ascii characters in markup mode, better handling of file encodings
 * raccoon: pass config vars directly to DomStore and Model factory functions
-* RxPath: more support for named graphs/contexts:
-** support removes from specific contexts in NTriples parser
-** store version history in separate store (versionModel config settings)
-** RxPathNamedGraph module
-** add asQuad argument to getStatements()
 * XUpdate: change xupdate:include href attribute to Attribute Value Template
 * RxPath: get Redland adapter working again(!)
 * raccoon:  fix uri resolver bug exposed by Python 2.5
-* rhizome: lozenge effect (requires IE7 javascript library)
-* http://rdflib.net/2.3.2/
+* rhizome: lozenge effect
+* RDFLib compatibility fixes (tested with http://rdflib.net/2.3.2/ )
 * rhizome: fix import cmd 
 * rhizome: added namespaces.txt specifying which namespaces to use when serializing RDF (e.g. when displaying RxML)
 * raccoon: change $STOP to $__STOP
