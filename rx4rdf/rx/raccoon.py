@@ -156,6 +156,17 @@ else:
     def notCacheableKeyPredicate(*args, **kw):
         raise MRUCache.NotCacheable
 
+    class ActionQuery(object):
+        def evaluate(self, requestProcessor, kw, contextNode):
+            return RxPath.XTrue
+    
+    class XPathActionQuery(object):
+        def XPathActionQuery(self, query):
+            self.query = query
+            
+        def evaluate(self, requestProcessor, kw, contextNode):
+            return requestProcessor.evalActionXPath(self.query, kw, contextNode)
+    
     class Action(object):
         '''
 The Action class encapsulates a step in the request processing pipeline.
@@ -166,7 +177,7 @@ match expressions. The action function returns a value which is passed
 onto the next Action in the sequence.
         '''
                 
-        def __init__(self, queries=('true()',), action=None, matchFirst=True,
+        def __init__(self, queries=None, action=None, matchFirst=True,
                 forEachNode = False, depthFirst=True, requiresContext=False,
                 cachePredicate=notCacheableKeyPredicate,
                 sideEffectsPredicate=None, sideEffectsFunc=None,
@@ -193,14 +204,17 @@ each node in a matching expression's result nodeset. The action
 function's result parameter will be a nodeset contain only that
 current node.
 '''        
-            self.queries = queries
+            if queries is None:
+                self.queries = [ActionQuery()]
+            self.queries = [isinstance(q, ActionQuery) and q or XPathActionQuery(q) 
+                              for q in queries]
             self.action = action
             self.matchFirst = matchFirst 
             self.forEachNode = forEachNode
             self.requiresContext = requiresContext
             self.depthFirst = depthFirst
             self.preVars = []
-            self.postVars = []        
+            self.postVars = []
             # self.requiresRetVal = requiresRetVal not yet implemented
             self.cacheKeyPredicate = cachePredicateFactory(self, cachePredicate)
             self.cachePredicateFactory = cachePredicateFactory
@@ -245,7 +259,27 @@ the Action is run (default is False).
                     break
             else:
                 varlist.append( (varName,  exps, assignWhenEmpty) )                    
-                                                                         
+    
+    class SimpleAction(Action, ActionQuery):
+        '''
+        Override match and go
+        '''
+        def match(self, kw):
+            return True
+            
+        def go(self, kw):
+            print 'wrong one'
+            return None
+    
+        def __init__(self):
+            Action.__init__(self, [self], self.runAction)
+            
+        def evaluate(self, requestProcessor, kw, contextNode):
+            return self.match(kw) and RxPath.XTrue or RxPath.XFalse
+            
+        def runAction(self, result, kw, contextNode, retVal):
+            return self.go(kw)    
+                                                                     
     def assignVars(self, kw, varlist, default):
         '''
         Helper function for assigning variables from the config file.
@@ -378,7 +412,7 @@ the Action is run (default is False).
             if not os.path.exists(path):
                 raise CmdArgError('%s not found' % path) 
 
-            kw = {}
+            kw = globals().copy() #copy this modules namespace
             if path:
                 if not self.BASE_MODEL_URI:
                     import socket            
@@ -393,7 +427,7 @@ the Action is run (default is False).
                 kw['__argv__'] = argsForConfig or []
                 kw['__include__'] = includeConfig
                 kw['__configpath__'] = [os.path.abspath(path)]
-                execfile(path, globals(), kw)
+                execfile(path, kw)                
 
             if appVars:
                 kw.update(appVars)
@@ -721,6 +755,11 @@ the Action is run (default is False).
                     AssignMetaData(kw, context, name, result, authorize=False)
                     #print name, result, contextNode
 
+        def evalActionXPath(self, xpath, kw, contextNode):
+            vars, extFunMap = self.mapToXPathVars(kw)
+            return self.evalXPath(xpath, vars=vars, extFunctionMap=extFunMap,
+                                                             node=contextNode)
+
         def _doActionsBare(self, sequence, kw, contextNode, retVal):
             result = None
             try:
@@ -733,10 +772,8 @@ the Action is run (default is False).
 
                     self.__assign(action.preVars, kw, contextNode, action.debug)
                                         
-                    for xpath in action.queries:                        
-                        vars, extFunMap = self.mapToXPathVars(kw)
-                        result = self.evalXPath(xpath, vars=vars,
-                                    extFunctionMap=extFunMap, node=contextNode)
+                    for xpath in action.queries:
+                        result = xpath.evaluate(self, kw, contextNode)
                         if result is self.STOP_VALUE:#for $STOP
                             break
                         if result: #todo: if result != []:
@@ -773,21 +810,21 @@ the Action is run (default is False).
                                         if kw.get('_metadatachanges'):
                                             del kw['_metadatachanges']
                                         retVal = self.actionCache.getOrCalcValue(
-                            action.action,
-                            [node], kw, contextNode, retVal,
-                            hashCalc=action.cacheKeyPredicate,
-                            sideEffectsCalc=action.sideEffectsPredicate,
-                            sideEffectsFunc=action.sideEffectsFunc,
-                            isValueCacheableCalc=action.isValueCacheableCalc)
+                action.action, [node], kw, contextNode, retVal,
+                hashCalc=action.cacheKeyPredicate,
+                sideEffectsCalc=action.sideEffectsPredicate,
+                sideEffectsFunc=action.sideEffectsFunc,
+                isValueCacheableCalc=action.isValueCacheableCalc)
                                 else:
                                     if kw.get('_metadatachanges'):
                                         del kw['_metadatachanges']
+                                        
                                     retVal = self.actionCache.getOrCalcValue(
-                        action.action, result, kw, contextNode, retVal,
-                        hashCalc=action.cacheKeyPredicate,
-                        sideEffectsCalc=action.sideEffectsPredicate,
-                        sideEffectsFunc=action.sideEffectsFunc,
-                        isValueCacheableCalc=action.isValueCacheableCalc)
+                action.action, result, kw, contextNode, retVal,
+                hashCalc=action.cacheKeyPredicate,
+                sideEffectsCalc=action.sideEffectsPredicate,
+                sideEffectsFunc=action.sideEffectsFunc,
+                isValueCacheableCalc=action.isValueCacheableCalc)
                             if action.matchFirst:
                                 break
 

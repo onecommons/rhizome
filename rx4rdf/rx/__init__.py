@@ -10,14 +10,19 @@ __all__ = ["raccoon", "utils", 'htmlfilter',
        "rhizome", 'RhizomeBase', 'RhizomeContent','RhizomeAuth','RhizomeCmds',
        #3rd party libraries with varying degrees of modifications:
        "Server", "XUpdate", 'MRUCache', "DomTree", 'akismet',
-       "glock", "metakitdriver", "htmldiff" ]
+       "glock", "metakitdriver", "htmldiff", 
+       #globals:
+       'hasFt' ]
 
-__version__ = '0.6.9'
+__version__ = '0.7.0'
 
+#XXX cleanup
 try:
     import Ft
+    hasFt = True
 except ImportError:
-    raise 'Rx4RDF requires the 4Suite package from Fourthought. It can be found at http://4suite.org'
+    hasFt = False
+    #raise 'Rx4RDF requires the 4Suite package from Fourthought. It can be found at http://4suite.org'
 
 import logging
 
@@ -29,3 +34,20 @@ except NameError:
     import sets
     set = sets.Set
     frozenset = sets.ImmutableSet
+
+#for pythons older than 2.5:
+try:
+    all = all
+    any = any
+except NameError:
+    def all(iterable):
+         for element in iterable:
+             if not element:
+                 return False
+         return True
+
+    def any(iterable):
+         for element in iterable:
+             if element:
+                 return True
+         return False

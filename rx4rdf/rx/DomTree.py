@@ -16,7 +16,16 @@ Project home, documentation, distributions: http://4suite.org/
 from xml.dom import Node as _Node
 from xml.dom import NotSupportedErr, HierarchyRequestErr, NotFoundErr
 from xml.dom import IndexSizeErr
-from Ft.Xml import SplitQName, XMLNS_NAMESPACE
+try:
+    from Ft.Xml import SplitQName, XMLNS_NAMESPACE, XML_NAMESPACE
+except ImportError:
+    XMLNS_NAMESPACE = u"http://www.w3.org/2000/xmlns/"
+    XML_NAMESPACE = u"http://www.w3.org/XML/1998/namespace"
+    def SplitQName(qname):
+        l = qname.split(':',1)
+        if len(l) < 2:
+            return None, l[0]
+        return tuple(l)
 
 # Number of characters to truncate to for Text and Comment repr's
 CDATA_REPR_LIMIT = 20

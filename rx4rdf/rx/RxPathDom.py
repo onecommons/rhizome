@@ -38,13 +38,13 @@
 '''
 
 from rx import RxPath, utils, DomTree
+from DomTree import SplitQName, XML_NAMESPACE
 from utils import NotSet
 from RxPath import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL
 from RxPath import RDF_MS_BASE, RDF_SCHEMA_BASE
 
 import xml.dom
 from xml.dom import NotSupportedErr, HierarchyRequestErr, NotFoundErr,IndexSizeErr
-from Ft.Xml import SplitQName, XML_NAMESPACE
 import sys, copy
 
 from rx import logging #for python 2.2 compatibility
@@ -1882,6 +1882,8 @@ class Document(DomTree.Document, Node): #Note: DomTree.Node will always be invok
                 self.subjectDict = {}  
                 #todo: handle this case more efficiently
 
+class DocumentFragment(DomTree.DocumentFragment, Node):
+    pass
         
 import traceback, sys, re
 

@@ -1,5 +1,9 @@
-#most of the code here is based on PEAK's transactions.py, specifically:
-#http://cvs.eby-sarna.com/PEAK/src/peak/storage/transactions.py?rev=1.33
+'''
+Most of the code here is based on PEAK's transactions.py, specifically:
+http://cvs.eby-sarna.com/PEAK/src/peak/storage/transactions.py?rev=1.33
+(also available at http://svn.eby-sarna.com/*checkout*/PEAK/src/peak/storage/transactions.py?rev=1573 )
+'''
+
 import time
 import os, os.path
 from rx import utils

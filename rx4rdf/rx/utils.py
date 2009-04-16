@@ -7,11 +7,16 @@
 """
 from __future__ import generators
 import os.path
-import os, sys, sha, types, re, copy
+import os, sys, types, re, copy
 from stat import *
 from time import *
 from types import *
 from binascii import unhexlify, b2a_base64
+try:
+    from hashlib import sha1
+except ImportError:
+    import sha
+    sha1 = sha.new
 
 from rx.htmlfilter import * #for backwards compatiblity
 
@@ -550,24 +555,24 @@ def compareNilsimsa(n1, n2, nilsimsaThreshold):
 
 class Hasher:
     def __init__(self):                         
-        self.sha = sha.new()
+        self.sha = sha1()
     def write(self, line):
         #print line
         self.sha.update(line.strip().encode('utf8'))
 
 def shaDigest(filepath):
     BUF = 8192
-    sha1 = sha.new()
+    sha = sha1()
     shaFile = file(filepath, 'rb', BUF)
     for line in iter(lambda: shaFile.read(BUF), ""):
-        sha1.update(line)
+        sha.update(line)
     shaFile.close()
-    return b2a_base64(sha1.digest())[:-1]
+    return b2a_base64(sha.digest())[:-1]
     
 def shaDigestString(line):
-    sha1 = sha.new()
-    sha1.update(line)
-    return b2a_base64(sha1.digest())[:-1]
+    sha = sha1()
+    sha.update(line)
+    return b2a_base64(sha.digest())[:-1]
             
 def getVolumeInfo(path):
     if sys.platform == 'win32':  #or sys.platform == 'cygwin':

@@ -5,10 +5,9 @@
     All rights reserved, see COPYING for details.
     http://rx4rdf.sf.net    
 """
-from Ft.Xml import Domlette, InputSource
 from rx import RxPath, transactions
 import StringIO, os, os.path
-from rx import logging #for python 2.2 compatibility
+from rx import hasFt, logging #for python 2.2 compatibility
 
 class DomStore(transactions.TransactionParticipant):
     '''
@@ -74,76 +73,79 @@ class DomStore(transactions.TransactionParticipant):
             #     -- this will break that
             source = os.path.join( requestProcessor.baseDir, source)
         return source
+
+if hasFt:
+    from Ft.Xml import Domlette, InputSource
     
-class XMLDomStore(DomStore):
-    _defaultModel = None
-    _location = None
-    prettyPrint = False
-
-    def __init__(self, STORAGE_PATH ='', STORAGE_TEMPLATE='', **kw):
-        self.STORAGE_PATH = STORAGE_PATH
-        self._defaultModel = StringIO.StringIO(STORAGE_TEMPLATE)
+    class XMLDomStore(DomStore):
+        _defaultModel = None
+        _location = None
+        prettyPrint = False
     
-    def loadDom(self, requestProcessor):        
-        self.log = logging.getLogger("domstore." + requestProcessor.appName)
-        source = self._normalizeSource(requestProcessor, self.STORAGE_PATH)
-
-        if os.path.exists(source):
-            inputSource = InputSource.DefaultFactory.fromUri(Uri.OsPathToUri(source))
-        else:
-            inputSource = InputSource.DefaultFactory.fromStream(self._defaultModel)
+        def __init__(self, STORAGE_PATH ='', STORAGE_TEMPLATE='', **kw):
+            self.STORAGE_PATH = STORAGE_PATH
+            self._defaultModel = StringIO.StringIO(STORAGE_TEMPLATE)
+        
+        def loadDom(self, requestProcessor):        
+            self.log = logging.getLogger("domstore." + requestProcessor.appName)
+            source = self._normalizeSource(requestProcessor, self.STORAGE_PATH)
+    
+            if os.path.exists(source):
+                inputSource = InputSource.DefaultFactory.fromUri(Uri.OsPathToUri(source))
+            else:
+                inputSource = InputSource.DefaultFactory.fromStream(self._defaultModel)
+                
+            self._location = source
+            self.dom = Domlette.NonvalidatingReader.parse(inputSource)
             
-        self._location = source
-        self.dom = Domlette.NonvalidatingReader.parse(inputSource)
-        
-    def evalXPath(self, xpath, context, expCache=None,queryCache=None):
-        self.log.debug(xpath)
-        if expCache:
-            compExpr = expCache.getValue(xpath) #todo: nsMap should be part of the key -- until then clear the cache if you change that!
-        else:
-            compExpr = XPath.Compile(xpath)
-        
-        if queryCache:
-            res = queryCache.getValue(compExpr, context)         
-        else:
-            res = compExpr.evaluate(context)
-        return res
-        
-
-    def applyXslt(self, xslStylesheet, topLevelParams = None, extFunctionMap = None,
-              baseUri='file:', styleSheetCache = None):
-        extFunctionMap = extFunctionMap or {}
-
-        from Ft.Xml.Xslt.Processor import Processor
-        processor = Processor()
-
-        if styleSheetCache:
-            styleSheet = styleSheetCache.getValue(xslStylesheet, baseUri)
-            processor.appendStylesheetInstance( styleSheet, baseUri ) 
-        else:
-            processor.appendStylesheet( InputSource.DefaultFactory.fromString
-                                        (xslStylesheet, baseUri)) #todo: fix baseUri
+        def evalXPath(self, xpath, context, expCache=None,queryCache=None):
+            self.log.debug(xpath)
+            if expCache:
+                compExpr = expCache.getValue(xpath) #todo: nsMap should be part of the key -- until then clear the cache if you change that!
+            else:
+                compExpr = XPath.Compile(xpath)
             
-        for (k, v) in extFunctionMap.items():
-            namespace, localName = k
-            processor.registerExtensionFunction(namespace, localName, v)
+            if queryCache:
+                res = queryCache.getValue(compExpr, context)         
+            else:
+                res = compExpr.evaluate(context)
+            return res
             
-        return processor.runNode(self.dom, None, 0, topLevelParams), processor.stylesheet
-
-    def commitTransaction(self, txnService):
-        #write out the dom
-        output = file(self._location, 'w+')
-        from Ft.Xml.Domlette import Print, PrettyPrint
-        if self.prettyPrint:
-            PrettyPrint(doc, output)
-        else:
-            Print(doc, output)
-        output.close()
-        self._defaultModel = None
-        
-    def abortTransaction(self, txnService):
-        #reload the file
-        self.loadDom(None, self._location, self._defaultModel)
+    
+        def applyXslt(self, xslStylesheet, topLevelParams = None, extFunctionMap = None,
+                  baseUri='file:', styleSheetCache = None):
+            extFunctionMap = extFunctionMap or {}
+    
+            from Ft.Xml.Xslt.Processor import Processor
+            processor = Processor()
+    
+            if styleSheetCache:
+                styleSheet = styleSheetCache.getValue(xslStylesheet, baseUri)
+                processor.appendStylesheetInstance( styleSheet, baseUri ) 
+            else:
+                processor.appendStylesheet( InputSource.DefaultFactory.fromString
+                                            (xslStylesheet, baseUri)) #todo: fix baseUri
+                
+            for (k, v) in extFunctionMap.items():
+                namespace, localName = k
+                processor.registerExtensionFunction(namespace, localName, v)
+                
+            return processor.runNode(self.dom, None, 0, topLevelParams), processor.stylesheet
+    
+        def commitTransaction(self, txnService):
+            #write out the dom
+            output = file(self._location, 'w+')
+            from Ft.Xml.Domlette import Print, PrettyPrint
+            if self.prettyPrint:
+                PrettyPrint(doc, output)
+            else:
+                Print(doc, output)
+            output.close()
+            self._defaultModel = None
+            
+        def abortTransaction(self, txnService):
+            #reload the file
+            self.loadDom(None, self._location, self._defaultModel)
             
 class RxPathDomStore(DomStore):
 

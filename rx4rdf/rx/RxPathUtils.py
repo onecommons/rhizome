@@ -16,10 +16,10 @@ except ImportError:
 
 from rx import utils
 
-from Ft.Lib import Uuid, Uri
-from Ft.Xml import InputSource
-
 try:
+    from Ft.Lib import Uri
+    from Ft.Xml import InputSource
+
     from Ft.Rdf import OBJECT_TYPE_RESOURCE, OBJECT_TYPE_LITERAL    
     #note: because we change these values here other modules need to import this module
     #before importing any Ft.Rdf modules
@@ -43,7 +43,16 @@ RDF_SCHEMA_BASE=u"http://www.w3.org/2000/01/rdf-schema#"
 
 _bNodeCounter  = 0
 #like this so this will be a valid bNode token (NTriples only allows alphanumeric, no _ or - etc.
-_sessionBNodeUUID = "x%032xx" % Uuid.GenerateUuid()
+try:
+    import uuid
+    _sessionBNodeUUID = 'x'+ uuid.uuid4().hex
+except ImportError:
+    try:
+        from Ft.Lib import Uuid
+        _sessionBNodeUUID = "x%032xx" % Uuid.GenerateUuid()
+    except ImportError:
+        import random
+        _sessionBNodeUUID = "x%032xx" % random.getrandbits(16*8)
 
 #todo rename this class to MutableStatement
 #write a Statement class derived from tuple, add a BaseStatement marker class

@@ -10,11 +10,6 @@
 '''
 from __future__ import generators
 
-from Ft.Lib.boolean import false as XFalse, true as XTrue, bool as Xbool
-
-from Ft.Xml.XPath.Conversions import StringValue, NumberValue
-from Ft.Xml import XPath, InputSource, SplitQName, EMPTY_NAMESPACE
-
 from rx import utils
 from rx.RxPathUtils import *
 
@@ -230,7 +225,7 @@ class MemModel(Model):
         return removeDupStatementsFromSortedList(stmts, asQuad)
                      
     def addStatement(self, stmt ):
-        '''add the specified statement to the model'''
+        '''add the specified statement to the model'''            
         if stmt in self.by_c.get(stmt[4], {}).get(stmt[0], []):
             return #statement already in
         self.by_s.setdefault(stmt[0], []).append(stmt)

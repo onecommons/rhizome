@@ -106,25 +106,25 @@ class MRUCache:
 
         self.valueCalc, self.hashCalc, self.sideEffectsCalc, etc. are all ignored by this function.
         '''
-        if kw.has_key('hashCalc'):
+        if 'hashCalc' in kw:
             hashCalc = kw['hashCalc']
             del kw['hashCalc']
         else:
             hashCalc = None
 
-        if kw.has_key('sideEffectsCalc'):
+        if 'sideEffectsCalc' in kw:
             sideEffectsCalc = kw['sideEffectsCalc']
             del kw['sideEffectsCalc']
         else:
             sideEffectsCalc = None
             
-        if kw.has_key('sideEffectsFunc'):
+        if 'sideEffectsFunc' in kw:
             sideEffectsFunc = kw['sideEffectsFunc']
             del kw['sideEffectsFunc']
         else:
             sideEffectsFunc = None
 
-        if kw.has_key('isValueCacheableCalc'):
+        if 'isValueCacheableCalc' in kw:
             isValueCacheableCalc = kw['isValueCacheableCalc']
             del kw['isValueCacheableCalc']
         else:
@@ -132,7 +132,7 @@ class MRUCache:
 
         if self.capacity == 0: #no cache, so just execute valueCalc
             return valueCalc(*args, **kw)
-        
+
         invalidateKeys = []
         if hashCalc:
             try: 
