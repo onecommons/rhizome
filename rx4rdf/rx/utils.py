@@ -39,7 +39,9 @@ def kw2dict(**kw):
     #not needed in python 2.3, dict ctor does the same thing
     return kw
 
-_flattenTypes = (list,tuple, GeneratorType, type({}.iteritems()) )
+_flattenTypes = (list,tuple, GeneratorType, type({}.iteritems()),
+    type({}.itervalues()), type({}.iterkeys()))
+
 def flattenSeq(seq, depth=0xFFFF, flattenTypes=None):
     '''
     >>> list(flattenSeq([ [1,2], 3, [4,5]]))
@@ -55,12 +57,22 @@ def flattenSeq(seq, depth=0xFFFF, flattenTypes=None):
 '''
     if flattenTypes is None:
         flattenTypes = _flattenTypes
-    for a in seq:
-        if depth > 0 and isinstance(a, flattenTypes):
-            for i in flattenSeq(a, depth-1):
-                yield i
-        else:
-            yield a
+    if not isinstance(seq, flattenTypes):
+        yield seq
+    else:
+        for a in seq:
+            if depth > 0:
+                for i in flattenSeq(a, depth-1, flattenTypes):
+                    yield i
+            else:
+                yield a
+
+def flatten(seq, to=list, depth=0xFFFF, flattenTypes=None, keepSeq=False):
+    flattened = to(flattenSeq(seq, depth, flattenTypes))
+    if not keepSeq and len(flattened)==1:
+        return flattened[0]
+    else:
+        return flattened
 
 def bisect_left(a, x, cmp=cmp, lo=0, hi=None):
     """

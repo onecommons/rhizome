@@ -18,12 +18,64 @@ import os.path, sys, traceback
 from rx import logging #for python 2.2 compatibility
 log = logging.getLogger("RxPath")
 
+class ColumnInfo(tuple):
+    __slots__ = ()
+
+    def __new__(cls, pos, label, type=object):
+        return tuple.__new__(cls, (pos, label,type) )
+
+    pos = property(lambda self: self[0])    
+    label = property(lambda self: self[1])
+    type = property(lambda self: self[2])
+
+class NestedRows(object):
+    def __init__(self, columns, reorder=True):
+        if reorder:
+            self.columns = [ColumnInfo(i, c.label, c.type)
+                                for (i, c) in enumerate(columns)]
+        else:
+            self.columns = columns
+
+    def findColumn(self, label, deep=False):
+        if isinstance(label, int):
+            if label >= len(self.columns):
+                return None
+            return self.columns[label]
+        for col in self.columns:
+            if label == col.label:
+                return col
+            if deep and isinstance(col.type, NestedRows):
+                if col.type.findColumn(label):
+                    return col
+        return None
+
+    def __repr__(self):
+        return 'NestedRows'+repr(self.columns)
+
 class Tupleset(object):
     '''
     Interface for representing a set of tuples
     '''
-    
-    def filter(self, conditions=None):        
+    columns = None
+
+    def findColumn(self, label, deep=False):
+        if not self.columns:
+            return None
+
+        if isinstance(label, int):
+            if label >= len(self.columns):
+                return None
+            return self.columns[label]
+
+        for col in self.columns:
+            if label == col.label:
+                return col
+            if deep and isinstance(col.type, NestedRows):
+                if col.type.findColumn(label):
+                    return col
+        return None
+
+    def filter(self, conditions=None, hints=None):
         '''Returns a iterator of the tuples in the set
            where conditions is a position:value mapping
         '''
@@ -67,6 +119,7 @@ class Tupleset(object):
         raise TypeError('Tupleset is read only')
     
 class Model(Tupleset):
+
     ### Transactional Interface ###
     autocommit = True
     
@@ -77,8 +130,10 @@ class Model(Tupleset):
         return
 
     ### Tupleset interface ###
+    columns = tuple(ColumnInfo(i, l, i == 4 and object or unicode) for i, l in
+          enumerate(('subject', 'predicate','object', 'objecttype','context')))
 
-    def filter(self,conditions=None):
+    def filter(self,conditions=None, hints=None):
         kw = {}
         if conditions:
             labels = ('subject', 'predicate','object', 'objecttype','context')
