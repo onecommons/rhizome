@@ -2,6 +2,7 @@ from ng import jql, sjson
 from ng.jqlAST import *
 from rx import RxPath
 import sys, pprint
+from rx.utils import flatten
 
 #aliases for convenience
 jc = JoinConditionOp
@@ -12,6 +13,9 @@ def cp(*args, **kw):
     return ConstructProp(*args, **kw)
 
 
+def modelFromJson(model):
+    model = sjson.sjson().to_rdf( { 'results' : model } )
+    return RxPath.MemModel(model)
 
 '''
 todo: query tests:
@@ -31,50 +35,101 @@ class Test(object):
     def __init__(self, attrs):
         self.__dict__.update(attrs)
 
-def t(query=None, results=None, **kw):
-    '''
-    optional arguments:
-    rows: test the tupleset result matches this
-    results : test the result of query execution matches this
-    name: name the test
-    '''
+class Suite(object):
     defaults = dict(ast=None, rows=None, result=None, skip=False,
-                skipParse=False, model=None, name=None)
-    defaults.update(query=query, results=results)
-    defaults.update(kw)
-    return Test(defaults)
+                skipParse=False, model=None, name=None, query=None)
 
-class Tests:
+    def __init__(self):
+        self.tests = []
+
+    def __call__(self, query=None, results=None, **kw):
+        '''
+        optional arguments:
+        rows: test the tupleset result matches this
+        results : test the result of query execution matches this
+        name: name the test
+        '''
+        defaults = self.defaults.copy()
+        defaults.update(self.__dict__)
+        defaults.update(query=query, results=results)
+        defaults.update(kw)
+        t = Test(defaults)
+        self.tests.append(t)
+        return t
+
+    def __iter__(self):
+        for t in self.tests:
+            yield t
+
+t = Suite()
+skip = Suite()
 
 ###################################
 ########### basic tests ###########
 ###################################
-    simpleModel = [
+t.model = modelFromJson([
         { "parent":"1", "child":"2"},
         { "parent":"1", "child":"3"},
         { "id" : "1"},
         { "id" : "2", "foo" : "bar"},
         { "id" : "3", "foo" : "bar"}
-    ]
+    ])
 
-    firstTests = (simpleModel, [t(
-''' { id : ?parent,
-      derivedprop : a + b,
-      children : { id : ?child,
+t('{*}')
+
+t(
+''' { id : ?childid,
+        *
+       where( {child = ?childid 
+           })
+    }
+''')
+
+
+t(
+''' { id : ?parentid,
+      #derivedprop : a + b,
+      'children' : { id : ?childid,
                    *
-                   where( {child = ?child,
-                        parent = ?parent
+                   where( {child = ?childid and
+                        parent = ?parentid
                        })
                  }
     }
-''',skipParse=1,
-ast=Root(
- Join(
-  jc(Join( #row : subject, "child", "parent"
-    Filter(None, Eq('child'), None, objectlabel='child'),
-    Filter(None, Eq('parent'), None, objectlabel='parent'),
-    ), 'parent'),  #this can end up with child cell as a list
+''',skipParse=0,
+result = [{
+ 'id' : '1',
+ 'children' : [
+      { 'id' : '2', 'foo':'bar'},
+      { 'id' : '3', 'foo':'bar'},
+   ]
+}],
+ast0=Select(Construct([
+    cs('id', 'parentid'),
+    #XXX outerjoin broken:
+    #cp('derivedprop',  qF.getOp('add', Project('a'), Project('b'))),
+    cp('children', Select(Construct([
+            cs('id', 'childid'),
+            cp(Project('*')) #XXX broken!: find all props
+        ])))
+    ]),
+    Join(
+ jc(
+    Join(
+    jc(
+    Join(
+    Filter(Eq('parent',Project(PROPERTY)), #qF.getOp('isref',Project(OBJECT)),
+                                          objectlabel='parent'),
+    Filter(Eq('child',Project(PROPERTY)), #qF.getOp('isref',Project(OBJECT)),
+                                          objectlabel='child'),
+    #name='childid'
+    ),
+    Eq(Project('child'), Project(SUBJECT)) ), name='childid'
+    ),
+ Eq(Project('parent'), Project(SUBJECT)) ), name='parentid'
+ )
 ),
+oldast=Select(
  Construct([
     cs('id'),
     #XXX outerjoin broken:
@@ -83,76 +138,97 @@ ast=Root(
             cs('id', 'child'),
             cp(Project('*')) #find all props
         ]))
-    ])
+    ]),
+     Join(
+  jc(Join( #row : subject, "child", "parent"
+    Filter(Eq('child',Project(PROPERTY)), objectlabel='child'),
+    Filter(Eq('parent',Project(PROPERTY)), objectlabel='parent'),
+    ), 'parent'),  #this can end up with child cell as a list
+)
 ),
 #expected rows: id, (child, parent)
-rows=[['1',
+rows0=[['1',
     [
       ['2', '1'], ['3', '1']
     ]
 ]]
-),
+)
+
 t(
-''' { id : ?parent,
-      derivedprop : a + b,
-      children : { id : ?child,
-                   foo : 'bar',                   
-                   where( {child = ?child,
-                        parent = ?parent
+''' { id : ?parentid,
+      #derivedprop : a + b,
+      'children' : { id : ?childid,
+                   foo : 'bar',
+                   where( {child = ?childid and
+                        parent = ?parentid
                        })
                  }
     }
-''',skipParse=1,
-ast=Root(
+''',skipParse=0,
+ast0=Select(
+  Construct([
+    cs('id', 'parent'),
+    #cp('derivedprop',  qF.getOp('add', Project('a'), Project('b'))),
+    cp('children', Select(Construct([
+            cs('id', 'child'),
+            cp('foo', Project('foo')) #find all props
+        ])))
+    ]),
  Join( #row  : (subject, (subject, foo, ("child", ("child", "parent"))))
   jc(
     Join( #row : subject, foo, ("child", ("child", "parent"))
+     Filter(Eq(Project(OBJECT),'bar'), Eq(Project(PROPERTY),'foo'), objectlabel='foo'),
      jc(Join( #row : subject, ("child", "parent")
-       Filter(None, Eq('child'), None, objectlabel='child'),
-       Filter(None, Eq('parent'), None, objectlabel='parent'),
-       ),'child'),
-     Filter(None, Eq('foo'), Eq('bar'), objectlabel='foo')
-    ),
+       Filter(Eq('parent',Project(PROPERTY)), objectlabel='parent'),
+       Filter(Eq('child', Project(PROPERTY)), objectlabel='child'),
+       name = '@1'
+       ),'child')     
+    , name='child'),
     'parent'),  #this can end up with child cell as a list
-),
- Construct([
-    cs('id'),
-    #cp('derivedprop',  qF.getOp('add', Project('a'), Project('b'))),
-    cp('children', Construct([
-            cs('id', 'child'),
-            cp(Project('foo')) #find all props
-        ]))
-    ])
+    name='parent'
+)
 ),
 #expected results (id, (child, foo), parent)
-rows=[['1',
+rows0=[['1',
     [
        ['bar', '3', '1'], ['bar', '2', '1']
     ]
 ]]
 )
-])
 
-    basicModel = [{}, {}]
-    basicTests = (basicModel, [
+t('''
+{ id : ?childid,
+      'parent' : { id : ?parentid,
+                   where( 
+                   {child = ?childid and
+                        parent = ?parentid
+                    })
+                 }
+    }
+''')
+
+basic = Suite()
+basic.model = [{}, {}]
+
 #join on prop
-('''
+basic('''
 {
 foo : { * } #find objects whose id equals prop's value
 where (bar = 'match')
 }
 ''',
-'''ConstructOp({
+['result'],
+ast= '''ConstructOp({
     'foo': ConstructOp({'id': Label('_construct1'), 
                         '*': ProjectOp('*')})
     }, JoinOp(FilterOp(None, 'bar', 'match'),
         FilterOp(None, 'foo', None, objectlabel='_construct1')
         )
     )''',
-['result']
-),
+)
+
 #correlated variable reference
-('''
+basic('''
 { id : ?parent,
 derivedprop : prop(a)/prop(b),
 children : {
@@ -167,7 +243,8 @@ children : {
 where (cost > 3)
 }
 ''',
-'''ConstructOp({
+['result'],
+ast = '''ConstructOp({
     id : Label('parent'),
     derivedprop : NumberFunOp('/', project('a')/project('b')),
     children : construct({
@@ -185,9 +262,10 @@ where (cost > 3)
          joinon=(SUBJECT,'parent') #group child vars together per join row
        )
     )''',
-['result']
-),
-t(name="implicit join via attribute reference",
+
+)
+
+basic(name="implicit join via attribute reference",
 query='''
 {
 id : ?parent,
@@ -196,8 +274,9 @@ where( foo = {
     id : ?parent.foo
   })
 }
-'''),
-t(name="implicit join via attribute reference",
+''')
+
+basic(name="implicit join via attribute reference",
 query='''
 {
 buzz : ?child.blah
@@ -207,12 +286,12 @@ where (buzz = ?child.blah)
 }
 ''', 
 ast=Join(
-Filter(None, 'buzz', Join(Filter(None, 'blah', None)) )
+Filter(Eq('buzz',Project(PROPERTY)), Join(Filter(Eq('blah',Project(PROPERTY)) )) )
 ),
 astrewrite= Join(
     jc(Join(
-        jc(Filter(None, Eq('buzz'), None, subjectlabel='_1'), OBJECT),
-        jc(Filter(None, Eq('blah'), None, subjectlabel='blah'), SUBJECT)
+        jc(Filter(Eq('buzz',Project(PROPERTY)), subjectlabel='_1'), OBJECT),
+        jc(Filter(Eq('blah',Project(PROPERTY)), subjectlabel='blah'), SUBJECT)
       ),
     '_1')
 )
@@ -228,18 +307,39 @@ astrewrite= Join(
 #  }
 ###
 )
- ])
 
+basic(name='recursive',
+query='''
+{
+id : ?a,
+'descendants' : ?b and ?c and ?d and ?e #XXX hmmm
+'descendants' : union(?b, ?c, ?d, ?e) #how about that?
+'descendants' : [?b,?c,?d,?e] #this could result in nested lists
+#this allows arbitrary constructions to be combined
+'descendants' : ?b,
+'descendants' : ?c,
+'descendants' : ?d,
+'descendants' : ?e,
+where (
+     maybe(?a parentof ?b) and
+     maybe(?b parentof ?c) and
+     maybe(?c parentof ?d) #don't execute is ?c is null/undefined
+     and maybe(?d parentof ?e)
+  )
+}
+''')
 
    #### BerlinSPARQLBenchmark tests
   ## see http://www4.wiwiss.fu-berlin.de/bizer/BerlinSPARQLBenchmark/spec/index.html#queriesTriple
   #######
-    benchmarkModel = [{
-    }]
 
-    benchmarkTests = (benchmarkModel, [
-  #1
-  '''
+berlin = Suite()
+berlin.model = {
+    }
+
+berlin.tests = [
+#1
+ '''
   { 
    rdfs:label : *
    where (
@@ -250,7 +350,7 @@ astrewrite= Join(
    )
   }
   ''',
-  #2
+ #2
   '''
   {
   rdfs:label : *,
@@ -274,27 +374,46 @@ where (feature1 or feature2)
 #5 Find products that are similar to a given product.
 '''
 '''
-])
+]
+
+skip(name='labeled but no where',
+#the nested construct will not have a where clause
+#but we have a joincondition referencing that object
+query='''
+{ 'inner' : { id : ?foo }
+  where ( ?foo = bar) }
+''')
 
 from optparse import OptionParser
 
 if __name__ == "__main__":
-    usage = "usage: %prog [options]"
+    usage = "usage: %prog [options] [test name or number]"
     parser = OptionParser(usage)
-    for name, default in [('printmodel', 0), ('printast', 1), ('explain', 1)]:
+    for name, default in [('printmodel', 0), ('printast', 0), ('explain', 0),
+        ('printdebug', 0), ('printrows', 0)]:
         parser.add_option('--'+name, dest=name, default=default, 
                                                 action="store_true")
     (options, args) = parser.parse_args()
+    options.num = -1
+    options.name = ''
+    if args and args[0] != 'null':
+        try:
+            options.num = int(args[0])
+        except:
+            options.name = args[0]
 
-    model, tests = Tests.firstTests
-    model = sjson.sjson().to_rdf( { 'results' : model } )
-    model = RxPath.MemModel(model)
+    model = t.model
     if options.printmodel:
         print 'model', list(model)
 
     count = 0
-    for (i, test) in enumerate(tests):
+    skipped = 0
+    for (i, test) in enumerate(flatten(t)):
+        if options.num > -1:
+            if i != options.num:
+                continue
         if test.skip:
+            skipped += 1
             continue
         count += 1
 
@@ -302,44 +421,51 @@ if __name__ == "__main__":
             name = test.name
         else:
             name = "%d" % i
+
+        if options.name:
+            if name != options.name:
+                continue
+
         print '*** running test:', name
+        print 'query', test.query
 
         if test.ast:
             if not test.skipParse:
                 testast = jql.buildAST(test.query)
-                assert testast == test.ast, ('unexpected ast for test %d' % i)
+                #jql.rewriteAST(testast)
+                print 'comparing ast'
+                assert testast == test.ast, ('unexpected ast for test %d: %s \n %s'
+                            % (i, findfirstdiff(testast, test.ast), testast))
+                ast = testast
             else:
                 ast = test.ast
         else:
             ast = jql.buildAST(test.query)
-
-        jql.rewriteAST(ast)
+            #jql.rewriteAST(ast)
         if options.printast:
             print "ast:"
             pprint.pprint(ast)
 
-        if test.rows is not None:
-            if options.explain:
-                print "explain plan:"
-                explain = sys.stdout
-            else:
-                explain = None
-            evalAst = ast.evalOp
-            testrows = list(jql.evalAST(evalAst, model, explain=explain))
-            print 'rows:'
+        if options.printrows or test.rows is not None:
+            evalAst = ast.where
+            testrows = list(jql.evalAST(evalAst, test.model))            
             print 'labels', evalAst.labels
+            print 'rows:'
             pprint.pprint(testrows)
-            assert test.rows== test.rows,  ('unexpected rows for test %d' % i)
-        elif options.explain:
-            print "explain plan:"
-            evalAst = ast.evalOp
-            testrows = list(jql.evalAST(evalAst, model, explain=sys.stdout))
+            if test.rows is not None:
+                assert test.rows== testrows,  ('unexpected rows for test %d' % i)
 
-        print "execute and construct (with debug):"
-        testresults = list(jql.evalAST(ast, model, debug=True))
+        if options.explain:
+            print "explain plan:"
+            explain = sys.stdout
+        else:
+            explain = None
+
+        print "construct " + (options.printdebug and '(with debug)' or '')
+        testresults = list(jql.evalAST(ast, test.model, explain=explain,debug=options.printdebug))
         print "Construct Results:"
         pprint.pprint(testresults)
         if test.results is not None:
             assert test.results == testresults,  ('unexpected results for test %d' % i)
 
-    print '***** %d tests passed, %d skipped' % (count, len(tests) - count)
+    print '***** %d tests passed, %d skipped' % (count, skipped)

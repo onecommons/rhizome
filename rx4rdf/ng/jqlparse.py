@@ -12,18 +12,24 @@ where(
 querypartfunc(expression) # groupby | orderby | limit | offset
 }
 
-expression = join | expr
-join = { expr }
-expr =
+{foo : bar} #construct foo, where foo = bar
+{"foo" : "bar"} #construct "foo" : "bar"
+{"foo" : bar}  #construct foo, value of bar property (on this object)
+#construct foo where value of baz on another object
+{foo : ?child.baz
+    where ({ id=?child, bar="dd"})
+}
 
-where(dfad=adfff, adfad=adfa or and or not
-{
-foo : bar #where foo = bar
-"foo" : "bar" #construct: foo : bar
-"foo" : bar  #construct foo, where foo = bar
-foo : "bar" #where foo = "bar"
-foo : ?child.baz
-where ({ id=?child, foo="dd"})
+#construct foo with a value as the ?child object but only matching baz property
+{'foo' : { id : ?child, * }
+    where ( foo = ?child.baz)
+}
+
+#same as above, but only child id as the value
+{'foo' : ?child
+    where ( foo = ?child.baz)
+}
+
 '''
 
 from jqlAST import *
@@ -44,7 +50,7 @@ class Tag(tuple):
         return self.__class__.__name__+tuple.__repr__(self)
 
     #for compatibility with QueryOp iterators:
-    args = property(lambda self: self)
+    args = property(lambda self: [s for s in self if hasattr(s,'args')])
 
 class _Env (object):
     _tagobjs = {}
@@ -78,7 +84,7 @@ import ply.yacc
 ###########
 
 reserved = ('TRUE', 'FALSE', 'NULL', 'NOT', 'AND', 'OR', 'IN', 'IS', 'NS',
-            'OPTIONAL', 'WHERE', 'LIMIT', 'OFFSET', 'GROUPBY', 'ORDERBY')
+           'ID', 'OPTIONAL', 'WHERE', 'LIMIT', 'OFFSET', 'GROUPBY', 'ORDERBY')
 
 tokens = reserved + (
     # Literals (identifier, integer constant, float constant, string constant, char const)
@@ -96,7 +102,7 @@ tokens = reserved + (
     'LBRACE', 'RBRACE',
     'COMMA', 'PERIOD', 'COLON',
 
-    'URI', 'VAR', 'QNAME', 'QSTAR', 'ID',
+    'URI', 'VAR', 'QNAME', 'QSTAR'
 )
 
 # Operators
@@ -145,18 +151,19 @@ def t_FLOAT(t):
     t.value = float(t.value)
     return t
 
-# String literal
-t_STRING = r'''(?:"(?:[^"\n\r\\]|(?:"")|(?:\\x[0-9a-fA-F]+)|(?:\\.))*")|(?:'(?:[^'\n\r\\]|(?:'')|(?:\\x[0-9a-fA-F]+)|(?:\\.))*')'''
+def t_STRING(t):
+    r'''(?:"(?:[^"\n\r\\]|(?:"")|(?:\\x[0-9a-fA-F]+)|(?:\\.))*")|(?:'(?:[^'\n\r\\]|(?:'')|(?:\\x[0-9a-fA-F]+)|(?:\\.))*')'''
+    t.value = t.value[1:-1]
+    return t
 
-t_URI = r'''<(([a-zA-Z][0-9a-zA-Z+\\-\\.]*:)/{0,2}[0-9a-zA-Z;/?:@&=+$\\.\\-_!~*'()%]+)?("\#[0-9a-zA-Z;/?:@&=+$\\.\\-_!~*'()%]+)?>'''
+def t_URI(t):
+    r'''<(([a-zA-Z][0-9a-zA-Z+\\-\\.]*:)/{0,2}[0-9a-zA-Z;/?:@&=+$\\.\\-_!~*'()%]+)?("\#[0-9a-zA-Z;/?:@&=+$\\.\\-_!~*'()%]+)?>'''
+    t.value = t.value[1:-1]
+    return t
 
 def t_VAR(t):
     v = t.value[1:]
-    if v.lower() == 'id': #reserved var
-        t.type = 'ID'
-        t.value = 'ID'
-    else:
-        t.value = T.var(v)
+    t.value = T.var(v)
     return t
 t_VAR.__doc__ = r'\?'+ _namere +''
 
@@ -169,7 +176,6 @@ def t_QNAME(t):
         t.type = reserved_map.get(key,"NAME")
         t.value = reserved_constants.get(key, t.value)
     return t
-
 t_QNAME.__doc__ = '(?P<prefix>'+_namere+':)?(?P<name>' + _namere + ')'
 
 def t_QSTAR(t):    
@@ -202,12 +208,172 @@ t_ignore = ' \t\x0c'
 lexer = ply.lex.lex(errorlog=errorlog) #optimize=1)
 
 # Parsing rules
+class _ParseState(object):
+    def __init__(self):
+        self.labeledjoins = {}
+        self.labeledjoinorder = []
+        self.labelreferences = {}
+        self._anonJoinCounter = 0
+
+    def addLabeledJoin(self, name, join):
+        if join.name:
+            if join.name != name:
+                raise JQLException(
+                   "can't assign id %s, join already labeled %s"
+                    % (name, join.name))
+        else:
+            join.name = name
+
+        self.labeledjoins.setdefault(name,[]).append(join)
+
+        if name in self.labeledjoinorder:
+            #outermost wins
+            self.labeledjoinorder.remove(name)
+        #assumes this is called in bottoms-up parse order
+        self.labeledjoinorder.append(name)
+
+    def nextAnonJoinId(self):
+        self._anonJoinCounter += 1
+        return '@' + str(self._anonJoinCounter)
+
+    def joinMoved(self, join, from_, to):
+        #print 'moving',join, 'from', from_, 'to', to
+        #XXX test: { id = ?self and ?self = 1 }
+        if not join.name:
+            join.name = self.nextAnonJoinId()
+        if not from_ or join is to or from_ is to:
+            return False
+        #XXX implement replaceArg for filter, any expression arg
+        if from_.parent:
+            from_.replaceArg(join, Label(join.name))
+            return True
+        return False
+
+def _YaccProduction_getattr__(self, name):
+    if name == 'jqlState':        
+        parseState = _ParseState()
+        self.jqlState = parseState
+        return parseState
+    else:
+        raise AttributeError, name
+
+#there doesn't seem to be an decent way to store glabal parse state
+#so monkey patch the "p" so that a state object is created upon first reference
+assert not hasattr(ply.yacc.YaccProduction,'__getattr__')
+ply.yacc.YaccProduction.__getattr__ = _YaccProduction_getattr__
+
+def _joinFromConstruct(construct, where, parseState):
+    '''
+    build a join expression from the construct pattern
+    '''
+    left = where
+    for prop in construct.args:
+        if prop == construct.id:
+            pass
+        else:
+            if isinstance(prop.value, Select):
+                value = prop.value.where
+            else:
+                value = prop.value
+            if value == Project('*'):
+                value = None
+
+            if prop.nameIsFilter:
+                if value:
+                    value = Eq(Project(prop.name), value)                    
+                else:
+                    value = Project(prop.name)
+                prop.appendArg( Project(prop.name) )
+                
+                if not left:
+                    left = value
+                else:
+                    left = And(left, value)
+            elif value:
+                #don't want treat construct values as boolean filter
+                #but we do want to find projections which we need to join:
+                for child in value.depthfirst(
+                 descendPredicate=lambda op: not isinstance(op, ResourceSetOp)):
+                    if isinstance(child, Project):
+                        if not left:                            
+                            left = child
+                        else:
+                            assert child
+                            left = And(left, child)
+
+            #XXX: handle outer joins:
+            #if prop.ifEmtpy == PropShape.omit:
+            #    jointype = JoinConditionOp.RIGHTOUTER
+            #else:
+            #    jointype = JoinConditionOp.INNER
+            #join.appendArg(JoinConditionOp(filter, SUBJECT,jointype))
+
+    if left:
+        left = makeJoinExpr(left, parseState)
+        print 'left0', left
+        assert left
+    
+    if not left:
+        left = Join()
+
+    if construct.id:
+        name = construct.id.getLabel()
+        assert left
+        parseState.addLabeledJoin(name, left)
+    return left
+
+def p_root(p):
+    '''
+    root : construct
+    '''
+    p[0] = p[1]
+    #we're when done parsing, now join together joins that share labels,
+    #removing any joined joins if their parent is a dependant (non-root) Select op
+    labeledjoins = {}
+    for label, joins in p.jqlState.labeledjoins.items():
+        if not joins:
+            continue
+        #construct that only have id labels will not have a join
+        #we only want to add the join if there are no another joins for the label
+        firstjoin = joins.pop()
+        for join in joins:
+            join.parent.removeArg(join) #XXX
+            firstjoin.appendArg(join)
+        labeledjoins[label] = firstjoin
+        firstjoin.name = label 
+    #print 'labeledjoins', labeledjoins
+    #print 'refs', p.jqlState.labelreferences
+    _buildJoinsFromReferences(labeledjoins, p.jqlState)
+    if not p[0].where:
+        p[0].appendArg( Join() )
+    #print 'root where', p[0].where
+
 def p_construct(p):
     '''
     construct : dictconstruct
                 | listconstruct
     '''
-    p[0] = Root(Join(), p[1])
+
+    if isinstance(p[1], T.listconstruct):
+        shape = Construct.listShape
+    elif isinstance(p[1], T.dictconstruct):
+        shape = Construct.dictShape
+    else:
+        assert 0, 'unexpected token'
+
+    props = p[1][0]
+    op = Construct(props, shape)
+
+    defaults = dict(where = None, ns = {}, offset = -1, limit = - 1,
+                    groupby = None)
+    if len(p[1]) > 1 and p[1][1]:
+        for constructop in p[1][1]:
+            defaults[ constructop[0].lower() ] = constructop[1]
+
+    where = _joinFromConstruct(op, defaults['where'], p.jqlState)
+    #XXX other constructops: limit, offset, ns, groupby
+    p[0] = Select(op, where)
+    assert not where or where.parent is p[0]
 
 precedence = (
     ('left', 'ASSIGN'),
@@ -285,17 +451,25 @@ def p_atom_constant(p):
             | TRUE
             | FALSE
     '''
-    p[0] = p[1]
+    p[0] = Constant(p[1])
 
 def p_atom(p):
     """atom : columnref
-            | VAR
-            | ID
             | funccall
             | constant
             | join
     """
     p[0] = p[1]
+
+def p_atom_var(p):
+    """atom : VAR
+    """
+    p[0] = Label(p[1][0])
+
+def p_atom_id(p):
+    """atom : ID
+    """
+    p[0] = Project(p[1])
 
 def p_barecolumnref(p):
     '''barecolumnref : NAME
@@ -324,8 +498,8 @@ def p_columnref(p):
     '''
     if len(p) == 2:
         p[0] = Project(p[1])
-    else:
-        p[0] = Project(p[3], p[1])
+    else: #?var.column
+        p[0] = Project(p[3], p[1][0])
 
 def p_funcname(p):
     '''funcname : NAME
@@ -363,8 +537,9 @@ def p_arglist(p):
 def p_constructoplist(p):
     """
     constructoplist : constructoplist constructop
-    """    
-    p[0] = p[1].append(p[2])
+    """
+    p[1].append(p[2])
+    p[0] = p[1]
 
 def p_arglist_empty(p):
     """
@@ -390,31 +565,70 @@ def p_keyword_argument(p):
 def p_join(p):
     "join : LBRACE expression RBRACE"
     try:
-        p[0] = makeJoinExpr(p[2])
-    except QueryException:
+        p[0] = makeJoinExpr(p[2], p.jqlState)
+    except QueryException, e:
+        import traceback
+        traceback.print_exc()#file=sys.stdout)
         p[0] = ErrorOp(p[2], "Invalid Join")
-        errorlog.error("invalid join: " + repr(p[2]))
+        errorlog.error("invalid join: "  +  str(e) + ' ' + repr(p[2]))
 
-def p_constructitem(p):
-    '''
-    constructitem : dictkey COLON dictvalue
-                    | optional
-                    | TIMES
-    '''
-    if len(p) == 2:
-        if p[1] == '*':
-            p[0] = '*' #ConstructProp(None, '*')
-        else:
-            p[0] = p[1]
+def _makeConstructProp(n, v, nameIsFilter):
+    if isinstance(v, T.forcelist):
+        return ConstructProp(n, v[0],
+                PropShape.uselist, PropShape.uselist, nameIsFilter)
     else:
-        p[0] = ConstructProp(p[1], p[3])
+        return ConstructProp(n, v, nameIsFilter=nameIsFilter)
 
-def p_dictkey(p): 
+def p_constructitem1(p):
     '''
-    dictkey : STRING
-            | columnname
+    constructitem : STRING COLON dictvalue
+    '''
+    p[0] = _makeConstructProp(p[1], p[3], False)
+
+def p_constructitem2(p):
+    '''
+    constructitem : columnname COLON dictvalue
+    '''
+    p[0] = _makeConstructProp(p[1], p[3], True)
+
+def p_constructitem3(p):
+    '''
+    constructitem : ID COLON VAR
+    '''
+    p[0] = ConstructSubject(value=p[3][0])
+
+def p_constructitem4(p):
+    '''
+    constructitem : TIMES
+    '''
+    p[0] = ConstructProp(None, Project('*'))
+
+def p_constructitem5(p):
+    '''
+    constructitem : optional
     '''
     p[0] = p[1]
+
+#def p_constructitem(p):
+#    '''
+#    constructitem : dictkey COLON dictvalue
+#                    | optional
+#                    | TIMES
+#    '''
+#    if len(p) == 2:
+#        if p[1] == '*':
+#            p[0] = ConstructProp(None, Project('*'))
+#        else:
+#            p[0] = p[1]
+#    else:
+#        p[0] = ConstructProp(p[1], p[3])
+#
+#def p_dictkey(p):
+#    '''
+#    dictkey : STRING
+#            | columnname
+#    '''
+#    p[0] = p[1]
 
 def p_columnname(p): 
     '''
@@ -428,7 +642,7 @@ def p_dictvalue(p):
     '''
     dictvalue : LBRACKET expression RBRACKET 
               | construct
-              | expression
+              | expression              
     '''
     if len(p) == 4:
         p[0] = T.forcelist(p[2])
@@ -454,7 +668,6 @@ def p_constructop(p):
     constructop : constructopname LPAREN expression RPAREN
     '''
     p[0] = T.constructop(p[1], p[3])
-
 
 XXX = '''
 constructop : WHERE LPAREN expression RPAREN
@@ -488,7 +701,7 @@ def p_dictconstruct(p):
     elif len(p) == 5:
         p[0] = T.dictconstruct( p[2], p[3])
     else:
-        p[0] = T.dictconstruct( p[2], p[4])
+        p[0] = T.dictconstruct( p[2 ], p[4])
 
 def p_listconstruct(p):
     '''
@@ -509,6 +722,8 @@ def p_listconstructitem(p):
     listconstructitem : expression
                       | optional
     '''
+    #XXX should dictvalue:
+    #p[0] = makeConstructProp(None, p[1], False)
     p[0] = p[1]
 
 def p_error(p):
@@ -527,7 +742,7 @@ def p_constructempty(p):
     #conflict is harmless
     pass
 
-parser = ply.yacc.yacc(start="construct", errorlog=errorlog ) #, debug=True)
+parser = ply.yacc.yacc(start="root", errorlog=errorlog ) #, debug=True)
 
 ####parse-tree-to-ast mapping ####
 
@@ -555,13 +770,130 @@ logicalops = {
  Or : Union,
 }
 
-def columnRefToAST(project):
+def rewriteLabelsInFilters():
     '''
-    Return a (pred, obj) pair
+    Filter conditions that depend are a label are actually join predicates on
+    the object that the label references. So we need to rewrite the filter and
+    add join conditions:
 
-    bar return Eq('bar'), Project(OBJECT)
+    * build a multimap between joins and labels (label => [join])
+    whenever encountered: id = ?label, ?foo.bar and id : ?foo
+    * build joincondition map for other references to labels
+      (label => [(join, joinconditionpred)]), exclude joinconditionpred from filter
+    * when done parsing, join together joins that share labels,
+      removing any joined joins if their parent is a dependant (non-root) Select op
 
-    bar.baz return
+    this:
+    {
+    id : ?owner,
+    'mypets' : {
+          'dogs' : { * where(owner=?owner and type='dog') },
+          'cats' : { * where(owner=?owner and type='cat') }
+        }
+    }
+
+    equivalent to:
+    {
+    id : ?owner,
+
+    'mypets' : {
+          'dogs' : { * where(id = ?pet and type='dog') },
+          'cats' : { * where(id = ?pet and type='cat') }
+        }
+
+    where ( {id = ?pet and owner=?owner} )
+    }
+
+    (but what about where ( { not id = ?foo or id = ?bar and id = ?baz }
+
+    also, this:
+    {
+    'foo' : ?baz.foo
+    'bar' : ?baz.bar
+    }
+    results in joining ?baz together
+
+    here we don't join but use the label to select a value
+    { 
+      'guardian' : ?guardian,
+      'pets' : { * where(owner=?guardian) },
+    }
+
+this is similar but does trigger a join on an unlabeled object:
+    {
+      'guardian' : ?guardian,
+      'dogs' : { * where(owner=?guardian and type='dog') },
+      'cats' : { * where(owner=?guardian and type='cat') }
+    }
+
+join( filter(eq(project('type'), 'dog')),
+     filter(eq(project('owner'),objectlabel='guardian')
+  jc(
+     join( filter(eq(project('type'), 'cat')),
+          filter(eq(project('owner'),objectlabel='guardian')
+     ),
+     Eq(Project('guardian'), Project('guardian'))
+)
+
+XXX test multiple labels in one filter, e.g.: { a : ?foo, b : ?bar where (?foo = ?bar) }
+XXX test self-joins e.g. this nonsensical example: { * where(?foo = 'a' and ?foo = 'b') }
+    '''
+
+def _buildJoinsFromReferences(labeledjoins, parseState):
+    skipped = []
+    for join, conditions in parseState.labelreferences.items():
+        currentjoin = join
+
+        def labelkey(item):
+            label = item[0]
+            try:
+                return parseState.labeledjoinorder.index(label)
+            except ValueError:
+                return 999999 #sort at end
+        #sort by order of labeled join appearence
+        #XXX is that enough for correctness? what about sibling joins?
+        conditions.sort(key=labelkey)        
+        for label, (op, pred) in conditions:
+            labeledjoin = labeledjoins.get(label)
+            if not labeledjoin:
+                if label in skipped:
+                    #XXX support unlabeled joins
+                    raise QueryException('unlabeled joins not yet supported')
+                else:
+                    #XXX keep skipped around to check if there are construct labels
+                    #for this label, if not, emit warning
+                    skipped.append(label)
+                continue
+
+            if op is join:
+                #any subsequent join predicates should operate on the new join
+                op = currentjoin
+            if op is not labeledjoin:
+                if isinstance(op, Join):
+                    parseState.joinMoved(op, op.parent, labeledjoin)
+                labeledjoin.appendArg(JoinConditionOp(op, pred))
+            currentjoin = labeledjoin
+
+    if skipped:
+        raise QueryException(
+                'reference to unknown label(s): '+ ', '.join(skipped))
+    return skipped
+
+def _getASTForProject(project, parseState):
+    '''
+    Return an op that will retrieve the values that match the projection
+
+    bar return 
+    
+    Filter(Eq('bar', Project(PROPERTY)), objectlabel='bar'))
+
+    foo.bar returns
+
+    jc(Join(
+        jc(Filter(Eq('bar', Project(PROPERTY)), objectlabel='bar'), OBJECT),
+        jc(Filter(Eq('foo', Project(PROPERTY)) ), SUBJECT)
+      ),
+    '_1')
 
     JoinCondition(
     Join(
@@ -576,17 +908,6 @@ def columnRefToAST(project):
     The join condition join this join back into the enclosing join
     using the subject of the "bar" filter.
 
-    If the filter was where(bar.baz = 'val') then add
-
-    eq(project('baz'), 'val')
-
-    foo = bar.baz
-
-    Having(None, Eq('foo'), Project('baz'))
-
-    to the enclosing join
-
-
     bar == { ?id where }
 
     Filter(Eq('bar'), Join(jc(
@@ -594,21 +915,88 @@ def columnRefToAST(project):
 
     ?foo.bar is shorthand for
     { id : ?foo where(bar) }
-
+    thus:
+    Join( Filter(Eq('bar',Project(PROPERTY)), subjectlabel='foo', objectlabel='bar') )
 
     '''
     #XXX we need to disabiguate labels with the same name
-    Join(
-    jc(Join(
-        jc(Filter(None, Eq('buzz'), None, subjectlabel='_1'), OBJECT),
-        jc(Filter(None, Eq('blah'), None, subjectlabel='blah'), SUBJECT)
-      ),
-    '_1')
-    )
+    op = None
+    if project.name == SUBJECT:
+        assert not project.varref
+        return op
 
-    return (pred, object)
+    for propname in reversed(project.fields):
+        #XXX if propname == '*', * == OBJECT? what about foo = * really a no-op
+        if not op:
+            op = Filter(Eq(propname, Project(PROPERTY)), objectlabel=propname)
+        else:
+            subjectlabel = parseState.nextAnonJoinId()
+            filter = Filter(Eq(propname, Project(PROPERTY)),
+                                            subjectlabel=subjectlabel)
+            #create a new join, joining the object of this filter with
+            #the subject of the prior one
+            op = JoinConditionOp(
+                    Join( JoinConditionOp(op, SUBJECT),
+                        JoinConditionOp(filter, OBJECT)), subjectlabel)
 
-def makeJoinExpr(expr):
+    if project.varref:
+        #XXX fix this questionable hack: addLabel should be available on Joins, etc.
+        for child in op.breadthfirst():
+            if isinstance(child, Filter):
+                child.addLabel(project.varref, SUBJECT)
+                break
+        op = Join(op)
+        parseState.addLabeledJoin(project.varref, op)
+    
+    return op
+
+def consolidateFilter(filter, projections):
+    '''
+    Crucial optimization is to consolidate filters that can be applied at once:
+    
+    e.g. instead foo = 'bar' being:
+
+
+    Filter(Eq(Project(PROPERTY), 'foo'), objectlabel='foo')
+    Filter(Eq(Project('foo'),'bar'))
+
+    consolidate those into:
+
+    Filter(Eq(Project(PROPERTY), 'foo'),Eq(Project(OBJECT), 'bar'), objectlabel='foo')
+
+    A consolidated filter can only have predicate per position
+
+    e.g. foo = bar
+
+    goes from:
+
+    Filter(Eq(Project(PROPERTY), 'foo'), objectlabel='foo')
+    Filter(Eq(Project(PROPERTY), 'bar'), objectlabel='bar')
+    Filter(Eq(Project('foo'),Project('bar')))
+
+    only can be:
+
+    Filter(Eq(Project(PROPERTY), 'bar'), objectlabel='bar')
+    Filter(Eq(Project(PROPERTY), 'foo'),Eq(Project(OBJECT), Project('bar')) )
+
+    however, this isn't much of an optimization, so, for simplicity, we don't bother
+    '''
+    #XXX consolidate subject filters
+    filterprojects = [(p, i) for (i, (p,f)) in enumerate(projections)
+                                                if isinstance(f, Filter)]
+    if len(filterprojects) == 1:
+        p, i = filterprojects[0]
+        name = p.name
+        assert len(p.fields) == 1
+        p.fields = [OBJECT] #replace label with pos
+        filter.appendArg( Eq(Project(PROPERTY), name) )
+        filter.addLabel(name, OBJECT)
+        #remove replaced filter:
+        del projections[i]
+        return True
+    return False
+
+def makeJoinExpr(expr, parseState):
     '''
     Rewrite expression into Filters, operations that filter rows
     and ResourceSetOps (join, union, except), which group together the Filter 
@@ -617,13 +1005,22 @@ def makeJoinExpr(expr):
     We also need to make sure that filter which apply individual statements
     (id, property, value) triples appear before filters that apply to more than
     one statement and so operate on the simple filter results.
-    '''
-    return expr
 
+    filters to test:
+    foo = (?a or ?b)
+    foo = (a or b)
+    foo = (?a and ?b)
+    foo = (a and b)
+    foo = {c='c'}
+    foo = ({c='c'} and ?a)
+    '''
     cmproots = []
     to_visit = []
     visited = set()
     to_visit.append( (None, expr) )
+
+    labeledjoins = parseState.labeledjoins
+    labelreferences = parseState.labelreferences
 
     newexpr = None
     while to_visit:
@@ -652,11 +1049,13 @@ def makeJoinExpr(expr):
                 if not parent:
                     parent = newexpr = optype()
                 elif type(parent) != optype:
-                    #skip and(and()) or(or())
-                    parent.appendArg(optype())
+                    #skip patterns like: and(and()) or(or())
+                    newop = optype()
+                    parent.appendArg(newop)
+                    parent = newop
                 
-                to_visit.extend([(v, a) for a in v.args]) #descend
-            else:
+                to_visit.extend([(parent, a) for a in v.args]) #descend
+            else: #if not isinstance(v, Join): #joins has already been processed
                 if not parent: #default to Join
                     parent = newexpr = Join()
                 if notcount % 2:
@@ -667,39 +1066,74 @@ def makeJoinExpr(expr):
     for parent, root in cmproots:
         #first add filter or join conditions that correspond to the columnrefs
         #(projections) that appear in the expression
-        #then try to consolidate the expression into those. If it doesn't "fit"
-        #in any of those append a new Filter with the expression.
 
-        columns = []
-        subject = None
         #look for Project ops but don't descend into ResourceSetOp (Join) ops
+        projectops = []
+        skipRoot = False
+        labelreference = None
         for child in root.depthfirst(
                 descendPredicate=lambda op: not isinstance(op, ResourceSetOp)):
-
+            if isinstance(child, ResourceSetOp):                
+                if child is root or (child.parent is root
+                                    and isinstance(child.parent, Not)):
+                    #XXX standalone join, do an "(not) exists join"
+                    skipRoot = True #don't include this root in this join
+                else:
+                    #XXX same as Label case (assign label if necessary)
+                    raise QueryException('join in filter not yet implemented')
             if isinstance(child, Project):
-                columns.append( child )
-            #else isinstance(child, ID): #XXX subject
-        #foo = 'bar': Not(Eq('foo') and Eq('bar'))
+                 projectop = _getASTForProject(child, parseState)
+                 if projectop:
+                    projectops.append( (child, projectop) )
+            elif isinstance(child, Label):
+                if root == Eq(Project(SUBJECT), child):
+                    #its a declaration like id = ?label
+                    parseState.addLabeledJoin(child.name, parent)
+                else: #label reference
+                    labelname = child.name
+                    if labelreference:
+                        if labelreference == labelname:
+                            #skip duplicates references like func(?foo, ?foo)
+                            continue
+                        else:
+                            #XXX ?a = ?b
+                            #XXX foo = (?a or ?b) handle boolean
+                            raise JQLException('expressions like ?a = ?b not yet supported')
+                    labelreference = labelname
+                    child.__class__ = Constant #hack so label is treated as independant
+                    if root.isIndependent():
+                        #doesn't independ, so  treat as filter
+                        joincond = (Filter(root), SUBJECT) #filter, join pred
+                    else:
+                        joincond = (parent, root) #join, join pred
+                    Project(SUBJECT)._mutateOpToThis(child)
+                    #print 'add label ref', joincond.parent
+                    labelreferences.setdefault(parent, []).append(
+                                                        (labelname, joincond) )
+                    #labelreferences.setdefault(labelname,[]).append(joincond)
+                skipRoot = True #don't include this root in this join
 
-        if len(columns) > 1: #XXX
-            #handle wildcard objects, *, qstart
-            raise QueryException('HAVING not yet implementing')
-        elif columns:
-            column[0].parent.replace(column[0], ObjectPlaceHolder)
-            obj = root
-            pred = Eq(column[0]) #XXX handle wildcard
-        else: #no column refs
-            pred = None
-            obj = None
-            if subject:
-                subject = root
+        #try to consolidate the projection filters into root filter.
+        if skipRoot:
+            filter = Filter()
+        else:
+            filter = Filter(root)
+            consolidateFilter(filter, projectops)
+        for (project, projectop) in projectops:
+            parent.appendArg(projectop)
+        if not skipRoot:
+            parent.appendArg( filter )
 
-        parent.appendArg( Filter(subject, pred, obj) )
-
+    #XXX remove no-op and redundant filters
+    assert newexpr
     return newexpr
 
 tests = [
 "{*,}",
+#vars are just :pp
+#"{  where (foo = ?var/2 and {id = ?var and foo = 'bar'} }",
+"{foo: {*} }", #XXX there's ambguity here: construct vs. join (wins)
+"{foo: [*]}", #XXX there's ambguity here: construct vs. forcelist (wins)
 "{*/1}", #bad
 '''{ 'ok': */1 }''',
 '''{ *, 
@@ -721,10 +1155,14 @@ GROUPBY(foo)
 '''
 ]
 
-for test in tests:
+def parse(query):
+    return parser.parse(query,tracking=True)#, debug=True)
+
+if __name__ == "__main__":
+  for test in tests:
     print "Test:", test.strip()
     try:
-        result = parser.parse(test)#,tracking=True)
+        result = parse(test)
 
     except JQLParseException, e:
         print "error:", e
@@ -736,5 +1174,4 @@ for test in tests:
             if isinstance(dd,dict):
                 print dd.items()
     except TypeError,te:
-        pass
-    print
+        pass    

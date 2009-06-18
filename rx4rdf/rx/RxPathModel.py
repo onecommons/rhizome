@@ -45,7 +45,7 @@ class NestedRows(object):
             if label == col.label:
                 return col
             if deep and isinstance(col.type, NestedRows):
-                if col.type.findColumn(label):
+                if col.type.findColumn(label, deep):
                     return col
         return None
 
@@ -71,7 +71,7 @@ class Tupleset(object):
             if label == col.label:
                 return col
             if deep and isinstance(col.type, NestedRows):
-                if col.type.findColumn(label):
+                if col.type.findColumn(label, deep):
                     return col
         return None
 

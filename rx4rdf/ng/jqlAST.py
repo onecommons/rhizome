@@ -43,19 +43,50 @@ def depthfirstsearch(root, descendPredicate = None, visited = None):
         if id(v) not in visited:
             visited.add( id(v) )
             yield v
-            if not descendPredicate or descendPredicate(v):
+            if not descendPredicate or descendPredicate(v):                
                 to_visit.extend(v.args)
+
+
+def findfirstdiff(op1, op2):
+    import itertools
+
+    l1 = list(op1.depthfirst())
+    l2 = list(op2.depthfirst())
+    for (i1, i2) in itertools.izip(reversed(l1), reversed(l2)):
+        if not (i1 == i2): #XXX i1 != i2 is wrong for Label, why?
+            return i1, i2
+
+    if len(l1) > len(l2):
+        return (l1[len(l2):], None)
+    elif len(l1) < len(l2):
+        return (None, l2[len(l1):])
+    else:
+        return (None, None)
 
 class QueryOp(object):
     '''
     Base class for the AST.
     '''
 
-    parent = None
+    _parent = None
     args = ()
     labels = ()
     name = None
     value = None #evaluation results maybe cached here
+
+    def _setparent(self, parent_):
+        parents = [id(self)]
+        parent = parent_
+        while parent:
+            if id(parent) in parents:
+                raise QueryException('loop!! anc %s:%s self %s:%s parent %s:%s'
+ % (type(parent), id(parent), type(self), id(self), type(parent_), id(parent_)))
+            parents.append(id(parent))
+            parent = parent.parent
+
+        self._parent = parent_
+    
+    parent = property(lambda self: self._parent, _setparent)
 
     @classmethod
     def _costMethodName(cls):
@@ -70,6 +101,8 @@ class QueryOp(object):
 
     def __eq__(self, other):
         if type(self) != type(other):
+            return False
+        if self.name != other.name:
             return False
         return self.args == other.args
 
@@ -93,9 +126,15 @@ class QueryOp(object):
     def __repr__(self):
         indent = self.parent and '\n' or ''
         parent = self.parent
+        parents = [id(self)]
         while parent:
             indent += '  '
+            if id(parent) in parents:
+                indent = 'LOOP!['+parent.__class__.__name__+']\n'
+                break;
+            parents.append(id(parent))
             parent = parent.parent
+            
         if self.name is not None:
             name = self.name
             if isinstance(name, tuple): #if qname pair
@@ -104,6 +143,7 @@ class QueryOp(object):
         else:
             namerepr = ''
         if self.args:
+            assert all(a.parent is self for a in self.args), repr(self.__class__) + repr([(a.__class__, a.parent) for a in self.args if a.parent is not self])
             argsrepr = '(' + ','.join([repr(a) for a in self.args]) + ')'
         else:
             argsrepr = ''
@@ -164,10 +204,22 @@ class ResourceSetOp(QueryOp):
         '''
         self.args = []
         self.labels = []
+        self.name = kw.get('name')
         for a in args:
             self.appendArg(a)
-        self.construct = kw.get('construct', {})
-        self.ref = kw.get('ref')
+
+    def _setname(self, name):
+        if self.labels:
+            assert len(self.labels) == 1
+            if name:
+                self.labels[0] = (name,0)
+            else:
+                del self.labels[0]
+        elif name:
+            self.labels.append( (name,0) )
+
+    #name = property(lambda self: self.labels and self.labels[0][0] or None,
+    #             _setname)
 
     def appendArg(self, op):
         if isinstance(op, (Filter,ResourceSetOp)):
@@ -203,12 +255,35 @@ class JoinConditionOp(QueryOp):
 
     def __init__(self, op, position=SUBJECT, join=INNER):
         self.op = op
-        self.args = (op,)
-        op.parent = self
-        self.position = position #index or label
+        self.args = []
+        self.appendArg(op)
+        self.setJoinPredicate(position)
         self.join = join
+        if isinstance(self.position, int):
+            assert isinstance(op, Filter)
+            label = "#%d" % self.position
+            op.addLabel(label, self.position)
+            self.position = label
 
     name = property(lambda self: '%s:%s' % (str(self.position),self.join) )
+
+    def setJoinPredicate(self, position):
+        if isinstance(position, QueryOp):
+            if isinstance(position, Eq):
+                if position.left == Project(SUBJECT):
+                    pred = position.right
+                elif position.right == Project(SUBJECT):
+                    pred = position.left
+                else:
+                    pred = None
+                if pred and isinstance(pred, Project):
+                    self.position = pred.name #position or label
+                    #self.appendArg(pred)
+                    return
+            raise QueryException('only equijoin supported for now')
+        else:
+            self.position = position #index or label
+            #self.appendArg(Eq(Project(SUBJECT),Project(self.position)) )
 
     def getPositionLabel(self):
         if isinstance(self.position, int):
@@ -267,26 +342,23 @@ class Filter(QueryOp):
     Filters rows out of a tupleset based on predicate
     '''
 
-    def __init__(self, sub=None, pred=None, obj=None,
-                 subjectlabel=None, propertylabel=None, objectlabel=None):
+    def __init__(self, *args, **kw):
 
-        self.predicates = [sub, pred, obj]        
+        self.args = []
         self.labels = []
-        if subjectlabel:
-            self.labels.append( (subjectlabel, SUBJECT) )
-        if propertylabel:
-            self.labels.append( (propertylabel, PROPERTY) )
-        if objectlabel:            
-            self.labels.append( (objectlabel, OBJECT) )
+        for a in args:
+            self.appendArg(a)
+
+        self.labels = []
+        if 'subjectlabel' in kw:
+            self.labels.append( (kw['subjectlabel'], SUBJECT) )
+        if 'propertylabel' in kw:
+            self.labels.append( (kw['propertylabel'], PROPERTY) )
+        if 'objectlabel' in kw:
+            self.labels.append( (kw['objectlabel'], OBJECT) )
  
     def getType(self):
         return Tupleset
-
-    args = property(lambda self: [a for a in self.predicates if a])
-
-    def appendArg(self, arg, pos):
-        self.predicates[pos] = arg
-        arg.parent = self
 
     def addLabel(self, label, pos):
         for (name, p) in self.labels:
@@ -302,8 +374,8 @@ class Label(QueryOp):
     def __init__(self, name):
         self.name = name
 
-    def __eq__(self, other):
-        return super(Label, self).__eq__(other) and self.name == self.name
+    def isIndependent(self):
+        return False
 
 class Constant(QueryOp):
     '''
@@ -349,9 +421,6 @@ class AnyFuncOp(QueryOp):
         else:
             return False
     
-    def __eq__(self, other):
-        return super(AnyFuncOp,self).__eq__(other) and self.name == other.name
-
     #def __repr__(self):
     #    if self.name:
     #        name = self.name[1]
@@ -378,30 +447,11 @@ class BooleanFuncOp(AnyFuncOp):
         return BooleanType
 
 class BooleanOp(QueryOp):
-    '''
-    BooleanOps filter the sourceModel, setting the resultModel to
-    all the statements that evaluate to true given the BooleanOp.
-    '''
-
-    left = None
-    right = None
-    
-    def __init__(self, left=None, right=None):
-        self.args = []
-        if left is not None:
-            if not isinstance(left, QueryOp):
-                left = Constant(left)
-            self.left = left
-            self.appendArg(left)
-            if right is not None:
-                if not isinstance(right, QueryOp):
-                    right = Constant(right)
-                self.right = right
-                self.appendArg(right)
 
     def __repr__(self):
+        #assert all(a.parent is self for a in self.args), repr(self.__class__) + repr([a.parent for a in self.args if a.parent is not self])
         if not self.args:
-            return self.name + '()'
+            return self.name + '()'        
         elif len(self.args) > 1:
             return '(' + self.name.join( [repr(a) for a in self.args] ) + ')'
         else:
@@ -410,27 +460,40 @@ class BooleanOp(QueryOp):
     def getType(self):
         return BooleanType
 
-class And(BooleanOp):
+class CommunitiveBinaryOp(BooleanOp):
+
+    left = property(lambda self: self.args[0])
+    right = property(lambda self: len(self.args) > 1 and self.args[1] or None)
+
+    def __init__(self, left=None, right=None):
+        self.args = []
+        if left is not None:
+            if not isinstance(left, QueryOp):
+                left = Constant(left)
+            self.appendArg(left)
+            if right is not None:
+                if not isinstance(right, QueryOp):
+                    right = Constant(right)
+                self.appendArg(right)
+
+    def __eq__(self, other):
+        '''
+        Order of args don't matter because op is communitive
+        '''
+        if type(self) != type(other):
+            return False
+        if self.left == other.left:
+            return self.right == other.right
+        elif self.left == other.right:
+            return self.right == other.left
+
+class And(CommunitiveBinaryOp):
     name = ' and '
 
-class Or(BooleanOp):
+class Or(CommunitiveBinaryOp):
     name = ' or '
 
-class In(BooleanOp):
-    '''Like OrOp + EqOp but the first argument is only evaluated once'''
-    def __repr__(self):
-        rep = repr(self.args[0]) + ' in ('
-        return rep + ','.join([repr(a) for a in self.args[1:] ]) + ')'
-
-class Eq(BooleanOp):
-    def __repr__(self):
-        return '(' + ' = '.join( [repr(a) for a in self.args] ) + ')'
-
-class IsNull(BooleanOp):
-    def __repr__(self):
-        return repr(self.args[0]) + ' is null '
-
-class Cmp(BooleanOp):
+class Cmp(CommunitiveBinaryOp):
 
     def __init__(self, op, *args):
         self.op = op
@@ -438,7 +501,23 @@ class Cmp(BooleanOp):
 
     def __repr__(self):
         op = self.op
+        assert all(a.parent is self for a in self.args)
         return '(' + op.join( [repr(a) for a in self.args] ) + ')'
+
+class Eq(CommunitiveBinaryOp):
+    def __repr__(self):
+        assert all(a.parent is self for a in self.args)
+        return '(' + ' == '.join( [repr(a) for a in self.args] ) + ')'
+
+class In(BooleanOp):
+    '''Like OrOp + EqOp but the first argument is only evaluated once'''
+    def __repr__(self):
+        rep = repr(self.args[0]) + ' in ('
+        return rep + ','.join([repr(a) for a in self.args[1:] ]) + ')'
+
+class IsNull(BooleanOp):
+    def __repr__(self):
+        return repr(self.args[0]) + ' is null '
 
 class Not(BooleanOp):
     def __repr__(self):
@@ -492,15 +571,50 @@ qF.addFunc('mul', lambda a, b: a*b, NumberType)
 qF.addFunc('div', lambda a, b: a/b, NumberType)
 qF.addFunc('mod', lambda a, b: a%b, NumberType)
 qF.addFunc('negate', lambda a: -a, NumberType)
+#XXX not so lame isref
+qF.addFunc('isref', lambda a: a and True or False, BooleanType)
 
-class Project(QueryOp):    
-    join = None
+
+class Project(QueryOp):  
     
-    def __init__(self, field, var=None):
-        self.varref = var #XXX
-        if isinstance(file, (list,tuple)):
-            field = field[0] #XXX
-        self.name = field #name or '*'
+    def __init__(self, fields, var=None):
+        self.varref = var 
+        if not isinstance(fields, (list,tuple)):
+            if str(fields).lower() == 'id':
+                fields = SUBJECT
+            self.fields = [ fields ]
+        else:
+            self.fields = fields
+
+    name = property(lambda self: self.fields[-1]) #name or '*'
+
+    def isPosition(self):
+        return isinstance(self.name, int)
+
+    def _mutateOpToThis(self, label):
+        '''
+        yes, a terrible hack
+        '''
+        assert isinstance(label, QueryOp)
+        label.__class__ = Project        
+        label.fields = self.fields
+        label.varref = self.varref
+
+    def isIndependent(self):
+        return False
+
+    def __eq__(self, other):
+        return (super(Project,self).__eq__(other)
+            and self.fields == other.fields and self.varref == self.varref)
+
+    def __repr__(self):
+        varref = ''
+        fields = ''
+        if self.varref:
+            varref = '('+self.varref + ')'
+        if len(self.fields) > 1:
+            fields = str(self.fields)
+        return super(Project,self).__repr__()+varref+fields
 
 class PropShape(object):
     omit = 'omit' #when MAYBE()
@@ -510,19 +624,20 @@ class PropShape(object):
 
 class ConstructProp(QueryOp):
     def __init__(self, name, value, ifEmpty=PropShape.usenull,
-                ifSingle=PropShape.nolist):
-       self.name = name #if name is None (and needed) derive from value (i.e. Project)
-       self.value = value
-       value.parent = self
-       assert ifEmpty in (PropShape.omit, PropShape.usenull, PropShape.uselist)
-       self.ifEmpty = ifEmpty
-       assert ifSingle in (PropShape.nolist, PropShape.uselist)
-       self.ifSingle = ifSingle
+                ifSingle=PropShape.nolist,nameIsFilter=False):
+        self.name = name #if name is None (and needed) derive from value (i.e. Project)
+        self.appendArg(value)
+        assert ifEmpty in (PropShape.omit, PropShape.usenull, PropShape.uselist)
+        self.ifEmpty = ifEmpty
+        assert ifSingle in (PropShape.nolist, PropShape.uselist)
+        self.ifSingle = ifSingle
+        self.nameIsFilter = nameIsFilter
+
+    def appendArg(self, value):
+        self.value = value #only one, replaces current if set
+        value.parent = self
 
     args = property(lambda self: (self.value,))
-
-    def __eq__(self, other):
-        return super(ConstructProp,self).__eq__(other) and self.name == other.name
 
 class ConstructSubject(QueryOp):
     def __init__(self, name='id', value=None):
@@ -541,9 +656,6 @@ class ConstructSubject(QueryOp):
 
     args = property(lambda self: self.value and (self.value,) or ())
 
-    def __eq__(self, other):
-        return super(ConstructSubject,self).__eq__(other) and self.name == other.name
-
 class Construct(QueryOp):
     '''
     '''
@@ -551,7 +663,8 @@ class Construct(QueryOp):
     listShape= list
     offset = None
     limit = None
-
+    id = None
+    
     def __init__(self, props, shape=dictShape):
         self.args = []
         for p in props:
@@ -560,19 +673,36 @@ class Construct(QueryOp):
                 self.id = p
         if not self.id:
             self.id = ConstructSubject()
-            self.id.parent = self
+            self.appendArg(self.id)
         self.shape = shape
 
     def __eq__(self, other):
         return (super(Construct,self).__eq__(other)
             and self.shape == other.shape and self.id == self.id)
 
-class Root(QueryOp):
-    def __init__(self, evalOp, construct):
-        self.evalOp = evalOp
-        evalOp.parent = self
-        self.construct = construct
-        construct.parent = self
+class Select(QueryOp):
+    offset = None
+    limit = None
+    where = None
 
-    args = property(lambda self:  (self.evalOp, self.construct))
+    def __init__(self, construct, where=None):
+        self.appendArg(construct)
+        if where:
+            self.appendArg(where)
 
+    def appendArg(self, op):
+        if (isinstance(op, Join)):
+            self.where = op #only one, replaces current if set
+        elif (isinstance(op, Construct)):
+            self.construct = op #only one, replaces current if set
+        else:
+            raise QueryException('bad ast')
+        op.parent = self
+
+    args = property(lambda self: [a for a in [self.construct, self.where] if a])
+
+    def replaceArg(self, child, with_):
+        if isinstance(child, Join):
+            self.where = None
+            return
+        raise QueryException('invalid operation')
