@@ -18,15 +18,14 @@ import os.path, sys, traceback
 from rx import logging #for python 2.2 compatibility
 log = logging.getLogger("RxPath")
 
-class ColumnInfo(tuple):
-    __slots__ = ()
+class ColumnInfo(object):
+    def __init__(self, pos, label, type=object):
+        self.pos = pos
+        self.label = label
+        self.type = type
 
-    def __new__(cls, pos, label, type=object):
-        return tuple.__new__(cls, (pos, label,type) )
-
-    pos = property(lambda self: self[0])    
-    label = property(lambda self: self[1])
-    type = property(lambda self: self[2])
+    def __repr__(self):
+        return 'ColInfo'+repr((self.pos, self.label,self.type))
 
 class NestedRows(object):
     def __init__(self, columns, reorder=True):
@@ -47,6 +46,19 @@ class NestedRows(object):
             if deep and isinstance(col.type, NestedRows):
                 if col.type.findColumn(label, deep):
                     return col
+        return None
+
+    def findColumnPos(self, label, pos=()):
+        if not self.columns:
+            return None
+
+        for col in self.columns:
+            if label == col.label:
+                return pos+(col.pos,)
+            if isinstance(col.type, NestedRows):
+                match = col.type.findColumnPos(label, pos+(col.pos,))
+                if match:
+                    return match
         return None
 
     def __repr__(self):
@@ -73,6 +85,19 @@ class Tupleset(object):
             if deep and isinstance(col.type, NestedRows):
                 if col.type.findColumn(label, deep):
                     return col
+        return None
+
+    def findColumnPos(self, label, pos=()):
+        if not self.columns:
+            return None
+
+        for col in self.columns:
+            if label == col.label:
+                return pos+(col.pos,)
+            if isinstance(col.type, NestedRows):
+                match = col.type.findColumnPos(label, pos+(col.pos,))
+                if match:
+                    return match
         return None
 
     def filter(self, conditions=None, hints=None):

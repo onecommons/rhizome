@@ -309,8 +309,7 @@ def _joinFromConstruct(construct, where, parseState):
             #join.appendArg(JoinConditionOp(filter, SUBJECT,jointype))
 
     if left:
-        left = makeJoinExpr(left, parseState)
-        print 'left0', left
+        left = makeJoinExpr(left, parseState)        
         assert left
     
     if not left:

@@ -11,6 +11,16 @@ class ColGroup(list):
     def __repr__(self):
         return 'ColGroup'+list.__repr__(self)
 
+def getitemdeep(l, pos):
+    '''
+    retrieves an item from nested lists where index is a sequence like (1, 2, ...)
+    '''
+    if isinstance(pos, int):
+        return l[pos]
+    for i in pos:
+        l = l[i]
+    return l
+
 class ResourceSet(Tupleset):
     '''
     (resource uri, {varname : [values+]}),*

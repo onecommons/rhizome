@@ -220,7 +220,7 @@ import jqlAST
 
 from rx import utils, RxPath
 from rx.utils import flattenSeq, flatten
-import operator, copy, sys
+import operator, copy, sys, pprint, itertools
 from ng import jqlAST, jqlparse
 from ng import *
 
@@ -339,6 +339,19 @@ def _colrepr(self):
         colstr = ','.join( map(x,self.columns) )
     return '('+colstr+')'
 
+def validateRowShape(columns, row):
+    if columns is None:
+        return
+    assert isinstance(row, (tuple,list)), row
+    assert len(columns) == len(row), '(c %d:%s, r %d:%s)'%(len(columns), columns,  len(row), row)
+    for (ci, ri) in itertools.izip(columns, row):
+        if isinstance(ci.type, NestedRows):
+            assert isinstance(ri, ColGroup), '%s %s' % (ri, ci.type)
+            if ri:
+                return validateRowShape(ci.type.columns, ri[0])
+        else:
+            assert not isinstance(ri, ColGroup), ri
+
 class SimpleTupleset(Tupleset):
     '''
     Interface for representing a set of tuples
@@ -365,10 +378,12 @@ class SimpleTupleset(Tupleset):
             self.filter = self._debugFilter
 
     def _debugFilter(self, conditions=None, hints=None):
-        results = tuple(self._filter(conditions, hints))
+        results = tuple(self._filter(conditions, hints))        
         print self.__class__.__name__,hex(id(self)), '('+self.op+')', \
           'on', self.hint, 'cols', _colrepr(self), 'filter:', repr(conditions),\
-          'results', results
+          'results:'
+        pprint.pprint(results)
+        [validateRowShape(self.columns, r) for r in results]
         for row in results:
             yield row
 
@@ -505,9 +520,11 @@ class Join(RxPath.Tupleset):
             self.filter = self._debugFilter
 
     def _debugFilter(self, conditions=None, hints=None):
-        results = tuple(self._filter(conditions, hints))
+        results = tuple(self._filter(conditions, hints))        
         print self.__class__.__name__,hex(id(self)), '('+self.msg+')', 'on', \
-            (self.left, self.right), 'cols', _colrepr(self), 'filter:', repr(conditions), 'results', results
+            (self.left, self.right), 'cols', _colrepr(self), 'filter:', repr(conditions), 'results:'
+        pprint.pprint(results)
+        [validateRowShape(self.columns, r) for r in results]
         for row in results:
             yield row
 
@@ -620,6 +637,133 @@ class MergeJoin(Join):
     def getJoinType(self):
         return 'ordered merge'
 
+def getcolumn(pos, row):
+    '''
+    yield a sequence of values for the nested column
+    '''
+    pos = list(pos)
+    #print 'gc', pos, row
+    p = pos.pop(0)    
+    c = row[p]
+    if pos:
+        assert isinstance(c, ColGroup)
+        for nc in c:
+            assert isinstance(nc, (list, tuple))
+            for (c, row) in getcolumn(pos, nc):
+                print 'c', c
+                yield (c, row)
+    else:
+        yield (c, row)
+
+def choosecolumns(groupby, columns, pos=None):
+    '''
+    "above" columns go first, omit groupby column
+    '''
+    pos = pos or []
+    level = len(pos)
+    for i, c in enumerate(columns):
+        if groupby[level-1] == i:
+            if level == len(groupby):
+                continue #groupby column, skip this column
+            for nc in choosecolumns(groupby, c, pos):
+                yield pos+[nc]
+        else:
+            yield c
+
+def groupbyUnordered(tupleset, groupby, columns, debug=False):
+    '''
+    (a1, b1), (a1, b2) => groupby(a) => (a1, (b1,b2))
+                       => groupby(b) => (b1, (a1)), (b2, (a1))
+
+    [a, b] => [a, NestedRows[b]] => [b, NestedRows[a]]
+
+    (a1, b1, c1), (a1, b2, c1) => groupby(a) => (a1, ( (b1, c1), (b2, c2) ) )
+                               => groupby(b) => (b1, (a1, (c1))), (b2, (a1,(c2)) )
+                               => groupby(c) => (c1, (b1, (a1))), (c2, (b2, (a1)))
+
+    [a, b, c] => [a, NestedRows[b,c]] => [b, [a, NestedRows[c]] ]
+
+    (a1, b1, c1), (a1, b1, c1) => groupby(a) => (a1, ( (b1, c1), (b1, c1) ) )
+                               => groupby(b) => (b1, (a1, (c1, c1)) )
+                               => groupby(c) => (c1, (b1, (a1)))
+
+    columns is a list of indexes into the rows
+    (all of the source columns except for the group by)
+    '''
+    resources = {}
+    for row in tupleset:
+        outputrow = ColGroup() #XXX
+        for colpos in columns:
+            if len(colpos) < len(groupby):
+                outputcell = []
+                for v, ignore in getcolumn(colpos, row):
+                    #print 'above', row, colpos, v
+                    outputcell.append(v)
+                outputrow.append(flatten(outputcell,depth=1))
+        print 'gb pos', groupby, row
+        for (key, row) in getcolumn(groupby, row):
+            print 'gb', key, row
+            vals = resources.get(key)
+            if vals is None:
+                vals = ColGroup()
+                resources[key] = vals
+            for col in columns:
+                colpos = col[len(groupby)-1:] #adjust position
+                if not colpos:
+                    #handled by 'above' logic above
+                    continue
+                if len(colpos)==1: #optimization
+                    outputrow.append( row[colpos[0]] )
+                    continue
+                outputcell = []
+                for v, ignore in getcolumn(colpos, row):
+                    #print 'append', row, key, colpos, v
+                    outputcell.append(v)
+                outputrow.append(flatten(outputcell,depth=1))
+            vals.append(outputrow)
+    for key, values in resources.iteritems():
+        print 'gb out', ColGroup([key, values])
+        yield ColGroup([key, values])
+
+def groupbyUnorderedXX(tupleset, groupby, columns, debug=False):
+    if not columns:
+        resources = set()
+        for row in tupleset:
+            for key, row in getcolumn(groupby, row):
+                if key in resources:
+                    continue
+                resources.add(key)
+                yield ColGroup(key,)
+        return
+
+    resources = {}
+    for row in tupleset:
+        abovevals = {}
+        for colpos in columns:
+            if len(colpos) < len(groupby):                
+                for v, ignore in getcolumn(colpos, row):
+                    #print 'above', row, colpos, v
+                    abovevals.setdefault(colpos,[]).append(v) #XXX use ColGroup()?
+        #print 'gb pos', groupby, row
+        for (key, row) in getcolumn(groupby, row):
+            #print 'gb', key, row
+            vals = resources.get(key)
+            if vals is None:
+                vals = {}
+                resources[key] = vals
+            for col in columns:
+                colpos = col[len(groupby)-1:] #adjust position
+                if not colpos:
+                    assert col in abovevals
+                    continue
+                for v, ignore in getcolumn(colpos, row):
+                    #print 'append', row, key, colpos, v
+                    vals.setdefault(col,[]).append(v) #XXX use ColGroup()?
+            vals.update(abovevals)
+    for key, values in resources.iteritems():
+        #each column
+        yield ColGroup([key, ColGroup(flatten(values[colpos],depth=1) for colpos in columns)])
+
 def groupbyOrdered(tupleset, pos, labels=None, debug=False):
     '''
     More efficient version of groupbyUnordered -- use if the tupleset is
@@ -628,7 +772,7 @@ def groupbyOrdered(tupleset, pos, labels=None, debug=False):
     for row in tupleset:
         raise Exception('nyi') #XXX
 
-def groupbyUnordered(tupleset, pos, labels=None, debug=False):
+def groupbyUnorderedX(tupleset, pos, labels=None, debug=False):
     '''
     Collapse the given tupleset selecting only the given position
     and labeled columns. Group by the given position, collecting labeled columns
@@ -954,48 +1098,41 @@ class SimpleQueryEngine(object):
 
     def _groupby(self, tupleset, joincond, msg='group by ',debug=False):
         #XXX use groupbyOrdered if we know tupleset is ordered by subject
-        col = tupleset.findColumn(joincond.position, True)
-        #print joincond.position, col, tupleset.columns
-        position = col.pos
+        position = tupleset.findColumnPos(joincond.position)
+        print '_groupby', joincond.position, position, tupleset.columns
         coltype = object
+        #XXX use choosecolumns
         columns = [
             ColumnInfo(0, joincond.parent.name or '', coltype),
             ColumnInfo(1, joincond.getPositionLabel(),
                                             NestedRows(tupleset.columns) )
         ]
+        colpositions = [(c.pos,) for c in tupleset.columns]
         return SimpleTupleset(
             lambda: groupbyUnordered(tupleset, position,
-                [(c[1],c[0]) for c in columns], debug=debug),
+                colpositions, debug=debug),
             columns=columns, 
             hint=tupleset, op=msg + repr(joincond.position),  debug=debug)
 
-    def _groupbyX(self, tupleset, joincond, msg='',debug=False):
-        #XXX use groupbyOrdered if we know tupleset is ordered by subject
-        position = joincond.resolvePosition()
-        #print 'resolvepos', position, joincond, type(joincond.op), joincond.op.labels
-        labels = joincond.op.labels
-        #XXX:
-        #if tupleset.columns:
-        #    coltype=tupleset.columns[position].type
-        #else:
-        #    coltype = object
-        coltype = object
-        columns = [ColumnInfo(0, joincond.parent.name or '', coltype),
-                    ColumnInfo(1, joincond.getPositionLabel(),
-                       NestedRows(_labelsToColumns(labels, tupleset))
-                )]
-        #print 'groupby columns', columns
-        return SimpleTupleset(
-            lambda: groupbyUnordered(tupleset, position, labels, debug=debug),
-            columns=columns, #_labelToColumns(labels, tupleset),
-            hint=tupleset, op=msg + repr(position),  debug=debug)
-
     def evalJoin(self, op, context):
+        #XXX context.currentTupleset isn't set when returned
         args = sorted(op.args, key=lambda arg: arg.op.cost(self, context))
         if not args:
             tmpop = jqlAST.JoinConditionOp(jqlAST.Filter())
             tmpop.parent = op
             args = [tmpop]
+
+        #evaluate each op, then join on results
+        #XXX optimizations:
+        # 1. if the result of a projection can used for a filter, apply it and
+        # use that as source of the filter
+        # 2. estimate and compare cost of projecting the prior result so next filter
+        # can use that as source (compare with cost of filtering with current source)
+        # 3.if we know results are ordered properly we can do a MergeJoin
+        #   (more efficient than IterationJoin):
+        #lslice = slice( joincond.position, joincond.position+1)
+        #rslice = slice( 0, 1) #curent tupleset is a
+        #current = MergeJoin(result, current, lslice,rslice)
 
         previous = None
         while args:
@@ -1005,20 +1142,21 @@ class SimpleQueryEngine(object):
             result = joincond.op.evaluate(self, context)
             assert isinstance(result, Tupleset)
 
-            current = self._groupby(result, joincond)
+            current = self._groupby(result, joincond,debug=context.debug)
             #print 'groupby col', current.columns
             if previous:
                 def joinFunc(leftRow, rightTable, lastRow):
                     for row in rightTable.filter({0 : leftRow[0]},
-                        hints={ 'makeindex' : 0 }):
+                        hints={ 'makeindex' : 0 }):                            
                             yield row
+                    #XXX handle outer join
 
                 coltype = object #XXX
                 assert current.columns and len(current.columns) >= 1
-                #columns: (pk, (left[1:] + right[1:])
+                #columns: (pk, (left[1:] + right)
                 columns = [previous.columns[0],
                     ColumnInfo(1, '',
-                        NestedRows(previous.columns[1:] + current.columns[1:]))
+                        NestedRows(previous.columns[1:] + current.columns))
                     ]
                 previous = IterationJoin(previous, current, joinFunc,
                                 columns,joincond.name,debug=context.debug)
@@ -1026,109 +1164,6 @@ class SimpleQueryEngine(object):
                 previous = current
         #print 'join col', previous.columns
         return previous
-
-
-    def evalJoinX(self, op, context):
-        #XXX context.currentTupleset isn't set when returned
-        args = sorted(op.args, key=lambda arg: arg.op.cost(self, context))
-        if not args:
-            tmpop = jqlAST.JoinConditionOp(jqlAST.Filter())
-            tmpop.parent = op
-            args = [tmpop]
-        #evaluate each op, then join on results
-        #XXX optimizations:
-        # 1. if the result of a projection can used for a filter, apply it and
-        # use that as source of the filter
-        # 2. estimate and compare cost of projecting the prior result so next filter
-        # can use that as source (compare with cost of filtering with current source)
-        # 3.if we know results are ordered properly we can do a MergeJoin
-        #   (more efficient IterationJoin):
-        #lslice = slice( joincond.position, joincond.position+1)
-        #rslice = slice( 0, 1) #curent tupleset is a
-        #current = MergeJoin(result, current, lslice,rslice)
-        current = None
-        for joincond in args:
-            assert isinstance(joincond, jqlAST.JoinConditionOp)
-            result = joincond.op.evaluate(self, context)            
-            assert isinstance(result, Tupleset)
-
-            #update labels with columns that will be added to the joined row
-            currentlabelcount = len(op.labels)+1
-            for i, (name, rowpos) in enumerate(joincond.op.labels):
-                #XXX ast ops should be immutable
-                #print 'addlabel', type(op), i, (name, rowpos), currentlabelcount
-               op.labels.append( (name, currentlabelcount+i) )
-
-            if not current:
-                #first time around, so need the left side of join to be collapsed
-                #also, if just one arg, won't do a join but we still need the
-                #result collapsed
-                current = self._groupby(result, joincond, 'group by ',
-                                                            debug=context.debug)
-            else:
-                coltype = object #XXX
-                assert current.columns and len(current.columns) >= 1
-                #columns: (pk, joinlabel: (left + right columns))
-                columns = [current.columns[0],
-                           ColumnInfo(1, joincond.getPositionLabel(),
-                                     NestedRows(current.columns[1:] +
-                                     list(result.columns) ))
-                          ]
-                def joinFunc(leftRow, rightTable, joincond):
-                    '''inner join on position '''
-                    #yields a row of labeled columns or None if no match
-                    #leftRow is a resourceset row
-                    #rightTable is the result tupleset
-                    #lastRow is (last leftRow, last result row)
-
-                    #print 'insert join', leftRow
-
-                    res = leftRow[0]
-                    #if each row that matches, collect any cells into a list
-                    #columns = list([] for i in xrange(len(joincond.op.labels)))
-                    columns = ColGroup()
-                    match = False
-                    #print 'join condition', joincond.name, joincond.op.__class__.__name__
-
-                    #joinposition = joincond.resolvePosition()
-                    joinposition = rightTable.findColumn(joincond.position).pos
-                    assert isinstance(joinposition, int)
-                    #XXX handle if cell is a list
-                    #XXX more complex join types
-
-
-                    #print joincond.name, joinposition, rightTable                    
-                    #print 'join iteration on', id(joincond), joincond.name,\
-                    #            'filter', joinposition, res
-                    for row in rightTable.filter({joinposition : res},
-                                hints={ 'makeindex' : joinposition }):
-                        match = True
-                        if not joincond.op.labels: #no labels, we're done
-                            break
-
-                        flatrow = flatten(row, flattenTypes=ColGroup)
-                        #print 'join row', flatrow, joincond.op.labels
-                        #XXX
-                        cg = ColGroup(flatrow[lpos] for (l,lpos) in
-                                        joincond.op.labels if lpos<len(flatrow))
-                        columns.append( cg )
-                        #for i, (name, rowpos) in enumerate(joincond.op.labels):
-                        #    val = flatrow[rowpos] #flatten(row[rowpos],to=tuple)
-                        #    #print 'join row', name, rowpos, row, val
-                        #    columns[i].append( val )
-
-                    if match or joincond.join == joincond.RIGHTOUTER:
-                        #print 'join iteration match', id(joincond), repr(leftRow), repr(columns)
-                        #return just the labels on the right rows, since we already have the key
-                        yield columns
-                    else:
-                        yield None #XXX handle outer join
-
-                func = lambda l,r,lastRow, jc=joincond: joinFunc(l,r,joincond)
-                current = IterationJoin(current, result, func, columns,
-                                        joincond.name,debug=context.debug)
-
-        return current
 
     def _findSimplePredicates(self, op, context):
         simpleops = (jqlAST.Eq,) #only Eq supported for now
