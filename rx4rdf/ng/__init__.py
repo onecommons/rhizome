@@ -1,15 +1,8 @@
-from rx.RxPath import Tupleset, ColumnInfo, EMPTY_NAMESPACE, NestedRows
+from rx.RxPath import Tupleset, ColumnInfo, EMPTY_NAMESPACE
 
 SUBJECT = 0
 PROPERTY = 1
 OBJECT = 2
-
-class ColGroup(list):
-    '''
-    Marker class to group columns together
-    '''
-    def __repr__(self):
-        return 'ColGroup'+list.__repr__(self)
 
 def getitemdeep(l, pos):
     '''

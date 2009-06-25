@@ -333,24 +333,30 @@ def _colrepr(self):
     if self.columns:
         def x(c):
             s = c.label
-            if isinstance(c.type, NestedRows):
+            if isinstance(c.type, Tupleset):
                 s += '('+','.join( map(x,c.type.columns) ) +')'
             return s
         colstr = ','.join( map(x,self.columns) )
     return '('+colstr+')'
 
+def _reordercols(cols):
+    for i, c in enumerate(cols):
+        c.pos = i
+    return cols
+
 def validateRowShape(columns, row):
-    if columns is None:
+    if 1:#columns is None:
         return
     assert isinstance(row, (tuple,list)), row
     assert len(columns) == len(row), '(c %d:%s, r %d:%s)'%(len(columns), columns,  len(row), row)
     for (ci, ri) in itertools.izip(columns, row):
-        if isinstance(ci.type, NestedRows):
-            assert isinstance(ri, ColGroup), '%s %s' % (ri, ci.type)
+        if isinstance(ci.type, Tupleset):
+            assert isinstance(ri, Tupleset), '%s %s' % (ri, ci.type)
             if ri:
+                #validate the first row of the tupleset
                 return validateRowShape(ci.type.columns, ri[0])
         else:
-            assert not isinstance(ri, ColGroup), ri
+            assert not isinstance(ri, Tupleset), ri
 
 class SimpleTupleset(Tupleset):
     '''
@@ -449,18 +455,26 @@ class SimpleTupleset(Tupleset):
             print >>out, self.hint
 
 
-class MutableTupleset(Tupleset):
+class MutableTupleset(list, Tupleset):
     '''
     Interface for representing a set of tuples
     '''
-    def __init__(self, seq=()):
-        self._rows = [row for row in seq]
+    columns = None
+
+    def __init__(self, columns=None, seq=(), reorder=True):
+        if columns is not None:
+            if reorder :
+                self.columns = [ColumnInfo(i, c.label, c.type)
+                                    for (i, c) in enumerate(columns)]
+            else:
+                self.columns = columns
+        return list.__init__(self, [row for row in seq])
     
     def filter(self, conditions=None, hints=None):
         '''Returns a iterator of the tuples in the set
            where conditions is a position:value mapping
         '''                
-        for row in self._rows:
+        for row in self:
             if conditions:
                 for pos, test in conditions.iteritems():
                     if row[pos] != test:
@@ -471,19 +485,13 @@ class MutableTupleset(Tupleset):
                 yield row
     
     def size(self):
-        return len(self._rows)
-
-    def __contains__(self, row):
-        return row in self._rows
-
-    def update(self, rows):
-        for row in rows:
-#            if row not in self._rows: #todo!
-                self._rows.append(row)        
-
-    def append(self, row, *moreRows):
-        assert not moreRows
-        self._rows.append(row)
+        return len(self)
+    
+    def __repr__(self):
+        if self.columns:
+            return 'MutableTupleset'+repr(self.columns)
+        else:
+            return 'MutableTupleset'+ list.__repr__(self)
                  
 def joinTuples(tableA, tableB, joinFunc):
     '''
@@ -549,16 +557,12 @@ class IterationJoin(Join):
         
     def filter(self, conditions=None, hints=None):
         for left, right in joinTuples(self.left, self.right, self.joinFunc):
-            #row = ColGroup((left,right)) #flatten(ColGroup((left, right)), flattenTypes=ColGroup, to=ColGroup)
-            #group as (key, rest):
-            row = ColGroup((ColGroup(left[:1]),
-                       ColGroup( left[1:]+ right[1:])
-                  ))
-            flatrow = flatten(row, flattenTypes=ColGroup)
+            row = left + right
+            flatrow = row #flatten(row, flattenTypes=ColGroup)
             #print 'Imatch', hex(id(self)), flatrow, 'filter', conditions
             if conditions:
                 for key, value in conditions.iteritems():
-                    if flatten(flatrow[key]) != value:
+                    if flatten(flatrow[key]) != value: #XXX
                         #print '@@@@skipped@@@', row[key], '!=', repr(value), flatten(row[key])
                         break
                 else:
@@ -644,16 +648,25 @@ def getcolumn(pos, row):
     pos = list(pos)
     #print 'gc', pos, row
     p = pos.pop(0)    
-    c = row[p]
+    cell = row[p]
     if pos:
-        assert isinstance(c, ColGroup)
-        for nc in c:
-            assert isinstance(nc, (list, tuple))
-            for (c, row) in getcolumn(pos, nc):
-                print 'c', c
+        #assert isinstance(cell, Tupleset), "cell %s p %s restp %s" % (cell, p, pos)
+        if isinstance(cell, Tupleset):
+            for nestedrow in cell:
+                assert isinstance(nestedrow, (list, tuple)
+                    ) and not isinstance(nestedrow, Tupleset), "%s" % (type(nestedrow))
+                for (c, row) in getcolumn(pos, nestedrow):
+                    #print 'ct', c
+                    yield (c, row)
+        else:
+            nestedrow = cell
+            assert isinstance(nestedrow, (list, tuple)
+                ) and not isinstance(nestedrow, Tupleset), "%s" % (type(nestedrow))
+            for (c, row) in getcolumn(pos, cell):
+                #print 'cl', c
                 yield (c, row)
     else:
-        yield (c, row)
+        yield (cell, row)
 
 def choosecolumns(groupby, columns, pos=None):
     '''
@@ -672,10 +685,20 @@ def choosecolumns(groupby, columns, pos=None):
 
 def groupbyUnordered(tupleset, groupby, columns, debug=False):
     '''
+    Group the given tupleset by the column specified by groupby
+    yields a row the groupby key and a nested tupleset containing the non-key columns
+    of the tupleset. The nested tupleset
+    will have one row for each occurence of the key. If the groupby key
+    is nested, the columns of ancestor tuplesets will be duplicated for each key
+    and cell coalesced into lists if necessary XXX
+
+    (a1, (b1, (c1,c2)), (a2, (b2, (c1,c2)) => groupby(c)
+    => (c1, ( (a1, (b1)), (a2, (b2)) ) ), (c2, ( (a1, (b1)), (a2, (b2)) ) )
+
     (a1, b1), (a1, b2) => groupby(a) => (a1, (b1,b2))
                        => groupby(b) => (b1, (a1)), (b2, (a1))
 
-    [a, b] => [a, NestedRows[b]] => [b, NestedRows[a]]
+    [a, b] => [a, Tupleset[b]] => [b, Tupleset[a]]
 
     (a1, b1, c1), (a1, b2, c1) => groupby(a) => (a1, ( (b1, c1), (b2, c2) ) )
                                => groupby(b) => (b1, (a1, (c1))), (b2, (a1,(c2)) )
@@ -692,20 +715,22 @@ def groupbyUnordered(tupleset, groupby, columns, debug=False):
     '''
     resources = {}
     for row in tupleset:
-        outputrow = ColGroup() #XXX
+        outputrow = []
         for colpos in columns:
             if len(colpos) < len(groupby):
                 outputcell = []
                 for v, ignore in getcolumn(colpos, row):
                     #print 'above', row, colpos, v
                     outputcell.append(v)
+                #print 'above flatten', flatten(outputcell,depth=1)
                 outputrow.append(flatten(outputcell,depth=1))
-        print 'gb pos', groupby, row
+        #print 'gb pos', groupby, row
         for (key, row) in getcolumn(groupby, row):
-            print 'gb', key, row
+            #print 'gb', key, row
+            outputrow = outputrow[:]
             vals = resources.get(key)
             if vals is None:
-                vals = ColGroup()
+                vals = MutableTupleset()
                 resources[key] = vals
             for col in columns:
                 colpos = col[len(groupby)-1:] #adjust position
@@ -713,56 +738,19 @@ def groupbyUnordered(tupleset, groupby, columns, debug=False):
                     #handled by 'above' logic above
                     continue
                 if len(colpos)==1: #optimization
+                    #print 'below1', row, key, colpos, row[colpos[0]]
                     outputrow.append( row[colpos[0]] )
                     continue
+                #XXX will we ever get here?
                 outputcell = []
                 for v, ignore in getcolumn(colpos, row):
-                    #print 'append', row, key, colpos, v
+                    #print 'below2', row, key, colpos, v
                     outputcell.append(v)
                 outputrow.append(flatten(outputcell,depth=1))
             vals.append(outputrow)
     for key, values in resources.iteritems():
-        print 'gb out', ColGroup([key, values])
-        yield ColGroup([key, values])
-
-def groupbyUnorderedXX(tupleset, groupby, columns, debug=False):
-    if not columns:
-        resources = set()
-        for row in tupleset:
-            for key, row in getcolumn(groupby, row):
-                if key in resources:
-                    continue
-                resources.add(key)
-                yield ColGroup(key,)
-        return
-
-    resources = {}
-    for row in tupleset:
-        abovevals = {}
-        for colpos in columns:
-            if len(colpos) < len(groupby):                
-                for v, ignore in getcolumn(colpos, row):
-                    #print 'above', row, colpos, v
-                    abovevals.setdefault(colpos,[]).append(v) #XXX use ColGroup()?
-        #print 'gb pos', groupby, row
-        for (key, row) in getcolumn(groupby, row):
-            #print 'gb', key, row
-            vals = resources.get(key)
-            if vals is None:
-                vals = {}
-                resources[key] = vals
-            for col in columns:
-                colpos = col[len(groupby)-1:] #adjust position
-                if not colpos:
-                    assert col in abovevals
-                    continue
-                for v, ignore in getcolumn(colpos, row):
-                    #print 'append', row, key, colpos, v
-                    vals.setdefault(col,[]).append(v) #XXX use ColGroup()?
-            vals.update(abovevals)
-    for key, values in resources.iteritems():
-        #each column
-        yield ColGroup([key, ColGroup(flatten(values[colpos],depth=1) for colpos in columns)])
+        #print 'gb out', [key, values]
+        yield [key, values]
 
 def groupbyOrdered(tupleset, pos, labels=None, debug=False):
     '''
@@ -771,66 +759,6 @@ def groupbyOrdered(tupleset, pos, labels=None, debug=False):
     '''
     for row in tupleset:
         raise Exception('nyi') #XXX
-
-def groupbyUnorderedX(tupleset, pos, labels=None, debug=False):
-    '''
-    Collapse the given tupleset selecting only the given position
-    and labeled columns. Group by the given position, collecting labeled columns
-    into a list if duplicate keys exist
-    '''
-    #print 'collapse start', pos, labels, hex(id(tupleset))
-    if not labels:
-        resources = set()
-        for row in tupleset.filter():
-            res = row[pos]
-            if res in resources:
-                continue
-            resources.add(res)
-            yield (res,)
-    else:
-        resources = {}
-        for row in tupleset.filter():
-            #ignore ColGroup structure when finding groupby key
-            flatrow = flatten(row, flattenTypes=ColGroup)
-            #print '!!collapse row start', hex(id(tupleset)), pos, 'row', row, 'flat', flatrow
-#            def getindex(row, pos):
-#                if isinstance(pos,int):
-#                    return row[pos]
-#                cell = row
-#                for p in pos:
-#                    cell = cell[p]
-#                return cell
-
-            #cell might be multi-valued so iterator over it, but use flattenSeq
-            #to avoid iterating through a string
-            for res in flattenSeq(flatrow[pos], depth=1):
-                res = flatten(res, to=tuple)
-                #XXX why too many labels?
-                cg = ColGroup(flatrow[lpos] for (l,lpos) in labels
-                                                if lpos<len(flatrow))
-                val = resources.get(res)
-                if not val:
-                    #two columns: the groupby key and a ColGroups of ColGroups
-                    resources[res] = ColGroup((res, ColGroup((cg,)) ))
-                else:
-                    val[1].append(cg)
-                continue
-
-                if not val:
-                    val = ColGroup([] for i in xrange(len(labels)+1))
-                    val[0] = res
-                    resources[res] = val
-                #add a column for each label
-                for i, l in enumerate(labels):
-                    lpos = l[1]
-                    #print 'collapserow', res, l[0], row[ lpos ]
-                    cell = row[lpos] #flatten(row[lpos], to=tuple)
-                    val[i+1].append( cell )
-
-        for v in resources.itervalues():
-            #print 'collapserow2', hex(id(tupleset)), v
-            yield v
-        #print 'collapse stop', hex(id(tupleset))
 
 class Projection(RxPath.Tupleset):
     '''
@@ -1022,9 +950,6 @@ class SimpleQueryEngine(object):
         def construct():
             count = 0
 
-            #print '!!construct ct'
-            #import sys
-            #context.currentTupleset.explain(sys.stdout)
             assert context.currentTupleset is tupleset
             for i, row in enumerate(tupleset.filter()):
                 if op.parent.offset is not None and op.parent.offset < i:
@@ -1032,21 +957,19 @@ class SimpleQueryEngine(object):
                 context.currentRow = row
                 pattern = op.shape()
 
-                if not op.id.getLabel():
-                    pos = SUBJECT #XXX doesn't seem to be true in nested cells
+                if not op.id.getLabel(): 
+                    subjectcol = (0,) 
                 else:
                     subjectlabel = op.id.getLabel()
-                    subjectcol = tupleset.findColumn(subjectlabel, True)
+                    subjectcol = tupleset.findColumnPos(subjectlabel)
                     if not subjectcol:
                         raise QueryException(
                             'construct: could not find subject label %s in %s'
                             % (subjectlabel, tupleset.columns))
-                    pos = subjectcol.pos #XXX !!
-                    #print 'sp', pos, subjectlabel
-                    #import pprint; pprint.pprint(tupleset.columns)
-                #print 'r', row, tupleset
-                idvalue = row[pos]
-                #print '{{{{}}}} id pos', op.id.getLabel(), pos, idvalue
+                idcells = list(getcolumn(subjectcol, row))
+                assert len(idcells) == 1, '%s %s %s' % (subjectcol, subjectlabel, idcells)
+                #get the first item in the nested sequence
+                idvalue = iter(flattenSeq( idcells[0][1] )).next()
 
                 #ccontext.currentTupleset = SimpleTupleset((row,),
                 #            hint=(row,), op='construct',debug=context.debug)
@@ -1066,23 +989,29 @@ class SimpleQueryEngine(object):
                             _setConstructProp(op, pattern, prop, value, name)
                     else:
                         ccontext = context
-                        if isinstance(prop.value, jqlAST.Construct):
+                        if isinstance(prop.value, jqlAST.Select):
                             ccontext = copy.copy( ccontext )
                             #if id label is set use that, or use the property name
-                            label = prop.value.id.getLabel() or prop.name                            
-                            col = tupleset.findColumn(label, True)
+                            label = prop.value.construct.id.getLabel() or prop.name                            
+                            col = tupleset.findColumnPos(label, True)
                             #print row
                             if not col:
                                 raise QueryException(
                                     'construct: could not find label %s in %s'
                                     % (label, tupleset.columns))
-                            v = row[col.pos]
+                            else:
+                                pos, rowInfoTupleset = col
+
+                            v = list([row for cell,row in getcolumn(pos, row)])
+                            #print '!!!v', col, label, v, 'row', row
                             assert isinstance(v, (list, tuple, Tupleset))
-                            assert isinstance(col.type, NestedRows)
+                            #assert isinstance(col.type, Tupleset)
                             ccontext.currentTupleset = SimpleTupleset(v,
-                              columns=col.type.columns, hint=v,
+                              columns=rowInfoTupleset.columns,
+                              hint=v,
                               op='nested construct value', debug=context.debug)
 
+                        #print '!!v eval', prop, '\n', prop.value
                         v = list(prop.value.evaluate(self, ccontext))
                         #print '####PROP', prop.name or prop.value.name, 'v', v
                         _setConstructProp(op, pattern, prop, v,
@@ -1099,13 +1028,14 @@ class SimpleQueryEngine(object):
     def _groupby(self, tupleset, joincond, msg='group by ',debug=False):
         #XXX use groupbyOrdered if we know tupleset is ordered by subject
         position = tupleset.findColumnPos(joincond.position)
-        print '_groupby', joincond.position, position, tupleset.columns
+        assert position is not None, '%s %s' % (tupleset, tupleset.columns)
+        #print '_groupby', joincond.position, position, tupleset.columns
         coltype = object
         #XXX use choosecolumns
         columns = [
             ColumnInfo(0, joincond.parent.name or '', coltype),
             ColumnInfo(1, joincond.getPositionLabel(),
-                                            NestedRows(tupleset.columns) )
+                                            MutableTupleset(tupleset.columns) )
         ]
         colpositions = [(c.pos,) for c in tupleset.columns]
         return SimpleTupleset(
@@ -1153,11 +1083,9 @@ class SimpleQueryEngine(object):
 
                 coltype = object #XXX
                 assert current.columns and len(current.columns) >= 1
-                #columns: (pk, (left[1:] + right)
-                columns = [previous.columns[0],
-                    ColumnInfo(1, '',
-                        NestedRows(previous.columns[1:] + current.columns))
-                    ]
+                assert previous.columns is not None
+                #columns: (left + right)
+                columns = _reordercols(previous.columns + current.columns) 
                 previous = IterationJoin(previous, current, joinFunc,
                                 columns,joincond.name,debug=context.debug)
             else:

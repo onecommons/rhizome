@@ -311,31 +311,6 @@ class JoinConditionOp(QueryOp):
         else:
             return self.position
 
-    def _xxxresolvePosition(self, columns, throw=True):
-        '''
-        Return the column index for the join
-        To handle joins on labels, this needs to be called after the underlying
-        op is evaluated.
-        '''
-        if not isinstance(self.position, int):
-            #print 'resolve', str(self.op), repr(self.op.labels)
-            for col in columns:                
-                if self.position == col.label:
-                    #print 'found', name, pos
-                    return col.pos
-                elif isinstance(col.type, NestedColumn) and col.type.columns:
-                    nestedpos = self.resolvePosition(col.type.columns, False)
-                    if nestedpos is not None:
-                        return flatten( (col.pos, nestedpos) )
-
-            if throw:
-                print tupleset, tupleset.columns
-                raise QueryException('unknown label ' + self.position)
-            else:
-                return None
-        else:
-            return self.position
-
 
 class Filter(QueryOp):
     '''

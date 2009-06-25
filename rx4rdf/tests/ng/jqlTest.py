@@ -198,6 +198,7 @@ rows0=[['1',
 
 t('''
 { id : ?childid,
+      *, 
       'parent' : { id : ?parentid,
                    where( 
                    {child = ?childid and

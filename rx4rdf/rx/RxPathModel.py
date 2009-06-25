@@ -27,43 +27,6 @@ class ColumnInfo(object):
     def __repr__(self):
         return 'ColInfo'+repr((self.pos, self.label,self.type))
 
-class NestedRows(object):
-    def __init__(self, columns, reorder=True):
-        if reorder:
-            self.columns = [ColumnInfo(i, c.label, c.type)
-                                for (i, c) in enumerate(columns)]
-        else:
-            self.columns = columns
-
-    def findColumn(self, label, deep=False):
-        if isinstance(label, int):
-            if label >= len(self.columns):
-                return None
-            return self.columns[label]
-        for col in self.columns:
-            if label == col.label:
-                return col
-            if deep and isinstance(col.type, NestedRows):
-                if col.type.findColumn(label, deep):
-                    return col
-        return None
-
-    def findColumnPos(self, label, pos=()):
-        if not self.columns:
-            return None
-
-        for col in self.columns:
-            if label == col.label:
-                return pos+(col.pos,)
-            if isinstance(col.type, NestedRows):
-                match = col.type.findColumnPos(label, pos+(col.pos,))
-                if match:
-                    return match
-        return None
-
-    def __repr__(self):
-        return 'NestedRows'+repr(self.columns)
-
 class Tupleset(object):
     '''
     Interface for representing a set of tuples
@@ -82,20 +45,24 @@ class Tupleset(object):
         for col in self.columns:
             if label == col.label:
                 return col
-            if deep and isinstance(col.type, NestedRows):
+            if deep and isinstance(col.type, Tupleset):
                 if col.type.findColumn(label, deep):
                     return col
         return None
 
-    def findColumnPos(self, label, pos=()):
+    def findColumnPos(self, label, rowinfo=False, pos=()):
         if not self.columns:
             return None
 
         for col in self.columns:
             if label == col.label:
-                return pos+(col.pos,)
-            if isinstance(col.type, NestedRows):
-                match = col.type.findColumnPos(label, pos+(col.pos,))
+                pos = pos+(col.pos,)
+                if rowinfo:
+                    return pos, self
+                else:
+                    return pos
+            if isinstance(col.type, Tupleset):
+                match = col.type.findColumnPos(label, rowinfo, pos+(col.pos,))
                 if match:
                     return match
         return None
@@ -108,10 +75,7 @@ class Tupleset(object):
 
     def toStatements(self, context):
         return self
-    
-    def left_inner(self):
-        return self
-    
+        
     def asBool(self):
         size = self.size()
         if size < sys.maxint:
