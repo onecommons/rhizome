@@ -345,7 +345,7 @@ def _reordercols(cols):
     return cols
 
 def validateRowShape(columns, row):
-    if 1:#columns is None:
+    if columns is None:
         return
     assert isinstance(row, (tuple,list)), row
     assert len(columns) == len(row), '(c %d:%s, r %d:%s)'%(len(columns), columns,  len(row), row)
@@ -650,20 +650,12 @@ def getcolumn(pos, row):
     p = pos.pop(0)    
     cell = row[p]
     if pos:
-        #assert isinstance(cell, Tupleset), "cell %s p %s restp %s" % (cell, p, pos)
-        if isinstance(cell, Tupleset):
-            for nestedrow in cell:
-                assert isinstance(nestedrow, (list, tuple)
-                    ) and not isinstance(nestedrow, Tupleset), "%s" % (type(nestedrow))
-                for (c, row) in getcolumn(pos, nestedrow):
-                    #print 'ct', c
-                    yield (c, row)
-        else:
-            nestedrow = cell
+        assert isinstance(cell, Tupleset), "cell %s p %s restp %s" % (cell, p, pos)
+        for nestedrow in cell:
             assert isinstance(nestedrow, (list, tuple)
                 ) and not isinstance(nestedrow, Tupleset), "%s" % (type(nestedrow))
-            for (c, row) in getcolumn(pos, cell):
-                #print 'cl', c
+            for (c, row) in getcolumn(pos, nestedrow):
+                #print 'ct', c
                 yield (c, row)
     else:
         yield (cell, row)
@@ -722,9 +714,9 @@ def groupbyUnordered(tupleset, groupby, columns, debug=False):
                 for v, ignore in getcolumn(colpos, row):
                     #print 'above', row, colpos, v
                     outputcell.append(v)
-                #print 'above flatten', flatten(outputcell,depth=1)
-                outputrow.append(flatten(outputcell,depth=1))
-        #print 'gb pos', groupby, row
+                assert len(outputcell)==1, 'above coalesce %s' % outputcell
+                outputrow.append( outputcell[0] )
+
         for (key, row) in getcolumn(groupby, row):
             #print 'gb', key, row
             outputrow = outputrow[:]
@@ -737,16 +729,9 @@ def groupbyUnordered(tupleset, groupby, columns, debug=False):
                 if not colpos:
                     #handled by 'above' logic above
                     continue
-                if len(colpos)==1: #optimization
-                    #print 'below1', row, key, colpos, row[colpos[0]]
-                    outputrow.append( row[colpos[0]] )
-                    continue
-                #XXX will we ever get here?
-                outputcell = []
-                for v, ignore in getcolumn(colpos, row):
-                    #print 'below2', row, key, colpos, v
-                    outputcell.append(v)
-                outputrow.append(flatten(outputcell,depth=1))
+                assert len(colpos)==1, 'unexpected multi-level position %s' % colpos
+                #print 'below1', row, key, colpos, row[colpos[0]]
+                outputrow.append( row[colpos[0]] )
             vals.append(outputrow)
     for key, values in resources.iteritems():
         #print 'gb out', [key, values]
