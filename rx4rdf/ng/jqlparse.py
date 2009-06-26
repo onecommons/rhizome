@@ -291,15 +291,17 @@ def _joinFromConstruct(construct, where, parseState):
                     left = And(left, value)
             elif value:
                 #don't want treat construct values as boolean filter
-                #but we do want to find projections which we need to join:
+                #but we do want to find projections which we need to join
+                #(but we skip project(0) -- no reason to join)
                 for child in value.depthfirst(
                  descendPredicate=lambda op: not isinstance(op, ResourceSetOp)):
-                    if isinstance(child, Project):
+                    if isinstance(child, Project) and child.fields != [SUBJECT]:
+                        import copy
                         if not left:                            
-                            left = child
+                            left = copy.copy( child )
                         else:
                             assert child
-                            left = And(left, child)
+                            left = And(left, copy.copy( child ))
 
             #XXX: handle outer joins:
             #if prop.ifEmtpy == PropShape.omit:
@@ -309,7 +311,7 @@ def _joinFromConstruct(construct, where, parseState):
             #join.appendArg(JoinConditionOp(filter, SUBJECT,jointype))
 
     if left:
-        left = makeJoinExpr(left, parseState)        
+        left = makeJoinExpr(left, parseState)
         assert left
     
     if not left:

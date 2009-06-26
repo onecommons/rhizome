@@ -68,6 +68,8 @@ def flattenSeq(seq, depth=0xFFFF, flattenTypes=None):
                 yield a
 
 def flatten(seq, to=list, depth=0xFFFF, flattenTypes=None, keepSeq=False):
+    if not keepSeq and not isinstance(seq, flattenTypes or _flattenTypes):
+        return seq
     flattened = to(flattenSeq(seq, depth, flattenTypes))
     if not keepSeq and len(flattened)==1:
         return flattened[0]

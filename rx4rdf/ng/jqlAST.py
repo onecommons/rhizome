@@ -383,7 +383,9 @@ class AnyFuncOp(QueryOp):
 
     def __init__(self, key=(), metadata=None, *args):
         self.name = key
-        self.args = args or []
+        self.args = []
+        for a in args:
+            self.appendArg(a)
         self.metadata = metadata or self.defaultMetadata
 
     def getType(self):

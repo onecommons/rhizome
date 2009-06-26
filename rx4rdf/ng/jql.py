@@ -406,11 +406,12 @@ class SimpleTupleset(Tupleset):
             makecache = None
 
         if self.cache is not None and makecache == self.cachekey:
+            assert len(conditions)==1 and makecache in conditions
             for row in self.cache.get(conditions[makecache], ()):
                 yield row
             return
         elif makecache is not None:
-            cache = {}           
+            cache = {} #no cache or cache for different key so create a new cache
 
         if 0:#self.debug:
             rows = list(self.generator())
@@ -503,7 +504,7 @@ def joinTuples(tableA, tableB, joinFunc):
         for resultRow in joinFunc(rowA, tableB, lastRowA):
             if resultRow is not None:
                 yield rowA, resultRow
-        lastRowA = rowA, resultRow
+            lastRowA = rowA, resultRow
 
 def crossJoin(rowA,tableB,lastRowA):
     '''cross join'''
@@ -892,6 +893,8 @@ def flattenOp(args, opType):
             yield a
 
 def _setConstructProp(op, pattern, prop, v, name):
+    if not isinstance(v, (list,tuple)):
+        v = [v]
     if not v:
         if prop.ifEmpty == jqlAST.PropShape.omit:
             return
@@ -1005,8 +1008,9 @@ class SimpleQueryEngine(object):
                               hint=v,
                               op='nested construct value', debug=context.debug)
 
-                        #print '!!v eval', prop, '\n', prop.value
-                        v = list(prop.value.evaluate(self, ccontext))
+                        #print '!!v eval', prop
+                        v = flatten(prop.value.evaluate(self, ccontext),
+                                    flattenTypes=Tupleset)
                         #print '####PROP', prop.name or prop.value.name, 'v', v
                         _setConstructProp(op, pattern, prop, v,
                                                 prop.name or prop.value.name)
@@ -1069,7 +1073,7 @@ class SimpleQueryEngine(object):
             if previous:
                 def joinFunc(leftRow, rightTable, lastRow):
                     for row in rightTable.filter({0 : leftRow[0]},
-                        hints={ 'makeindex' : 0 }):                            
+                        hints={ 'makeindex' : 0 }):
                             yield row
                     #XXX handle outer join
 
@@ -1156,7 +1160,7 @@ class SimpleQueryEngine(object):
                     #XXX evalFunc, etc. to use value
                     #XXX memoize results lazily
             #        arg.left.value = arg.left.evaluate(self, fcontext)
-                
+
             for row in tupleset:
                 for cost, i, arg in args:                    
                     fcontext.currentRow = row
@@ -1165,9 +1169,8 @@ class SimpleQueryEngine(object):
                     if not value:
                         break
                 if not value:
-                    continue
-                yield row
-
+                    continue                
+                yield row        
         return SimpleTupleset(filterRows, hint=tupleset,columns=columns,
                 colmap=colmap, op='complexfilter', debug=context.debug)
 
@@ -1190,7 +1193,7 @@ class SimpleQueryEngine(object):
             col = context.currentTupleset.findColumn(op.name, True)
             if not col:
                 raise QueryException(op.name + " projection not found")
-            return [context.currentRow[col.pos]]
+            return context.currentRow[col.pos]
             #context.currentRow[pos]
             #for (name, pos) in op.join.labels:
             #    if name == op.field:
@@ -1287,7 +1290,8 @@ class SimpleQueryEngine(object):
         
     def evalAnyFuncOp(self, op, context):
         values = [arg.evaluate(self, context) for arg in op.args]
-        return op.metadata.func(*values)
+        result = op.metadata.func(*values)
+        return result
 
     def costAnyFuncOp(self, op, context):
         if op.metadata.costFunc:

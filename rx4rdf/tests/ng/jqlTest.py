@@ -92,7 +92,7 @@ t(
 
 t(
 ''' { id : ?parentid,
-      #derivedprop : a + b,
+      'derivedprop' : id * 2,
       'children' : { id : ?childid,
                    *
                    where( {child = ?childid and
@@ -101,13 +101,9 @@ t(
                  }
     }
 ''',skipParse=0,
-result = [{
- 'id' : '1',
- 'children' : [
-      { 'id' : '2', 'foo':'bar'},
-      { 'id' : '3', 'foo':'bar'},
-   ]
-}],
+results = [{'children': [{'foo': 'bar', 'id': '3'}, {'foo': 'bar', 'id': '2'}],
+  'derivedprop': '11',
+  'id': '1'}],
 ast0=Select(Construct([
     cs('id', 'parentid'),
     #XXX outerjoin broken:
