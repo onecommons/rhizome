@@ -348,7 +348,7 @@ def validateRowShape(columns, row):
     if columns is None:
         return
     assert isinstance(row, (tuple,list)), row
-    assert len(columns) == len(row), '(c %d:%s, r %d:%s)'%(len(columns), columns,  len(row), row)
+    #assert len(columns) == len(row), '(c %d:%s, r %d:%s)'%(len(columns), columns,  len(row), row)
     for (ci, ri) in itertools.izip(columns, row):
         if isinstance(ci.type, Tupleset):
             assert isinstance(ri, Tupleset), '%s %s' % (ri, ci.type)
@@ -641,41 +641,28 @@ class MergeJoin(Join):
     def getJoinType(self):
         return 'ordered merge'
 
-def getcolumn(pos, row):
-    '''
-    yield a sequence of values for the nested column
-    '''
-    pos = list(pos)
-    #print 'gc', pos, row
-    p = pos.pop(0)    
-    cell = row[p]
-    if pos:
-        assert isinstance(cell, Tupleset), "cell %s p %s restp %s" % (cell, p, pos)
-        for nestedrow in cell:
-            assert isinstance(nestedrow, (list, tuple)
-                ) and not isinstance(nestedrow, Tupleset), "%s" % (type(nestedrow))
-            for (c, row) in getcolumn(pos, nestedrow):
-                #print 'ct', c
-                yield (c, row)
-    else:
-        yield (cell, row)
-
-def choosecolumns(groupby, columns, pos=None):
-    '''
-    "above" columns go first, omit groupby column
-    '''
-    pos = pos or []
-    level = len(pos)
-    for i, c in enumerate(columns):
-        if groupby[level-1] == i:
-            if level == len(groupby):
-                continue #groupby column, skip this column
-            for nc in choosecolumns(groupby, c, pos):
-                yield pos+[nc]
+def getcolumns(keypos, row):
+    keypos = list(keypos)
+    pos = keypos.pop(0)
+    cols = []
+    for i, cell in enumerate(row):
+        if i == pos:
+            keycell = cell
         else:
-            yield c
+            cols.append(cell)
+    
+    assert keycell
+    if not keypos:
+        yield keycell, cols
+    else: #i above keypos
+        assert isinstance(keycell, Tupleset), "cell %s p %s restp %s" % (keycell, pos, keypos)
+        #print 'keycell', keycell
+        for nestedrow in keycell:
+            #print 'nestedrow', nestedrow
+            for key, nestedcols in getcolumns(keypos, nestedrow):
+                yield key, cols+nestedcols
 
-def groupbyUnordered(tupleset, groupby, columns, debug=False):
+def groupbyUnordered(tupleset, groupby, debug=False):
     '''
     Group the given tupleset by the column specified by groupby
     yields a row the groupby key and a nested tupleset containing the non-key columns
@@ -707,35 +694,57 @@ def groupbyUnordered(tupleset, groupby, columns, debug=False):
     '''
     resources = {}
     for row in tupleset:
-        outputrow = []
-        for colpos in columns:
-            if len(colpos) < len(groupby):
-                outputcell = []
-                for v, ignore in getcolumn(colpos, row):
-                    #print 'above', row, colpos, v
-                    outputcell.append(v)
-                assert len(outputcell)==1, 'above coalesce %s' % outputcell
-                outputrow.append( outputcell[0] )
-
-        for (key, row) in getcolumn(groupby, row):
-            #print 'gb', key, row
-            outputrow = outputrow[:]
+        #print 'gb', groupby, row
+        for key, outputrow in getcolumns(groupby, row):
             vals = resources.get(key)
             if vals is None:
                 vals = MutableTupleset()
                 resources[key] = vals
-            for col in columns:
-                colpos = col[len(groupby)-1:] #adjust position
-                if not colpos:
-                    #handled by 'above' logic above
-                    continue
-                assert len(colpos)==1, 'unexpected multi-level position %s' % colpos
-                #print 'below1', row, key, colpos, row[colpos[0]]
-                outputrow.append( row[colpos[0]] )
             vals.append(outputrow)
+
     for key, values in resources.iteritems():
         #print 'gb out', [key, values]
         yield [key, values]
+
+def getcolumn(pos, row):
+    '''
+    yield a sequence of values for the nested column
+    '''
+    pos = list(pos)
+    #print 'gc', pos, row
+    p = pos.pop(0)    
+    cell = row[p]
+    if pos:
+        assert isinstance(cell, Tupleset), "cell %s p %s restp %s" % (cell, p, pos)
+        for nestedrow in cell:
+            assert isinstance(nestedrow, (list, tuple)
+                ) and not isinstance(nestedrow, Tupleset), "%s" % (type(nestedrow))
+            for (c, row) in getcolumn(pos, nestedrow):
+                #print 'ct', c
+                yield (c, row)
+    else:
+        yield (cell, row)
+
+def choosecolumns(groupby, columns):
+    '''
+    "above" columns go first, omit groupby column
+    '''
+    groupby = list(groupby)
+    pos = groupby.pop(0)
+    outputcolumns = []
+    groupbycol = None
+    for i, c in enumerate(columns):
+        if pos == i:
+            if groupby:
+                groupbycol = choosecolumns(groupby, c.type.columns)
+            #else: skip column
+        else:
+            outputcolumns.append(c)
+    if groupbycol:
+        outputcolumns.append(groupbycol) #goes last
+    return MutableTupleset(columns=outputcolumns)
+
+
 
 def groupbyOrdered(tupleset, pos, labels=None, debug=False):
     '''
@@ -892,7 +901,7 @@ def _setConstructProp(op, pattern, prop, v, name):
             val = None #null
     elif (prop.ifSingle == jqlAST.PropShape.nolist
             and len(v) == 1):
-        val = v[0]
+        val = flatten(v[0])
     else: #uselist
         val = v
 
@@ -1011,21 +1020,19 @@ class SimpleQueryEngine(object):
                                                             debug=context.debug)
 
     def _groupby(self, tupleset, joincond, msg='group by ',debug=False):
-        #XXX use groupbyOrdered if we know tupleset is ordered by subject
+        #XXX use groupbyOrdered if we know tupleset is ordered by groupby key
         position = tupleset.findColumnPos(joincond.position)
         assert position is not None, '%s %s' % (tupleset, tupleset.columns)
         #print '_groupby', joincond.position, position, tupleset.columns
-        coltype = object
-        #XXX use choosecolumns
+        coltype = object        
         columns = [
             ColumnInfo(0, joincond.parent.name or '', coltype),
             ColumnInfo(1, joincond.getPositionLabel(),
-                                            MutableTupleset(tupleset.columns) )
+                                    choosecolumns(position,tupleset.columns) )
         ]
-        colpositions = [(c.pos,) for c in tupleset.columns]
         return SimpleTupleset(
             lambda: groupbyUnordered(tupleset, position,
-                colpositions, debug=debug),
+                debug=debug),
             columns=columns, 
             hint=tupleset, op=msg + repr(joincond.position),  debug=debug)
 

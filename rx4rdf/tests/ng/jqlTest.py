@@ -75,7 +75,11 @@ t.model = modelFromJson([
         { "id" : "3", "foo" : "bar"}
     ])
 
-t('{*}')
+t('{*}',
+[{'foo': 'bar', 'id': '3'},
+ {'foo': 'bar', 'id': '2'},
+ {'child': '2', 'id': '_:2', 'parent': '1'},
+ {'child': '3', 'id': '_:1', 'parent': '1'}])
 
 t(
 ''' { id : ?childid,
@@ -83,7 +87,7 @@ t(
        where( {child = ?childid 
            })
     }
-''')
+''', [{'foo': 'bar', 'id': '3'}, {'foo': 'bar', 'id': '2'}])
 
 
 t(
@@ -164,7 +168,10 @@ t(
                        })
                  }
     }
-''',skipParse=0,
+''',
+[{'children': [{'foo': 'bar', 'id': '3'}, {'foo': 'bar', 'id': '2'}],
+  'id': '1'}],
+  skipParse=0,
 ast0=Select(
   Construct([
     cs('id', 'parent'),
@@ -206,7 +213,9 @@ t('''
                     })
                  }
     }
-''')
+''', [{'foo': 'bar', 'id': '3', 'parent': {'id': '1'}},
+ {'foo': 'bar', 'id': '2', 'parent': {'id': '1'}}]
+ )
 
 basic = Suite()
 basic.model = [{}, {}]
