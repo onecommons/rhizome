@@ -15,9 +15,9 @@ TODO: refactor with no dependency on (in order)
 RxDom OK for small documents (e.g. shredding)
 
 * Ft dependencies:
- * RxPath (create FTStub with NumberValue, StringValue, XPath.Context, etc.)? 
+ * RxPath (create FTStub with NumberValue, StringValue, XPath.Context, etc.)[half-done]
  * RxPathUtils.parseRDFFromURI (Uri, ImportSource)
- * RxPathUtils._sessionBNodeUUID (fixed using uuid.uuid4() -- only for >= 2.5)
+ * RxPathUtils._sessionBNodeUUID [x;]
  * RxPathGraph: RxPath.Id, String/NumberValue, xpath extension functions
  * RxPathDOM: SplitQName, XML_NAMESPACE [x;]
  * DOMStore: applyXslt, applyXPath (subclass)

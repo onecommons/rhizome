@@ -231,65 +231,6 @@ def runQuery(query, model):
 def buildAST(query):
     return jqlparse.parse(query)
 
-def rewriteAST(ast):
-    if not isinstance(ast, jqlAST.Select):
-        return
-    op = ast
-    #create a mapping of join conditions' join "column" to the join op
-    #use this to add labels if the projections are being selected
-    joins = {}
-    where = op.where
-    if not where:
-        where = Join()
-    for child in where.breadthfirst():
-        if isinstance(child, jqlAST.JoinConditionOp) and not isinstance(
-                                                    child.position, int):
-            assert isinstance(child.parent, jqlAST.Join)
-            joins[child.position] = child.parent
-
-    currentConstruct = op.construct
-    #look through each Project op referenced by the construct
-    #and see if there's a corresponding filter for the Project op
-    #if there is add a label so that the column is preserved
-    #if there isn't, add an outer join so the column is retrieved if present
-
-    #print 'children', len(list(op.construct.depthfirst() ))
-    for child in op.construct.depthfirst():
-        if isinstance(child, jqlAST.Construct):
-            currentConstruct = child
-        elif isinstance(child, jqlAST.Project) and not child.join:
-            #find the join the Project will be associated with
-            #(skip if join already set by parser)
-            if currentConstruct.id.getLabel():
-                join = joins.get(currentConstruct.id.getLabel())
-            else:                
-                join = where
-            if join:
-                child.join = join
-                if child.name != '*':
-                    #check for matching filter already be defined
-                    test = jqlAST.Eq(child.name, jqlAST.Project(PROPERTY))
-                    found = False
-                    for arg in join.args:
-                        assert(isinstance(arg, jqlAST.JoinConditionOp))
-                        if not isinstance(arg.op, jqlAST.Filter):
-                            continue
-                        #XXX predicates
-                        if test in arg.op.args:
-                            arg.op.addLabel(child.name, OBJECT)
-                            found = True
-                    if found:
-                        continue
-                    filter = jqlAST.Filter(test,objectlabel=child.name)
-                    #set as outer join #XXX outer join seems broken
-                    join.appendArg(
-                        jqlAST.JoinConditionOp(filter, SUBJECT,
-                                    jqlAST.JoinConditionOp.RIGHTOUTER) )
-                else:
-                    pass #XXX if '*' preserve object column on all filters
-            else:
-                pass #XXX need to construct a join
-
 def evalAST(ast, model, bindvars=(), explain=None, debug=False):
     #rewriteAST(ast)
     queryContext = QueryContext(model, ast, explain, debug)
@@ -670,8 +611,7 @@ def groupbyUnordered(tupleset, groupby, debug=False):
     of the tupleset. The nested tupleset
     will have one row for each occurence of the key. If the groupby key
     is nested, the columns of ancestor tuplesets will be duplicated for each key
-    and cell coalesced into lists if necessary XXX
-
+    
     (a1, (b1, (c1,c2)), (a2, (b2, (c1,c2)) => groupby(c)
     => (c1, ( (a1, (b1)), (a2, (b2)) ) ), (c2, ( (a1, (b1)), (a2, (b2)) ) )
 
@@ -745,109 +685,53 @@ def choosecolumns(groupby, columns):
         outputcolumns.append(groupbycol) #goes last
     return MutableTupleset(columns=outputcolumns)
 
-
-
-def groupbyOrdered(tupleset, pos, labels=None, debug=False):
+def groupbyOrdered(tupleset, groupby, debug=False):
     '''
     More efficient version of groupbyUnordered -- use if the tupleset is
     ordered by column in the given pos
     '''
+    previous = None
     for row in tupleset:
-        raise Exception('nyi') #XXX
-
-class Projection(RxPath.Tupleset):
-    '''
-    Corresponds to a nodeset with all nodes of the same type (position)
-    '''
-    #todo: not really a projection any more rename to GroupBy
-    #todo?: need to adjust position for joins?    
-
-    def __init__(self, tupleset, position, distinct=True,op=''):
-        #todo: to support joins needs to be a more generalized tuple set
-        self.tupleset = tupleset
-        #todo: for more general query languages like XQuery or SPARQL,
-        #needs to be a tuple of positions
-        self.position = position
-        if position == 0: #subject
-            self.groupby_offset = 1
-        else:
-            self.groupby_offset = 5 #the whole statement        
-        self.distinct=distinct
-        self.op=op #for debugging
-
-    def toStatements(self, context):
-        if self.position == 0: 
-            model = _findModel(self.tupleset)
-            if model:
-                return model
-            
-            def getRowsForSubjects():
-                lastSubject = None
-                for row in self:
-                    #print 'subject', row
-                    subject = row[0]
-                    if subject != lastSubject:
-                        lastSubject = subject
-                        for stmt in context.initialModel.filter(
-                            {0 : subject}):
-                            yield stmt
-                            
-            return SimpleTupleset(getRowsForSubjects,self,op='PROJECT toStatements')
-        else:
-            return self.tupleset
-        
-    def filter(self, conditions=None, hints=None):
-        #if conditions:
-        #    assert (len(conditions) <= self.position+1), conditions
-
-        distinct = self.distinct
-        last = None
-
-        for row in self.tupleset:
-            result = row[:self.groupby_offset]
-            assert len(result) == self.groupby_offset, '%s should be %s in %s' %(
-                                len(result),self.groupby_offset, self.tupleset)
-            if distinct:                
-                if result == last:
-                    continue
-                else:
-                    last = result
-                    
-            if conditions:
-                for key, value in conditions.iteritems():
-                    if result[key] != value:
-                        break
-                else:
-                    yield result
+        cols = []
+        keycell = None
+        for i, cell in enumerate(row):
+            if i == groupby:
+                keycell = cell
             else:
-                yield result
-
-    def size(self):
-        return self.tupleset.size()
-
-    def left_inner(self):
-        return Projection(self.tupleset.left_inner(), self.position, op='left_inner of ' + self.op)
-
-    def explain(self, out, indent=''):        
-        print >>out, indent,'Projection', hex(id(self)), self.position, \
-              self.distinct and 'DISTINCT' or '','for', self.op,'using:'
-        indent += ' '*4
-        self.tupleset.explain(out,indent)
+                cols.append(cell)
+        assert keycell is not None
+        if keycell != previous:
+            yield [previous, vals]
+            vals = MutableTupleset()
+            previous = keycell
+        vals.append(cols)
+    if previous is not None:
+        yield [previous, vals]
     
 class Union(RxPath.Tupleset):
     '''
     Corresponds to a nodeset containing nodes of different node types
     '''
-    def __init__(self, projections=None,op=''):
-        projections = projections or []
-        self.tuplesets = projections #set of tuplesets
+    def __init__(self, tuplesets=None,op='',unique=True):
+        tuplesets = tuplesets or []
+        self.tuplesets = tuplesets #set of tuplesets
         self.op=op #for debugging
-        #self.correlated = {} #correlated positions (columns) between projections
+        self.unique = unique
     
     def filter(self, conditions=None, hints=None):
+        if self.unique:
+            index = set()
+        else:
+            index = None
         for tupleset in self.tuplesets:
             for row in tupleset.filter(conditions, hints):
-                 yield row
+                if index is None:
+                    yield row
+                    continue
+                key = hash(flatten(row, to=tuple))
+                if key not in index:
+                    index.add(key)
+                    yield row
 
     def toStatements(self, context):
         return Union([t.toStatements(context) for t in self.tuplesets],op='UNION toStatements')
@@ -857,26 +741,6 @@ class Union(RxPath.Tupleset):
         indent += ' '*4
         for t in self.tuplesets:
             t.explain(out,indent)
-
-def _findModel(tupleset):
-    if isinstance(tupleset, Union):
-        tuplesets = tupleset.tuplesets
-    else:
-        tuplesets = (tupleset,)
-    for tupleset in tuplesets:
-        if isinstance(tupleset, Union):
-            model = _findModel(tupleset)
-            if model:
-                return model
-            continue
-        #XXX:
-        while isinstance(tupleset, Projection):
-            tupleset = tupleset.tupleset
-        
-        if isinstance(tupleset, RxPath.Model):
-            return tupleset
-                
-    return None
 
 #############################################################
 ################ Evaluation Engine ##########################
@@ -912,22 +776,6 @@ def _setConstructProp(op, pattern, prop, v, name):
         pattern[name] = val
     else:
         pattern.append(val)
-
-def _labelsToColumns(labels, tupleset, start=0):
-    return [ColumnInfo(start+i, name,
-          (tupleset and tupleset.columns and len(tupleset.columns)>pos
-          and tupleset.columns[pos].type) or object)
-                      for i,(name, pos) in enumerate(labels)]
-
-#def _findFlatPos(columns, label, start=0):
-#    for i,c in enumerate(columns):
-#        if c.label == label:
-#            return start + i
-#        if isinstance(c.type, NestedRows):
-#            pos = _findFlatPos(c.type.columns, start+i)
-#            if pos > -1:
-#                return pos
-#    return -1
 
 class SimpleQueryEngine(object):
     
@@ -1041,6 +889,14 @@ class SimpleQueryEngine(object):
             hint=tupleset, op=msg + repr(joincond.position),  debug=debug)
 
     def evalJoin(self, op, context):
+        return self._evalJoin(op, context, 'i')
+
+    def evalExcept(self, op, context):
+        #Note: actually an antijoin not except: doesn't compare whole row,
+        #just join key
+        return self._evalJoin(op, context, 'a')
+ 
+    def _evalJoin(self, op, context, jointype):
         #XXX context.currentTupleset isn't set when returned
         args = sorted(op.args, key=lambda arg: arg.op.cost(self, context))
         if not args:
@@ -1071,18 +927,38 @@ class SimpleQueryEngine(object):
             current = self._groupby(result, joincond,debug=context.debug)
             #print 'groupby col', current.columns
             if previous:
-                def joinFunc(leftRow, rightTable, lastRow):
-                    for row in rightTable.filter({0 : leftRow[0]},
-                        hints={ 'makeindex' : 0 }):
-                            yield row
-                    #XXX handle outer join
+                def bindjoinFunc(jointype, current):
+                    #need this func to create new local bindings inside iteration
+                    if jointype=='o':
+                        nullrows = [None] * len(current.columns)
+                    elif jointype=='a':
+                        nullrows = [] #no match, so include leftRow
+                    else:
+                        nullrows = None
+
+                    def joinFunc(leftRow, rightTable, lastRow):
+                        match = False
+                        for row in rightTable.filter({0 : leftRow[0]},
+                            hints={ 'makeindex' : 0 }):
+                                if jointype=='a': #antijoin, skip leftRow if found
+                                    return
+                                elif jointype=='s': #semijoin
+                                    yield []
+                                else:
+                                    yield row
+                                match = True
+                        if not match:
+                            yield nullrows
+
+                    return joinFunc
 
                 coltype = object #XXX
                 assert current.columns and len(current.columns) >= 1
                 assert previous.columns is not None
                 #columns: (left + right)
                 columns = _reordercols(previous.columns + current.columns) 
-                previous = IterationJoin(previous, current, joinFunc,
+                previous = IterationJoin(previous, current,
+                                bindjoinFunc(jointype, current),
                                 columns,joincond.name,debug=context.debug)
             else:
                 previous = current
@@ -1218,7 +1094,6 @@ class SimpleQueryEngine(object):
         #if op.name == "*": 
         return 1.0 #XXX
 
-#XXXX
     def costFilter(self, op, context):
         return 1.0 #XXX
 
@@ -1278,6 +1153,7 @@ class SimpleQueryEngine(object):
         return 0.0
 
     def evalEq(self, op, context):
+        #XXX
         lvalue = op.left.evaluate(self, context)
         if op.right:
             rvalue = op.left.evaluate(self, context)
@@ -1285,9 +1161,10 @@ class SimpleQueryEngine(object):
             rvalue = context.currentValue
         return lvalue == rvalue
 
-    def costEq(self, op, context):
-        return 0
-        
+    def costEq(self, op, context): #XXX
+        assert len(op.args) == 2
+        return op.args[0].cost(self, context) + op.args[1].cost(self, context)
+
     def evalAnyFuncOp(self, op, context):
         values = [arg.evaluate(self, context) for arg in op.args]
         result = op.metadata.func(*values)
@@ -1319,7 +1196,6 @@ class SimpleQueryEngine(object):
             return result
                     
     def evalAnd(self, op, context):
-        assert not op.xpathExp
         #first flatten nested ands
         #then sort by cost and evaluate in that order        
         args = [(a.cost(self, context), -1, a) for x in flattenOp(op.args, AndOp)]
@@ -1421,110 +1297,6 @@ class SimpleQueryEngine(object):
 
     def costIn(self, op, context):
         return reduce(operator.add, [a.cost(self, context) for a in op.args], 0.0)
-
-    def evalEq(self, op, context):        
-        assert not op.xpathExp
-        assert len(op.args) == 2
-        left, right = op.args
-        leftValue = rightValue = None
-        if left.isIndependent():
-            leftValue = left.evaluate(self, context)                    
-        if right.isIndependent():
-            rightValue = right.evaluate(self, context)        
-        return self._evalEq(left, right, context, leftValue, rightValue, op.op)
-
-    def _selectWithValue(self, context, selectop, value):
-        #optimization:
-        #if we know the selectop's final position and
-        #the other side is a simple value we can filter by that value
-        #before evaluating the selectop
-        assert selectop.joinPosition > -1
         
-        context = copy.copy( context )
-        if selectop.joinPosition < 1: #for 0 (join on subject) or -1 (absolute, no join)
-            context.joinTupleset =  context.currentTupleset
-            tupleset = context.initialModel.toStatements(context)
-        else: #no join -1 (absolute) or pred or obj
-            tupleset = context.currentTupleset.toStatements(context)
-
-        context.currentTupleset = SimpleTupleset(
-                    lambda: tupleset.filter(
-                    #todo: modelContext?
-                    {selectop.finalPosition : value}), tupleset,
-                    op='selectWithValue2 '+ value)
-            
-        return selectop.evaluate(self, context)
-
-        #if the current tupleset isn't the model, do a mergejoin to avoid 
-        #filtering linearly 
-        #this is only a win if the current tupleset is large and most rows don't match
-        #compareSlice = slice(selectop.finalPosition, selectop.finalPosition+1)
-        #context.joinTupleset = MergeJoin(tupleset, 
-        #        SimpleTupleset(lambda: context.initialModel.filter(
-        #            #todo: modelContext?
-        #            {selectop.finalPosition : value}), context.initialModel,
-        #            op='selectWithValue '+ value),
-        #        compareSlice, compareSlice)
-        #return selectop.evaluate(self, context) #will return a Projection of a Join
-    
-    def _evalEq(self, left, right, context, leftValue, rightValue, op='eq'):
-        if leftValue is None or rightValue is None:
-            #one or both are dependent: return a Tupleset
-            
-            #first, try to optimize:
-            if op == 'eq':
-                if isinstance(left, SelectOp):
-                    if left.getPosition() > -1 and (rightValue is not None
-                                        and not isinstance(rightValue, Tupleset)):
-                        return self._selectWithValue(context, left, rightValue)
-                elif isinstance(right, SelectOp):                
-                    if right.getPosition() > -1 and (leftValue is not None
-                                        and not isinstance(leftValue, Tupleset)):
-                        return self._selectWithValue(context, right, leftValue)
-            
-            context = copy.copy( context )        
-            def joinFunc(leftRow, rightTable,lastLeftRow):
-                '''Dependent EqOp join'''
-                
-                jcontext = copy.copy( context )
-                jcontext.currentTupleset = SimpleTupleset((leftRow,),op='eqJoinFunc')
-
-            #def compareFunc():
-            #    '''Dependent EqOp'''
-                
-                if leftValue is None:
-                    jleftValue = left.evaluate(self, jcontext)
-                else:
-                    jleftValue = leftValue
-                
-                if rightValue is None:
-                    jrightValue = right.evaluate(self, jcontext)
-                else:
-                    jrightValue = rightValue
-
-                result = xpathEquality(jleftValue, jrightValue, op) #XXX
-                if result:
-                    yield [result]
-            
-            #return SimpleTupleset(compareFunc, op='EqOp')
-            
-            #if not isinstance(leftValue, Tupleset):
-            #    leftValue = SimpleTupleset((leftValue,) )
-            
-            #joinFunc(): leftRow, rightTable
-                
-            #    result = xpathEquality(jleftValue, jrightValue, op)
-            #    if result:
-            #        yield [result]
-                        
-            return IterationJoin(context.currentTupleset, 
-                    SimpleTupleset(hint=right, op='EqOp'+repr(left)), joinFunc)
-        else: #both are independent
-            return xpathEquality(leftValue, rightValue, op) #XXX
-                                    
-    def costEq(self, op, context):
-        assert len(op.args) == 2        
-        return op.args[0].cost(self, context) + op.args[1].cost(self, context)
-    
         
 

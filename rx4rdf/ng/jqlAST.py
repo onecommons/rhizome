@@ -542,12 +542,12 @@ class QueryFuncs(object):
         return funcMetadata.opFactory(name,funcMetadata,*args)
 
 qF = QueryFuncs() #todo: SupportedFuncs should be per query engine and schema handler
-qF.addFunc('add', lambda a, b: a+b, NumberType)
-qF.addFunc('sub', lambda a, b: a-b, NumberType)
-qF.addFunc('mul', lambda a, b: a*b, NumberType)
-qF.addFunc('div', lambda a, b: a/b, NumberType)
-qF.addFunc('mod', lambda a, b: a%b, NumberType)
-qF.addFunc('negate', lambda a: -a, NumberType)
+qF.addFunc('add', lambda a, b: float(a)+float(b), NumberType)
+qF.addFunc('sub', lambda a, b: float(a)-float(b), NumberType)
+qF.addFunc('mul', lambda a, b: float(a)*float(b), NumberType)
+qF.addFunc('div', lambda a, b: float(a)/float(b), NumberType)
+qF.addFunc('mod', lambda a, b: float(a)%float(b), NumberType)
+qF.addFunc('negate', lambda a: -float(a), NumberType)
 #XXX not so lame isref
 qF.addFunc('isref', lambda a: a and True or False, BooleanType)
 

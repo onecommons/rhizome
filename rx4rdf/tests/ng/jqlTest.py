@@ -102,15 +102,14 @@ t(
     }
 ''',skipParse=0,
 results = [{'children': [{'foo': 'bar', 'id': '3'}, {'foo': 'bar', 'id': '2'}],
-  'derivedprop': '11',
+  'derivedprop': 2.0,
   'id': '1'}],
-ast0=Select(Construct([
-    cs('id', 'parentid'),
-    #XXX outerjoin broken:
-    #cp('derivedprop',  qF.getOp('add', Project('a'), Project('b'))),
+ast=Select(Construct([
+    cs('id', 'parentid'),    
+    cp('derivedprop',  qF.getOp('mul', Project(0), Constant(2))),
     cp('children', Select(Construct([
             cs('id', 'childid'),
-            cp(Project('*')) #XXX broken!: find all props
+            cp(Project('*')) 
         ])))
     ]),
     Join(
@@ -118,45 +117,25 @@ ast0=Select(Construct([
     Join(
     jc(
     Join(
-    Filter(Eq('parent',Project(PROPERTY)), #qF.getOp('isref',Project(OBJECT)),
-                                          objectlabel='parent'),
-    Filter(Eq('child',Project(PROPERTY)), #qF.getOp('isref',Project(OBJECT)),
-                                          objectlabel='child'),
-    #name='childid'
+    Filter(Eq('parent',Project(PROPERTY)), objectlabel='parent'),
+    Filter(Eq('child',Project(PROPERTY)), objectlabel='child'),
+    name='@1'
     ),
     Eq(Project('child'), Project(SUBJECT)) ), name='childid'
     ),
  Eq(Project('parent'), Project(SUBJECT)) ), name='parentid'
  )
 ),
-oldast=Select(
- Construct([
-    cs('id'),
-    #XXX outerjoin broken:
-    #cp('derivedprop',  qF.getOp('add', Project('a'), Project('b'))),
-    cp('children', Construct([
-            cs('id', 'child'),
-            cp(Project('*')) #find all props
-        ]))
-    ]),
-     Join(
-  jc(Join( #row : subject, "child", "parent"
-    Filter(Eq('child',Project(PROPERTY)), objectlabel='child'),
-    Filter(Eq('parent',Project(PROPERTY)), objectlabel='parent'),
-    ), 'parent'),  #this can end up with child cell as a list
-)
-),
 #expected rows: id, (child, parent)
-rows0=[['1',
+rows=[['1',
     [
-      ['2', '1'], ['3', '1']
+      ['3', '_:1', '_:1'], ['2', '_:2', '_:2']
     ]
 ]]
 )
 
 t(
 ''' { id : ?parentid,
-      #derivedprop : a + b,
       'children' : { id : ?childid,
                    foo : 'bar',
                    where( {child = ?childid and
@@ -168,12 +147,11 @@ t(
 [{'children': [{'foo': 'bar', 'id': '3'}, {'foo': 'bar', 'id': '2'}],
   'id': '1'}],
   skipParse=0,
-ast0=Select(
+ast=Select(
   Construct([
-    cs('id', 'parent'),
-    #cp('derivedprop',  qF.getOp('add', Project('a'), Project('b'))),
+    cs('id', 'parentid'),
     cp('children', Select(Construct([
-            cs('id', 'child'),
+            cs('id', 'childid'),
             cp('foo', Project('foo')) #find all props
         ])))
     ]),
@@ -185,16 +163,17 @@ ast0=Select(
        Filter(Eq('parent',Project(PROPERTY)), objectlabel='parent'),
        Filter(Eq('child', Project(PROPERTY)), objectlabel='child'),
        name = '@1'
-       ),'child')     
-    , name='child'),
+       ),'child')
+    , name='childid'),
     'parent'),  #this can end up with child cell as a list
-    name='parent'
+    name='parentid'
 )
 ),
 #expected results (id, (child, foo), parent)
-rows0=[['1',
+rows=[['1',
     [
-       ['bar', '3', '1'], ['bar', '2', '1']
+       ['3', [['bar']], '3', '_:1', '_:1'],
+       ['2', [['bar']], '2', '_:2', '_:2']
     ]
 ]]
 )
