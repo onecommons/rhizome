@@ -40,6 +40,10 @@ __addItem__('sri',loc='path:.rzvs/sri.zml', format='zml',
        title='Semantic Wikis and Microformats', 
        accessTokens=['base:save-only-token'], disposition='s5-template')
 
+__addItem__('codecon2006',loc='path:.rzvs/codecon.zml', format='zml',
+       title='CodeCon 2006',
+       accessTokens=['base:save-only-token'], disposition='s5-template')
+
 __addRxML__(replace = '@sitevars', contents = '''
  base:site-template:
   wiki:header-image: `Rx4RDFlogo.gif
